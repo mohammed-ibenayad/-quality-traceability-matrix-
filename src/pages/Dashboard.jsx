@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import MainLayout from '../components/Layout/MainLayout';
 import DashboardCards from '../components/Dashboard/DashboardCards';
 import QualityGatesTable from '../components/Dashboard/QualityGatesTable';
@@ -7,21 +7,42 @@ import MetricsChart from '../components/Dashboard/MetricsChart';
 import HealthScoreGauge from '../components/Dashboard/HealthScoreGauge';
 import EmptyState from '../components/common/EmptyState';
 import { useRelease } from '../hooks/useRelease';
+import dataStore from '../services/DataStore';
 
-// Import data
-import requirements from '../data/requirements';
-import testCases from '../data/testcases';
-import mapping from '../data/mapping';
-import versionsData from '../data/versions';  // Renamed to versionsData to avoid conflict
+// Import only versions for dropdown
+import versionsData from '../data/versions';
 
 const Dashboard = () => {
+  // State to hold the data from DataStore
+  const [requirements, setRequirements] = useState([]);
+  const [testCases, setTestCases] = useState([]);
+  const [mapping, setMapping] = useState({});
+  
+  // Load data from DataStore
+  useEffect(() => {
+    // Get data from DataStore
+    setRequirements(dataStore.getRequirements());
+    setTestCases(dataStore.getTestCases());
+    setMapping(dataStore.getMapping());
+    
+    // Subscribe to DataStore changes
+    const unsubscribe = dataStore.subscribe(() => {
+      setRequirements(dataStore.getRequirements());
+      setTestCases(dataStore.getTestCases());
+      setMapping(dataStore.getMapping());
+    });
+    
+    // Clean up subscription
+    return () => unsubscribe();
+  }, []);
+
   // Use the custom hook to get release data
   const { 
     selectedVersion, 
     setSelectedVersion, 
     metrics,
     versions,
-    hasData  // Added this to check if we have data
+    hasData
   } = useRelease(requirements, testCases, mapping, versionsData, 'v2.2');
 
   return (

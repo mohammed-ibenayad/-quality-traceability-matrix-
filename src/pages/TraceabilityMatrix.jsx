@@ -1,19 +1,40 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import MainLayout from '../components/Layout/MainLayout';
 import MatrixTable from '../components/TraceabilityMatrix/MatrixTable';
 import EmptyState from '../components/common/EmptyState';
 import { useRelease } from '../hooks/useRelease';
+import dataStore from '../services/DataStore';
 
-// Import data
-import requirements from '../data/requirements';
-import testCases from '../data/testcases';
-import mapping from '../data/mapping';
-import versionsData from '../data/versions';  // Renamed to versionsData for consistency
+// Import only versions data for the header dropdown
+import versionsData from '../data/versions';
 
 const TraceabilityMatrix = () => {
   // State for collapsed test case view
   const [collapseTestCases, setCollapseTestCases] = useState(true);
   const [expandedRequirement, setExpandedRequirement] = useState(null);
+  
+  // State to hold the data from DataStore
+  const [requirements, setRequirements] = useState([]);
+  const [testCases, setTestCases] = useState([]);
+  const [mapping, setMapping] = useState({});
+  
+  // Load data from DataStore
+  useEffect(() => {
+    // Get data from DataStore
+    setRequirements(dataStore.getRequirements());
+    setTestCases(dataStore.getTestCases());
+    setMapping(dataStore.getMapping());
+    
+    // Subscribe to DataStore changes
+    const unsubscribe = dataStore.subscribe(() => {
+      setRequirements(dataStore.getRequirements());
+      setTestCases(dataStore.getTestCases());
+      setMapping(dataStore.getMapping());
+    });
+    
+    // Clean up subscription
+    return () => unsubscribe();
+  }, []);
   
   // Use the custom hook to get release data
   const { 

@@ -97,21 +97,5 @@
       "automationStatus": "Planned",
       "requirementIds": ["REQ-004"],
       "priority": "Medium"
-    },
-    {
-      // Planned automation example
-      "id": "TC-008",
-      "name": "Verify Password Requirements",
-      "description": "Verify password meets complexity requirements",
-      "steps": [
-        "Navigate to registration page",
-        "Enter password with various combinations to test each requirement",
-        "Check validation feedback"
-      ],
-      "expectedResult": "System provides feedback for each password requirement",
-      "status": "Not Run",
-      "automationStatus": "Planned",
-      "requirementIds": ["REQ-008"],
-      "priority": "Medium"
     }
   ]

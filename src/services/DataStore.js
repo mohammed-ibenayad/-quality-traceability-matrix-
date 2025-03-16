@@ -31,15 +31,12 @@ class DataStoreService {
    * This can be called explicitly when wanting to load sample data
    */
   initWithDefaultData() {
-    if (!this._hasInitializedData) {
-      this._requirements = [...defaultRequirements];
-      this._testCases = [...defaultTestCases];
-      this._mapping = { ...defaultMapping };
-      this._hasInitializedData = true;
-      this._notifyListeners();
-      return true;
-    }
-    return false;
+    this._requirements = [...defaultRequirements];
+    this._testCases = [...defaultTestCases];
+    this._mapping = { ...defaultMapping };
+    this._hasInitializedData = true;
+    this._notifyListeners();
+    return true;
   }
 
   /**

@@ -32,18 +32,6 @@ const versions = [
       { name: 'Automation coverage', target: 80, actual: 75, status: 'failed' },
       { name: 'Security requirements passed', target: 100, actual: 75, status: 'failed' }
     ]
-  },
-  { 
-    id: 'v2.3', 
-    name: 'Authentication Security Update', 
-    releaseDate: '2025-07-15', 
-    status: 'In Progress',
-    qualityGates: [
-      { name: 'Critical requirements tested', target: 100, actual: 0, status: 'pending' },
-      { name: 'Overall test pass rate', target: 95, actual: 0, status: 'pending' },
-      { name: 'Automation coverage', target: 85, actual: 0, status: 'pending' },
-      { name: 'Security requirements passed', target: 100, actual: 0, status: 'pending' }
-    ]
   }
 ];
 

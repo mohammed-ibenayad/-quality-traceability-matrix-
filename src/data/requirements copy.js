@@ -64,6 +64,19 @@ const requirements = [
     minTestCases: 3,
     versions: ['v2.2', 'v2.3']
   },
+  { 
+    id: 'REQ-006', 
+    name: 'Two-Factor Authentication', 
+    description: 'Users must be able to enable 2FA for their accounts', 
+    priority: 'High',
+    businessImpact: 5,
+    technicalComplexity: 4,
+    regulatoryFactor: 5,
+    usageFrequency: 4,
+    testDepthFactor: 4.6,
+    minTestCases: 10,
+    versions: ['v2.3']
+  },
 ];
 
 export default requirements;
