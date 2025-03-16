@@ -1,4 +1,6 @@
 import defaultRequirements from '../data/requirements';
+import defaultTestCases from '../data/testcases';
+import defaultMapping from '../data/mapping';
 
 /**
  * Simple in-memory data store service
@@ -8,6 +10,8 @@ class DataStoreService {
   constructor() {
     // Initialize with default data
     this._requirements = [...defaultRequirements];
+    this._testCases = [...defaultTestCases];
+    this._mapping = { ...defaultMapping };
     this._listeners = [];
   }
 
@@ -20,15 +24,44 @@ class DataStoreService {
   }
 
   /**
+   * Get all test cases
+   * @returns {Array} Array of test case objects
+   */
+  getTestCases() {
+    return [...this._testCases];
+  }
+
+  /**
+   * Get requirement-test mapping
+   * @returns {Object} Mapping between requirements and test cases
+   */
+  getMapping() {
+    return { ...this._mapping };
+  }
+
+  /**
    * Set requirements data
    * @param {Array} requirementsData - New requirements data to set
+   * @returns {Array} Processed requirements data
    */
   setRequirements(requirementsData) {
     if (!Array.isArray(requirementsData)) {
       throw new Error('Requirements data must be an array');
     }
     
-    this._requirements = [...requirementsData];
+    // Process requirements to ensure calculated fields
+    const processedRequirements = this.processRequirements(requirementsData);
+    
+    // Update requirements
+    this._requirements = [...processedRequirements];
+    
+    // Clean up mappings for requirements that no longer exist
+    const existingReqIds = new Set(processedRequirements.map(req => req.id));
+    Object.keys(this._mapping).forEach(reqId => {
+      if (!existingReqIds.has(reqId)) {
+        delete this._mapping[reqId];
+      }
+    });
     
     // Notify listeners of data change
     this._notifyListeners();

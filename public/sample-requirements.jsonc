@@ -53,5 +53,21 @@
       "status": "Active",
       "owner": "Security Team",
       "tags": ["Authentication", "Security"]
+    },
+    {
+      // New requirement example
+      "id": "REQ-007",
+      "name": "Social Media Login",
+      "description": "Users must be able to login with social media accounts",
+      "priority": "Medium",
+      "type": "Functional",
+      "businessImpact": 3,
+      "technicalComplexity": 4,
+      "regulatoryFactor": 2,
+      "usageFrequency": 4,
+      "versions": ["v2.2"],
+      "status": "Proposed",
+      "owner": "Authentication Team",
+      "tags": ["Authentication", "Integration"]
     }
   ]

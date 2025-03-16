@@ -5,7 +5,7 @@ import './App.css';
 // Import pages
 import Dashboard from './pages/Dashboard';
 import TraceabilityMatrix from './pages/TraceabilityMatrix';
-import ImportData from './pages/ImportData';  // Add the new import page
+import ImportData from './pages/ImportData';
 
 function App() {
   return (
@@ -13,7 +13,7 @@ function App() {
       <Routes>
         <Route path="/" element={<Dashboard />} />
         <Route path="/matrix" element={<TraceabilityMatrix />} />
-        <Route path="/import" element={<ImportData />} />  {/* New route for import */}
+        <Route path="/import" element={<ImportData />} />
         {/* Placeholder routes for future implementation */}
         <Route path="/requirements" element={<Dashboard />} />
         <Route path="/test-cases" element={<Dashboard />} />
