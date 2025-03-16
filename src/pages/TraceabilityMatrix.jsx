@@ -7,7 +7,7 @@ import { useRelease } from '../hooks/useRelease';
 import requirements from '../data/requirements';
 import testCases from '../data/testcases';
 import mapping from '../data/mapping';
-import versions from '../data/versions';
+import versionsData from '../data/versions';  // Renamed to versionsData for consistency
 
 const TraceabilityMatrix = () => {
   // State for collapsed test case view
@@ -21,7 +21,7 @@ const TraceabilityMatrix = () => {
     coverage,
     summary,
     versions 
-  } = useRelease(requirements, testCases, mapping, versions, 'v2.2');
+  } = useRelease(requirements, testCases, mapping, versionsData, 'v2.2');
   
   // Toggle test case view
   const toggleTestCaseView = () => {

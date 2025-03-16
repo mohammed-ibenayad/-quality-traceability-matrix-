@@ -11,7 +11,7 @@ import { useRelease } from '../hooks/useRelease';
 import requirements from '../data/requirements';
 import testCases from '../data/testcases';
 import mapping from '../data/mapping';
-import versions from '../data/versions';
+import versionsData from '../data/versions';  // Renamed to versionsData to avoid conflict
 
 const Dashboard = () => {
   // Use the custom hook to get release data
@@ -19,8 +19,8 @@ const Dashboard = () => {
     selectedVersion, 
     setSelectedVersion, 
     metrics,
-    versions 
-  } = useRelease(requirements, testCases, mapping, versions, 'v2.2');
+    versions  // This destructured property name conflicts with the imported variable
+  } = useRelease(requirements, testCases, mapping, versionsData, 'v2.2');
 
   return (
     <MainLayout 
