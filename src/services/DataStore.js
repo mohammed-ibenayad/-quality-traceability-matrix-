@@ -68,6 +68,83 @@ class DataStoreService {
     
     return this._requirements;
   }
+  
+  /**
+   * Set test cases data
+   * @param {Array} testCasesData - New test cases data to set
+   * @returns {Array} Updated test cases
+   */
+  setTestCases(testCasesData) {
+    if (!Array.isArray(testCasesData)) {
+      throw new Error('Test cases data must be an array');
+    }
+    
+    // Update test cases
+    this._testCases = [...testCasesData];
+    
+    // Clean up mappings for test cases that no longer exist
+    const existingTestCaseIds = new Set(testCasesData.map(tc => tc.id));
+    
+    // For each requirement mapping
+    Object.keys(this._mapping).forEach(reqId => {
+      // Filter out non-existent test cases
+      this._mapping[reqId] = this._mapping[reqId].filter(tcId => 
+        existingTestCaseIds.has(tcId)
+      );
+    });
+    
+    // Notify listeners of data change
+    this._notifyListeners();
+    
+    return this._testCases;
+  }
+  
+  /**
+   * Update requirement-test mappings
+   * @param {Object} mappings - Mappings to update ({reqId: [testCaseIds]})
+   * @returns {Object} Updated mappings
+   */
+  updateMappings(mappings) {
+    if (!mappings || typeof mappings !== 'object') {
+      throw new Error('Mappings must be an object');
+    }
+    
+    // Get existing test cases and requirements
+    const existingTestCaseIds = new Set(this._testCases.map(tc => tc.id));
+    const existingReqIds = new Set(this._requirements.map(req => req.id));
+    
+    // Update each mapping
+    Object.keys(mappings).forEach(reqId => {
+      // Verify requirement exists
+      if (!existingReqIds.has(reqId)) {
+        console.warn(`Requirement ${reqId} not found, skipping mapping`);
+        return;
+      }
+      
+      // Filter test case IDs to only existing ones
+      const validTestCaseIds = mappings[reqId].filter(tcId => 
+        existingTestCaseIds.has(tcId)
+      );
+      
+      // If this is a new mapping or has valid test cases
+      if (!this._mapping[reqId]) {
+        this._mapping[reqId] = [...validTestCaseIds];
+      } else {
+        // Merge with existing, avoiding duplicates
+        const existingMappings = new Set(this._mapping[reqId]);
+        validTestCaseIds.forEach(tcId => {
+          if (!existingMappings.has(tcId)) {
+            this._mapping[reqId].push(tcId);
+          }
+        });
+      }
+    });
+    
+    // Notify listeners of data change
+    this._notifyListeners();
+    
+    return this.getMapping();
+  }
 
   /**
    * Calculate Test Depth Factor for a requirement
@@ -114,6 +191,30 @@ class DataStoreService {
         minTestCases: minCases
       };
     });
+  }
+
+  /**
+   * Extract mappings from test cases with requirementIds
+   * @param {Array} testCases - Test cases with requirementIds arrays
+   * @returns {Object} Extracted mappings
+   */
+  extractMappingsFromTestCases(testCases) {
+    const mappings = {};
+    
+    testCases.forEach(tc => {
+      if (tc.requirementIds && Array.isArray(tc.requirementIds)) {
+        tc.requirementIds.forEach(reqId => {
+          if (!mappings[reqId]) {
+            mappings[reqId] = [];
+          }
+          if (!mappings[reqId].includes(tc.id)) {
+            mappings[reqId].push(tc.id);
+          }
+        });
+      }
+    });
+    
+    return mappings;
   }
 
   /**
