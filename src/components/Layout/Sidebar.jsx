@@ -10,7 +10,8 @@ const Sidebar = () => {
     { name: 'Traceability Matrix', path: '/matrix' },
     { name: 'Requirements', path: '/requirements' },
     { name: 'Test Cases', path: '/test-cases' },
-    { name: 'Reports', path: '/reports' }
+    { name: 'Reports', path: '/reports' },
+    { name: 'Import Data', path: '/import' }  // Add the new Import Data link
   ];
   
   return (

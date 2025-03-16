@@ -1,0 +1,57 @@
+[
+    {
+      // Basic user authentication requirement
+      "id": "REQ-001",
+      "name": "User Login",
+      "description": "Users must be able to login with email and password",
+      "priority": "High",  // Can be High, Medium, or Low
+      "type": "Functional",
+      
+      // Rating factors (1-5 scale)
+      "businessImpact": 5,    // How important to business outcomes
+      "technicalComplexity": 3,  // Implementation complexity
+      "regulatoryFactor": 4,     // Compliance/regulatory importance
+      "usageFrequency": 5,      // How often the feature is used
+      
+      // Optional fields (will be added by the system if not present)
+      // "testDepthFactor": 4.3,  // Calculated based on ratings
+      // "minTestCases": 8,       // Derived from testDepthFactor
+      
+      // Additional metadata
+      "versions": ["v2.0", "v2.1", "v2.2"],
+      "status": "Active",
+      "owner": "Authentication Team",
+      "tags": ["Authentication", "Security"]
+    },
+    {
+      "id": "REQ-002",
+      "name": "Password Reset",
+      "description": "Users must be able to reset their password",
+      "priority": "Medium",
+      "type": "Functional",
+      "businessImpact": 4,
+      "technicalComplexity": 2,
+      "regulatoryFactor": 3,
+      "usageFrequency": 3,
+      "versions": ["v2.0", "v2.1", "v2.2"],
+      "status": "Active",
+      "owner": "Authentication Team",
+      "tags": ["Authentication", "Security"]
+    },
+    {
+      // Security-related requirement
+      "id": "REQ-003",
+      "name": "Account Lockout",
+      "description": "Account should lock after 3 failed attempts",
+      "priority": "High",
+      "type": "Security",
+      "businessImpact": 5,
+      "technicalComplexity": 2,
+      "regulatoryFactor": 5,
+      "usageFrequency": 3,
+      "versions": ["v2.1", "v2.2"],
+      "status": "Active",
+      "owner": "Security Team",
+      "tags": ["Authentication", "Security"]
+    }
+  ]
