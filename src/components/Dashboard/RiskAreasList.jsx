@@ -2,6 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 
 const RiskAreasList = ({ riskAreas }) => {
+  // Handle both null/undefined and empty array cases
   if (!riskAreas || riskAreas.length === 0) {
     return (
       <div className="bg-white rounded shadow p-4 mb-6">

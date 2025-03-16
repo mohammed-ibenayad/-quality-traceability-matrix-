@@ -1,6 +1,7 @@
 import React from 'react';
 
 const DashboardCards = ({ metrics }) => {
+  // Return null if no metrics
   if (!metrics) return null;
   
   return (
@@ -68,7 +69,7 @@ const DashboardCards = ({ metrics }) => {
         </div>
       </div>
       
-      {metrics.version.status === 'In Progress' && (
+      {metrics.version && metrics.version.status === 'In Progress' && (
         <div className="bg-white p-4 rounded shadow col-span-1 md:col-span-2 lg:col-span-4">
           <div className="flex justify-between items-center">
             <div>

@@ -1,7 +1,19 @@
 import React from 'react';
 
 const QualityGatesTable = ({ qualityGates }) => {
-  if (!qualityGates || qualityGates.length === 0) return null;
+  // If no quality gates data, show a placeholder message
+  if (!qualityGates || qualityGates.length === 0) {
+    return (
+      <div className="bg-white rounded shadow overflow-hidden mb-6">
+        <div className="p-4 border-b">
+          <h2 className="text-lg font-semibold">Release Quality Gates</h2>
+        </div>
+        <div className="p-8 text-center text-gray-500">
+          <p>No quality gates defined for this version</p>
+        </div>
+      </div>
+    );
+  }
   
   const passedGates = qualityGates.filter(gate => gate.status === 'passed').length;
   const totalGates = qualityGates.length;

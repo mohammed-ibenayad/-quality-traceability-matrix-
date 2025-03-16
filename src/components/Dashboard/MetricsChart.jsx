@@ -2,8 +2,19 @@ import React from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 const MetricsChart = ({ data }) => {
-  // If no data provided, return null
-  if (!data || data.length === 0) return null;
+  // If no data provided, show a placeholder message
+  if (!data || data.length === 0) {
+    return (
+      <div className="bg-white p-4 rounded shadow">
+        <h2 className="text-lg font-semibold mb-4">Test Metrics by Requirement</h2>
+        <div className="h-72 flex items-center justify-center bg-gray-50">
+          <div className="text-center text-gray-500">
+            <p>No test metrics data available</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
   
   return (
     <div className="bg-white p-4 rounded shadow">

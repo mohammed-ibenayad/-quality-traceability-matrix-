@@ -8,11 +8,38 @@ import defaultMapping from '../data/mapping';
  */
 class DataStoreService {
   constructor() {
-    // Initialize with default data
-    this._requirements = [...defaultRequirements];
-    this._testCases = [...defaultTestCases];
-    this._mapping = { ...defaultMapping };
+    // Initialize with empty data instead of default data
+    this._requirements = [];
+    this._testCases = [];
+    this._mapping = {};
     this._listeners = [];
+    
+    // Check if we should load default data
+    this._hasInitializedData = false;
+  }
+  
+  /**
+   * Check if there is any data in the system
+   * @returns {boolean} True if there is data, false otherwise
+   */
+  hasData() {
+    return this._requirements.length > 0;
+  }
+  
+  /**
+   * Initialize with default data if needed
+   * This can be called explicitly when wanting to load sample data
+   */
+  initWithDefaultData() {
+    if (!this._hasInitializedData) {
+      this._requirements = [...defaultRequirements];
+      this._testCases = [...defaultTestCases];
+      this._mapping = { ...defaultMapping };
+      this._hasInitializedData = true;
+      this._notifyListeners();
+      return true;
+    }
+    return false;
   }
 
   /**
@@ -63,6 +90,9 @@ class DataStoreService {
       }
     });
     
+    // Mark data as initialized
+    this._hasInitializedData = true;
+    
     // Notify listeners of data change
     this._notifyListeners();
     
@@ -92,6 +122,9 @@ class DataStoreService {
         existingTestCaseIds.has(tcId)
       );
     });
+    
+    // Mark data as initialized
+    this._hasInitializedData = true;
     
     // Notify listeners of data change
     this._notifyListeners();
@@ -243,6 +276,18 @@ class DataStoreService {
         console.error('Error in data store listener:', e);
       }
     });
+  }
+  
+  /**
+   * Reset all data
+   * Useful for testing or clearing the application
+   */
+  resetAll() {
+    this._requirements = [];
+    this._testCases = [];
+    this._mapping = {};
+    this._hasInitializedData = false;
+    this._notifyListeners();
   }
 }
 

@@ -177,7 +177,7 @@ const ImportRequirements = ({ onImportSuccess }) => {
     if (!processedData || !validationSuccess) return;
     
     try {
-      // Update the DataStore
+      // Update the DataStore - THIS IS THE CRITICAL PART THAT WASN'T WORKING
       const updatedRequirements = dataStore.setRequirements(processedData);
       
       // Notify parent component of successful import
@@ -187,7 +187,10 @@ const ImportRequirements = ({ onImportSuccess }) => {
       
       // Reset the form
       resetForm();
+
+      console.log("Requirements imported successfully:", updatedRequirements);
     } catch (error) {
+      console.error("Error importing requirements:", error);
       setValidationErrors([`Error importing data: ${error.message}`]);
     }
   };

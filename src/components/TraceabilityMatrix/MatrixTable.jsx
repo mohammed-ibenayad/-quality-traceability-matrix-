@@ -13,22 +13,48 @@ const MatrixTable = ({
   toggleRequirementExpansion,
   toggleTestCaseView 
 }) => {
+  // Check if we have data to display
+  const hasRequirements = requirements && requirements.length > 0;
+  const hasTestCases = testCases && testCases.length > 0;
+  
+  // If no requirements, show empty state
+  if (!hasRequirements) {
+    return (
+      <div className="bg-white p-4 rounded shadow">
+        <div className="mb-4 flex justify-between items-center">
+          <h2 className="text-lg font-semibold">Requirements and Test Cases Matrix</h2>
+        </div>
+        <div className="py-12 text-center text-gray-500">
+          <p>No requirements found. Import requirements to get started.</p>
+        </div>
+      </div>
+    );
+  }
   
   return (
     <div className="bg-white p-4 rounded shadow overflow-auto">
-      {/* View toggle button */}
+      {/* View toggle button - only show when there are test cases */}
       <div className="mb-4 flex justify-between items-center">
         <h2 className="text-lg font-semibold">Requirements and Test Cases Matrix</h2>
-        <button 
-          className="px-3 py-1 bg-blue-100 text-blue-800 rounded hover:bg-blue-200 text-sm"
-          onClick={toggleTestCaseView}
-        >
-          {collapseTestCases ? 'Show All Test Cases' : 'Summary View'}
-        </button>
+        {hasTestCases && (
+          <button 
+            className="px-3 py-1 bg-blue-100 text-blue-800 rounded hover:bg-blue-200 text-sm"
+            onClick={toggleTestCaseView}
+          >
+            {collapseTestCases ? 'Show All Test Cases' : 'Summary View'}
+          </button>
+        )}
       </div>
       
-      {/* The matrix table - Different display based on collapsed state */}
-      {collapseTestCases ? (
+      {/* Show empty state if no test cases */}
+      {!hasTestCases && (
+        <div className="py-8 text-center text-gray-500 border-t">
+          <p>No test cases found. Import test cases to build the traceability matrix.</p>
+        </div>
+      )}
+      
+      {/* The matrix table - Different display based on collapsed state and availability of test cases */}
+      {hasTestCases && collapseTestCases && (
         // Summary view with collapsible rows
         <table className="min-w-full border-collapse">
           <thead>
@@ -57,7 +83,9 @@ const MatrixTable = ({
             ))}
           </tbody>
         </table>
-      ) : (
+      )}
+      
+      {hasTestCases && !collapseTestCases && (
         // Full detailed view with all test cases (horizontal scroll)
         <table className="min-w-full border-collapse">
           <thead>

@@ -7,7 +7,8 @@ const MainLayout = ({
   title, 
   selectedVersion, 
   setSelectedVersion, 
-  versions 
+  versions,
+  hasData = true  // Add hasData prop with default value
 }) => {
   return (
     <div className="bg-gray-100 min-h-screen">
@@ -19,6 +20,7 @@ const MainLayout = ({
             selectedVersion={selectedVersion} 
             setSelectedVersion={setSelectedVersion}
             versions={versions}
+            hasData={hasData}  // Pass hasData to Header
           />
           <main className="p-6">
             {children}

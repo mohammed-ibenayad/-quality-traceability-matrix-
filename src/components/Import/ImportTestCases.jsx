@@ -223,7 +223,10 @@ const ImportTestCases = ({ onImportSuccess }) => {
       
       // Reset the form
       resetForm();
+
+      console.log("Test cases imported successfully:", updatedTestCases);
     } catch (error) {
+      console.error("Error importing test cases:", error);
       setValidationErrors([`Error importing data: ${error.message}`]);
     }
   };
