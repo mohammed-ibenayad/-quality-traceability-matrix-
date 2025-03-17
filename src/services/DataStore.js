@@ -74,6 +74,84 @@ class DataStoreService {
   getMapping() {
     return { ...this._mapping };
   }
+  
+  /**
+   * Get all versions
+   * @returns {Array} Array of version objects
+   */
+  getVersions() {
+    return [...this._versions];
+  }
+  
+  /**
+   * Set versions data
+   * @param {Array} versionsData - New versions data to set
+   * @returns {Array} Updated versions
+   */
+  setVersions(versionsData) {
+    if (!Array.isArray(versionsData)) {
+      throw new Error('Versions data must be an array');
+    }
+    
+    this._versions = [...versionsData];
+    this._notifyListeners();
+    
+    return this._versions;
+  }
+  
+  /**
+   * Add a new version
+   * @param {Object} versionData - New version data
+   * @returns {Object} Added version
+   */
+  addVersion(versionData) {
+    // Check for duplicate ID
+    if (this._versions.some(v => v.id === versionData.id)) {
+      throw new Error(`Version with ID ${versionData.id} already exists`);
+    }
+    
+    this._versions.push(versionData);
+    this._notifyListeners();
+    
+    return versionData;
+  }
+  
+  /**
+   * Update a version
+   * @param {string} versionId - ID of the version to update
+   * @param {Object} updateData - Updated version data
+   * @returns {Object} Updated version
+   */
+  updateVersion(versionId, updateData) {
+    const index = this._versions.findIndex(v => v.id === versionId);
+    
+    if (index === -1) {
+      throw new Error(`Version with ID ${versionId} not found`);
+    }
+    
+    this._versions[index] = { ...this._versions[index], ...updateData };
+    this._notifyListeners();
+    
+    return this._versions[index];
+  }
+  
+  /**
+   * Delete a version
+   * @param {string} versionId - ID of the version to delete
+   * @returns {boolean} True if successful
+   */
+  deleteVersion(versionId) {
+    const index = this._versions.findIndex(v => v.id === versionId);
+    
+    if (index === -1) {
+      throw new Error(`Version with ID ${versionId} not found`);
+    }
+    
+    this._versions.splice(index, 1);
+    this._notifyListeners();
+    
+    return true;
+  }
 
   /**
    * Set requirements data
@@ -374,6 +452,7 @@ class DataStoreService {
     this._requirements = [];
     this._testCases = [];
     this._mapping = {};
+    this._versions = [];
     this._hasInitializedData = false;
     this._notifyListeners();
   }

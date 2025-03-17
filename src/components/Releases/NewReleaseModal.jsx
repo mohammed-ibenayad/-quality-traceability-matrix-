@@ -1,11 +1,21 @@
 import React from 'react';
 import NewReleaseForm from './NewReleaseForm';
+import dataStore from '../../services/DataStore';
+import { calculateCoverage } from '../../utils/coverage';
 
 /**
  * Modal component for the new release form
  */
 const NewReleaseModal = ({ isOpen, onClose, onSave, existingVersions }) => {
   if (!isOpen) return null;
+
+  // Get the required data for calculating metrics
+  const requirements = dataStore.getRequirements();
+  const testCases = dataStore.getTestCases();
+  const mapping = dataStore.getMapping();
+  
+  // Calculate coverage metrics using the existing utility
+  const coverage = calculateCoverage(requirements, mapping, testCases);
 
   return (
     <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
@@ -30,6 +40,10 @@ const NewReleaseModal = ({ isOpen, onClose, onSave, existingVersions }) => {
             }}
             onCancel={onClose}
             existingVersions={existingVersions}
+            requirements={requirements}
+            testCases={testCases}
+            mapping={mapping}
+            coverage={coverage}
           />
         </div>
       </div>

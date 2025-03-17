@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
+import QualityGateSelector, { PREDEFINED_QUALITY_GATES } from './QualityGateSelector';
 
 /**
  * Component for creating a new release version
  */
-const NewReleaseForm = ({ onSave, onCancel, existingVersions }) => {
+const NewReleaseForm = ({ onSave, onCancel, existingVersions, requirements, testCases, mapping, coverage }) => {
   const today = new Date().toISOString().split('T')[0];
   
   // Initial form state
@@ -12,11 +13,7 @@ const NewReleaseForm = ({ onSave, onCancel, existingVersions }) => {
     name: '',
     releaseDate: '',
     status: 'Planned',
-    qualityGates: [
-      { name: 'Critical requirements tested', target: 100, actual: 0, status: 'failed' },
-      { name: 'Overall test pass rate', target: 95, actual: 0, status: 'failed' },
-      { name: 'Automation coverage', target: 80, actual: 0, status: 'failed' }
-    ]
+    qualityGates: []
   });
   
   // Form validation state
@@ -36,32 +33,61 @@ const NewReleaseForm = ({ onSave, onCancel, existingVersions }) => {
     }
   };
   
-  // Handle quality gate changes
-  const handleGateChange = (index, field, value) => {
-    const updatedGates = [...formData.qualityGates];
-    updatedGates[index] = { ...updatedGates[index], [field]: field === 'target' || field === 'actual' ? Number(value) : value };
+  // Handle adding a quality gate
+  const handleAddGate = (newGate) => {
+    setFormData(prev => ({
+      ...prev,
+      qualityGates: [...prev.qualityGates, newGate]
+    }));
+  };
+  
+  // Handle removing a quality gate
+  const handleRemoveGate = (gateId) => {
+    setFormData(prev => ({
+      ...prev,
+      qualityGates: prev.qualityGates.filter(gate => gate.id !== gateId)
+    }));
+  };
+  
+  // Handle updating a quality gate
+  const handleUpdateGate = (gateId, updates) => {
+    setFormData(prev => ({
+      ...prev,
+      qualityGates: prev.qualityGates.map(gate => 
+        gate.id === gateId ? { ...gate, ...updates } : gate
+      )
+    }));
+  };
+  
+  // Calculate actual metrics for all gates based on current data
+  const calculateActualMetrics = () => {
+    if (!requirements || !testCases || !mapping || !coverage) {
+      return;
+    }
     
-    setFormData(prev => ({
-      ...prev,
-      qualityGates: updatedGates
-    }));
-  };
-  
-  // Add a new quality gate
-  const handleAddGate = () => {
-    setFormData(prev => ({
-      ...prev,
-      qualityGates: [
-        ...prev.qualityGates,
-        { name: '', target: 90, actual: 0, status: 'failed' }
-      ]
-    }));
-  };
-  
-  // Remove a quality gate
-  const handleRemoveGate = (index) => {
-    const updatedGates = [...formData.qualityGates];
-    updatedGates.splice(index, 1);
+    const updatedGates = formData.qualityGates.map(gate => {
+      // Find the corresponding gate definition
+      const gateDefinition = PREDEFINED_QUALITY_GATES.find(g => g.id === gate.id);
+      if (!gateDefinition) return gate;
+      
+      // Calculate the actual value
+      const actual = gateDefinition.calculateActual(requirements, testCases, mapping, coverage);
+      
+      // Determine if the gate is passed based on target and actual
+      // For inverted metrics (like defect density), lower is better
+      let status = 'failed';
+      if (gateDefinition.isInverted) {
+        status = actual <= gate.target ? 'passed' : 'failed';
+      } else {
+        status = actual >= gate.target ? 'passed' : 'failed';
+      }
+      
+      return {
+        ...gate,
+        actual,
+        status
+      };
+    });
     
     setFormData(prev => ({
       ...prev,
@@ -89,18 +115,6 @@ const NewReleaseForm = ({ onSave, onCancel, existingVersions }) => {
       newErrors.releaseDate = 'Release date is required';
     }
     
-    // Validate each quality gate
-    const gateErrors = formData.qualityGates.map(gate => {
-      const errors = {};
-      if (!gate.name.trim()) errors.name = true;
-      if (gate.target <= 0 || gate.target > 100) errors.target = true;
-      return Object.keys(errors).length > 0 ? errors : null;
-    });
-    
-    if (gateErrors.some(error => error !== null)) {
-      newErrors.qualityGates = gateErrors;
-    }
-    
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -108,6 +122,9 @@ const NewReleaseForm = ({ onSave, onCancel, existingVersions }) => {
   // Handle form submission
   const handleSubmit = (e) => {
     e.preventDefault();
+    
+    // Recalculate metrics before saving
+    calculateActualMetrics();
     
     if (validateForm()) {
       onSave(formData);
@@ -199,94 +216,22 @@ const NewReleaseForm = ({ onSave, onCancel, existingVersions }) => {
             </label>
             <button
               type="button"
-              onClick={handleAddGate}
+              onClick={calculateActualMetrics}
               className="text-sm text-blue-600 hover:text-blue-800"
             >
-              + Add Quality Gate
+              Recalculate Metrics
             </button>
           </div>
           
-          {formData.qualityGates.map((gate, index) => (
-            <div key={index} className="bg-gray-50 p-3 rounded mb-2">
-              <div className="grid grid-cols-12 gap-2">
-                <div className="col-span-5">
-                  <input
-                    type="text"
-                    value={gate.name}
-                    onChange={(e) => handleGateChange(index, 'name', e.target.value)}
-                    placeholder="Gate name"
-                    className={`w-full p-2 border rounded text-sm ${
-                      errors.qualityGates && errors.qualityGates[index]?.name 
-                        ? 'border-red-500' 
-                        : 'border-gray-300'
-                    }`}
-                  />
-                </div>
-                <div className="col-span-2">
-                  <div className="flex items-center">
-                    <input
-                      type="number"
-                      value={gate.target}
-                      onChange={(e) => handleGateChange(index, 'target', e.target.value)}
-                      min="0"
-                      max="100"
-                      className={`w-full p-2 border rounded text-sm ${
-                        errors.qualityGates && errors.qualityGates[index]?.target 
-                          ? 'border-red-500' 
-                          : 'border-gray-300'
-                      }`}
-                    />
-                    <span className="ml-1">%</span>
-                  </div>
-                </div>
-                <div className="col-span-2">
-                  <div className="flex items-center">
-                    <input
-                      type="number"
-                      value={gate.actual}
-                      onChange={(e) => handleGateChange(index, 'actual', e.target.value)}
-                      min="0"
-                      max="100"
-                      className="w-full p-2 border border-gray-300 rounded text-sm"
-                    />
-                    <span className="ml-1">%</span>
-                  </div>
-                </div>
-                <div className="col-span-2">
-                  <select
-                    value={gate.status}
-                    onChange={(e) => handleGateChange(index, 'status', e.target.value)}
-                    className="w-full p-2 border border-gray-300 rounded text-sm"
-                  >
-                    <option value="passed">Passed</option>
-                    <option value="failed">Failed</option>
-                  </select>
-                </div>
-                <div className="col-span-1 flex items-center justify-center">
-                  {formData.qualityGates.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveGate(index)}
-                      className="text-red-600 hover:text-red-800"
-                    >
-                      &times;
-                    </button>
-                  )}
-                </div>
-              </div>
-              {index === 0 && (
-                <div className="grid grid-cols-12 gap-2 mt-1 text-xs text-gray-500">
-                  <div className="col-span-5">Gate name</div>
-                  <div className="col-span-2">Target</div>
-                  <div className="col-span-2">Actual</div>
-                  <div className="col-span-2">Status</div>
-                </div>
-              )}
-            </div>
-          ))}
+          <QualityGateSelector
+            selectedGates={formData.qualityGates}
+            onAddGate={handleAddGate}
+            onRemoveGate={handleRemoveGate}
+            onUpdateGate={handleUpdateGate}
+          />
         </div>
         
-        <div className="flex justify-end gap-3">
+        <div className="flex justify-end gap-3 mt-6">
           <button
             type="button"
             onClick={onCancel}

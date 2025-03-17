@@ -8,6 +8,7 @@ import HealthScoreGauge from '../components/Dashboard/HealthScoreGauge';
 import EmptyState from '../components/common/EmptyState';
 import { useRelease } from '../hooks/useRelease';
 import dataStore from '../services/DataStore';
+import { refreshQualityGates } from '../utils/calculateQualityGates';
 
 // Import initial versions for the dropdown
 import versionsData from '../data/versions';
@@ -27,10 +28,21 @@ const Dashboard = () => {
     setMapping(dataStore.getMapping());
     
     // Initialize versions in DataStore if needed
-    if (!dataStore.getVersions || !dataStore.getVersions().length) {
-      dataStore.setVersions && dataStore.setVersions(versionsData);
-    } else {
-      setVersions(dataStore.getVersions());
+    if (typeof dataStore.getVersions === 'function') {
+      if (dataStore.getVersions().length === 0) {
+        if (typeof dataStore.setVersions === 'function') {
+          dataStore.setVersions(versionsData);
+        }
+      } else {
+        setVersions(dataStore.getVersions());
+      }
+    }
+    
+    // Try to refresh quality gates, but don't crash if methods aren't available
+    try {
+      refreshQualityGates(dataStore);
+    } catch (error) {
+      console.warn('Failed to refresh quality gates:', error);
     }
     
     // Subscribe to DataStore changes
@@ -40,8 +52,15 @@ const Dashboard = () => {
       setMapping(dataStore.getMapping());
       
       // Update versions if the method exists
-      if (dataStore.getVersions) {
+      if (typeof dataStore.getVersions === 'function') {
         setVersions(dataStore.getVersions());
+      }
+      
+      // Try to refresh quality gates
+      try {
+        refreshQualityGates(dataStore);
+      } catch (error) {
+        console.warn('Failed to refresh quality gates:', error);
       }
     });
     
@@ -61,7 +80,7 @@ const Dashboard = () => {
   const handleAddVersion = (newVersion) => {
     try {
       // Use DataStore method if available, otherwise update local state
-      if (dataStore.addVersion) {
+      if (typeof dataStore.addVersion === 'function') {
         dataStore.addVersion(newVersion);
       } else {
         // Fallback to updating local state

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import MainLayout from '../components/Layout/MainLayout';
 import NewReleaseModal from '../components/Releases/NewReleaseModal';
 import ReleaseVersionGrid from '../components/Releases/ReleaseVersionGrid';
+import RefreshQualityGatesButton from '../components/Releases/RefreshQualityGatesButton';
 import EmptyState from '../components/Common/EmptyState';
 import dataStore from '../services/DataStore';
 
@@ -113,6 +114,9 @@ const Releases = () => {
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold">Release Versions</h2>
         <div className="flex items-center gap-4">
+          {/* Refresh Quality Gates Button */}
+          <RefreshQualityGatesButton />
+          
           {/* View Mode Toggle */}
           <div className="bg-gray-100 rounded-lg p-1 flex">
             <button
