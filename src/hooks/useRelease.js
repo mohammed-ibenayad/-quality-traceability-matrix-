@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { calculateCoverage } from '../utils/coverage';
 import { calculateReleaseMetrics } from '../utils/metrics';
 
@@ -21,7 +21,14 @@ export const useRelease = (requirements, testCases, mapping, versions, initialVe
   const defaultVersion = versions && versions.length > 0 ? versions[0].id : '';
   const [selectedVersion, setSelectedVersion] = useState(initialVersion || defaultVersion);
   
-  // Calculate coverage using the utility function
+  // When versions change and the selected version isn't in the list, update it
+  useEffect(() => {
+    if (versions.length > 0 && !versions.find(v => v.id === selectedVersion)) {
+      setSelectedVersion(versions[0].id);
+    }
+  }, [versions, selectedVersion]);
+  
+  // Calculate overall coverage for all requirements and test cases
   const coverage = useMemo(() => {
     if (!hasData) return [];
     return calculateCoverage(requirements, mapping, testCases);
@@ -30,6 +37,7 @@ export const useRelease = (requirements, testCases, mapping, versions, initialVe
   // Calculate version-specific coverage
   const versionCoverage = useMemo(() => {
     if (!hasData) return [];
+    // Pass the selectedVersion to calculateCoverage to filter data
     return calculateCoverage(requirements, mapping, testCases, selectedVersion);
   }, [requirements, mapping, testCases, selectedVersion, hasData]);
   
@@ -56,7 +64,7 @@ export const useRelease = (requirements, testCases, mapping, versions, initialVe
     return calculatedMetrics;
   }, [selectedVersion, versions, requirements, mapping, testCases, versionCoverage, hasData]);
   
-  // Summary statistics
+  // Summary statistics - filter by version where appropriate
   const summary = useMemo(() => {
     if (!hasData) {
       return {
@@ -68,12 +76,33 @@ export const useRelease = (requirements, testCases, mapping, versions, initialVe
       };
     }
     
-    const totalRequirements = requirements.length;
-    const reqWithTests = requirements.filter(req => (mapping[req.id] || []).length > 0).length;
-    const reqFullyAutomated = coverage.filter(stat => 
+    // Filter requirements by selected version
+    const versionRequirements = requirements.filter(req => 
+      req.versions && req.versions.includes(selectedVersion)
+    );
+    
+    // Filter test cases by selected version (empty version means applies to all)
+    const versionTestCases = testCases.filter(tc => 
+      !tc.version || tc.version === selectedVersion || tc.version === ''
+    );
+    
+    const totalRequirements = versionRequirements.length;
+    
+    // Count requirements with tests
+    const reqWithTests = versionRequirements.filter(req => 
+      (mapping[req.id] || []).some(tcId => {
+        const tc = testCases.find(t => t.id === tcId);
+        return tc && (!tc.version || tc.version === selectedVersion || tc.version === '');
+      })
+    ).length;
+    
+    // Count fully automated requirements
+    const reqFullyAutomated = versionCoverage.filter(stat => 
       stat.automationPercentage === 100 && stat.totalTests > 0
     ).length;
-    const reqFullyPassed = coverage.filter(stat => 
+    
+    // Count fully passed requirements
+    const reqFullyPassed = versionCoverage.filter(stat => 
       stat.passPercentage === 100 && stat.totalTests > 0
     ).length;
 
@@ -82,9 +111,9 @@ export const useRelease = (requirements, testCases, mapping, versions, initialVe
       reqWithTests,
       reqFullyAutomated,
       reqFullyPassed,
-      totalTestCases: testCases.length
+      totalTestCases: versionTestCases.length
     };
-  }, [requirements, coverage, mapping, testCases, hasData]);
+  }, [requirements, versionCoverage, mapping, testCases, selectedVersion, hasData]);
 
   return {
     selectedVersion,

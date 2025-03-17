@@ -41,10 +41,20 @@ const TraceabilityMatrix = () => {
     selectedVersion, 
     setSelectedVersion, 
     coverage,
+    versionCoverage, // Include versionCoverage in destructuring
     summary,
     versions,
     hasData
   } = useRelease(requirements, testCases, mapping, versionsData, 'v2.2');
+  
+  // Filter requirements and test cases by selected version
+  const filteredRequirements = requirements.filter(req => 
+    req.versions && req.versions.includes(selectedVersion)
+  );
+  
+  const filteredTestCases = testCases.filter(tc => 
+    !tc.version || tc.version === selectedVersion || tc.version === ''
+  );
   
   // Toggle test case view
   const toggleTestCaseView = () => {
@@ -95,12 +105,12 @@ const TraceabilityMatrix = () => {
             </div>
           </div>
           
-          {/* Matrix Table */}
+          {/* Matrix Table - Now using filtered data and versionCoverage */}
           <MatrixTable
-            requirements={requirements}
-            testCases={testCases}
+            requirements={filteredRequirements}
+            testCases={filteredTestCases}
             mapping={mapping}
-            coverage={coverage}
+            coverage={versionCoverage} // Use versionCoverage instead of coverage
             collapseTestCases={collapseTestCases}
             expandedRequirement={expandedRequirement}
             toggleRequirementExpansion={toggleRequirementExpansion}

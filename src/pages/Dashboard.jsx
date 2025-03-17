@@ -65,7 +65,13 @@ const Dashboard = () => {
       ) : (
         // Show dashboard content when data is available
         <>
-          <h2 className="text-2xl font-bold mb-6">Release Quality Overview</h2>
+          <h2 className="text-2xl font-bold mb-6">
+            Release Quality Overview
+            {/* Show version name next to title */}
+            <span className="ml-2 text-base font-normal text-gray-500">
+              {versions.find(v => v.id === selectedVersion)?.name || ''}
+            </span>
+          </h2>
           
           {/* Dashboard Cards */}
           <DashboardCards metrics={metrics} />
