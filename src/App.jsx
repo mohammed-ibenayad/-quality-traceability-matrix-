@@ -6,6 +6,7 @@ import dataStore from './services/DataStore';
 // Import pages
 import Dashboard from './pages/Dashboard';
 import TraceabilityMatrix from './pages/TraceabilityMatrix';
+import Requirements from './pages/Requirements';
 import ImportData from './pages/ImportData';
 
 function App() {
@@ -31,9 +32,9 @@ function App() {
         {/* If no data exists, redirect to import page */}
         <Route path="/" element={hasData ? <Dashboard /> : <Navigate to="/import" />} />
         <Route path="/matrix" element={hasData ? <TraceabilityMatrix /> : <Navigate to="/import" />} />
+        <Route path="/requirements" element={hasData ? <Requirements /> : <Navigate to="/import" />} />
         <Route path="/import" element={<ImportData />} />
         {/* Placeholder routes for future implementation */}
-        <Route path="/requirements" element={hasData ? <Dashboard /> : <Navigate to="/import" />} />
         <Route path="/test-cases" element={hasData ? <Dashboard /> : <Navigate to="/import" />} />
         <Route path="/reports" element={hasData ? <Dashboard /> : <Navigate to="/import" />} />
         {/* Redirect any unknown paths to dashboard or import based on data presence */}
