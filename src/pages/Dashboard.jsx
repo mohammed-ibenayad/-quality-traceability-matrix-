@@ -9,7 +9,7 @@ import EmptyState from '../components/common/EmptyState';
 import { useRelease } from '../hooks/useRelease';
 import dataStore from '../services/DataStore';
 
-// Import only versions for dropdown
+// Import initial versions for the dropdown
 import versionsData from '../data/versions';
 
 const Dashboard = () => {
@@ -17,6 +17,7 @@ const Dashboard = () => {
   const [requirements, setRequirements] = useState([]);
   const [testCases, setTestCases] = useState([]);
   const [mapping, setMapping] = useState({});
+  const [versions, setVersions] = useState(versionsData);
   
   // Load data from DataStore
   useEffect(() => {
@@ -25,25 +26,55 @@ const Dashboard = () => {
     setTestCases(dataStore.getTestCases());
     setMapping(dataStore.getMapping());
     
+    // Initialize versions in DataStore if needed
+    if (!dataStore.getVersions || !dataStore.getVersions().length) {
+      dataStore.setVersions && dataStore.setVersions(versionsData);
+    } else {
+      setVersions(dataStore.getVersions());
+    }
+    
     // Subscribe to DataStore changes
     const unsubscribe = dataStore.subscribe(() => {
       setRequirements(dataStore.getRequirements());
       setTestCases(dataStore.getTestCases());
       setMapping(dataStore.getMapping());
+      
+      // Update versions if the method exists
+      if (dataStore.getVersions) {
+        setVersions(dataStore.getVersions());
+      }
     });
     
     // Clean up subscription
     return () => unsubscribe();
   }, []);
 
-  // Use the custom hook to get release data
+  // Use the custom hook to get release data - use our local versions
   const { 
     selectedVersion, 
     setSelectedVersion, 
     metrics,
-    versions,
     hasData
-  } = useRelease(requirements, testCases, mapping, versionsData, 'v2.2');
+  } = useRelease(requirements, testCases, mapping, versions, 'v2.2');
+
+  // Handler for adding a new version
+  const handleAddVersion = (newVersion) => {
+    try {
+      // Use DataStore method if available, otherwise update local state
+      if (dataStore.addVersion) {
+        dataStore.addVersion(newVersion);
+      } else {
+        // Fallback to updating local state
+        setVersions(prev => [...prev, newVersion]);
+      }
+      
+      // Switch to the newly created version
+      setSelectedVersion(newVersion.id);
+    } catch (error) {
+      console.error("Error adding version:", error);
+      // In a real app, show a notification
+    }
+  };
 
   return (
     <MainLayout 
@@ -52,6 +83,7 @@ const Dashboard = () => {
       setSelectedVersion={setSelectedVersion}
       versions={versions}
       hasData={hasData}
+      onAddVersion={handleAddVersion} // Pass the handler
     >
       {!hasData ? (
         // Show empty state when no data is available

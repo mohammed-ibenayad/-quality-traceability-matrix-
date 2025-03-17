@@ -1,6 +1,7 @@
 import defaultRequirements from '../data/requirements';
 import defaultTestCases from '../data/testcases';
 import defaultMapping from '../data/mapping';
+import defaultVersions from '../data/versions';
 
 /**
  * Simple in-memory data store service
@@ -12,6 +13,7 @@ class DataStoreService {
     this._requirements = [];
     this._testCases = [];
     this._mapping = {};
+    this._versions = [];
     this._listeners = [];
     
     // Check if we should load default data
@@ -34,6 +36,7 @@ class DataStoreService {
     this._requirements = [...defaultRequirements];
     this._testCases = [...defaultTestCases];
     this._mapping = { ...defaultMapping };
+    this._versions = [...defaultVersions];
     this._hasInitializedData = true;
     this._notifyListeners();
     return true;

@@ -8,6 +8,7 @@ import Dashboard from './pages/Dashboard';
 import TraceabilityMatrix from './pages/TraceabilityMatrix';
 import Requirements from './pages/Requirements';
 import ImportData from './pages/ImportData';
+import Releases from './pages/Releases'; // Import the new Releases page
 
 function App() {
   const [hasData, setHasData] = useState(false);
@@ -33,6 +34,7 @@ function App() {
         <Route path="/" element={hasData ? <Dashboard /> : <Navigate to="/import" />} />
         <Route path="/matrix" element={hasData ? <TraceabilityMatrix /> : <Navigate to="/import" />} />
         <Route path="/requirements" element={hasData ? <Requirements /> : <Navigate to="/import" />} />
+        <Route path="/releases" element={hasData ? <Releases /> : <Navigate to="/import" />} /> {/* Add new route */}
         <Route path="/import" element={<ImportData />} />
         {/* Placeholder routes for future implementation */}
         <Route path="/test-cases" element={hasData ? <Dashboard /> : <Navigate to="/import" />} />

@@ -8,7 +8,8 @@ const MainLayout = ({
   selectedVersion, 
   setSelectedVersion, 
   versions,
-  hasData = true  // Add hasData prop with default value
+  hasData = true,
+  onAddVersion = null
 }) => {
   return (
     <div className="bg-gray-100 min-h-screen">
@@ -20,7 +21,8 @@ const MainLayout = ({
             selectedVersion={selectedVersion} 
             setSelectedVersion={setSelectedVersion}
             versions={versions}
-            hasData={hasData}  // Pass hasData to Header
+            hasData={hasData}
+            onAddVersion={onAddVersion}
           />
           <main className="p-6">
             {children}
