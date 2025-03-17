@@ -106,19 +106,16 @@ const Requirements = () => {
                     Name
                   </th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Type
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Priority
                   </th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Test Depth
                   </th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Business Impact
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Coverage
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Test Cases
                   </th>
                   <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Actions
@@ -143,6 +140,11 @@ const Requirements = () => {
                         {req.name}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
+                          {req.type || 'Functional'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
                           req.priority === 'High' ? 'bg-red-100 text-red-800' : 
                           req.priority === 'Medium' ? 'bg-yellow-100 text-yellow-800' : 'bg-blue-100 text-blue-800'
@@ -156,33 +158,27 @@ const Requirements = () => {
                           <span className="text-xs text-gray-500">{req.minTestCases} min tests</span>
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        <div className="flex items-center">
-                          <div className="text-xs bg-gray-100 px-2 py-1 rounded">
-                            {req.businessImpact}/5
-                          </div>
-                        </div>
-                      </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         {coverage ? (
-                          <div className={`text-sm font-medium ${
-                            coverage.meetsMinimum 
-                              ? 'text-green-600' 
-                              : 'text-orange-600'
-                          }`}>
-                            {coverage.coverageRatio}% of required
+                          <div className="flex flex-col">
+                            <div className={`text-sm font-medium ${
+                              coverage.meetsMinimum 
+                                ? 'text-green-600' 
+                                : 'text-orange-600'
+                            }`}>
+                              {coverage.coverageRatio}% of required
+                            </div>
+                            <div className="text-xs text-gray-500 mt-1">
+                              {linkedTestCount} test{linkedTestCount !== 1 ? 's' : ''} linked
+                            </div>
                           </div>
                         ) : (
-                          <span className="text-red-500 text-xs">No Coverage</span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {linkedTestCount === 0 ? (
-                          <span className="text-red-500 text-xs">None</span>
-                        ) : (
-                          <span className="text-xs bg-gray-100 px-2 py-1 rounded">
-                            {linkedTestCount} test{linkedTestCount !== 1 ? 's' : ''}
-                          </span>
+                          <div className="flex flex-col">
+                            <span className="text-red-500 text-xs">No Coverage</span>
+                            <div className="text-xs text-gray-500 mt-1">
+                              {linkedTestCount} test{linkedTestCount !== 1 ? 's' : ''} linked
+                            </div>
+                          </div>
                         )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
