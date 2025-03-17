@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import MainLayout from '../components/Layout/MainLayout';
 import EmptyState from '../components/Common/EmptyState';
+import EditRequirementModal from '../components/Requirements/EditRequirementModal';
 import { useRelease } from '../hooks/useRelease';
 import dataStore from '../services/DataStore';
 
@@ -13,6 +14,7 @@ const Requirements = () => {
   const [requirements, setRequirements] = useState([]);
   const [testCases, setTestCases] = useState([]);
   const [mapping, setMapping] = useState({});
+  const [editingRequirement, setEditingRequirement] = useState(null);
   
   // Load data from DataStore
   useEffect(() => {
@@ -45,6 +47,17 @@ const Requirements = () => {
   const filteredRequirements = requirements.filter(req => 
     req.versions && req.versions.includes(selectedVersion)
   );
+
+  // Handle saving the edited requirement
+  const handleSaveRequirement = (updatedRequirement) => {
+    try {
+      dataStore.updateRequirement(updatedRequirement.id, updatedRequirement);
+      setEditingRequirement(null);
+    } catch (error) {
+      console.error("Error updating requirement:", error);
+      // You might want to show an error message to the user
+    }
+  };
 
   return (
     <MainLayout 
@@ -106,6 +119,9 @@ const Requirements = () => {
                   </th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Test Cases
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Actions
                   </th>
                 </tr>
               </thead>
@@ -169,12 +185,29 @@ const Requirements = () => {
                           </span>
                         )}
                       </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
+                        <button
+                          onClick={() => setEditingRequirement(req)}
+                          className="text-blue-600 hover:text-blue-900"
+                        >
+                          Edit
+                        </button>
+                      </td>
                     </tr>
                   );
                 })}
               </tbody>
             </table>
           </div>
+          
+          {/* Edit Requirement Modal */}
+          {editingRequirement && (
+            <EditRequirementModal
+              requirement={editingRequirement}
+              onSave={handleSaveRequirement}
+              onCancel={() => setEditingRequirement(null)}
+            />
+          )}
         </>
       )}
     </MainLayout>

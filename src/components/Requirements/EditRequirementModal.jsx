@@ -1,15 +1,15 @@
-// src/components/Requirements/EditRequirementModal.jsx
 import React, { useState } from 'react';
 
 const EditRequirementModal = ({ requirement, onSave, onCancel }) => {
   const [formData, setFormData] = useState({
     name: requirement.name,
-    description: requirement.description,
+    description: requirement.description || '',
     priority: requirement.priority,
     businessImpact: requirement.businessImpact,
     technicalComplexity: requirement.technicalComplexity,
     regulatoryFactor: requirement.regulatoryFactor,
     usageFrequency: requirement.usageFrequency,
+    versions: requirement.versions || []
   });
 
   // Calculate TDF based on current values

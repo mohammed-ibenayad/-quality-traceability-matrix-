@@ -48,6 +48,15 @@ class DataStoreService {
   }
 
   /**
+   * Get a single requirement by ID
+   * @param {string} id - Requirement ID
+   * @returns {Object|null} Requirement object or null if not found
+   */
+  getRequirement(id) {
+    return this._requirements.find(req => req.id === id) || null;
+  }
+
+  /**
    * Get all test cases
    * @returns {Array} Array of test case objects
    */
@@ -94,6 +103,85 @@ class DataStoreService {
     this._notifyListeners();
     
     return this._requirements;
+  }
+  
+  /**
+   * Update a single requirement
+   * @param {string} reqId - ID of the requirement to update
+   * @param {Object} updatedData - Updated requirement data
+   * @returns {Object} Updated requirement
+   */
+  updateRequirement(reqId, updatedData) {
+    const index = this._requirements.findIndex(req => req.id === reqId);
+    
+    if (index === -1) {
+      throw new Error(`Requirement with ID ${reqId} not found`);
+    }
+    
+    // Process the updated requirement to ensure calculated fields
+    const processed = this.processRequirements([updatedData])[0];
+    
+    // Update the requirement
+    this._requirements[index] = processed;
+    
+    // Notify listeners of data change
+    this._notifyListeners();
+    
+    return this._requirements[index];
+  }
+  
+  /**
+   * Add a new requirement
+   * @param {Object} requirementData - New requirement data
+   * @returns {Object} Added requirement
+   */
+  addRequirement(requirementData) {
+    // Validate required fields
+    if (!requirementData.id || !requirementData.name) {
+      throw new Error('Requirement must include id and name');
+    }
+    
+    // Check for duplicate ID
+    if (this._requirements.some(req => req.id === requirementData.id)) {
+      throw new Error(`Requirement with ID ${requirementData.id} already exists`);
+    }
+    
+    // Process the new requirement to ensure calculated fields
+    const processed = this.processRequirements([requirementData])[0];
+    
+    // Add the requirement
+    this._requirements.push(processed);
+    
+    // Notify listeners of data change
+    this._notifyListeners();
+    
+    return processed;
+  }
+  
+  /**
+   * Delete a requirement
+   * @param {string} reqId - ID of the requirement to delete
+   * @returns {boolean} True if successful
+   */
+  deleteRequirement(reqId) {
+    const index = this._requirements.findIndex(req => req.id === reqId);
+    
+    if (index === -1) {
+      throw new Error(`Requirement with ID ${reqId} not found`);
+    }
+    
+    // Remove the requirement
+    this._requirements.splice(index, 1);
+    
+    // Remove related mappings
+    if (this._mapping[reqId]) {
+      delete this._mapping[reqId];
+    }
+    
+    // Notify listeners of data change
+    this._notifyListeners();
+    
+    return true;
   }
   
   /**
