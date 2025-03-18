@@ -41,12 +41,12 @@ const Requirements = () => {
     versionCoverage,
     versions,
     hasData
-  } = useRelease(requirements, testCases, mapping, versionsData, 'v2.2');
+  } = useRelease(requirements, testCases, mapping, versionsData, 'unassigned');
 
   // Filter requirements by selected version
-  const filteredRequirements = requirements.filter(req => 
-    req.versions && req.versions.includes(selectedVersion)
-  );
+  const filteredRequirements = selectedVersion === 'unassigned'
+    ? requirements // Show all requirements for "unassigned"
+    : requirements.filter(req => req.versions && req.versions.includes(selectedVersion));
 
   // Handle saving the edited requirement
   const handleSaveRequirement = (updatedRequirement) => {
@@ -82,7 +82,9 @@ const Requirements = () => {
             <h2 className="text-2xl font-bold">
               Requirements
               <span className="ml-2 text-base font-normal text-gray-500">
-                {versions.find(v => v.id === selectedVersion)?.name || ''}
+                {selectedVersion === 'unassigned' 
+                  ? 'All Items (Unassigned View)' 
+                  : versions.find(v => v.id === selectedVersion)?.name || ''}
               </span>
             </h2>
             <div className="flex gap-2">
@@ -94,6 +96,16 @@ const Requirements = () => {
               </Link>
             </div>
           </div>
+
+          {/* Version indicator for unassigned view */}
+          {selectedVersion === 'unassigned' && (
+            <div className="bg-blue-100 p-4 rounded-lg mb-6 text-blue-800">
+              <div className="font-medium">Showing All Requirements (Unassigned View)</div>
+              <p className="text-sm mt-1">
+                This view shows all requirements, including those that may be assigned to versions that haven't been created yet.
+              </p>
+            </div>
+          )}
 
           <div className="bg-white rounded shadow overflow-auto">
             <table className="min-w-full divide-y divide-gray-200">
@@ -117,6 +129,9 @@ const Requirements = () => {
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Coverage
                   </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Versions
+                  </th>
                   <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Actions
                   </th>
@@ -128,6 +143,11 @@ const Requirements = () => {
                   const coverage = versionCoverage.find(c => c.reqId === req.id);
                   // Count linked test cases
                   const linkedTestCount = (mapping[req.id] || []).length;
+                  
+                  // Check for unassigned versions (versions that don't exist yet)
+                  const assignedVersions = req.versions || [];
+                  const existingVersionIds = versions.map(v => v.id);
+                  const unassignedVersions = assignedVersions.filter(v => !existingVersionIds.includes(v));
                   
                   return (
                     <tr key={req.id} className="hover:bg-gray-50">
@@ -178,8 +198,31 @@ const Requirements = () => {
                             <div className="text-xs text-gray-500 mt-1">
                               {linkedTestCount} test{linkedTestCount !== 1 ? 's' : ''} linked
                             </div>
-                          </div>
+                            </div>
                         )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <div className="flex flex-wrap gap-1">
+                          {req.versions && req.versions.map(vId => {
+                            const versionExists = versions.some(v => v.id === vId);
+                            return (
+                              <span 
+                                key={vId} 
+                                className={`inline-block px-2 py-0.5 text-xs rounded-full ${
+                                  versionExists 
+                                    ? 'bg-blue-100 text-blue-800' 
+                                    : 'bg-yellow-100 text-yellow-800'
+                                }`}
+                                title={versionExists ? 'Existing version' : 'Version not created yet'}
+                              >
+                                {vId}
+                              </span>
+                            );
+                          })}
+                          {(!req.versions || req.versions.length === 0) && (
+                            <span className="text-gray-400 text-xs">No versions</span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
                         <button
@@ -211,3 +254,4 @@ const Requirements = () => {
 };
 
 export default Requirements;
+                            

@@ -45,16 +45,16 @@ const TraceabilityMatrix = () => {
     summary,
     versions,
     hasData
-  } = useRelease(requirements, testCases, mapping, versionsData, 'v2.2');
+  } = useRelease(requirements, testCases, mapping, versionsData, 'unassigned');
   
   // Filter requirements and test cases by selected version
-  const filteredRequirements = requirements.filter(req => 
-    req.versions && req.versions.includes(selectedVersion)
-  );
+  const filteredRequirements = selectedVersion === 'unassigned' 
+    ? requirements // Show all requirements for "unassigned"
+    : requirements.filter(req => req.versions && req.versions.includes(selectedVersion));
   
-  const filteredTestCases = testCases.filter(tc => 
-    !tc.version || tc.version === selectedVersion || tc.version === ''
-  );
+  const filteredTestCases = selectedVersion === 'unassigned'
+    ? testCases // Show all test cases for "unassigned"
+    : testCases.filter(tc => !tc.version || tc.version === selectedVersion || tc.version === '');
   
   // Toggle test case view
   const toggleTestCaseView = () => {
@@ -104,6 +104,16 @@ const TraceabilityMatrix = () => {
               <div className="text-sm text-gray-500">Total Test Cases</div>
             </div>
           </div>
+          
+          {/* Version indicator for unassigned view */}
+          {selectedVersion === 'unassigned' && (
+            <div className="bg-blue-100 p-4 rounded-lg mb-6 text-blue-800">
+              <div className="font-medium">Showing All Items (Unassigned View)</div>
+              <p className="text-sm mt-1">
+                This view shows all requirements and test cases, including those that may be assigned to versions that haven't been created yet.
+              </p>
+            </div>
+          )}
           
           {/* Matrix Table - Now using filtered data and versionCoverage */}
           <MatrixTable

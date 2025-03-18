@@ -74,7 +74,7 @@ const Dashboard = () => {
     setSelectedVersion, 
     metrics,
     hasData
-  } = useRelease(requirements, testCases, mapping, versions, 'v2.2');
+  } = useRelease(requirements, testCases, mapping, versions, 'unassigned');
 
   // Handler for adding a new version
   const handleAddVersion = (newVersion) => {
@@ -120,36 +120,85 @@ const Dashboard = () => {
             Release Quality Overview
             {/* Show version name next to title */}
             <span className="ml-2 text-base font-normal text-gray-500">
-              {versions.find(v => v.id === selectedVersion)?.name || ''}
+              {selectedVersion === 'unassigned' 
+                ? 'All Items (Unassigned View)' 
+                : versions.find(v => v.id === selectedVersion)?.name || ''}
             </span>
           </h2>
+          
+          {/* Unassigned Warning Banner */}
+          {selectedVersion === 'unassigned' && (
+            <div className="bg-blue-100 p-4 rounded-lg mb-6 text-blue-800">
+              <div className="font-medium">Showing All Items (Unassigned View)</div>
+              <p className="text-sm mt-1">
+                This view shows metrics for all requirements and test cases, including those that may be assigned to versions that haven't been created yet. For specific release metrics, please select a version from the dropdown.
+              </p>
+            </div>
+          )}
           
           {/* Dashboard Cards */}
           <DashboardCards metrics={metrics} />
           
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-            {/* Health Score Gauge */}
-            <div className="bg-white rounded shadow">
-              <HealthScoreGauge score={metrics?.healthScore} />
-            </div>
-            
-            {/* Quality Gates */}
-            <div className="lg:col-span-2">
-              <QualityGatesTable qualityGates={metrics?.qualityGates} />
-            </div>
-          </div>
-          
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Risk Areas */}
-            <div>
-              <RiskAreasList riskAreas={metrics?.riskAreas} />
-            </div>
-            
-            {/* Metrics Chart */}
-            <div>
-              <MetricsChart data={metrics ? metrics.versionCoverage : []} />
-            </div>
-          </div>
+          {selectedVersion !== 'unassigned' ? (
+            // Show normal dashboard content for specific releases
+            <>
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+                {/* Health Score Gauge */}
+                <div className="bg-white rounded shadow">
+                  <HealthScoreGauge score={metrics?.healthScore} />
+                </div>
+                
+                {/* Quality Gates */}
+                <div className="lg:col-span-2">
+                  <QualityGatesTable qualityGates={metrics?.qualityGates} />
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Risk Areas */}
+                <div>
+                  <RiskAreasList riskAreas={metrics?.riskAreas} />
+                </div>
+                
+                {/* Metrics Chart */}
+                <div>
+                  <MetricsChart data={metrics ? metrics.versionCoverage : []} />
+                </div>
+              </div>
+            </>
+          ) : (
+            // For unassigned view, show a simplified dashboard
+            <>
+              <div className="bg-white p-6 rounded shadow mb-6">
+                <h2 className="text-lg font-semibold mb-4">Coverage Overview - All Requirements</h2>
+                <p className="text-gray-600 mb-4">
+                  When viewing all items, detailed release metrics like health scores and quality gates are not available. 
+                  Please select a specific release version to see complete quality metrics.
+                </p>
+                
+                <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4">
+                  <div className="flex">
+                    <div className="flex-shrink-0">
+                      <svg className="h-5 w-5 text-yellow-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                        <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <div className="ml-3">
+                      <p className="text-sm text-yellow-700">
+                        Some requirements reference versions that haven't been created yet. Consider creating these releases or updating the requirements.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Metrics Chart - All Requirements */}
+              <div className="bg-white rounded shadow p-4">
+                <h2 className="text-lg font-semibold mb-4">Test Metrics - All Requirements</h2>
+                <MetricsChart data={metrics ? metrics.versionCoverage : []} />
+              </div>
+            </>
+          )}
         </>
       )}
     </MainLayout>

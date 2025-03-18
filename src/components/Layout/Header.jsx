@@ -33,6 +33,7 @@ const Header = ({
                   onChange={(e) => setSelectedVersion(e.target.value)}
                   className="border rounded p-1.5 text-sm"
                 >
+                  <option value="unassigned">Unassigned/All Items</option>
                   {versions.map(v => (
                     <option key={v.id} value={v.id}>{v.name}</option>
                   ))}
