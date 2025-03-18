@@ -1,5 +1,6 @@
 import React from 'react';
 import CoverageIndicator from './CoverageIndicator';
+import TDFInfoTooltip from '../Common/TDFInfoTooltip';
 
 const RequirementRow = ({ req, coverage, mapping, testCases, expanded, onToggleExpand }) => {
   const mappedTests = mapping[req.id] || [];
@@ -36,7 +37,10 @@ const RequirementRow = ({ req, coverage, mapping, testCases, expanded, onToggleE
         </td>
         <td className="border p-2 text-center">
           <div className="flex flex-col items-center">
-            <span className="text-sm font-medium">{req.testDepthFactor.toFixed(1)}</span>
+            <div className="flex items-center">
+              <span className="text-sm font-medium">{req.testDepthFactor.toFixed(1)}</span>
+              <TDFInfoTooltip />
+            </div>
             <span className="text-xs text-gray-500">{mappedTests.length}/{req.minTestCases} tests</span>
             <div className={`mt-1 w-4 h-4 rounded-full flex items-center justify-center ${
               mappedTests.length >= req.minTestCases 

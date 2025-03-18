@@ -2,6 +2,7 @@ import React from 'react';
 import RequirementRow from './RequirementRow';
 import CoverageIndicator from './CoverageIndicator';
 import { getCellStatus } from '../../utils/coverage';
+import TDFInfoTooltip from '../Common/TDFInfoTooltip';
 
 const MatrixTable = ({ 
   requirements, 
@@ -63,7 +64,12 @@ const MatrixTable = ({
               <th className="border p-2">Requirement ID</th>
               <th className="border p-2">Requirement Name</th>
               <th className="border p-2">Priority</th>
-              <th className="border p-2">Test Depth</th>
+              <th className="border p-2">
+                <div className="flex items-center">
+                  Test Depth
+                  <TDFInfoTooltip />
+                </div>
+              </th>
               <th className="border p-2">Test Cases</th>
               <th className="border p-2">Status</th>
               <th className="border p-2 w-40">Coverage</th>
@@ -93,7 +99,12 @@ const MatrixTable = ({
               <th className="border p-2 w-36">Requirement ID</th>
               <th className="border p-2">Requirement Name</th>
               <th className="border p-2">Priority</th>
-              <th className="border p-2 w-20">Test Depth</th>
+              <th className="border p-2 w-20">
+                <div className="flex items-center">
+                  Test Depth
+                  <TDFInfoTooltip />
+                </div>
+              </th>
               {testCases.map(tc => (
                 <th key={tc.id} className="border p-2 w-24 text-xs">
                   {tc.id}<br/>
@@ -127,7 +138,10 @@ const MatrixTable = ({
                 </td>
                 <td className="border p-2 text-center">
                   <div className="flex flex-col items-center">
-                    <span className="text-sm font-medium">{req.testDepthFactor.toFixed(1)}</span>
+                    <div className="flex items-center">
+                      <span className="text-sm font-medium">{req.testDepthFactor.toFixed(1)}</span>
+                      <TDFInfoTooltip />
+                    </div>
                     <span className="text-xs text-gray-500">{(mapping[req.id] || []).length}/{req.minTestCases} tests</span>
                     <div className={`mt-1 w-4 h-4 rounded-full flex items-center justify-center ${
                       (mapping[req.id] || []).length >= req.minTestCases 

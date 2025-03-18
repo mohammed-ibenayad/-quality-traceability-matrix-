@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import MainLayout from '../components/Layout/MainLayout';
 import EmptyState from '../components/Common/EmptyState';
 import EditRequirementModal from '../components/Requirements/EditRequirementModal';
+import TDFInfoTooltip from '../components/Common/TDFInfoTooltip';
 import { useRelease } from '../hooks/useRelease';
 import dataStore from '../services/DataStore';
 
@@ -124,7 +125,10 @@ const Requirements = () => {
                     Priority
                   </th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Test Depth
+                    <div className="flex items-center">
+                      Test Depth
+                      <TDFInfoTooltip />
+                    </div>
                   </th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Coverage
@@ -174,7 +178,10 @@ const Requirements = () => {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         <div className="flex flex-col items-center">
-                          <span className="text-sm font-medium">{req.testDepthFactor.toFixed(1)}</span>
+                          <div className="flex items-center">
+                            <span className="text-sm font-medium">{req.testDepthFactor.toFixed(1)}</span>
+                            <TDFInfoTooltip />
+                          </div>
                           <span className="text-xs text-gray-500">{req.minTestCases} min tests</span>
                         </div>
                       </td>
@@ -254,4 +261,3 @@ const Requirements = () => {
 };
 
 export default Requirements;
-                            

@@ -1,4 +1,5 @@
 import React from 'react';
+import TDFInfoTooltip from '../Common/TDFInfoTooltip';
 
 const DashboardCards = ({ metrics }) => {
   // Return null if no metrics
@@ -19,7 +20,10 @@ const DashboardCards = ({ metrics }) => {
       </div>
       
       <div className="bg-white p-4 rounded shadow">
-        <div className="text-sm text-gray-600 mb-1">Coverage</div>
+        <div className="text-sm text-gray-600 mb-1 flex items-center">
+          Coverage
+          <TDFInfoTooltip />
+        </div>
         <div className="flex flex-col">
           <div className="text-2xl font-bold">{metrics.sufficientCoveragePercentage}%</div>
           <div className="text-xs text-gray-500">Requirements with sufficient tests</div>
