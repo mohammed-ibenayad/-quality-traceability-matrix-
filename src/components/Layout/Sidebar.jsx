@@ -17,11 +17,18 @@ const Sidebar = () => {
   ];
   
   return (
-    <div className="w-64 bg-gray-800 text-white h-screen fixed">
-      <div className="p-4 border-b border-gray-700">
+    <div className="w-64 bg-gray-800 text-white h-screen fixed flex flex-col">
+      <div className="p-4 border-b border-gray-700 flex items-center">
+        {/* Quality Check Logo */}
+        <div className="mr-3">
+          <svg className="w-8 h-8 text-blue-400" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+            <path fillRule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"></path>
+          </svg>
+        </div>
         <h1 className="text-xl font-bold">Quality Tracker</h1>
       </div>
-      <nav className="mt-4">
+      
+      <nav className="mt-4 flex-grow overflow-y-auto">
         {menuItems.map(item => (
           item.active ? (
             <Link 
@@ -53,6 +60,22 @@ const Sidebar = () => {
           )
         ))}
       </nav>
+      
+      {/* ASAL Technologies Footer */}
+      <div className="p-4 border-t border-gray-700 mt-auto">
+        <div className="flex items-center justify-center mb-2">
+          {/* Replace with your company logo */}
+          <img 
+            src="/asal-logo.png" 
+            alt="ASAL Technologies" 
+            className="h-6 mr-2" 
+          />
+          <span className="font-semibold text-blue-400">ASAL Technologies</span>
+        </div>
+        <div className="text-xs text-center text-gray-400">
+          © {new Date().getFullYear()} ASAL Technologies. All rights reserved.
+        </div>
+      </div>
     </div>
   );
 };

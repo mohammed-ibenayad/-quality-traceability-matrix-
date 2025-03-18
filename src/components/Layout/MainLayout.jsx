@@ -15,7 +15,7 @@ const MainLayout = ({
     <div className="bg-gray-100 min-h-screen">
       <div className="flex min-h-screen">
         <Sidebar />
-        <div className="flex-1 ml-64">
+        <div className="flex-1 ml-64 flex flex-col">
           <Header 
             title={title} 
             selectedVersion={selectedVersion} 
@@ -24,9 +24,25 @@ const MainLayout = ({
             hasData={hasData}
             onAddVersion={onAddVersion}
           />
-          <main className="p-6">
+          <main className="p-6 flex-grow">
             {children}
           </main>
+          
+          {/* Footer with copyright */}
+          <footer className="mt-auto bg-white shadow-md p-4 text-center text-gray-600">
+            <div className="flex justify-center items-center mb-2">
+              {/* Replace with your company logo */}
+              <img 
+                src="/asal-logo.png" 
+                alt="ASAL Technologies" 
+                className="h-5 mr-2" 
+              />
+              <span className="font-medium">Developed by ASAL Technologies</span>
+            </div>
+            <div className="text-sm">
+              © {new Date().getFullYear()} ASAL Technologies. All rights reserved.
+            </div>
+          </footer>
         </div>
       </div>
     </div>
