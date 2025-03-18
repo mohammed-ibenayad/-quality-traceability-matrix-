@@ -36,9 +36,11 @@ function App() {
         <Route path="/requirements" element={hasData ? <Requirements /> : <Navigate to="/import" />} />
         <Route path="/releases" element={hasData ? <Releases /> : <Navigate to="/import" />} /> {/* Add new route */}
         <Route path="/import" element={<ImportData />} />
-        {/* Placeholder routes for future implementation */}
-        <Route path="/test-cases" element={hasData ? <Dashboard /> : <Navigate to="/import" />} />
-        <Route path="/reports" element={hasData ? <Dashboard /> : <Navigate to="/import" />} />
+        
+        {/* Commented out routes that aren't implemented yet */}
+        {/* <Route path="/test-cases" element={hasData ? <Dashboard /> : <Navigate to="/import" />} /> */}
+        {/* <Route path="/reports" element={hasData ? <Dashboard /> : <Navigate to="/import" />} /> */}
+        
         {/* Redirect any unknown paths to dashboard or import based on data presence */}
         <Route path="*" element={<Navigate to={hasData ? "/" : "/import"} />} />
       </Routes>
