@@ -95,22 +95,44 @@ const ImportData = () => {
             
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-5 mb-6">
               <h2 className="text-lg font-semibold text-blue-800 mb-2">Getting Started</h2>
-              <ol className="list-decimal pl-6 text-blue-700 space-y-2">
-                <li>Import your requirements using the Requirements tab below</li>
-                <li>Import your test cases using the Test Cases tab</li>
-                <li>View the Traceability Matrix to see the relationship between requirements and tests</li>
-                <li>Check the Dashboard for quality metrics and release health</li>
+              <ol className="space-y-3">
+                <li className="flex items-start">
+                  <div className="flex-shrink-0 h-5 w-5 text-blue-600 mr-2">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path>
+                    </svg>
+                  </div>
+                  <span className="text-blue-700">Import your requirements using the Requirements tab below</span>
+                </li>
+                <li className="flex items-start">
+                  <div className="flex-shrink-0 h-5 w-5 text-blue-600 mr-2">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>
+                    </svg>
+                  </div>
+                  <span className="text-blue-700">Import your test cases using the Test Cases tab</span>
+                </li>
+                <li className="flex items-start">
+                  <div className="flex-shrink-0 h-5 w-5 text-blue-600 mr-2">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path>
+                    </svg>
+                  </div>
+                  <span className="text-blue-700">View the Traceability Matrix to see the relationship between requirements and tests</span>
+                </li>
+                <li className="flex items-start">
+                  <div className="flex-shrink-0 h-5 w-5 text-blue-600 mr-2">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                    </svg>
+                  </div>
+                  <span className="text-blue-700">Check the Dashboard for quality metrics and release health</span>
+                </li>
               </ol>
             </div>
             
             <div className="mt-4 text-center">
-              <button
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 mr-2"
-                onClick={() => window.loadSampleData && window.loadSampleData()}
-              >
-                Load Sample Data
-              </button>
-              <span className="text-sm text-gray-500">or import your own data below</span>
+              <p className="text-sm text-gray-500">Select a tab below to get started</p>
             </div>
           </div>
         )}
@@ -129,7 +151,12 @@ const ImportData = () => {
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                 }`}
               >
-                Import Requirements
+                <div className="flex items-center justify-center">
+                  <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path>
+                  </svg>
+                  Import Requirements
+                </div>
               </button>
               <button
                 onClick={() => setActiveTab('testcases')}
@@ -139,16 +166,25 @@ const ImportData = () => {
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                 }`}
               >
-                Import Test Cases
+                <div className="flex items-center justify-center">
+                  <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>
+                  </svg>
+                  Import Test Cases
+                </div>
               </button>
             </nav>
           </div>
         </div>
         
-        {/* Requirements Import Interface */}
+        {/* Requirements Import Interface - MOVED TO TOP */}
         {activeTab === 'requirements' && (
           <>
-            <div className="mb-6 bg-white p-6 rounded shadow">
+            {/* Import card moved to the top */}
+            <ImportRequirements onImportSuccess={handleImportSuccess} />
+            
+            {/* Instructions moved below the import component */}
+            <div className="mt-6 bg-white p-6 rounded shadow">
               <h2 className="text-lg font-semibold mb-3">How to Import Requirements</h2>
               <p className="mb-3">
                 Use this page to import requirements data in JSONC format. The system will:
@@ -176,27 +212,37 @@ const ImportData = () => {
               
               <div className="text-sm bg-gray-50 p-3 rounded border border-gray-200">
                 <p className="font-medium mb-1">Need a sample file?</p>
-                <a 
-                  href="/sample-requirements.jsonc" 
-                  download 
-                  className="text-blue-600 hover:underline flex items-center"
-                >
-                  <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-                    <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd"></path>
-                  </svg>
-                  Download sample requirements.jsonc
-                </a>
+                <div className="flex items-center justify-between">
+                  <a 
+                    href="/sample-requirements.jsonc" 
+                    download 
+                    className="text-blue-600 hover:underline flex items-center"
+                  >
+                    <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                      <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd"></path>
+                    </svg>
+                    Download sample
+                  </a>
+                  <button
+                    className="px-2 py-1 bg-gray-200 text-gray-700 rounded text-xs hover:bg-gray-300"
+                    onClick={() => window.loadSampleData && window.loadSampleData()}
+                  >
+                    Load Sample Data
+                  </button>
+                </div>
               </div>
             </div>
-            
-            <ImportRequirements onImportSuccess={handleImportSuccess} />
           </>
         )}
         
-        {/* Test Case Import Interface */}
+        {/* Test Case Import Interface - MOVED TO TOP */}
         {activeTab === 'testcases' && (
           <>
-            <div className="mb-6 bg-white p-6 rounded shadow">
+            {/* Import card moved to the top */}
+            <ImportTestCases onImportSuccess={handleImportSuccess} />
+            
+            {/* Instructions moved below the import component */}
+            <div className="mt-6 bg-white p-6 rounded shadow">
               <h2 className="text-lg font-semibold mb-3">How to Import Test Cases</h2>
               <p className="mb-3">
                 Use this page to import test case data in JSONC format. The system will:
@@ -229,20 +275,26 @@ const ImportData = () => {
               
               <div className="text-sm bg-gray-50 p-3 rounded border border-gray-200">
                 <p className="font-medium mb-1">Need a sample file?</p>
-                <a 
-                  href="/sample-testcases.jsonc" 
-                  download 
-                  className="text-blue-600 hover:underline flex items-center"
-                >
-                  <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-                    <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd"></path>
-                  </svg>
-                  Download sample testcases.jsonc
-                </a>
+                <div className="flex items-center justify-between">
+                  <a 
+                    href="/sample-testcases.jsonc" 
+                    download 
+                    className="text-blue-600 hover:underline flex items-center"
+                  >
+                    <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                      <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd"></path>
+                    </svg>
+                    Download sample
+                  </a>
+                  <button
+                    className="px-2 py-1 bg-gray-200 text-gray-700 rounded text-xs hover:bg-gray-300"
+                    onClick={() => window.loadSampleData && window.loadSampleData()}
+                  >
+                    Load Sample Data
+                  </button>
+                </div>
               </div>
             </div>
-            
-            <ImportTestCases onImportSuccess={handleImportSuccess} />
           </>
         )}
         
