@@ -39,7 +39,6 @@ const RequirementRow = ({ req, coverage, mapping, testCases, expanded, onToggleE
           <div className="flex flex-col items-center">
             <div className="flex items-center">
               <span className="text-sm font-medium">{req.testDepthFactor.toFixed(1)}</span>
-              <TDFInfoTooltip />
             </div>
             <span className="text-xs text-gray-500">{mappedTests.length}/{req.minTestCases} tests</span>
             <div className={`mt-1 w-4 h-4 rounded-full flex items-center justify-center ${
