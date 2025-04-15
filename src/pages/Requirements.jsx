@@ -145,8 +145,15 @@ const Requirements = () => {
                 {filteredRequirements.map((req) => {
                   // Find corresponding coverage data
                   const coverage = versionCoverage.find(c => c.reqId === req.id);
-                  // Count linked test cases
-                  const linkedTestCount = (mapping[req.id] || []).length;
+                  
+                  // Filter linked test cases based on selected version
+                  const allLinkedTests = mapping[req.id] || [];
+                  const linkedTestCount = selectedVersion === 'unassigned'
+                    ? allLinkedTests.length
+                    : allLinkedTests.filter(tcId => {
+                        const tc = testCases.find(t => t.id === tcId);
+                        return tc && (!tc.version || tc.version === selectedVersion || tc.version === '');
+                      }).length;
                   
                   // Check for unassigned versions (versions that don't exist yet)
                   const assignedVersions = req.versions || [];
