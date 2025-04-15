@@ -41,7 +41,7 @@ const TraceabilityMatrix = () => {
     selectedVersion, 
     setSelectedVersion, 
     coverage,
-    versionCoverage, // Include versionCoverage in destructuring
+    versionCoverage,
     summary,
     versions,
     hasData
@@ -115,16 +115,17 @@ const TraceabilityMatrix = () => {
             </div>
           )}
           
-          {/* Matrix Table - Now using filtered data and versionCoverage */}
+          {/* Matrix Table - Now passing selectedVersion to MatrixTable */}
           <MatrixTable
             requirements={filteredRequirements}
             testCases={filteredTestCases}
             mapping={mapping}
-            coverage={versionCoverage} // Use versionCoverage instead of coverage
+            coverage={versionCoverage}
             collapseTestCases={collapseTestCases}
             expandedRequirement={expandedRequirement}
             toggleRequirementExpansion={toggleRequirementExpansion}
             toggleTestCaseView={toggleTestCaseView}
+            selectedVersion={selectedVersion}
           />
           
           {/* Information Panel */}

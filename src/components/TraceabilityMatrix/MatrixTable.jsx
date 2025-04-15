@@ -12,7 +12,8 @@ const MatrixTable = ({
   collapseTestCases,
   expandedRequirement,
   toggleRequirementExpansion,
-  toggleTestCaseView 
+  toggleTestCaseView,
+  selectedVersion
 }) => {
   // Check if we have data to display
   const hasRequirements = requirements && requirements.length > 0;
@@ -66,7 +67,7 @@ const MatrixTable = ({
               <th className="border p-2">Priority</th>
               <th className="border p-2">
                 <div className="flex items-center">
-                  Test Depth
+                  Test Coverage
                   <TDFInfoTooltip />
                 </div>
               </th>
@@ -85,6 +86,7 @@ const MatrixTable = ({
                 testCases={testCases}
                 expanded={expandedRequirement === req.id}
                 onToggleExpand={() => toggleRequirementExpansion(req.id)}
+                selectedVersion={selectedVersion}
               />
             ))}
           </tbody>
@@ -101,7 +103,7 @@ const MatrixTable = ({
               <th className="border p-2">Priority</th>
               <th className="border p-2 w-20">
                 <div className="flex items-center">
-                  Test Depth
+                  Coverage
                   <TDFInfoTooltip />
                 </div>
               </th>
@@ -124,54 +126,76 @@ const MatrixTable = ({
             </tr>
           </thead>
           <tbody>
-            {requirements.map(req => (
-              <tr key={req.id} className="hover:bg-gray-50">
-                <td className="border p-2 font-medium">{req.id}</td>
-                <td className="border p-2">{req.name}</td>
-                <td className="border p-2 text-center">
-                  <span className={`px-2 py-1 rounded text-xs ${
-                    req.priority === 'High' ? 'bg-red-100 text-red-800' : 
-                    req.priority === 'Medium' ? 'bg-yellow-100 text-yellow-800' : 'bg-blue-100 text-blue-800'
-                  }`}>
-                    {req.priority}
-                  </span>
-                </td>
-                <td className="border p-2 text-center">
-                  <div className="flex flex-col items-center">
-                    <span className="text-xs text-gray-500">{(mapping[req.id] || []).length}/{req.minTestCases} tests</span>
-                    <div className={`mt-1 w-4 h-4 rounded-full flex items-center justify-center ${
-                      (mapping[req.id] || []).length >= req.minTestCases 
-                        ? 'bg-green-500 text-white' 
-                        : 'bg-orange-500 text-white'
+            {requirements.map(req => {
+              // Filter test cases based on the selected version for test cell display
+              const filteredTestCases = selectedVersion === 'unassigned' 
+                ? testCases 
+                : testCases.filter(tc => !tc.version || tc.version === selectedVersion || tc.version === '');
+              
+              return (
+                <tr key={req.id} className="hover:bg-gray-50">
+                  <td className="border p-2 font-medium">{req.id}</td>
+                  <td className="border p-2">{req.name}</td>
+                  <td className="border p-2 text-center">
+                    <span className={`px-2 py-1 rounded text-xs ${
+                      req.priority === 'High' ? 'bg-red-100 text-red-800' : 
+                      req.priority === 'Medium' ? 'bg-yellow-100 text-yellow-800' : 'bg-blue-100 text-blue-800'
                     }`}>
-                      {(mapping[req.id] || []).length >= req.minTestCases ? '✓' : '!'}
+                      {req.priority}
+                    </span>
+                  </td>
+                  <td className="border p-2 text-center">
+                    <div className="flex flex-col items-center">
+                      {/* Filter mapped tests based on selected version */}
+                      {(() => {
+                        const allMappedTests = mapping[req.id] || [];
+                        const versionMappedTests = selectedVersion === 'unassigned'
+                          ? allMappedTests
+                          : allMappedTests.filter(tcId => {
+                              const tc = testCases.find(t => t.id === tcId);
+                              return tc && (!tc.version || tc.version === selectedVersion || tc.version === '');
+                            });
+                            
+                        return (
+                          <>
+                            <span className="text-xs text-gray-500">{versionMappedTests.length}/{req.minTestCases} tests</span>
+                            <div className={`mt-1 w-4 h-4 rounded-full flex items-center justify-center ${
+                              versionMappedTests.length >= req.minTestCases 
+                                ? 'bg-green-500 text-white' 
+                                : 'bg-orange-500 text-white'
+                            }`}>
+                              {versionMappedTests.length >= req.minTestCases ? '✓' : '!'}
+                            </div>
+                          </>
+                        );
+                      })()}
                     </div>
-                  </div>
-                </td>
-                
-                {testCases.map(tc => {
-                  const isLinked = (mapping[req.id] || []).includes(tc.id);
-                  const status = isLinked ? getCellStatus(req.id, tc.id, testCases) : 'none';
+                  </td>
                   
-                  return (
-                    <td key={`${req.id}-${tc.id}`} className="border p-2 text-center">
-                      {isLinked ? (
-                        <div className={`w-4 h-4 mx-auto rounded-full ${
-                          status === 'passed' ? 'bg-green-500' : 
-                          status === 'failed' ? 'bg-red-500' : 'bg-gray-300'
-                        }`}></div>
-                      ) : (
-                        <div className="w-4 h-4 mx-auto"></div>
-                      )}
-                    </td>
-                  );
-                })}
-                
-                <td className="border p-2">
-                  <CoverageIndicator coverage={coverage.find(c => c.reqId === req.id)} />
-                </td>
-              </tr>
-            ))}
+                  {filteredTestCases.map(tc => {
+                    const isLinked = (mapping[req.id] || []).includes(tc.id);
+                    const status = isLinked ? getCellStatus(req.id, tc.id, testCases) : 'none';
+                    
+                    return (
+                      <td key={`${req.id}-${tc.id}`} className="border p-2 text-center">
+                        {isLinked ? (
+                          <div className={`w-4 h-4 mx-auto rounded-full ${
+                            status === 'passed' ? 'bg-green-500' : 
+                            status === 'failed' ? 'bg-red-500' : 'bg-gray-300'
+                          }`}></div>
+                        ) : (
+                          <div className="w-4 h-4 mx-auto"></div>
+                        )}
+                      </td>
+                    );
+                  })}
+                  
+                  <td className="border p-2">
+                    <CoverageIndicator coverage={coverage.find(c => c.reqId === req.id)} />
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       )}

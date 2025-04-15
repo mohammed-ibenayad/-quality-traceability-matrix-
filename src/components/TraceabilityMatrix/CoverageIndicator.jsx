@@ -8,7 +8,7 @@ const CoverageIndicator = ({ coverage }) => {
   return (
     <div className="flex flex-col">
       <div className="flex justify-between items-center mb-1">
-        <div className="text-xs font-medium">Test Coverage:</div>
+        <div className="text-xs font-medium">Coverage:</div>
         <div className={`text-xs font-semibold ${
           coverage.meetsMinimum 
             ? 'text-green-600' 
@@ -42,11 +42,6 @@ const CoverageIndicator = ({ coverage }) => {
           className="bg-green-600 h-1.5 rounded-full" 
           style={{width: `${coverage.passPercentage}%`}}
         ></div>
-      </div>
-      
-      <div className="mt-2 text-xs text-gray-500">
-        TDF: {coverage.testDepthFactor.toFixed(1)} | 
-        Min Tests: {coverage.minTestCases}
       </div>
     </div>
   );

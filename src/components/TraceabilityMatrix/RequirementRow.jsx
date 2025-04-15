@@ -2,8 +2,19 @@ import React from 'react';
 import CoverageIndicator from './CoverageIndicator';
 import TDFInfoTooltip from '../Common/TDFInfoTooltip';
 
-const RequirementRow = ({ req, coverage, mapping, testCases, expanded, onToggleExpand }) => {
-  const mappedTests = mapping[req.id] || [];
+const RequirementRow = ({ req, coverage, mapping, testCases, expanded, onToggleExpand, selectedVersion }) => {
+  // Get all mapped test cases for this requirement
+  const allMappedTests = mapping[req.id] || [];
+  
+  // Filter test cases based on the selected version
+  const mappedTests = selectedVersion === 'unassigned'
+    ? allMappedTests
+    : allMappedTests.filter(tcId => {
+        const tc = testCases.find(t => t.id === tcId);
+        return tc && (!tc.version || tc.version === selectedVersion || tc.version === '');
+      });
+  
+  // Count statuses for the filtered test cases
   const passedCount = mappedTests.filter(tcId => 
     testCases.find(tc => tc.id === tcId)?.status === 'Passed'
   ).length;
@@ -37,9 +48,6 @@ const RequirementRow = ({ req, coverage, mapping, testCases, expanded, onToggleE
         </td>
         <td className="border p-2 text-center">
           <div className="flex flex-col items-center">
-            <div className="flex items-center">
-              <span className="text-sm font-medium">{req.testDepthFactor.toFixed(1)}</span>
-            </div>
             <span className="text-xs text-gray-500">{mappedTests.length}/{req.minTestCases} tests</span>
             <div className={`mt-1 w-4 h-4 rounded-full flex items-center justify-center ${
               mappedTests.length >= req.minTestCases 
@@ -85,7 +93,7 @@ const RequirementRow = ({ req, coverage, mapping, testCases, expanded, onToggleE
             <div className="p-3 bg-gray-50">
               <h4 className="font-medium mb-2">Test Cases for {req.id}: {req.name}</h4>
               {mappedTests.length === 0 ? (
-                <p className="text-gray-500 italic">No test cases associated with this requirement.</p>
+                <p className="text-gray-500 italic">No test cases associated with this requirement for the selected version.</p>
               ) : (
                 <table className="w-full border-collapse text-sm">
                   <thead>
@@ -94,6 +102,7 @@ const RequirementRow = ({ req, coverage, mapping, testCases, expanded, onToggleE
                       <th className="border p-1">Name</th>
                       <th className="border p-1">Status</th>
                       <th className="border p-1">Automation</th>
+                      <th className="border p-1">Version</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -117,6 +126,11 @@ const RequirementRow = ({ req, coverage, mapping, testCases, expanded, onToggleE
                               tc.automationStatus === 'Planned' ? 'bg-orange-100 text-orange-800' : 'bg-gray-100 text-gray-800'
                             }`}>
                               {tc.automationStatus}
+                            </span>
+                          </td>
+                          <td className="border p-1">
+                            <span className="text-xs">
+                              {tc.version || 'All Versions'}
                             </span>
                           </td>
                         </tr>
