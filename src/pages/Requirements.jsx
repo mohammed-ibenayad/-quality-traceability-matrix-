@@ -178,10 +178,6 @@ const Requirements = () => {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         <div className="flex flex-col items-center">
-                          <div className="flex items-center">
-                            <span className="text-sm font-medium">{req.testDepthFactor.toFixed(1)}</span>
-                            <TDFInfoTooltip />
-                          </div>
                           <span className="text-xs text-gray-500">{req.minTestCases} min tests</span>
                         </div>
                       </td>

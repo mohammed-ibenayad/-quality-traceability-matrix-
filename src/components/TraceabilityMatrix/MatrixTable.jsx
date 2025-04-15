@@ -138,10 +138,6 @@ const MatrixTable = ({
                 </td>
                 <td className="border p-2 text-center">
                   <div className="flex flex-col items-center">
-                    <div className="flex items-center">
-                      <span className="text-sm font-medium">{req.testDepthFactor.toFixed(1)}</span>
-                      <TDFInfoTooltip />
-                    </div>
                     <span className="text-xs text-gray-500">{(mapping[req.id] || []).length}/{req.minTestCases} tests</span>
                     <div className={`mt-1 w-4 h-4 rounded-full flex items-center justify-center ${
                       (mapping[req.id] || []).length >= req.minTestCases 
