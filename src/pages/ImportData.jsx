@@ -55,9 +55,17 @@ const ImportData = () => {
         jsonData: jsonString
       });
       
-      // In a real application, you would update your data store here
-      console.log(`Imported ${activeTab}:`, importedData);
+      console.log(`Import successful: ${importedData.length} ${activeTab} imported`);
+      
+      // Scroll to the success message
+      setTimeout(() => {
+        const successElement = document.getElementById('import-status');
+        if (successElement) {
+          successElement.scrollIntoView({ behavior: 'smooth' });
+        }
+      }, 100);
     } catch (error) {
+      console.error("Error in handleImportSuccess:", error);
       setImportStatus({
         success: false,
         message: `Error processing import: ${error.message}`
@@ -144,7 +152,10 @@ const ImportData = () => {
           <div className="border-b border-gray-200">
             <nav className="-mb-px flex" aria-label="Tabs">
               <button
-                onClick={() => setActiveTab('requirements')}
+                onClick={() => {
+                  setActiveTab('requirements');
+                  setImportStatus(null); // Clear previous import status when changing tabs
+                }}
                 className={`w-1/2 py-4 px-1 text-center border-b-2 font-medium text-sm ${
                   activeTab === 'requirements'
                     ? 'border-blue-500 text-blue-600'
@@ -159,7 +170,10 @@ const ImportData = () => {
                 </div>
               </button>
               <button
-                onClick={() => setActiveTab('testcases')}
+                onClick={() => {
+                  setActiveTab('testcases');
+                  setImportStatus(null); // Clear previous import status when changing tabs
+                }}
                 className={`w-1/2 py-4 px-1 text-center border-b-2 font-medium text-sm ${
                   activeTab === 'testcases'
                     ? 'border-blue-500 text-blue-600'
@@ -177,11 +191,60 @@ const ImportData = () => {
           </div>
         </div>
         
-        {/* Requirements Import Interface - MOVED TO TOP */}
+        {/* Requirements Import Interface */}
         {activeTab === 'requirements' && (
           <>
             {/* Import card moved to the top */}
             <ImportRequirements onImportSuccess={handleImportSuccess} />
+            
+            {/* Import Status (Success/Error) - Placed right after import component */}
+            {importStatus && activeTab === 'requirements' && (
+              <div 
+                id="import-status"
+                className={`mt-6 p-4 rounded shadow ${
+                  importStatus.success ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'
+                }`}
+                style={{ 
+                  animation: 'fadeIn 0.5s',
+                  scrollMarginTop: '20px'
+                }}
+              >
+                <h3 className={`font-semibold ${
+                  importStatus.success ? 'text-green-700' : 'text-red-700'
+                } text-lg mb-2`}>
+                  {importStatus.success ? 'Import Successful!' : 'Import Failed'}
+                </h3>
+                <p className={importStatus.success ? 'text-green-600' : 'text-red-600'}>
+                  {importStatus.message}
+                </p>
+                
+                {importStatus.success && importStatus.jsonData && (
+                  <div className="mt-4">
+                    <h4 className="font-medium text-gray-700 mb-2">Imported Data Preview:</h4>
+                    <div className="bg-gray-800 text-green-400 p-4 rounded overflow-auto max-h-96">
+                      <pre className="text-sm">{importStatus.jsonData}</pre>
+                    </div>
+                  </div>
+                )}
+                
+                {importStatus.success && (
+                  <div className="mt-6 flex gap-4">
+                    <button
+                      onClick={() => navigate('/matrix')}
+                      className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                    >
+                      Go to Traceability Matrix
+                    </button>
+                    <button
+                      onClick={() => navigate('/')}
+                      className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                    >
+                      View Dashboard
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
             
             {/* Instructions moved below the import component */}
             <div className="mt-6 bg-white p-6 rounded shadow">
@@ -235,11 +298,60 @@ const ImportData = () => {
           </>
         )}
         
-        {/* Test Case Import Interface - MOVED TO TOP */}
+        {/* Test Case Import Interface */}
         {activeTab === 'testcases' && (
           <>
             {/* Import card moved to the top */}
             <ImportTestCases onImportSuccess={handleImportSuccess} />
+            
+            {/* Import Status (Success/Error) - Placed right after import component */}
+            {importStatus && activeTab === 'testcases' && (
+              <div 
+                id="import-status"
+                className={`mt-6 p-4 rounded shadow ${
+                  importStatus.success ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'
+                }`}
+                style={{ 
+                  animation: 'fadeIn 0.5s',
+                  scrollMarginTop: '20px'
+                }}
+              >
+                <h3 className={`font-semibold ${
+                  importStatus.success ? 'text-green-700' : 'text-red-700'
+                } text-lg mb-2`}>
+                  {importStatus.success ? 'Import Successful!' : 'Import Failed'}
+                </h3>
+                <p className={importStatus.success ? 'text-green-600' : 'text-red-600'}>
+                  {importStatus.message}
+                </p>
+                
+                {importStatus.success && importStatus.jsonData && (
+                  <div className="mt-4">
+                    <h4 className="font-medium text-gray-700 mb-2">Imported Data Preview:</h4>
+                    <div className="bg-gray-800 text-green-400 p-4 rounded overflow-auto max-h-96">
+                      <pre className="text-sm">{importStatus.jsonData}</pre>
+                    </div>
+                  </div>
+                )}
+                
+                {importStatus.success && (
+                  <div className="mt-6 flex gap-4">
+                    <button
+                      onClick={() => navigate('/matrix')}
+                      className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                    >
+                      Go to Traceability Matrix
+                    </button>
+                    <button
+                      onClick={() => navigate('/')}
+                      className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                    >
+                      View Dashboard
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
             
             {/* Instructions moved below the import component */}
             <div className="mt-6 bg-white p-6 rounded shadow">
@@ -298,48 +410,18 @@ const ImportData = () => {
           </>
         )}
         
-        {/* Import Status (Success/Error) */}
-        {importStatus && (
-          <div className={`mt-6 p-4 rounded shadow ${
-            importStatus.success ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'
-          }`}>
-            <h3 className={`font-semibold ${
-              importStatus.success ? 'text-green-700' : 'text-red-700'
-            } text-lg mb-2`}>
-              {importStatus.success ? 'Import Successful!' : 'Import Failed'}
-            </h3>
-            <p className={importStatus.success ? 'text-green-600' : 'text-red-600'}>
-              {importStatus.message}
-            </p>
-            
-            {importStatus.success && importStatus.jsonData && (
-              <div className="mt-4">
-                <h4 className="font-medium text-gray-700 mb-2">Imported Data Preview:</h4>
-                <div className="bg-gray-800 text-green-400 p-4 rounded overflow-auto max-h-96">
-                  <pre className="text-sm">{importStatus.jsonData}</pre>
-                </div>
-              </div>
-            )}
-            
-            {importStatus.success && (
-              <div className="mt-6 flex gap-4">
-                <button
-                  onClick={() => navigate('/matrix')}
-                  className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-                >
-                  Go to Traceability Matrix
-                </button>
-                <button
-                  onClick={() => navigate('/')}
-                  className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-                >
-                  View Dashboard
-                </button>
-              </div>
-            )}
-          </div>
-        )}
+        {/* Removed original import status section that was at the bottom */}
       </div>
+      
+      {/* Add CSS for animations */}
+      <style>
+        {`
+          @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+          }
+        `}
+      </style>
     </MainLayout>
   );
 };
