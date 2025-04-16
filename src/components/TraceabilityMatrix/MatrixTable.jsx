@@ -2,7 +2,6 @@ import React from 'react';
 import RequirementRow from './RequirementRow';
 import CoverageIndicator from './CoverageIndicator';
 import { getCellStatus } from '../../utils/coverage';
-import TDFInfoTooltip from '../Common/TDFInfoTooltip';
 
 const MatrixTable = ({ 
   requirements, 
@@ -65,15 +64,9 @@ const MatrixTable = ({
               <th className="border p-2">Requirement ID</th>
               <th className="border p-2">Requirement Name</th>
               <th className="border p-2">Priority</th>
-              <th className="border p-2">
-                <div className="flex items-center">
-                  Test Coverage
-                  <TDFInfoTooltip />
-                </div>
-              </th>
+              <th className="border p-2">Test Coverage</th>
               <th className="border p-2">Test Cases</th>
-              <th className="border p-2">Status</th>
-              <th className="border p-2 w-40">Coverage</th>
+              <th className="border p-2">Execution Details</th>
             </tr>
           </thead>
           <tbody>
@@ -101,12 +94,7 @@ const MatrixTable = ({
               <th className="border p-2 w-36">Requirement ID</th>
               <th className="border p-2">Requirement Name</th>
               <th className="border p-2">Priority</th>
-              <th className="border p-2 w-20">
-                <div className="flex items-center">
-                  Coverage
-                  <TDFInfoTooltip />
-                </div>
-              </th>
+              <th className="border p-2 w-20">Coverage</th>
               {testCases.map(tc => (
                 <th key={tc.id} className="border p-2 w-24 text-xs">
                   {tc.id}<br/>
@@ -122,7 +110,7 @@ const MatrixTable = ({
                   </span>
                 </th>
               ))}
-              <th className="border p-2 w-40">Coverage</th>
+              <th className="border p-2 w-40">Execution Details</th>
             </tr>
           </thead>
           <tbody>
@@ -131,6 +119,21 @@ const MatrixTable = ({
               const filteredTestCases = selectedVersion === 'unassigned' 
                 ? testCases 
                 : testCases.filter(tc => !tc.version || tc.version === selectedVersion || tc.version === '');
+              
+              // Get coverage data
+              const reqCoverage = coverage.find(c => c.reqId === req.id);
+              const coveragePercentage = reqCoverage ? reqCoverage.coverageRatio : 0;
+              
+              // Get all mapped test cases for this requirement
+              const allMappedTests = mapping[req.id] || [];
+              
+              // Filter test cases based on the selected version
+              const mappedTests = selectedVersion === 'unassigned'
+                ? allMappedTests
+                : allMappedTests.filter(tcId => {
+                    const tc = testCases.find(t => t.id === tcId);
+                    return tc && (!tc.version || tc.version === selectedVersion || tc.version === '');
+                  });
               
               return (
                 <tr key={req.id} className="hover:bg-gray-50">
@@ -146,29 +149,25 @@ const MatrixTable = ({
                   </td>
                   <td className="border p-2 text-center">
                     <div className="flex flex-col items-center">
-                      {/* Filter mapped tests based on selected version */}
-                      {(() => {
-                        const allMappedTests = mapping[req.id] || [];
-                        const versionMappedTests = selectedVersion === 'unassigned'
-                          ? allMappedTests
-                          : allMappedTests.filter(tcId => {
-                              const tc = testCases.find(t => t.id === tcId);
-                              return tc && (!tc.version || tc.version === selectedVersion || tc.version === '');
-                            });
-                            
-                        return (
-                          <>
-                            <span className="text-xs text-gray-500">{versionMappedTests.length}/{req.minTestCases} tests</span>
-                            <div className={`mt-1 w-4 h-4 rounded-full flex items-center justify-center ${
-                              versionMappedTests.length >= req.minTestCases 
-                                ? 'bg-green-500 text-white' 
-                                : 'bg-orange-500 text-white'
-                            }`}>
-                              {versionMappedTests.length >= req.minTestCases ? '✓' : '!'}
-                            </div>
-                          </>
-                        );
-                      })()}
+                      <span className="text-xs text-gray-500">{mappedTests.length}/{req.minTestCases} tests</span>
+                      <div className={`mt-1 w-4 h-4 rounded-full flex items-center justify-center ${
+                        mappedTests.length >= req.minTestCases 
+                          ? 'bg-green-500 text-white' 
+                          : 'bg-orange-500 text-white'
+                      }`}>
+                        {mappedTests.length >= req.minTestCases ? '✓' : '!'}
+                      </div>
+                      
+                      {/* Coverage percentage displayed here */}
+                      {reqCoverage && (
+                        <div className={`text-xs font-medium mt-1 ${
+                          reqCoverage.meetsMinimum 
+                            ? 'text-green-600' 
+                            : 'text-orange-600'
+                        }`}>
+                          {coveragePercentage}% coverage
+                        </div>
+                      )}
                     </div>
                   </td>
                   
@@ -191,7 +190,27 @@ const MatrixTable = ({
                   })}
                   
                   <td className="border p-2">
-                    <CoverageIndicator coverage={coverage.find(c => c.reqId === req.id)} />
+                    {reqCoverage ? (
+                      <div className="flex flex-col">
+                        <div className="text-xs mb-1">Pass: {reqCoverage.passPercentage}%</div>
+                        <div className="w-full bg-gray-200 rounded-full h-1.5 mb-2">
+                          <div 
+                            className="bg-green-600 h-1.5 rounded-full" 
+                            style={{width: `${reqCoverage.passPercentage}%`}}
+                          ></div>
+                        </div>
+                        
+                        <div className="text-xs mb-1">Auto: {reqCoverage.automationPercentage}%</div>
+                        <div className="w-full bg-gray-200 rounded-full h-1.5">
+                          <div 
+                            className="bg-blue-600 h-1.5 rounded-full" 
+                            style={{width: `${reqCoverage.automationPercentage}%`}}
+                          ></div>
+                        </div>
+                      </div>
+                    ) : (
+                      <span className="text-red-500 text-xs">No Coverage</span>
+                    )}
                   </td>
                 </tr>
               );

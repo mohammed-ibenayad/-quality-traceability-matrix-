@@ -1,6 +1,5 @@
 import React from 'react';
 import CoverageIndicator from './CoverageIndicator';
-import TDFInfoTooltip from '../Common/TDFInfoTooltip';
 
 const RequirementRow = ({ req, coverage, mapping, testCases, expanded, onToggleExpand, selectedVersion }) => {
   // Get all mapped test cases for this requirement
@@ -25,6 +24,9 @@ const RequirementRow = ({ req, coverage, mapping, testCases, expanded, onToggleE
     testCases.find(tc => tc.id === tcId)?.status === 'Not Run'
   ).length;
 
+  // Calculate coverage percentage
+  const coveragePercentage = coverage ? coverage.coverageRatio : 0;
+
   return (
     <>
       <tr className="hover:bg-gray-50">
@@ -46,6 +48,8 @@ const RequirementRow = ({ req, coverage, mapping, testCases, expanded, onToggleE
             {req.priority}
           </span>
         </td>
+        
+        {/* Test Coverage column - Now showing the Coverage Percentage */}
         <td className="border p-2 text-center">
           <div className="flex flex-col items-center">
             <span className="text-xs text-gray-500">{mappedTests.length}/{req.minTestCases} tests</span>
@@ -56,8 +60,20 @@ const RequirementRow = ({ req, coverage, mapping, testCases, expanded, onToggleE
             }`}>
               {mappedTests.length >= req.minTestCases ? '✓' : '!'}
             </div>
+            
+            {/* Coverage percentage displayed here */}
+            {coverage && (
+              <div className={`text-xs font-medium mt-1 ${
+                coverage.meetsMinimum 
+                  ? 'text-green-600' 
+                  : 'text-orange-600'
+              }`}>
+                {coveragePercentage}% coverage
+              </div>
+            )}
           </div>
         </td>
+        
         <td className="border p-2">
           <div className="flex gap-2 items-center justify-center">
             <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs">{passedCount} Passed</span>
@@ -69,27 +85,36 @@ const RequirementRow = ({ req, coverage, mapping, testCases, expanded, onToggleE
             )}
           </div>
         </td>
-        <td className="border p-2 text-center">
-          {mappedTests.length === 0 ? (
-            <span className="text-red-500 text-sm">No Tests</span>
-          ) : (
-            <span className={`text-sm font-medium ${
-              passedCount === mappedTests.length ? 'text-green-600' :
-              failedCount > 0 ? 'text-red-600' : 'text-blue-600'
-            }`}>
-              {passedCount === mappedTests.length ? '✓ All Passing' :
-               failedCount > 0 ? '✗ Failing' : '⟳ In Progress'}
-            </span>
-          )}
-        </td>
+        
+        {/* Coverage column - Only showing Pass Rate and Automation Rate */}
         <td className="border p-2">
-          <CoverageIndicator coverage={coverage} />
+          {coverage ? (
+            <div className="flex flex-col">
+              <div className="text-xs mb-1">Pass: {coverage.passPercentage}%</div>
+              <div className="w-full bg-gray-200 rounded-full h-1.5 mb-2">
+                <div 
+                  className="bg-green-600 h-1.5 rounded-full" 
+                  style={{width: `${coverage.passPercentage}%`}}
+                ></div>
+              </div>
+              
+              <div className="text-xs mb-1">Auto: {coverage.automationPercentage}%</div>
+              <div className="w-full bg-gray-200 rounded-full h-1.5">
+                <div 
+                  className="bg-blue-600 h-1.5 rounded-full" 
+                  style={{width: `${coverage.automationPercentage}%`}}
+                ></div>
+              </div>
+            </div>
+          ) : (
+            <span className="text-red-500 text-xs">No Coverage</span>
+          )}
         </td>
       </tr>
       
       {expanded && (
         <tr>
-          <td colSpan="8" className="border p-0">
+          <td colSpan="7" className="border p-0">
             <div className="p-3 bg-gray-50">
               <h4 className="font-medium mb-2">Test Cases for {req.id}: {req.name}</h4>
               {mappedTests.length === 0 ? (
