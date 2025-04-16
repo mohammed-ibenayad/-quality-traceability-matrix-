@@ -1,7 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import RequirementRow from './RequirementRow';
 import CoverageIndicator from './CoverageIndicator';
 import { getCellStatus } from '../../utils/coverage';
+import { Play } from 'lucide-react';
+import TestExecutionModal from '../TestExecution/TestExecutionModal';
 
 const MatrixTable = ({ 
   requirements, 
@@ -14,9 +16,41 @@ const MatrixTable = ({
   toggleTestCaseView,
   selectedVersion
 }) => {
+  // State for test execution modal
+  const [testModalState, setTestModalState] = useState({
+    isOpen: false,
+    requirement: null,
+    testCases: []
+  });
+  
   // Check if we have data to display
   const hasRequirements = requirements && requirements.length > 0;
   const hasTestCases = testCases && testCases.length > 0;
+  
+  // Handler for opening test execution modal
+  const handleOpenTestModal = (requirement) => {
+    // Get test cases for this requirement
+    const reqTestIds = mapping[requirement.id] || [];
+    const reqTestCases = reqTestIds
+      .map(tcId => testCases.find(tc => tc.id === tcId))
+      .filter(Boolean);
+    
+    setTestModalState({
+      isOpen: true,
+      requirement,
+      testCases: reqTestCases
+    });
+  };
+  
+  // Handler for test completion
+  const handleTestComplete = (results) => {
+    console.log('Test execution completed:', results);
+    
+    // Close modal after a short delay
+    setTimeout(() => {
+      setTestModalState(prev => ({ ...prev, isOpen: false }));
+    }, 2000);
+  };
   
   // If no requirements, show empty state
   if (!hasRequirements) {
@@ -67,6 +101,7 @@ const MatrixTable = ({
               <th className="border p-2">Test Coverage</th>
               <th className="border p-2">Test Cases</th>
               <th className="border p-2">Execution Details</th>
+              <th className="border p-2">Actions</th> {/* New column for Run Tests button */}
             </tr>
           </thead>
           <tbody>
@@ -111,6 +146,7 @@ const MatrixTable = ({
                 </th>
               ))}
               <th className="border p-2 w-40">Execution Details</th>
+              <th className="border p-2 w-24">Actions</th> {/* New column for Run Tests button */}
             </tr>
           </thead>
           <tbody>
@@ -134,6 +170,11 @@ const MatrixTable = ({
                     const tc = testCases.find(t => t.id === tcId);
                     return tc && (!tc.version || tc.version === selectedVersion || tc.version === '');
                   });
+              
+              // Get test case objects for this requirement
+              const mappedTestObjects = mappedTests.map(tcId => 
+                testCases.find(tc => tc.id === tcId)
+              ).filter(Boolean);
               
               return (
                 <tr key={req.id} className="hover:bg-gray-50">
@@ -212,12 +253,34 @@ const MatrixTable = ({
                       <span className="text-red-500 text-xs">No Coverage</span>
                     )}
                   </td>
+                  
+                  {/* New cell for Run Tests button */}
+                  <td className="border p-2 text-center">
+                    <button
+                      onClick={() => handleOpenTestModal(req)}
+                      className="inline-flex items-center px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 text-xs"
+                      disabled={mappedTests.length === 0}
+                      title={mappedTests.length === 0 ? "No test cases to run" : "Run tests for this requirement"}
+                    >
+                      <Play className="mr-1" size={12} />
+                      Run
+                    </button>
+                  </td>
                 </tr>
               );
             })}
           </tbody>
         </table>
       )}
+
+      {/* Test Execution Modal */}
+      <TestExecutionModal
+        requirement={testModalState.requirement}
+        testCases={testModalState.testCases}
+        isOpen={testModalState.isOpen}
+        onClose={() => setTestModalState(prev => ({ ...prev, isOpen: false }))}
+        onTestComplete={handleTestComplete}
+      />
     </div>
   );
 };

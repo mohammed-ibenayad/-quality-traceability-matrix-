@@ -1,7 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { Play } from 'lucide-react';
 import CoverageIndicator from './CoverageIndicator';
+import TestExecutionModal from '../TestExecution/TestExecutionModal';
 
 const RequirementRow = ({ req, coverage, mapping, testCases, expanded, onToggleExpand, selectedVersion }) => {
+  const [isTestModalOpen, setIsTestModalOpen] = useState(false);
+  
   // Get all mapped test cases for this requirement
   const allMappedTests = mapping[req.id] || [];
   
@@ -12,6 +16,11 @@ const RequirementRow = ({ req, coverage, mapping, testCases, expanded, onToggleE
         const tc = testCases.find(t => t.id === tcId);
         return tc && (!tc.version || tc.version === selectedVersion || tc.version === '');
       });
+  
+  // Get the actual test case objects
+  const mappedTestObjects = mappedTests.map(tcId => 
+    testCases.find(tc => tc.id === tcId)
+  ).filter(Boolean);
   
   // Count statuses for the filtered test cases
   const passedCount = mappedTests.filter(tcId => 
@@ -26,6 +35,17 @@ const RequirementRow = ({ req, coverage, mapping, testCases, expanded, onToggleE
 
   // Calculate coverage percentage
   const coveragePercentage = coverage ? coverage.coverageRatio : 0;
+  
+  // Handle test completion
+  const handleTestComplete = (results) => {
+    // In a real application, this would update the test case statuses in your data store
+    console.log(`Test execution completed for ${req.id}:`, results);
+    
+    // Close the modal after a short delay
+    setTimeout(() => {
+      setIsTestModalOpen(false);
+    }, 2000);
+  };
 
   return (
     <>
@@ -49,7 +69,7 @@ const RequirementRow = ({ req, coverage, mapping, testCases, expanded, onToggleE
           </span>
         </td>
         
-        {/* Test Coverage column - Now showing the Coverage Percentage */}
+        {/* Test Coverage column */}
         <td className="border p-2 text-center">
           <div className="flex flex-col items-center">
             <span className="text-xs text-gray-500">{mappedTests.length}/{req.minTestCases} tests</span>
@@ -110,11 +130,24 @@ const RequirementRow = ({ req, coverage, mapping, testCases, expanded, onToggleE
             <span className="text-red-500 text-xs">No Coverage</span>
           )}
         </td>
+        
+        {/* Add new column for actions */}
+        <td className="border p-2 text-center">
+          <button
+            onClick={() => setIsTestModalOpen(true)}
+            className="inline-flex items-center px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 text-xs"
+            disabled={mappedTests.length === 0}
+            title={mappedTests.length === 0 ? "No test cases to run" : "Run tests for this requirement"}
+          >
+            <Play className="mr-1" size={12} />
+            Run Tests
+          </button>
+        </td>
       </tr>
       
       {expanded && (
         <tr>
-          <td colSpan="7" className="border p-0">
+          <td colSpan="8" className="border p-0">
             <div className="p-3 bg-gray-50">
               <h4 className="font-medium mb-2">Test Cases for {req.id}: {req.name}</h4>
               {mappedTests.length === 0 ? (
@@ -168,6 +201,15 @@ const RequirementRow = ({ req, coverage, mapping, testCases, expanded, onToggleE
           </td>
         </tr>
       )}
+      
+      {/* Test Execution Modal */}
+      <TestExecutionModal
+        requirement={req}
+        testCases={mappedTestObjects}
+        isOpen={isTestModalOpen}
+        onClose={() => setIsTestModalOpen(false)}
+        onTestComplete={handleTestComplete}
+      />
     </>
   );
 };
