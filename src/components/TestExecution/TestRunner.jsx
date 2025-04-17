@@ -1,16 +1,24 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { GitBranch, Play, Check, AlertTriangle, X, Loader2 } from 'lucide-react';
+import GitHubService from '../../services/GitHubService';
 
-/**
- * Test Runner component that connects to a GitHub repository to execute tests
- * for a specific requirement.
- */
 const TestRunner = ({ requirement, testCases, onTestComplete }) => {
   const [repoUrl, setRepoUrl] = useState('');
   const [branch, setBranch] = useState('main');
+  const [workflowId, setWorkflowId] = useState('quality-tracker-tests.yml');
+  const [ghToken, setGhToken] = useState('');
   const [isRunning, setIsRunning] = useState(false);
+  const [workflowRun, setWorkflowRun] = useState(null);
   const [results, setResults] = useState(null);
   const [error, setError] = useState(null);
+  const [pollInterval, setPollInterval] = useState(null);
+
+  // Clean up polling on unmount
+  useEffect(() => {
+    return () => {
+      if (pollInterval) clearInterval(pollInterval);
+    };
+  }, [pollInterval]);
 
   const handleRunTests = async () => {
     if (!repoUrl) {
@@ -18,47 +26,71 @@ const TestRunner = ({ requirement, testCases, onTestComplete }) => {
       return;
     }
 
+    if (!ghToken) {
+      setError('GitHub token is required to trigger workflows');
+      return;
+    }
+
     setIsRunning(true);
     setError(null);
     setResults(null);
+    setWorkflowRun(null);
 
     try {
-      // In a real implementation, this would be an API call to your backend
-      // which would trigger the tests in the specified repository
-      await simulateTestRun(requirement, testCases);
+      // Extract owner and repo from URL
+      const { owner, repo } = GitHubService.parseGitHubUrl(repoUrl);
       
-      // Simulate test results
-      const mockResults = generateMockResults(testCases);
-      setResults(mockResults);
+      // Define the test payload - this will be sent to the GitHub Actions workflow
+      const payload = {
+        requirementId: requirement.id,
+        testCases: testCases.map(tc => tc.id),
+        requirementName: requirement.name
+      };
       
-      if (onTestComplete) {
-        onTestComplete(mockResults);
-      }
+      // Trigger the workflow dispatch event
+      const run = await GitHubService.triggerWorkflow(
+        owner, 
+        repo, 
+        workflowId, 
+        branch, 
+        ghToken, 
+        payload
+      );
+      
+      setWorkflowRun(run);
+      
+      // Start polling for workflow status
+      const interval = setInterval(async () => {
+        try {
+          const status = await GitHubService.getWorkflowStatus(owner, repo, run.id, ghToken);
+          
+          if (status.status === 'completed') {
+            clearInterval(interval);
+            setPollInterval(null);
+            setIsRunning(false);
+            
+            // Fetch test results
+            const testResults = await GitHubService.getWorkflowResults(owner, repo, run.id, ghToken);
+            setResults(testResults);
+            
+            if (onTestComplete) {
+              onTestComplete(testResults);
+            }
+          }
+        } catch (err) {
+          clearInterval(interval);
+          setPollInterval(null);
+          setIsRunning(false);
+          setError(`Error monitoring workflow: ${err.message}`);
+        }
+      }, 5000); // Check every 5 seconds
+      
+      setPollInterval(interval);
+      
     } catch (err) {
-      setError(err.message || 'Failed to run tests');
-    } finally {
       setIsRunning(false);
+      setError(`Error triggering workflow: ${err.message}`);
     }
-  };
-
-  // This function simulates test execution - in a real implementation
-  // this would trigger tests in your Python repository
-  const simulateTestRun = async (requirement, testCases) => {
-    // Simulate network delay
-    return new Promise((resolve) => {
-      setTimeout(resolve, 2000);
-    });
-  };
-
-  // Generate mock results for demonstration
-  const generateMockResults = (testCases) => {
-    return testCases.map(tc => ({
-      id: tc.id,
-      name: tc.name,
-      status: Math.random() > 0.2 ? 'Passed' : 'Failed',
-      duration: Math.floor(Math.random() * 1000) + 100,
-      logs: `Executing test ${tc.id}: ${tc.name}\nTest completed with ${Math.random() > 0.2 ? 'success' : 'failure'}.`
-    }));
   };
 
   const passedCount = results?.filter(r => r.status === 'Passed').length || 0;
@@ -66,7 +98,7 @@ const TestRunner = ({ requirement, testCases, onTestComplete }) => {
 
   return (
     <div className="bg-white rounded-lg shadow-md p-6">
-      <h2 className="text-xl font-semibold mb-4">Run Tests for {requirement?.id}: {requirement?.name}</h2>
+      <h2 className="text-xl font-semibold mb-4">Run Tests via GitHub Actions</h2>
       
       <div className="mb-6">
         <div className="mb-4">
@@ -80,6 +112,9 @@ const TestRunner = ({ requirement, testCases, onTestComplete }) => {
             placeholder="https://github.com/username/repository"
             className="w-full p-2 border border-gray-300 rounded"
           />
+          <p className="text-xs text-gray-500 mt-1">
+            The repository containing your test files
+          </p>
         </div>
 
         <div className="mb-4">
@@ -95,6 +130,38 @@ const TestRunner = ({ requirement, testCases, onTestComplete }) => {
               className="w-full p-2 border border-gray-300 rounded"
             />
           </div>
+        </div>
+        
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Workflow File
+          </label>
+          <input
+            type="text"
+            value={workflowId}
+            onChange={(e) => setWorkflowId(e.target.value)}
+            placeholder="quality-tracker-tests.yml"
+            className="w-full p-2 border border-gray-300 rounded"
+          />
+          <p className="text-xs text-gray-500 mt-1">
+            The workflow file in .github/workflows directory of your repository
+          </p>
+        </div>
+        
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            GitHub Token
+          </label>
+          <input
+            type="password"
+            value={ghToken}
+            onChange={(e) => setGhToken(e.target.value)}
+            placeholder="ghp_..."
+            className="w-full p-2 border border-gray-300 rounded"
+          />
+          <p className="text-xs text-gray-500 mt-1">
+            Personal access token with workflow permissions
+          </p>
         </div>
 
         <div className="mb-4">
@@ -127,12 +194,12 @@ const TestRunner = ({ requirement, testCases, onTestComplete }) => {
           {isRunning ? (
             <>
               <Loader2 className="animate-spin mr-2" size={18} />
-              Running Tests...
+              Running Workflow...
             </>
           ) : (
             <>
               <Play className="mr-2" size={18} />
-              Run Tests
+              Trigger GitHub Actions
             </>
           )}
         </button>
@@ -143,6 +210,25 @@ const TestRunner = ({ requirement, testCases, onTestComplete }) => {
           <div className="flex items-center">
             <AlertTriangle className="mr-2" size={18} />
             <span>{error}</span>
+          </div>
+        </div>
+      )}
+      
+      {workflowRun && isRunning && (
+        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded">
+          <div className="flex justify-between items-center">
+            <div className="flex items-center">
+              <Loader2 className="animate-spin mr-2 text-blue-600" size={18} />
+              <span className="text-blue-700">Workflow is running...</span>
+            </div>
+            <a 
+              href={workflowRun.html_url} 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-xs bg-blue-700 text-white px-2 py-1 rounded hover:bg-blue-800"
+            >
+              View on GitHub
+            </a>
           </div>
         </div>
       )}
