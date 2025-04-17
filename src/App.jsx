@@ -25,16 +25,52 @@ function App() {
       setHasData(dataStore.hasData());
     });
     
-    // Register the test results endpoint with the window for debugging
+    // Improved test results API handling
     if (!window.qualityTracker) {
       window.qualityTracker = {
         apis: {
           testResults: testResultsApi
+        },
+        // Add a directly callable function to process test results
+        processTestResults: (data) => {
+          console.log("Test results received via window.qualityTracker.processTestResults:", data);
+          return testResultsApi.test(data);
         }
       };
       
-      console.log('Quality Tracker APIs registered on window.qualityTracker.apis');
+      // Also expose window.receiveTestResults for direct script invocation
+      window.receiveTestResults = (data) => {
+        console.log("Test results received via window.receiveTestResults:", data);
+        try {
+          return testResultsApi.test(data);
+        } catch (error) {
+          console.error("Error processing test results:", error);
+          return { success: false, error: error.message };
+        }
+      };
+      
+      console.log('Quality Tracker APIs registered:');
+      console.log('- window.qualityTracker.apis.testResults');
+      console.log('- window.qualityTracker.processTestResults(data)');
+      console.log('- window.receiveTestResults(data)');
       console.log('Test results callback URL:', testResultsApi.baseUrl);
+      
+      // Display helper message about how to manually test the API
+      console.log('\nTo manually test the API, run this in the console:');
+      console.log(`
+window.receiveTestResults({
+  requirementId: "REQ-001",
+  timestamp: "${new Date().toISOString()}",
+  results: [
+    {
+      id: "TC_001",
+      name: "test_homepage_loads_TC_001",
+      status: "Failed",
+      duration: 13267
+    }
+  ]
+}).then(result => console.log("Result:", result));
+      `);
     }
     
     return () => {

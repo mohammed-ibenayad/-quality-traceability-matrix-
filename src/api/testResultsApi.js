@@ -5,7 +5,7 @@
 import dataStore from '../services/DataStore';
 
 /**
- * Process test results submitted from the Python test runner
+ * Process test results submitted from the GitHub Actions workflow
  * 
  * In a real application, this would be an Express or other server-side route handler
  * For this example, we're simulating a backend API in the browser
@@ -29,7 +29,7 @@ export const processTestResults = async (req) => {
     }
     
     console.log(`Received test results for ${requirementId} at ${timestamp}`);
-    console.log(`${results.length} tests executed`);
+    console.log(`${results.length} tests executed:`, results);
     
     // Update test case status in the dataStore
     const updatedTestCases = updateTestCaseStatus(requirementId, results);
@@ -49,6 +49,22 @@ export const processTestResults = async (req) => {
       body: { error: 'Internal server error processing test results' }
     };
   }
+};
+
+/**
+ * Normalize test case ID to match application format
+ * @param {String} id - The test case ID to normalize
+ * @returns {String} Normalized test case ID
+ */
+const normalizeTestCaseId = (id) => {
+  if (!id) return id;
+  
+  // Convert TC_XXX to TC-XXX
+  if (id.startsWith('TC_')) {
+    return id.replace('TC_', 'TC_');
+  }
+  
+  return id;
 };
 
 /**
@@ -72,24 +88,105 @@ const updateTestCaseStatus = (requirementId, results) => {
     
     // Update test case status based on results
     results.forEach(result => {
+      // Normalize test case ID to handle format differences
+      const normalizedId = normalizeTestCaseId(result.id);
+      
+      console.log(`Looking for test case with ID: ${normalizedId} (original: ${result.id})`);
+      
       // Find the corresponding test case in the dataStore
-      const testCaseIndex = testCases.findIndex(tc => tc.id === result.id);
+      const testCaseIndex = testCases.findIndex(tc => tc.id === normalizedId);
+      
+      if (testCaseIndex !== -1) {
+        console.log(`Found test case at index ${testCaseIndex}:`, testCases[testCaseIndex]);
+      } else {
+        console.log(`Test case not found with ID ${normalizedId}`);
+      }
+      
+      // Check if this test is associated with the requirement
+      const isAssociated = associatedTestIds.includes(normalizedId);
+      
+      if (!isAssociated) {
+        console.log(`Test case ${normalizedId} is not associated with requirement ${requirementId}`);
+        console.log(`Associated test IDs:`, associatedTestIds);
+      }
       
       // If found and the test is associated with this requirement, update its status
-      if (testCaseIndex !== -1 && associatedTestIds.includes(result.id)) {
+      if (testCaseIndex !== -1 && isAssociated) {
         testCases[testCaseIndex] = {
           ...testCases[testCaseIndex],
           status: result.status,
-          lastExecuted: new Date().toISOString()
+          lastExecuted: new Date().toISOString(),
+          executionTime: result.duration || 0  // Store execution time in milliseconds
         };
         
+        console.log(`Updated test case:`, testCases[testCaseIndex]);
         updatedTestCases.push(testCases[testCaseIndex]);
+      } else if (testCaseIndex !== -1) {
+        // Test case exists but is not associated with this requirement
+        console.log(`Test case ${normalizedId} exists but is not associated with requirement ${requirementId}`);
+        
+        // Optionally update the mapping to associate this test with the requirement
+        if (!mapping[requirementId]) {
+          mapping[requirementId] = [];
+        }
+        
+        if (!mapping[requirementId].includes(normalizedId)) {
+          mapping[requirementId].push(normalizedId);
+          console.log(`Added association between ${requirementId} and ${normalizedId}`);
+          
+          // Now update the test case
+          testCases[testCaseIndex] = {
+            ...testCases[testCaseIndex],
+            status: result.status,
+            lastExecuted: new Date().toISOString(),
+            executionTime: result.duration || 0
+          };
+          
+          updatedTestCases.push(testCases[testCaseIndex]);
+        }
+      } else {
+        // Test case doesn't exist, could create it automatically
+        console.log(`Test case ${normalizedId} not found in the system. Consider creating it.`);
+        
+        // Create a new test case
+        const newTestCase = {
+          id: normalizedId,
+          name: result.name || `Test Case ${normalizedId}`,
+          status: result.status,
+          automationStatus: 'Automated',
+          lastExecuted: new Date().toISOString(),
+          executionTime: result.duration || 0,
+          description: `Automatically created from test results for ${requirementId}`
+        };
+        
+        // Add to test cases
+        testCases.push(newTestCase);
+        console.log(`Created new test case:`, newTestCase);
+        
+        // Add to mapping
+        if (!mapping[requirementId]) {
+          mapping[requirementId] = [];
+        }
+        
+        if (!mapping[requirementId].includes(normalizedId)) {
+          mapping[requirementId].push(normalizedId);
+          console.log(`Added association between ${requirementId} and ${normalizedId}`);
+        }
+        
+        updatedTestCases.push(newTestCase);
       }
     });
     
     // Update the dataStore with the updated test cases
     if (updatedTestCases.length > 0) {
       dataStore.setTestCases([...testCases]);
+      
+      // Also update mappings if necessary
+      dataStore.updateMappings(mapping);
+      
+      console.log(`Updated ${updatedTestCases.length} test cases in DataStore`);
+    } else {
+      console.log('No test cases were updated');
     }
     
     return updatedTestCases;
@@ -117,6 +214,7 @@ export const setupTestResultsEndpoint = () => {
   
   return {
     url: 'window.mockApi.testResults',
+    baseUrl: `${window.location.protocol}//${window.location.host}/api/test-results`,
     test: (data) => window.mockApi.testResults(data)
   };
 };

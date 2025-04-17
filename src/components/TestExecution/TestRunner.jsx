@@ -1,18 +1,38 @@
 import React, { useState, useEffect } from 'react';
-import { GitBranch, Play, Check, AlertTriangle, X, Loader2 } from 'lucide-react';
+import { GitBranch, Play, Check, AlertTriangle, X, Loader2, ChevronDown, ChevronRight, Save } from 'lucide-react';
 import GitHubService from '../../services/GitHubService';
 
 const TestRunner = ({ requirement, testCases, onTestComplete }) => {
-  const [repoUrl, setRepoUrl] = useState('');
-  const [branch, setBranch] = useState('main');
-  const [workflowId, setWorkflowId] = useState('quality-tracker-tests.yml');
-  const [ghToken, setGhToken] = useState('');
-  const [callbackUrl, setCallbackUrl] = useState('');
+  // State for GitHub configuration
+  const [config, setConfig] = useState({
+    repoUrl: '',
+    branch: 'main',
+    workflowId: 'quality-tracker-tests.yml',
+    ghToken: '',
+    callbackUrl: ''
+  });
+  
+  // State for UI
+  const [isConfigExpanded, setIsConfigExpanded] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
   const [workflowRun, setWorkflowRun] = useState(null);
   const [results, setResults] = useState(null);
   const [error, setError] = useState(null);
   const [pollInterval, setPollInterval] = useState(null);
+  const [isSaved, setIsSaved] = useState(false);
+
+  // Load saved configuration on component mount
+  useEffect(() => {
+    try {
+      const savedConfig = localStorage.getItem('testRunnerConfig');
+      if (savedConfig) {
+        const parsedConfig = JSON.parse(savedConfig);
+        setConfig(parsedConfig);
+      }
+    } catch (err) {
+      console.error('Error loading saved configuration:', err);
+    }
+  }, []);
 
   // Clean up polling on unmount
   useEffect(() => {
@@ -21,13 +41,40 @@ const TestRunner = ({ requirement, testCases, onTestComplete }) => {
     };
   }, [pollInterval]);
 
+  // Handle input changes
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setConfig(prev => ({
+      ...prev,
+      [name]: value
+    }));
+    
+    // Reset saved indicator when changes are made
+    setIsSaved(false);
+  };
+
+  // Save configuration to localStorage
+  const saveConfiguration = () => {
+    try {
+      localStorage.setItem('testRunnerConfig', JSON.stringify(config));
+      setIsSaved(true);
+      
+      // Show saved indicator for 2 seconds
+      setTimeout(() => {
+        setIsSaved(false);
+      }, 2000);
+    } catch (err) {
+      console.error('Error saving configuration:', err);
+    }
+  };
+
   const handleRunTests = async () => {
-    if (!repoUrl) {
+    if (!config.repoUrl) {
       setError('Please provide a GitHub repository URL');
       return;
     }
 
-    if (!ghToken) {
+    if (!config.ghToken) {
       setError('GitHub token is required to trigger workflows');
       return;
     }
@@ -39,14 +86,14 @@ const TestRunner = ({ requirement, testCases, onTestComplete }) => {
 
     try {
       // Extract owner and repo from URL
-      const { owner, repo } = GitHubService.parseGitHubUrl(repoUrl);
+      const { owner, repo } = GitHubService.parseGitHubUrl(config.repoUrl);
       
       // Define the test payload with callback URL
       const payload = {
         requirementId: requirement.id,
         requirementName: requirement.name,
         testCases: testCases.map(tc => tc.id),
-        callbackUrl: callbackUrl // Include the callback URL in the payload
+        callbackUrl: config.callbackUrl
       };
       
       console.log("Sending payload to GitHub Actions:", payload);
@@ -55,9 +102,9 @@ const TestRunner = ({ requirement, testCases, onTestComplete }) => {
       const run = await GitHubService.triggerWorkflow(
         owner, 
         repo, 
-        workflowId, 
-        branch, 
-        ghToken, 
+        config.workflowId, 
+        config.branch, 
+        config.ghToken, 
         payload
       );
       
@@ -66,7 +113,7 @@ const TestRunner = ({ requirement, testCases, onTestComplete }) => {
       // Start polling for workflow status
       const interval = setInterval(async () => {
         try {
-          const status = await GitHubService.getWorkflowStatus(owner, repo, run.id, ghToken);
+          const status = await GitHubService.getWorkflowStatus(owner, repo, run.id, config.ghToken);
           
           if (status.status === 'completed') {
             clearInterval(interval);
@@ -74,7 +121,7 @@ const TestRunner = ({ requirement, testCases, onTestComplete }) => {
             setIsRunning(false);
             
             // If we don't have a callback URL, fallback to simulated results
-            if (!callbackUrl) {
+            if (!config.callbackUrl) {
               // Simulate test results for demo purposes
               const simulatedResults = testCases.map(tc => ({
                 id: tc.id,
@@ -126,129 +173,170 @@ const TestRunner = ({ requirement, testCases, onTestComplete }) => {
     <div className="bg-white rounded-lg shadow-md p-6">
       <h2 className="text-xl font-semibold mb-4">Run Tests via GitHub Actions</h2>
       
-      <div className="mb-6">
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            GitHub Repository URL
-          </label>
-          <input
-            type="text"
-            value={repoUrl}
-            onChange={(e) => setRepoUrl(e.target.value)}
-            placeholder="https://github.com/username/repository"
-            className="w-full p-2 border border-gray-300 rounded"
-          />
-          <p className="text-xs text-gray-500 mt-1">
-            The repository containing your test files
-          </p>
-        </div>
-
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Branch
-          </label>
-          <div className="flex items-center">
-            <GitBranch className="text-gray-500 mr-2" size={18} />
-            <input
-              type="text"
-              value={branch}
-              onChange={(e) => setBranch(e.target.value)}
-              className="w-full p-2 border border-gray-300 rounded"
-            />
-          </div>
-        </div>
-        
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Workflow File
-          </label>
-          <input
-            type="text"
-            value={workflowId}
-            onChange={(e) => setWorkflowId(e.target.value)}
-            placeholder="quality-tracker-tests.yml"
-            className="w-full p-2 border border-gray-300 rounded"
-          />
-          <p className="text-xs text-gray-500 mt-1">
-            The workflow file in .github/workflows directory of your repository
-          </p>
-        </div>
-        
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            GitHub Token
-          </label>
-          <input
-            type="password"
-            value={ghToken}
-            onChange={(e) => setGhToken(e.target.value)}
-            placeholder="ghp_..."
-            className="w-full p-2 border border-gray-300 rounded"
-          />
-          <p className="text-xs text-gray-500 mt-1">
-            Personal access token with workflow permissions
-          </p>
-        </div>
-        
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Callback URL (Optional)
-          </label>
-          <input
-            type="text"
-            value={callbackUrl}
-            onChange={(e) => setCallbackUrl(e.target.value)}
-            placeholder="https://your-app.com/api/test-results"
-            className="w-full p-2 border border-gray-300 rounded"
-          />
-          <p className="text-xs text-gray-500 mt-1">
-            URL where test results should be sent when complete (leave empty to use simulated results)
-          </p>
-        </div>
-
-        <div className="mb-4">
-          <h3 className="text-sm font-medium text-gray-700 mb-2">Test Cases to Run:</h3>
-          <div className="bg-gray-50 rounded p-3 max-h-40 overflow-y-auto">
-            {testCases.length === 0 ? (
-              <p className="text-gray-500 italic">No test cases available for this requirement</p>
-            ) : (
-              <ul className="space-y-1">
-                {testCases.map(tc => (
-                  <li key={tc.id} className="text-sm flex items-center">
-                    <span className="w-16 font-medium">{tc.id}</span>
-                    <span className="flex-1">{tc.name}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        </div>
-
-        <button
-          onClick={handleRunTests}
-          disabled={isRunning || testCases.length === 0}
-          className={`w-full py-2 px-4 rounded flex items-center justify-center ${
-            isRunning || testCases.length === 0
-              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-              : 'bg-blue-600 text-white hover:bg-blue-700'
-          }`}
+      {/* GitHub configuration section (collapsible) */}
+      <div className="mb-4 border rounded-md">
+        <button 
+          className="w-full px-4 py-2 flex items-center justify-between bg-gray-50 border-b"
+          onClick={() => setIsConfigExpanded(!isConfigExpanded)}
         >
-          {isRunning ? (
-            <>
-              <Loader2 className="animate-spin mr-2" size={18} />
-              Running Workflow...
-            </>
-          ) : (
-            <>
-              <Play className="mr-2" size={18} />
-              Trigger GitHub Actions
-            </>
-          )}
+          <div className="flex items-center">
+            {isConfigExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
+            <span className="font-medium ml-1">GitHub Configuration</span>
+          </div>
+          <div className="flex items-center">
+            {!isConfigExpanded && (
+              <span className="text-sm text-gray-600 mr-2">
+                {config.repoUrl ? `${config.repoUrl} (${config.branch})` : 'Not configured'}
+              </span>
+            )}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                saveConfiguration();
+              }}
+              className={`px-2 py-1 text-xs rounded flex items-center ${
+                isSaved ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+              }`}
+              disabled={isRunning}
+            >
+              <Save size={14} className="mr-1" />
+              {isSaved ? 'Saved' : 'Save'}
+            </button>
+          </div>
         </button>
+        
+        {isConfigExpanded && (
+          <div className="p-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  GitHub Repository URL
+                </label>
+                <input
+                  type="text"
+                  name="repoUrl"
+                  value={config.repoUrl}
+                  onChange={handleInputChange}
+                  placeholder="https://github.com/username/repository"
+                  className="w-full p-2 border border-gray-300 rounded"
+                  disabled={isRunning}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Branch
+                </label>
+                <div className="flex items-center">
+                  <GitBranch className="text-gray-500 mr-2" size={18} />
+                  <input
+                    type="text"
+                    name="branch"
+                    value={config.branch}
+                    onChange={handleInputChange}
+                    className="w-full p-2 border border-gray-300 rounded"
+                    disabled={isRunning}
+                  />
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Workflow File
+                </label>
+                <input
+                  type="text"
+                  name="workflowId"
+                  value={config.workflowId}
+                  onChange={handleInputChange}
+                  placeholder="quality-tracker-tests.yml"
+                  className="w-full p-2 border border-gray-300 rounded"
+                  disabled={isRunning}
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  GitHub Token
+                </label>
+                <input
+                  type="password"
+                  name="ghToken"
+                  value={config.ghToken}
+                  onChange={handleInputChange}
+                  placeholder="ghp_..."
+                  className="w-full p-2 border border-gray-300 rounded"
+                  disabled={isRunning}
+                />
+              </div>
+              
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Callback URL (Optional)
+                </label>
+                <input
+                  type="text"
+                  name="callbackUrl"
+                  value={config.callbackUrl}
+                  onChange={handleInputChange}
+                  placeholder="https://your-app.com/api/test-results"
+                  className="w-full p-2 border border-gray-300 rounded"
+                  disabled={isRunning}
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  URL where test results should be sent (leave empty to use simulated results)
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
+      {/* Test Cases Section */}
+      <div className="mb-6">
+        <h3 className="text-sm font-medium text-gray-700 mb-2">Test Cases to Run:</h3>
+        <div className="bg-gray-50 rounded p-3 max-h-40 overflow-y-auto">
+          {testCases.length === 0 ? (
+            <p className="text-gray-500 italic">No test cases available for this requirement</p>
+          ) : (
+            <ul className="space-y-1">
+              {testCases.map(tc => (
+                <li key={tc.id} className="text-sm flex items-center">
+                  <span className="w-16 font-medium">{tc.id}</span>
+                  <span className="flex-1">{tc.name}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+
+      {/* Run Tests Button */}
+      <button
+        onClick={handleRunTests}
+        disabled={isRunning || testCases.length === 0}
+        className={`w-full py-2 px-4 rounded flex items-center justify-center ${
+          isRunning || testCases.length === 0
+            ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+            : 'bg-blue-600 text-white hover:bg-blue-700'
+        }`}
+      >
+        {isRunning ? (
+          <>
+            <Loader2 className="animate-spin mr-2" size={18} />
+            Running Workflow...
+          </>
+        ) : (
+          <>
+            <Play className="mr-2" size={18} />
+            Trigger GitHub Actions
+          </>
+        )}
+      </button>
+
+      {/* Error Message */}
       {error && (
-        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-red-700">
+        <div className="my-4 p-3 bg-red-50 border border-red-200 rounded text-red-700">
           <div className="flex items-center">
             <AlertTriangle className="mr-2" size={18} />
             <span>{error}</span>
@@ -256,8 +344,9 @@ const TestRunner = ({ requirement, testCases, onTestComplete }) => {
         </div>
       )}
       
+      {/* Workflow Run Status */}
       {workflowRun && isRunning && (
-        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded">
+        <div className="my-4 p-3 bg-blue-50 border border-blue-200 rounded">
           <div className="flex justify-between items-center">
             <div className="flex items-center">
               <Loader2 className="animate-spin mr-2 text-blue-600" size={18} />
@@ -275,8 +364,9 @@ const TestRunner = ({ requirement, testCases, onTestComplete }) => {
         </div>
       )}
 
+      {/* Test Results */}
       {results && (
-        <div className="mb-4">
+        <div className="mt-4">
           <div className="flex justify-between items-center mb-2">
             <h3 className="text-lg font-medium">Test Results</h3>
             {results[0]?.id !== 'INFO' && (
