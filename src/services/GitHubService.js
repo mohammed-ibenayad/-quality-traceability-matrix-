@@ -39,6 +39,8 @@ class GitHubService {
     try {
       const octokit = new Octokit({ auth: token });
       
+      console.log("Triggering workflow with payload:", payload);
+      
       // Create a repository dispatch event to trigger the workflow
       await octokit.request('POST /repos/{owner}/{repo}/dispatches', {
         owner,
@@ -49,6 +51,8 @@ class GitHubService {
           'X-GitHub-Api-Version': '2022-11-28'
         }
       });
+      
+      console.log("Repository dispatch event sent successfully");
       
       // Get the latest workflow run for the specified workflow file
       const { data } = await octokit.request('GET /repos/{owner}/{repo}/actions/workflows/{workflow_id}/runs', {
@@ -64,8 +68,16 @@ class GitHubService {
         throw new Error('No workflow runs found. The workflow may not exist or has not been triggered yet.');
       }
       
+      console.log("Found latest workflow run:", data.workflow_runs[0].id);
+      
       // Return the most recent workflow run
-      return data.workflow_runs[0];
+      return {
+        id: data.workflow_runs[0].id,
+        status: data.workflow_runs[0].status,
+        html_url: data.workflow_runs[0].html_url,
+        // Store the payload with the run for later reference
+        client_payload: payload
+      };
     } catch (error) {
       console.error('Error triggering workflow:', error);
       if (error.response) {
@@ -91,6 +103,8 @@ class GitHubService {
         }
       });
       
+      console.log("Workflow status:", data.status, "conclusion:", data.conclusion);
+      
       return {
         id: data.id,
         status: data.status,
@@ -110,7 +124,7 @@ class GitHubService {
    * Get the results of a GitHub Actions workflow run
    * This would typically parse test results from workflow artifacts or job outputs
    */
-  async getWorkflowResults(owner, repo, runId, token) {
+  async getWorkflowResults(owner, repo, runId, token, clientPayload) {
     try {
       const octokit = new Octokit({ auth: token });
       
@@ -144,15 +158,18 @@ class GitHubService {
       );
       
       if (testResultsArtifact) {
-        // Download the test results artifact
-        // Note: This would require additional implementation to download and extract the ZIP
-        // For now, we'll simulate the response
+        // In a real implementation, you would download and parse the test results artifact
         console.log('Found test results artifact:', testResultsArtifact.name);
       }
       
-      // For demonstration purposes, we're simulating test results
-      // In a real implementation, you would parse actual test results from artifacts or workflow outputs
-      return runData.client_payload.testCases.map(testId => {
+      // For demonstration purposes, we're using the original client payload to generate
+      // simulated test results when we can't access actual results from artifacts
+      if (!clientPayload || !clientPayload.testCases) {
+        throw new Error('Test case information not found in client payload');
+      }
+      
+      // Generate simulated test results based on the test case IDs
+      return clientPayload.testCases.map(testId => {
         const isPassed = Math.random() > 0.2;
         return {
           id: testId,
