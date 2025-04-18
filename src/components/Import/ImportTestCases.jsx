@@ -159,7 +159,7 @@ const ImportTestCases = ({ onImportSuccess }) => {
         
         // Check ID format (TC_XXX)
         if (!/^TC_\d+$/.test(tc.id)) {
-          // errors.push(`Invalid ID format for '${tc.id}'. Expected format: TC_XXX where XXX is a number`);
+          errors.push(`Invalid ID format for '${tc.id}'. Expected format: TC_XXX where XXX is a number`);
         }
       }
       
