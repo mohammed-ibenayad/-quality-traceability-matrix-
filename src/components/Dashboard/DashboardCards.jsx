@@ -8,18 +8,20 @@ const DashboardCards = ({ metrics }) => {
   // Calculate overall test case coverage percentage
   const totalMinTestCases = metrics.versionCoverage?.reduce((sum, cov) => sum + cov.minTestCases, 0) || 0;
   const totalActualTestCases = metrics.versionCoverage?.reduce((sum, cov) => sum + cov.totalTests, 0) || 0;
-  const overallTestCaseCoverage = totalMinTestCases > 0 
-    ? Math.round((totalActualTestCases / totalMinTestCases) * 100) 
-    : 0;
+  
+  // Calculate manual and automated test counts (excluding planned tests)
+  const totalAutomatedTests = metrics.totalAutomatedTests || 0;
+  const totalManualTests = metrics.totalManualTests || 0;
+  const totalExecutableTests = totalAutomatedTests + totalManualTests;
   
   // Calculate manual test rate
-  const totalManualTests = metrics.versionCoverage?.reduce(
-    (sum, cov) => sum + (cov.totalTests - cov.automatedTests), 0
-  ) || 0;
   const manualTestRate = totalActualTestCases > 0 
     ? Math.round((totalManualTests / totalActualTestCases) * 100)
     : 0;
   
+    // Moved total test count calculation here
+  const totalTestCount = metrics.totalTestsForVersion || totalActualTestCases || 0;
+
   return (
     <div className="mb-6">
       {/* Requirements-focused metrics */}
@@ -58,19 +60,19 @@ const DashboardCards = ({ metrics }) => {
         </div>
         
         <div className="bg-white p-4 rounded shadow">
-          <div className="text-sm text-gray-600 mb-1">Overall Test Coverage</div>
+          <div className="text-sm text-gray-600 mb-1">Fully Verified Requirements</div>
           <div className="flex flex-col">
-            <div className="text-2xl font-bold">{overallTestCaseCoverage}%</div>
+            <div className="text-2xl font-bold">{metrics.summary?.reqFullyPassed || 0} / {metrics.totalRequirements}</div>
             <div className="text-xs text-gray-500">
-              {totalActualTestCases} / {totalMinTestCases} required tests
+              With all tests passing
             </div>
             <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
               <div 
                 className={`h-2 rounded-full ${
-                  overallTestCaseCoverage >= 90 ? 'bg-green-500' :
-                  overallTestCaseCoverage >= 75 ? 'bg-yellow-500' : 'bg-red-500'
+                  (metrics.summary?.reqFullyPassed / metrics.totalRequirements * 100) >= 90 ? 'bg-green-500' :
+                  (metrics.summary?.reqFullyPassed / metrics.totalRequirements * 100) >= 75 ? 'bg-yellow-500' : 'bg-red-500'
                 }`}
-                style={{width: `${overallTestCaseCoverage}%`}}
+                style={{width: `${(metrics.summary?.reqFullyPassed / metrics.totalRequirements * 100) || 0}%`}}
               ></div>
             </div>
           </div>
@@ -79,7 +81,7 @@ const DashboardCards = ({ metrics }) => {
       
       {/* Test case-focused metrics */}
       <h3 className="text-sm font-medium text-gray-700 mb-2">Test Execution Status</h3>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
         <div className="bg-white p-4 rounded shadow">
           <div className="text-sm text-gray-600 mb-1">Test Pass Rate</div>
           <div className="flex flex-col">
@@ -98,38 +100,22 @@ const DashboardCards = ({ metrics }) => {
         </div>
         
         <div className="bg-white p-4 rounded shadow">
-          <div className="text-sm text-gray-600 mb-1">Automation Rate</div>
+          <div className="text-sm text-gray-600 mb-1">Test Automation</div>
           <div className="flex flex-col">
-            <div className="text-2xl font-bold">{metrics.automationRate}%</div>
-            <div className="text-xs text-gray-500">
-              {metrics.totalAutomatedTests || 0} / {metrics.totalTestsForVersion || 0} tests are automated
+            <div className="flex justify-between items-end">
+              <div className="text-2xl font-bold">{metrics.automationRate}%</div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs px-2 py-1 bg-blue-100 text-blue-800 rounded-full">{totalAutomatedTests} Auto</span>
+                <span className="text-xs px-2 py-1 bg-gray-100 text-gray-800 rounded-full">{totalManualTests} Manual</span>
+              </div>
+            </div>
+            <div className="text-xs text-gray-500 mt-1">
+              {totalActualTestCases} total tests
             </div>
             <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
               <div 
-                className={`h-2 rounded-full ${
-                  metrics.automationRate >= 80 ? 'bg-green-500' :
-                  metrics.automationRate >= 60 ? 'bg-yellow-500' : 'bg-red-500'
-                }`}
+                className="h-2 rounded-full bg-blue-500"
                 style={{width: `${metrics.automationRate}%`}}
-              ></div>
-            </div>
-          </div>
-        </div>
-        
-        <div className="bg-white p-4 rounded shadow">
-          <div className="text-sm text-gray-600 mb-1">Manual Test Rate</div>
-          <div className="flex flex-col">
-            <div className="text-2xl font-bold">{manualTestRate}%</div>
-            <div className="text-xs text-gray-500">
-              {totalManualTests || 0} / {totalActualTestCases || 0} tests are manual
-            </div>
-            <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
-              <div 
-                className={`h-2 rounded-full ${
-                  manualTestRate <= 20 ? 'bg-green-500' :
-                  manualTestRate <= 40 ? 'bg-yellow-500' : 'bg-red-500'
-                }`}
-                style={{width: `${manualTestRate}%`}}
               ></div>
             </div>
           </div>
