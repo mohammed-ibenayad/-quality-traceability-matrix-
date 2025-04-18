@@ -14,13 +14,21 @@ const DashboardCards = ({ metrics }) => {
   const totalManualTests = metrics.totalManualTests || 0;
   const totalExecutableTests = totalAutomatedTests + totalManualTests;
   
+  // Calculate test execution counts
+  const passedTests = metrics.summary?.passed || 0;
+  const failedTests = metrics.summary?.failed || 0;
+  const notExecutedTests = metrics.summary?.notExecuted || 0;
+  const totalExecutedTests = passedTests + failedTests;
+  
   // Calculate manual test rate
   const manualTestRate = totalActualTestCases > 0 
     ? Math.round((totalManualTests / totalActualTestCases) * 100)
     : 0;
-  
-    // Moved total test count calculation here
-  const totalTestCount = metrics.totalTestsForVersion || totalActualTestCases || 0;
+
+  // Calculate actual pass rate based on executed tests only
+  const actualPassRate = totalExecutedTests > 0
+    ? Math.round((passedTests / totalExecutedTests) * 100)
+    : 0;
 
   return (
     <div className="mb-6">
@@ -85,15 +93,26 @@ const DashboardCards = ({ metrics }) => {
         <div className="bg-white p-4 rounded shadow">
           <div className="text-sm text-gray-600 mb-1">Test Pass Rate</div>
           <div className="flex flex-col">
-            <div className="text-2xl font-bold">{metrics.passRate}%</div>
-            <div className="text-xs text-gray-500">Tests passing</div>
+            <div className="flex justify-between items-end">
+              <div className="text-2xl font-bold">{actualPassRate}%</div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs px-2 py-1 bg-green-100 text-green-800 rounded-full">{passedTests} Passed</span>
+                <span className="text-xs px-2 py-1 bg-red-100 text-red-800 rounded-full">{failedTests} Failed</span>
+                {notExecutedTests > 0 && (
+                  <span className="text-xs px-2 py-1 bg-gray-100 text-gray-800 rounded-full">{notExecutedTests} Not Run</span>
+                )}
+              </div>
+            </div>
+            <div className="text-xs text-gray-500 mt-1">
+              {totalExecutedTests} executed of {totalActualTestCases} total tests
+            </div>
             <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
               <div 
                 className={`h-2 rounded-full ${
-                  metrics.passRate >= 90 ? 'bg-green-500' :
-                  metrics.passRate >= 75 ? 'bg-yellow-500' : 'bg-red-500'
+                  actualPassRate >= 90 ? 'bg-green-500' :
+                  actualPassRate >= 75 ? 'bg-yellow-500' : 'bg-red-500'
                 }`}
-                style={{width: `${metrics.passRate}%`}}
+                style={{width: `${actualPassRate}%`}}
               ></div>
             </div>
           </div>
