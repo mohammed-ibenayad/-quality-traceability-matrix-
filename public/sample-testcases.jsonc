@@ -1,7 +1,7 @@
 [
     {
       // Basic authentication test case
-      "id": "TC-001",
+      "id": "TC_001",
       "name": "Valid Login",
       "description": "Test valid user login with correct credentials",
       "steps": [
@@ -29,7 +29,7 @@
       "estimatedDuration": 2 // Estimated duration in minutes
     },
     {
-      "id": "TC-002",
+      "id": "TC_002",
       "name": "Invalid Password",
       "description": "Test login with invalid password",
       "steps": [
@@ -50,7 +50,7 @@
     },
     {
       // Password reset test
-      "id": "TC-004",
+      "id": "TC_004",
       "name": "Password Reset Link",
       "description": "Test password reset link functionality",
       "steps": [
@@ -68,7 +68,7 @@
     },
     {
       // Manual test example
-      "id": "TC-005",
+      "id": "TC_005",
       "name": "Password Reset Validation",
       "description": "Test password reset form validation",
       "steps": [
@@ -84,7 +84,7 @@
     },
     {
       // Planned automation example
-      "id": "TC-007",
+      "id": "TC_007",
       "name": "Verify Password Requirements",
       "description": "Verify password meets complexity requirements",
       "steps": [
@@ -100,7 +100,7 @@
     },
     {
       // Planned automation example
-      "id": "TC-008",
+      "id": "TC_008",
       "name": "Verify Password Requirements",
       "description": "Verify password meets complexity requirements",
       "steps": [
