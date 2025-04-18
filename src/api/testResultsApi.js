@@ -5,34 +5,37 @@
 import dataStore from '../services/DataStore';
 
 /**
- * Process test results submitted from the GitHub Actions workflow
+ * Process test results submitted from external test runners
  * 
- * In a real application, this would be an Express or other server-side route handler
- * For this example, we're simulating a backend API in the browser
- * 
- * @param {Object} req - The request object
- * @param {Object} req.body - The request body containing test results
- * @param {String} req.body.requirementId - The requirement ID associated with the tests
- * @param {String} req.body.timestamp - ISO timestamp when the tests were run
- * @param {Array} req.body.results - Array of test results
+ * @param {Object} data - The request data containing test results
+ * @param {String} data.requirementId - The requirement ID associated with the tests
+ * @param {String} data.timestamp - ISO timestamp when the tests were run
+ * @param {Array} data.results - Array of test results
  * @returns {Object} Response object
  */
-export const processTestResults = async (req) => {
+export const processTestResults = async (data) => {
   try {
-    const { requirementId, timestamp, results } = req.body;
+    console.log("Processing test results:", JSON.stringify(data, null, 2));
+    
+    const { requirementId, timestamp, results } = data;
     
     if (!requirementId || !timestamp || !Array.isArray(results)) {
+      console.error("Invalid test results data:", data);
       return {
         status: 400,
-        body: { error: 'Invalid request body. requirementId, timestamp, and results[] are required.' }
+        body: { error: 'Invalid data format. requirementId, timestamp, and results array are required.' }
       };
     }
     
-    console.log(`Received test results for ${requirementId} at ${timestamp}`);
-    console.log(`${results.length} tests executed:`, results);
+    console.log(`Received ${results.length} test results for ${requirementId} at ${timestamp}`);
     
     // Update test case status in the dataStore
-    const updatedTestCases = updateTestCaseStatus(requirementId, results);
+    const updatedTestCases = updateTestStatusesDirectly(requirementId, results);
+    
+    // Force a DataStore notification to ensure UI is updated
+    if (typeof dataStore._notifyListeners === 'function') {
+      dataStore._notifyListeners();
+    }
     
     return {
       status: 200,
@@ -52,165 +55,173 @@ export const processTestResults = async (req) => {
 };
 
 /**
- * Normalize test case ID to match application format
- * @param {String} id - The test case ID to normalize
- * @returns {String} Normalized test case ID
- */
-const normalizeTestCaseId = (id) => {
-  if (!id) return id;
-  
-  // Convert TC_XXX to TC-XXX
-  if (id.startsWith('TC_')) {
-    return id.replace('TC_', 'TC_');
-  }
-  
-  return id;
-};
-
-/**
- * Update test case status in the dataStore based on test results
- * 
+ * Update test case statuses directly in the DataStore
  * @param {String} requirementId - The requirement ID associated with the tests
  * @param {Array} results - Array of test results
  * @returns {Array} Array of updated test cases
  */
-const updateTestCaseStatus = (requirementId, results) => {
+const updateTestStatusesDirectly = (requirementId, results) => {
   try {
-    // Get existing test cases
-    const testCases = dataStore.getTestCases();
+    console.log(`Directly updating ${results.length} test statuses for requirement ${requirementId}...`);
     
-    // Get mapping to find test cases associated with this requirement
-    const mapping = dataStore.getMapping();
-    const associatedTestIds = mapping[requirementId] || [];
+    // Get current test cases from DataStore
+    const currentTestCases = dataStore.getTestCases();
+    console.log(`Found ${currentTestCases.length} test cases in DataStore`);
     
-    // Array to track updated test cases
+    // Track updated test cases
     const updatedTestCases = [];
     
-    // Update test case status based on results
+    // Process each test result
     results.forEach(result => {
-      // Normalize test case ID to handle format differences
-      const normalizedId = normalizeTestCaseId(result.id);
-      
-      console.log(`Looking for test case with ID: ${normalizedId} (original: ${result.id})`);
-      
-      // Find the corresponding test case in the dataStore
-      const testCaseIndex = testCases.findIndex(tc => tc.id === normalizedId);
-      
-      if (testCaseIndex !== -1) {
-        console.log(`Found test case at index ${testCaseIndex}:`, testCases[testCaseIndex]);
-      } else {
-        console.log(`Test case not found with ID ${normalizedId}`);
+      // Make sure we have a valid test ID
+      if (!result.id) {
+        console.warn("Test result missing ID:", result);
+        return;
       }
       
-      // Check if this test is associated with the requirement
-      const isAssociated = associatedTestIds.includes(normalizedId);
+      console.log(`Processing result for test case ${result.id} with status: ${result.status}`);
       
-      if (!isAssociated) {
-        console.log(`Test case ${normalizedId} is not associated with requirement ${requirementId}`);
-        console.log(`Associated test IDs:`, associatedTestIds);
-      }
+      // Find the test case to update
+      const testCaseIndex = currentTestCases.findIndex(tc => tc.id === result.id);
       
-      // If found and the test is associated with this requirement, update its status
-      if (testCaseIndex !== -1 && isAssociated) {
-        testCases[testCaseIndex] = {
-          ...testCases[testCaseIndex],
-          status: result.status,
-          lastExecuted: new Date().toISOString(),
-          executionTime: result.duration || 0  // Store execution time in milliseconds
-        };
+      if (testCaseIndex === -1) {
+        console.log(`Test case ${result.id} not found in DataStore - creating new test case`);
         
-        console.log(`Updated test case:`, testCases[testCaseIndex]);
-        updatedTestCases.push(testCases[testCaseIndex]);
-      } else if (testCaseIndex !== -1) {
-        // Test case exists but is not associated with this requirement
-        console.log(`Test case ${normalizedId} exists but is not associated with requirement ${requirementId}`);
-        
-        // Optionally update the mapping to associate this test with the requirement
-        if (!mapping[requirementId]) {
-          mapping[requirementId] = [];
-        }
-        
-        if (!mapping[requirementId].includes(normalizedId)) {
-          mapping[requirementId].push(normalizedId);
-          console.log(`Added association between ${requirementId} and ${normalizedId}`);
-          
-          // Now update the test case
-          testCases[testCaseIndex] = {
-            ...testCases[testCaseIndex],
-            status: result.status,
-            lastExecuted: new Date().toISOString(),
-            executionTime: result.duration || 0
-          };
-          
-          updatedTestCases.push(testCases[testCaseIndex]);
-        }
-      } else {
-        // Test case doesn't exist, could create it automatically
-        console.log(`Test case ${normalizedId} not found in the system. Consider creating it.`);
-        
-        // Create a new test case
+        // Create a new test case if it doesn't exist
         const newTestCase = {
-          id: normalizedId,
-          name: result.name || `Test Case ${normalizedId}`,
+          id: result.id,
+          name: result.name || `Test case ${result.id}`,
+          description: `Automatically created from test results for ${requirementId}`,
           status: result.status,
           automationStatus: 'Automated',
           lastExecuted: new Date().toISOString(),
           executionTime: result.duration || 0,
-          description: `Automatically created from test results for ${requirementId}`
+          requirementIds: [requirementId]
         };
         
-        // Add to test cases
-        testCases.push(newTestCase);
-        console.log(`Created new test case:`, newTestCase);
-        
-        // Add to mapping
-        if (!mapping[requirementId]) {
-          mapping[requirementId] = [];
-        }
-        
-        if (!mapping[requirementId].includes(normalizedId)) {
-          mapping[requirementId].push(normalizedId);
-          console.log(`Added association between ${requirementId} and ${normalizedId}`);
-        }
-        
+        console.log(`Created new test case: ${result.id} with status "${result.status}"`);
+        currentTestCases.push(newTestCase);
         updatedTestCases.push(newTestCase);
+        
+        // Update mapping
+        updateRequirementMapping(requirementId, result.id);
+      } else {
+        // Update existing test case
+        const oldStatus = currentTestCases[testCaseIndex].status;
+        
+        currentTestCases[testCaseIndex] = {
+          ...currentTestCases[testCaseIndex],
+          status: result.status, // Use the exact status from the result
+          lastExecuted: new Date().toISOString(),
+          executionTime: result.duration || 0
+        };
+        
+        console.log(`Updated test case ${result.id} status: "${oldStatus}" → "${result.status}"`);
+        updatedTestCases.push(currentTestCases[testCaseIndex]);
+        
+        // Ensure this test is mapped to the requirement
+        updateRequirementMapping(requirementId, result.id);
       }
     });
     
-    // Update the dataStore with the updated test cases
+    // Debug the final state of test cases
+    const relevantTestIds = results.map(r => r.id);
+    console.log("After processing, final status of updated test cases:");
+    currentTestCases
+      .filter(tc => relevantTestIds.includes(tc.id))
+      .forEach(tc => console.log(`- ${tc.id}: ${tc.status}`));
+    
+    // Update the DataStore with modified test cases
     if (updatedTestCases.length > 0) {
-      dataStore.setTestCases([...testCases]);
-      
-      // Also update mappings if necessary
-      dataStore.updateMappings(mapping);
-      
-      console.log(`Updated ${updatedTestCases.length} test cases in DataStore`);
-    } else {
-      console.log('No test cases were updated');
+      console.log(`Setting ${currentTestCases.length} test cases in DataStore with ${updatedTestCases.length} updates`);
+      dataStore.setTestCases(currentTestCases);
     }
     
     return updatedTestCases;
   } catch (error) {
-    console.error('Error updating test case status:', error);
+    console.error('Error updating test statuses:', error);
     return [];
   }
 };
 
 /**
+ * Make sure a test case is properly mapped to a requirement
+ * @param {String} requirementId - The requirement ID
+ * @param {String} testCaseId - The test case ID
+ */
+const updateRequirementMapping = (requirementId, testCaseId) => {
+  try {
+    // Get current mapping
+    const mapping = dataStore.getMapping();
+    
+    // Create mapping entry if it doesn't exist
+    if (!mapping[requirementId]) {
+      mapping[requirementId] = [];
+    }
+    
+    // Add test case to mapping if not already present
+    if (!mapping[requirementId].includes(testCaseId)) {
+      console.log(`Adding mapping from ${requirementId} to ${testCaseId}`);
+      mapping[requirementId].push(testCaseId);
+      dataStore.updateMappings(mapping);
+    }
+  } catch (error) {
+    console.error('Error updating requirement mapping:', error);
+  }
+};
+
+/**
+ * Test function to simulate exactly the webhook data you received
+ */
+const testNotRunScenario = () => {
+  const testData = {
+    "requirementId": "REQ-006",
+    "timestamp": "2025-04-18T07:51:54Z",
+    "results": [
+      {
+        "id": "TC_007",
+        "name": "Test TC_007",
+        "status": "Not Run",
+        "duration": 0
+      },
+      {
+        "id": "TC_008",
+        "name": "Test TC_008",
+        "status": "Not Run",
+        "duration": 0
+      }
+    ]
+  };
+  
+  console.log("Testing 'Not Run' status handling with data:", testData);
+  return processTestResults(testData);
+};
+
+/**
  * Example API route setup for test results
- * 
- * This function simulates an API endpoint for receiving test results
- * In a real application, you would use an actual backend server
  */
 export const setupTestResultsEndpoint = () => {
   // Create a mock endpoint for test results
-  // This is just for demonstration purposes
   window.mockApi = window.mockApi || {};
   window.mockApi.testResults = async (data) => {
-    return processTestResults({ body: data });
+    return processTestResults(data);
   };
   
-  console.log('Test results API endpoint is set up at window.mockApi.testResults');
+  // Create a direct callable function for testing
+  window.updateTestResults = (data) => {
+    console.log("Manual test update called with:", data);
+    return processTestResults(data);
+  };
+  
+  // Add test function for the specific Not Run scenario
+  window.testNotRunScenario = testNotRunScenario;
+  
+  console.log('Test results API endpoints set up:');
+  console.log('- window.mockApi.testResults()');
+  console.log('- window.updateTestResults()');
+  console.log('- window.testNotRunScenario()');
+  
+  console.log('\nTest exact "Not Run" scenario with: window.testNotRunScenario()');
   
   return {
     url: 'window.mockApi.testResults',
