@@ -10,7 +10,7 @@ const RequirementRow = ({ req, coverage, mapping, testCases, expanded, onToggleE
   const allMappedTests = mapping[req.id] || [];
   
   // Filter test cases based on the selected version
-  const mappedTests = selectedVersion === 'unassigned'
+  const mappedTests = selectedVersion === 'unassigned' 
     ? allMappedTests
     : allMappedTests.filter(tcId => {
         const tc = testCases.find(t => t.id === tcId);
@@ -22,16 +22,22 @@ const RequirementRow = ({ req, coverage, mapping, testCases, expanded, onToggleE
     testCases.find(tc => tc.id === tcId)
   ).filter(Boolean);
   
-  // Count statuses for the filtered test cases
-  const passedCount = mappedTests.filter(tcId => 
-    testCases.find(tc => tc.id === tcId)?.status === 'Passed'
-  ).length;
-  const failedCount = mappedTests.filter(tcId => 
-    testCases.find(tc => tc.id === tcId)?.status === 'Failed'
-  ).length;
-  const notRunCount = mappedTests.filter(tcId => 
-    testCases.find(tc => tc.id === tcId)?.status === 'Not Run'
-  ).length;
+  // Count test cases by execution status
+  const passedCount = mappedTests.filter(tcId => {
+    const tc = testCases.find(tc => tc.id === tcId);
+    return tc && tc.status === 'Passed';
+  }).length;
+  
+  const failedCount = mappedTests.filter(tcId => {
+    const tc = testCases.find(tc => tc.id === tcId);
+    return tc && tc.status === 'Failed';
+  }).length;
+  
+  // Count tests that have execution status (passed or failed)
+  const executedCount = passedCount + failedCount;
+  
+  // All tests that don't have a definitive execution result are considered "Not Run"
+  const notRunCount = mappedTests.length - executedCount;
 
   // Calculate coverage percentage
   const coveragePercentage = coverage ? coverage.coverageRatio : 0;
@@ -96,12 +102,24 @@ const RequirementRow = ({ req, coverage, mapping, testCases, expanded, onToggleE
         
         <td className="border p-2">
           <div className="flex gap-2 items-center justify-center">
-            <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs">{passedCount} Passed</span>
+            {/* Only show passed tests if there are any */}
+            {passedCount > 0 && (
+              <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs">{passedCount} Passed</span>
+            )}
+            
+            {/* Only show failed tests if there are any */}
             {failedCount > 0 && (
               <span className="bg-red-100 text-red-800 px-2 py-1 rounded-full text-xs">{failedCount} Failed</span>
             )}
+            
+            {/* Show all tests without execution status as Not Run */}
             {notRunCount > 0 && (
               <span className="bg-gray-100 text-gray-800 px-2 py-1 rounded-full text-xs">{notRunCount} Not Run</span>
+            )}
+            
+            {/* Show a message when there are no tests */}
+            {mappedTests.length === 0 && (
+              <span className="text-gray-500 text-xs">No tests linked</span>
             )}
           </div>
         </td>
