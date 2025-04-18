@@ -47,11 +47,24 @@ export const calculateReleaseMetrics = (versionId, versions, requirements, calcu
     ? Math.round((totalAutomatedTests / totalTestsForVersion) * 100)
     : 0;
   
-  // Calculate overall health score (simplified version)
+  // Calculate overall test case coverage
+  const totalMinRequiredTests = versionCoverage.reduce((sum, c) => sum + c.minTestCases, 0);
+  const overallTestCaseCoverage = totalMinRequiredTests
+    ? Math.round((totalTestsForVersion / totalMinRequiredTests) * 100)
+    : 0;
+  
+  // Calculate manual test rate
+  const totalManualTests = totalTestsForVersion - totalAutomatedTests;
+  const manualTestRate = totalTestsForVersion
+    ? Math.round((totalManualTests / totalTestsForVersion) * 100)
+    : 0;
+  
+  // Calculate overall health score 
   const healthFactors = [
-    { weight: 0.4, value: passRate },
-    { weight: 0.3, value: sufficientCoveragePercentage },
-    { weight: 0.3, value: automationRate }
+    { weight: 0.3, value: passRate },                  // Pass rate (30%)
+    { weight: 0.25, value: sufficientCoveragePercentage }, // Requirements with enough tests (25%)
+    { weight: 0.25, value: overallTestCaseCoverage },  // Test case coverage (25%)
+    { weight: 0.2, value: automationRate }            // Automation rate (20%)
   ];
   
   const healthScore = healthFactors.reduce(
@@ -92,11 +105,18 @@ export const calculateReleaseMetrics = (versionId, versions, requirements, calcu
     sufficientCoveragePercentage,
     passRate,
     automationRate,
+    manualTestRate,
+    overallTestCaseCoverage,
+    totalMinRequiredTests,
+    totalTestsForVersion,
+    totalAutomatedTests,
+    totalManualTests,
     healthScore,
     riskAreas,
     qualityGates: versionData.qualityGates,
     daysToRelease: versionData.status === 'In Progress' 
       ? Math.ceil((new Date(versionData.releaseDate) - new Date()) / (1000 * 60 * 60 * 24))
-      : 0
+      : 0,
+    versionCoverage
   };
 };

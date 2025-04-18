@@ -47,7 +47,7 @@ const TDFInfoTooltip = () => {
             </div>
           </div>
           
-          <div className="bg-gray-700 p-2 rounded">
+          <div className="bg-gray-700 p-2 rounded mb-3">
             <p className="text-xs font-medium mb-1">Example Calculation:</p>
             <div className="text-xs mb-1">For a requirement with ratings:</div>
             <div className="grid grid-cols-4 gap-1 text-xs mb-1">
@@ -59,6 +59,15 @@ const TDFInfoTooltip = () => {
             <div className="text-xs mb-1">TDF = (4 × 0.4) + (3 × 0.3) + (5 × 0.2) + (4 × 0.1)</div>
             <div className="text-xs mb-1">TDF = 1.6 + 0.9 + 1.0 + 0.4 = <strong>3.9</strong></div>
             <div className="text-xs font-medium">Result: This requirement requires 5-7 test cases</div>
+          </div>
+          
+          <div className="border-t border-gray-600 pt-2">
+            <p className="text-xs font-medium mb-1">Coverage Metrics Explained:</p>
+            <div className="text-xs space-y-1">
+              <div className="mb-1"><span className="font-medium">Test Depth Coverage:</span> Percentage of requirements that have enough test cases to meet their minimum threshold (based on TDF).</div>
+              <div className="mb-1"><span className="font-medium">Overall Test Coverage:</span> Total test cases defined divided by total minimum test cases required across all requirements.</div>
+              <div><span className="font-medium">Health Score:</span> Weighted assessment combining test pass rate, coverage metrics, and automation rate.</div>
+            </div>
           </div>
         </div>
       }
