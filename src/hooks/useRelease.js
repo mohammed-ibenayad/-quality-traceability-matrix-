@@ -10,9 +10,10 @@ import dataStore from '../services/DataStore';
  * @param {Object} mapping - Mapping between requirements and test cases
  * @param {Array} initialVersions - Initial version data
  * @param {string} initialVersion - Initial version to select
+ * @param {number} refreshTrigger - A counter to force recalculation of metrics
  * @returns {Object} Release data and functions
  */
-export const useRelease = (requirements, testCases, mapping, initialVersions, initialVersion) => {
+export const useRelease = (requirements, testCases, mapping, initialVersions, initialVersion, refreshTrigger = 0) => {
   // Create state for versions so we can keep it updated from DataStore
   const [versions, setVersions] = useState(initialVersions);
   
@@ -47,10 +48,12 @@ export const useRelease = (requirements, testCases, mapping, initialVersions, in
   }, [versions, selectedVersion]);
   
   // Calculate overall coverage for all requirements and test cases
+  // Use refreshTrigger to force recalculation when test statuses change
   const coverage = useMemo(() => {
     if (!hasData) return [];
+    console.log("Recalculating overall coverage with refreshTrigger:", refreshTrigger);
     return calculateCoverage(requirements, mapping, testCases);
-  }, [requirements, mapping, testCases, hasData]);
+  }, [requirements, mapping, testCases, hasData, refreshTrigger]);
   
   // Calculate version-specific coverage or all coverage if "unassigned" is selected
   const versionCoverage = useMemo(() => {
@@ -62,12 +65,15 @@ export const useRelease = (requirements, testCases, mapping, initialVersions, in
     }
     
     // Otherwise, filter by the selected version
+    console.log("Recalculating version-specific coverage for:", selectedVersion);
     return calculateCoverage(requirements, mapping, testCases, selectedVersion);
-  }, [requirements, mapping, testCases, selectedVersion, coverage, hasData]);
+  }, [requirements, mapping, testCases, selectedVersion, coverage, hasData, refreshTrigger]);
   
   // Calculate release metrics for the selected version
   const metrics = useMemo(() => {
     if (!hasData) return null;
+    
+    console.log("Recalculating metrics for version:", selectedVersion);
     
     // If "unassigned" is selected, don't calculate specific metrics
     if (selectedVersion === 'unassigned') {
@@ -105,7 +111,7 @@ export const useRelease = (requirements, testCases, mapping, initialVersions, in
     }
     
     return calculatedMetrics;
-  }, [selectedVersion, versions, requirements, mapping, testCases, versionCoverage, coverage, hasData]);
+  }, [selectedVersion, versions, requirements, mapping, testCases, versionCoverage, coverage, hasData, refreshTrigger]);
   
   // Summary statistics - filter by version where appropriate
   const summary = useMemo(() => {
@@ -166,7 +172,7 @@ export const useRelease = (requirements, testCases, mapping, initialVersions, in
       reqFullyPassed,
       totalTestCases: versionTestCases.length
     };
-  }, [requirements, versionCoverage, mapping, testCases, selectedVersion, hasData]);
+  }, [requirements, versionCoverage, mapping, testCases, selectedVersion, hasData, refreshTrigger]);
 
   return {
     selectedVersion,

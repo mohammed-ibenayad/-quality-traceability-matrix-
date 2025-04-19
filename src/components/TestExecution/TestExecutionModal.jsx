@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { Loader2, Check, AlertTriangle } from 'lucide-react';
 import TestRunner from './TestRunner';
 import dataStore from '../../services/DataStore';
+import { calculateCoverage } from '../../utils/coverage';
+import { refreshQualityGates } from '../../utils/calculateQualityGates';
 
 /**
  * Modal component for displaying the test runner interface
@@ -32,10 +34,13 @@ const TestExecutionModal = ({ requirement, testCases, isOpen, onClose, onTestCom
     setIsProcessing(true);
     setProcessingStatus("Updating test statuses in the application...");
     
-    // Directly update the test statuses in the DataStore
+    // Directly update the test statuses in the DataStore and ensure metrics are recalculated
     try {
-      // Get current test cases
+      // Get current test cases and requirements
       const currentTestCases = dataStore.getTestCases();
+      const currentRequirements = dataStore.getRequirements();
+      const currentMapping = dataStore.getMapping();
+      
       console.log("Current test cases before update:", currentTestCases.map(tc => ({ id: tc.id, status: tc.status })));
       
       // Update test cases based on results
@@ -55,9 +60,39 @@ const TestExecutionModal = ({ requirement, testCases, isOpen, onClose, onTestCom
         return tc;
       });
       
-      // Update in DataStore
+      // 1. Update test cases in DataStore
       dataStore.setTestCases(updatedTestCases);
       console.log("Test cases after update:", updatedTestCases.map(tc => ({ id: tc.id, status: tc.status })));
+      
+      // 2. Force a recalculation of coverage
+      try {
+        console.log("Recalculating coverage metrics");
+        // Directly recalculate coverage to ensure fresh data
+        const updatedCoverage = calculateCoverage(currentRequirements, currentMapping, updatedTestCases);
+        console.log("Updated coverage metrics:", updatedCoverage);
+      } catch (coverageError) {
+        console.warn("Error recalculating coverage:", coverageError);
+      }
+      
+      // 3. Force a recalculation of quality gates
+      try {
+        console.log("Refreshing quality gates to update dashboard metrics");
+        refreshQualityGates(dataStore);
+      } catch (refreshError) {
+        console.warn("Error refreshing quality gates:", refreshError);
+      }
+      
+      // 4. Force explicit DataStore notification to ensure UI is updated
+      if (typeof dataStore._notifyListeners === 'function') {
+        console.log("Notifying all DataStore listeners of changes");
+        dataStore._notifyListeners();
+        
+        // Double notification after a short delay to ensure updates are caught
+        setTimeout(() => {
+          console.log("Sending secondary notification to DataStore listeners");
+          dataStore._notifyListeners();
+        }, 100);
+      }
       
       setProcessingStatus("Test statuses updated successfully!");
       setIsProcessing(false);
@@ -66,7 +101,7 @@ const TestExecutionModal = ({ requirement, testCases, isOpen, onClose, onTestCom
       if (onTestComplete) {
         setTimeout(() => {
           onTestComplete(results);
-        }, 2000); // Give the user a moment to see the success message
+        }, 1000); // Give the user a moment to see the success message
       }
     } catch (error) {
       console.error("Error updating test statuses:", error);

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { GitBranch, Play, Check, AlertTriangle, X, Loader2, ChevronDown, ChevronRight, Save } from 'lucide-react';
 import GitHubService from '../../services/GitHubService';
 import dataStore from '../../services/DataStore';
+import { refreshQualityGates } from '../../utils/calculateQualityGates';
 
 const TestRunner = ({ requirement, testCases, onTestComplete }) => {
   // State for GitHub configuration
@@ -99,6 +100,19 @@ const TestRunner = ({ requirement, testCases, onTestComplete }) => {
       
       // Update test cases in DataStore
       dataStore.setTestCases(updatedTestCases);
+      
+      // Force a recalculation of quality gates
+      try {
+        console.log("Refreshing quality gates to update dashboard metrics");
+        refreshQualityGates(dataStore);
+      } catch (refreshError) {
+        console.warn("Error refreshing quality gates:", refreshError);
+      }
+      
+      // Force a DataStore notification
+      if (typeof dataStore._notifyListeners === 'function') {
+        dataStore._notifyListeners();
+      }
       
       // Count how many were actually updated
       const updatedCount = updatedTestCases.filter((tc, idx) => 
