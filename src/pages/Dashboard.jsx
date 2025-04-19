@@ -1,3 +1,4 @@
+// src/pages/Dashboard.jsx - Updated version with fixed pass rate calculation
 import React, { useState, useEffect, useMemo } from 'react';
 import MainLayout from '../components/Layout/MainLayout';
 import DashboardCards from '../components/Dashboard/DashboardCards';
@@ -106,9 +107,18 @@ const Dashboard = () => {
           !tc.version || tc.version === selectedVersion || tc.version === '');
     
     // Calculate pass rate - mirror the calculation in TraceabilityMatrix
+    // UPDATED: Calculate based on tests that have actually been executed, not all tests
+    const executedTests = versionTests.filter(tc => tc.status === 'Passed' || tc.status === 'Failed');
     const passedTests = versionTests.filter(tc => tc.status === 'Passed').length;
+    const executedCount = executedTests.length;
+    const failedTests = versionTests.filter(tc => tc.status === 'Failed').length;
+    const notExecutedTests = versionTests.filter(tc => tc.status !== 'Passed' && tc.status !== 'Failed').length;
+    
+    // Calculate pass rate based on executed tests only
+    const passRate = executedCount > 0 ? Math.round((passedTests / executedCount) * 100) : 0;
+    
+    // Calculate overall test case count
     const totalTests = versionTests.length;
-    const passRate = totalTests > 0 ? Math.round((passedTests / totalTests) * 100) : 0;
     
     // Calculate fully verified requirements - mirror TraceabilityMatrix approach
     const versionRequirements = selectedVersion === 'unassigned'
@@ -140,7 +150,16 @@ const Dashboard = () => {
     return {
       directPassRate: passRate,
       reqFullyPassed,
-      totalRequirements: versionRequirements.length
+      totalRequirements: versionRequirements.length,
+      passedTests,
+      failedTests,
+      notExecutedTests,
+      totalTests,
+      summary: {
+        passed: passedTests,
+        failed: failedTests,
+        notExecuted: notExecutedTests
+      }
     };
   }, [
     requirements, 
@@ -181,6 +200,9 @@ const Dashboard = () => {
       // Add direct calculation of fully verified requirements to summary
       summary: {
         ...(metrics.summary || {}),
+        passed: directMetrics?.summary?.passed ?? 0,
+        failed: directMetrics?.summary?.failed ?? 0,
+        notExecuted: directMetrics?.summary?.notExecuted ?? 0,
         reqFullyPassed: directMetrics?.reqFullyPassed ?? metrics.summary?.reqFullyPassed ?? 0,
         totalRequirements: directMetrics?.totalRequirements ?? metrics.totalRequirements ?? 0
       }

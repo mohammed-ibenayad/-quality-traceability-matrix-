@@ -1,3 +1,4 @@
+// src/components/Dashboard/DashboardCards.jsx - Updated version
 import React from 'react';
 import TDFInfoTooltip from '../Common/TDFInfoTooltip';
 
@@ -14,21 +15,21 @@ const DashboardCards = ({ metrics }) => {
   const totalManualTests = metrics.totalManualTests || 0;
   const totalExecutableTests = totalAutomatedTests + totalManualTests;
   
-  // Calculate test execution counts
+  // Calculate test execution counts using the updated values from direct metrics
   const passedTests = metrics.summary?.passed || 0;
   const failedTests = metrics.summary?.failed || 0;
   const notExecutedTests = metrics.summary?.notExecuted || 0;
   const totalExecutedTests = passedTests + failedTests;
+  const totalTests = totalActualTestCases;
   
   // Calculate manual test rate
   const manualTestRate = totalActualTestCases > 0 
     ? Math.round((totalManualTests / totalActualTestCases) * 100)
     : 0;
 
-  // Calculate actual pass rate based on executed tests only
-  const actualPassRate = totalExecutedTests > 0
-    ? Math.round((passedTests / totalExecutedTests) * 100)
-    : 0;
+  // Use the pass rate already calculated in the Dashboard component
+  // This ensures it's always up to date
+  const actualPassRate = metrics.passRate || 0;
 
   return (
     <div className="mb-6">
@@ -40,9 +41,9 @@ const DashboardCards = ({ metrics }) => {
           <div className="flex justify-between items-end">
             <div className="text-2xl font-bold">{metrics.totalRequirements}</div>
             <div className="flex items-center gap-2">
-              <span className="text-xs px-2 py-1 bg-red-100 text-red-800 rounded-full">{metrics.reqByPriority.High} High</span>
-              <span className="text-xs px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full">{metrics.reqByPriority.Medium} Med</span>
-              <span className="text-xs px-2 py-1 bg-blue-100 text-blue-800 rounded-full">{metrics.reqByPriority.Low} Low</span>
+              <span className="text-xs px-2 py-1 bg-red-100 text-red-800 rounded-full">{metrics.reqByPriority?.High || 0} High</span>
+              <span className="text-xs px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full">{metrics.reqByPriority?.Medium || 0} Med</span>
+              <span className="text-xs px-2 py-1 bg-blue-100 text-blue-800 rounded-full">{metrics.reqByPriority?.Low || 0} Low</span>
             </div>
           </div>
         </div>
@@ -104,7 +105,7 @@ const DashboardCards = ({ metrics }) => {
               </div>
             </div>
             <div className="text-xs text-gray-500 mt-1">
-              {totalExecutedTests} executed of {totalActualTestCases} total tests
+              {totalExecutedTests} executed of {totalTests} total tests
             </div>
             <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
               <div 
@@ -129,7 +130,7 @@ const DashboardCards = ({ metrics }) => {
               </div>
             </div>
             <div className="text-xs text-gray-500 mt-1">
-              {totalActualTestCases} total tests
+              {totalTests} total tests
             </div>
             <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
               <div 
