@@ -260,61 +260,116 @@ const TestRunner = ({ requirement, testCases, onTestComplete }) => {
         console.log("Webhook timeout reached, using GitHub API to check status");
         
         // Start polling for workflow status
-        const interval = setInterval(async () => {
-          try {
-            const status = await GitHubService.getWorkflowStatus(owner, repo, run.id, config.ghToken);
-            
-            if (status.status === 'completed') {
-              clearInterval(interval);
-              setPollInterval(null);
-              setIsRunning(false);
-              setWaitingForWebhook(false);
-              
-              // Get test results from GitHub Actions
-              try {
-                const actionResults = await GitHubService.getWorkflowResults(
-                  owner, repo, run.id, config.ghToken, run.client_payload
-                );
-                
-                // Update test statuses in DataStore
-                updateTestStatusesInDataStore(actionResults);
-                
-                setResults(actionResults);
-                
-                if (onTestComplete) {
-                  onTestComplete(actionResults);
-                }
-              } catch (resultsError) {
-                console.error('Error getting workflow results:', resultsError);
-                
-                // Fallback to simulated results
-                const simulatedResults = testCases.map(tc => ({
-                  id: tc.id,
-                  name: tc.name,
-                  status: Math.random() > 0.2 ? 'Passed' : 'Failed',
-                  duration: Math.floor(Math.random() * 1000) + 100,
-                  logs: `Executing test ${tc.id}: ${tc.name}\n${Math.random() > 0.2 ? 'PASSED' : 'FAILED: Assertion error'}`
-                }));
-                
-                // Update test statuses in DataStore
-                updateTestStatusesInDataStore(simulatedResults);
-                
-                setResults(simulatedResults);
-                
-                if (onTestComplete) {
-                  onTestComplete(simulatedResults);
-                }
-              }
+        // Enhanced TestRunner.jsx with result fetching
+// Update the polling section inside handleRunTests function
+
+// Start polling for workflow status
+const interval = setInterval(async () => {
+  try {
+    const status = await GitHubService.getWorkflowStatus(owner, repo, run.id, config.ghToken);
+    
+    if (status.status === 'completed') {
+      clearInterval(interval);
+      setPollInterval(null);
+      setIsRunning(false);
+      setWaitingForWebhook(false);
+      
+      console.log("%c✅ GitHub workflow completed", "background: #4CAF50; color: white; font-weight: bold; padding: 3px 6px; border-radius: 3px;");
+      
+      // Now that we know the workflow is complete, fetch results from the callback URL
+      if (config.callbackUrl && !config.callbackUrl.includes('webhook.site')) {
+        try {
+          console.log("%c🔄 Fetching results directly from callback URL", "background: #2196F3; color: white; font-weight: bold; padding: 3px 6px; border-radius: 3px;");
+          
+          // Prepare the URL with a query parameter for this specific run
+          const resultsUrl = new URL(config.callbackUrl);
+          resultsUrl.searchParams.append('runId', run.id);
+          resultsUrl.searchParams.append('requirementId', requirement.id);
+          
+          // Fetch the results
+          const resultsResponse = await fetch(resultsUrl, {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json'
             }
-          } catch (err) {
-            clearInterval(interval);
-            setPollInterval(null);
-            setIsRunning(false);
-            setWaitingForWebhook(false);
-            setError(`Error monitoring workflow: ${err.message}`);
+          });
+          
+          if (resultsResponse.ok) {
+            const callbackResults = await resultsResponse.json();
+            console.log("%c📊 Retrieved test results from callback URL", "background: #4CAF50; color: white; font-weight: bold; padding: 3px 6px; border-radius: 3px;");
+            console.log(callbackResults);
+            
+            // Process the results if they match our expected format
+            if (callbackResults.results && Array.isArray(callbackResults.results)) {
+              // Update test statuses in DataStore
+              updateTestStatusesInDataStore(callbackResults.results);
+              
+              setResults(callbackResults.results);
+              
+              if (onTestComplete) {
+                onTestComplete(callbackResults.results);
+              }
+              return;
+            } else {
+              console.warn("Results from callback URL don't match expected format:", callbackResults);
+            }
+          } else {
+            console.warn("Failed to retrieve results from callback URL:", resultsResponse.statusText);
           }
-        }, 5000); // Check every 5 seconds
+        } catch (fetchError) {
+          console.error("Error fetching results from callback URL:", fetchError);
+        }
+      }
+      
+      // If we couldn't get results from the callback URL, fall back to GitHub Actions API
+      try {
+        console.log("%c🔄 Fetching results from GitHub Actions API", "background: #FF9800; color: white; font-weight: bold; padding: 3px 6px; border-radius: 3px;");
         
+        const actionResults = await GitHubService.getWorkflowResults(
+          owner, repo, run.id, config.ghToken, run.client_payload
+        );
+        
+        // Update test statuses in DataStore
+        updateTestStatusesInDataStore(actionResults);
+        
+        setResults(actionResults);
+        
+        if (onTestComplete) {
+          onTestComplete(actionResults);
+        }
+      } catch (resultsError) {
+        console.error('Error getting workflow results:', resultsError);
+        
+        // Fallback to simulated results
+        console.log("%c🔄 Falling back to simulated results", "background: #F44336; color: white; font-weight: bold; padding: 3px 6px; border-radius: 3px;");
+        
+        const simulatedResults = testCases.map(tc => ({
+          id: tc.id,
+          name: tc.name,
+          status: Math.random() > 0.2 ? 'Passed' : 'Failed',
+          duration: Math.floor(Math.random() * 1000) + 100,
+          logs: `Executing test ${tc.id}: ${tc.name}\n${Math.random() > 0.2 ? 'PASSED' : 'FAILED: Assertion error'}`
+        }));
+        
+        // Update test statuses in DataStore
+        updateTestStatusesInDataStore(simulatedResults);
+        
+        setResults(simulatedResults);
+        
+        if (onTestComplete) {
+          onTestComplete(simulatedResults);
+        }
+      }
+    }
+  } catch (err) {
+    clearInterval(interval);
+    setPollInterval(null);
+    setIsRunning(false);
+    setWaitingForWebhook(false);
+    setError(`Error monitoring workflow: ${err.message}`);
+  }
+}, 5000); // Check every 5 seconds
         setPollInterval(interval);
       }, 30000); // Wait 30 seconds for webhook before falling back to polling
       
