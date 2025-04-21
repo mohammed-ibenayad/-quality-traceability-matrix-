@@ -22,7 +22,7 @@
       "requirementIds": ["REQ-001"], // Array of requirement IDs this test covers
       
       // Additional metadata (all optional)
-      "version": "v2.2", // Version this test applies to
+      "version": "v1.0", // Version this test applies to
       "executedBy": "John Smith", // Person who executed the test
       "tags": ["Authentication", "Smoke Test"],
       "priority": "High", // Test priority
@@ -44,7 +44,7 @@
       "automationPath": "tests/auth/invalid_login.spec.js",
       "lastExecuted": "2025-03-15",
       "requirementIds": ["REQ-001"],
-      "version": "v2.2",
+      "version": "v1.0",
       "executedBy": "John Smith",
       "tags": ["Authentication", "Validation"]
     },
@@ -64,7 +64,7 @@
       "automationStatus": "Automated",
       "lastExecuted": "2025-03-15",
       "requirementIds": ["REQ-002"],
-      "version": "v2.2"
+      "version": "v1.0"
     },
     {
       // Manual test example
@@ -80,7 +80,7 @@
       "status": "Not Run",
       "automationStatus": "Manual",
       "requirementIds": ["REQ-002", "REQ-004"],
-      "version": "v2.1"
+      "version": "v1.0"
     },
     {
       // Planned automation example

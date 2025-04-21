@@ -37,6 +37,14 @@ export const processTestResults = async (data) => {
       dataStore._notifyListeners();
     }
     
+    // Important: Notify any UI components waiting for the webhook callback
+    if (typeof window.onTestWebhookReceived === 'function') {
+      console.log("Calling onTestWebhookReceived with data:", data);
+      window.onTestWebhookReceived(data);
+    } else {
+      console.log("No webhook listener detected (window.onTestWebhookReceived is not a function)");
+    }
+    
     return {
       status: 200,
       body: { 
@@ -81,7 +89,7 @@ const updateTestStatusesDirectly = (requirementId, results) => {
       
       console.log(`Processing result for test case ${result.id} with status: ${result.status}`);
       
-      // Find the test case to update
+      // Find the test case to update - ENSURE EXACT MATCHING
       const testCaseIndex = currentTestCases.findIndex(tc => tc.id === result.id);
       
       if (testCaseIndex === -1) {
@@ -92,7 +100,7 @@ const updateTestStatusesDirectly = (requirementId, results) => {
           id: result.id,
           name: result.name || `Test case ${result.id}`,
           description: `Automatically created from test results for ${requirementId}`,
-          status: result.status,
+          status: result.status, // Use exactly what was reported
           automationStatus: 'Automated',
           lastExecuted: new Date().toISOString(),
           executionTime: result.duration || 0,
@@ -109,9 +117,10 @@ const updateTestStatusesDirectly = (requirementId, results) => {
         // Update existing test case
         const oldStatus = currentTestCases[testCaseIndex].status;
         
+        // IMPORTANT: Make sure we preserve the exact status string from the webhook
         currentTestCases[testCaseIndex] = {
           ...currentTestCases[testCaseIndex],
-          status: result.status, // Use the exact status from the result
+          status: result.status, // Use exactly what was reported, including "Not Run"
           lastExecuted: new Date().toISOString(),
           executionTime: result.duration || 0
         };
@@ -135,6 +144,15 @@ const updateTestStatusesDirectly = (requirementId, results) => {
     if (updatedTestCases.length > 0) {
       console.log(`Setting ${currentTestCases.length} test cases in DataStore with ${updatedTestCases.length} updates`);
       dataStore.setTestCases(currentTestCases);
+      
+      // Trigger a second notification after a short delay
+      // This helps ensure UI components catch the update
+      setTimeout(() => {
+        if (typeof dataStore._notifyListeners === 'function') {
+          console.log("Sending secondary notification to ensure UI updates");
+          dataStore._notifyListeners();
+        }
+      }, 100);
     }
     
     return updatedTestCases;

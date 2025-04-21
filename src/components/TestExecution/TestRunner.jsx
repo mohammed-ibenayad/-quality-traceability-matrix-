@@ -22,6 +22,8 @@ const TestRunner = ({ requirement, testCases, onTestComplete }) => {
   const [error, setError] = useState(null);
   const [pollInterval, setPollInterval] = useState(null);
   const [isSaved, setIsSaved] = useState(false);
+  const [waitingForWebhook, setWaitingForWebhook] = useState(false);
+  const [webhookTimeout, setWebhookTimeout] = useState(null);
 
   // Load saved configuration on component mount
   useEffect(() => {
@@ -31,17 +33,37 @@ const TestRunner = ({ requirement, testCases, onTestComplete }) => {
         const parsedConfig = JSON.parse(savedConfig);
         setConfig(parsedConfig);
       }
+      
+      // Set up webhook result listener
+      window.onTestWebhookReceived = (webhookData) => {
+        console.log("Webhook data received in TestRunner:", webhookData);
+        if (webhookData && webhookData.requirementId === requirement?.id) {
+          // Clear webhook timeout
+          if (webhookTimeout) {
+            clearTimeout(webhookTimeout);
+            setWebhookTimeout(null);
+          }
+          
+          // Process webhook results
+          handleWebhookResults(webhookData);
+        }
+      };
     } catch (err) {
       console.error('Error loading saved configuration:', err);
     }
-  }, []);
-
-  // Clean up polling on unmount
-  useEffect(() => {
+    
+    // Cleanup function
     return () => {
+      // Remove webhook listener
+      window.onTestWebhookReceived = null;
+      
+      // Clear any polling intervals
       if (pollInterval) clearInterval(pollInterval);
+      
+      // Clear webhook timeout
+      if (webhookTimeout) clearTimeout(webhookTimeout);
     };
-  }, [pollInterval]);
+  }, [requirement, webhookTimeout]);
 
   // Handle input changes
   const handleInputChange = (e) => {
@@ -67,6 +89,28 @@ const TestRunner = ({ requirement, testCases, onTestComplete }) => {
       }, 2000);
     } catch (err) {
       console.error('Error saving configuration:', err);
+    }
+  };
+
+  // Helper function to process webhook results
+  const handleWebhookResults = (webhookData) => {
+    console.log("Processing webhook results:", webhookData);
+    setWaitingForWebhook(false);
+    
+    if (webhookData && webhookData.results && Array.isArray(webhookData.results)) {
+      const testResults = webhookData.results;
+      
+      // Update test statuses in DataStore
+      updateTestStatusesInDataStore(testResults);
+      
+      // Update UI
+      setResults(testResults);
+      setIsRunning(false);
+      
+      // Notify parent component
+      if (onTestComplete) {
+        onTestComplete(testResults);
+      }
     }
   };
 
@@ -143,6 +187,7 @@ const TestRunner = ({ requirement, testCases, onTestComplete }) => {
     setError(null);
     setResults(null);
     setWorkflowRun(null);
+    setWaitingForWebhook(false);
 
     try {
       // Extract owner and repo from URL
@@ -163,27 +208,37 @@ const TestRunner = ({ requirement, testCases, onTestComplete }) => {
       const useSimulatedResults = !config.repoUrl || config.repoUrl.includes('example');
       
       if (useSimulatedResults) {
-        // Generate simulated test results for demo purposes
-        setTimeout(() => {
-          const simulatedResults = testCases.map(tc => ({
-            id: tc.id,
-            name: tc.name,
-            status: Math.random() > 0.2 ? 'Passed' : 'Failed',
-            duration: Math.floor(Math.random() * 1000) + 100,
-            logs: `Executing test ${tc.id}: ${tc.name}\n${Math.random() > 0.2 ? 'PASSED' : 'FAILED: Assertion error'}`
-          }));
-          
-          // Update test statuses in DataStore
-          const updated = updateTestStatusesInDataStore(simulatedResults);
-          
-          setResults(simulatedResults);
-          setIsRunning(false);
-          
-          if (onTestComplete) {
-            onTestComplete(simulatedResults);
-          }
-        }, 1500);
+        // Set a flag to indicate we're waiting for results
+        setWaitingForWebhook(true);
         
+        // Set a timeout - if we don't get webhook results within 10 seconds, use simulated ones
+        const timeout = setTimeout(() => {
+          console.log("Webhook timeout reached, using simulated results");
+          
+          if (waitingForWebhook) {
+            // Generate simulated test results for demo purposes
+            const simulatedResults = testCases.map(tc => ({
+              id: tc.id,
+              name: tc.name,
+              status: Math.random() > 0.2 ? 'Passed' : 'Failed',
+              duration: Math.floor(Math.random() * 1000) + 100,
+              logs: `Executing test ${tc.id}: ${tc.name}\n${Math.random() > 0.2 ? 'PASSED' : 'FAILED: Assertion error'}`
+            }));
+            
+            // Update test statuses in DataStore
+            updateTestStatusesInDataStore(simulatedResults);
+            
+            setResults(simulatedResults);
+            setIsRunning(false);
+            setWaitingForWebhook(false);
+            
+            if (onTestComplete) {
+              onTestComplete(simulatedResults);
+            }
+          }
+        }, 10000);
+        
+        setWebhookTimeout(timeout);
         return;
       }
       
@@ -198,65 +253,76 @@ const TestRunner = ({ requirement, testCases, onTestComplete }) => {
       );
       
       setWorkflowRun(run);
+      setWaitingForWebhook(true);
       
-      // Start polling for workflow status
-      const interval = setInterval(async () => {
-        try {
-          const status = await GitHubService.getWorkflowStatus(owner, repo, run.id, config.ghToken);
-          
-          if (status.status === 'completed') {
+      // Set a timeout for the webhook callback
+      const timeout = setTimeout(() => {
+        console.log("Webhook timeout reached, using GitHub API to check status");
+        
+        // Start polling for workflow status
+        const interval = setInterval(async () => {
+          try {
+            const status = await GitHubService.getWorkflowStatus(owner, repo, run.id, config.ghToken);
+            
+            if (status.status === 'completed') {
+              clearInterval(interval);
+              setPollInterval(null);
+              setIsRunning(false);
+              setWaitingForWebhook(false);
+              
+              // Get test results from GitHub Actions
+              try {
+                const actionResults = await GitHubService.getWorkflowResults(
+                  owner, repo, run.id, config.ghToken, run.client_payload
+                );
+                
+                // Update test statuses in DataStore
+                updateTestStatusesInDataStore(actionResults);
+                
+                setResults(actionResults);
+                
+                if (onTestComplete) {
+                  onTestComplete(actionResults);
+                }
+              } catch (resultsError) {
+                console.error('Error getting workflow results:', resultsError);
+                
+                // Fallback to simulated results
+                const simulatedResults = testCases.map(tc => ({
+                  id: tc.id,
+                  name: tc.name,
+                  status: Math.random() > 0.2 ? 'Passed' : 'Failed',
+                  duration: Math.floor(Math.random() * 1000) + 100,
+                  logs: `Executing test ${tc.id}: ${tc.name}\n${Math.random() > 0.2 ? 'PASSED' : 'FAILED: Assertion error'}`
+                }));
+                
+                // Update test statuses in DataStore
+                updateTestStatusesInDataStore(simulatedResults);
+                
+                setResults(simulatedResults);
+                
+                if (onTestComplete) {
+                  onTestComplete(simulatedResults);
+                }
+              }
+            }
+          } catch (err) {
             clearInterval(interval);
             setPollInterval(null);
             setIsRunning(false);
-            
-            // Get test results from GitHub Actions
-            try {
-              const actionResults = await GitHubService.getWorkflowResults(
-                owner, repo, run.id, config.ghToken, run.client_payload
-              );
-              
-              // Update test statuses in DataStore
-              const updated = updateTestStatusesInDataStore(actionResults);
-              
-              setResults(actionResults);
-              
-              if (onTestComplete) {
-                onTestComplete(actionResults);
-              }
-            } catch (resultsError) {
-              console.error('Error getting workflow results:', resultsError);
-              
-              // Fallback to simulated results
-              const simulatedResults = testCases.map(tc => ({
-                id: tc.id,
-                name: tc.name,
-                status: Math.random() > 0.2 ? 'Passed' : 'Failed',
-                duration: Math.floor(Math.random() * 1000) + 100,
-                logs: `Executing test ${tc.id}: ${tc.name}\n${Math.random() > 0.2 ? 'PASSED' : 'FAILED: Assertion error'}`
-              }));
-              
-              // Update test statuses in DataStore
-              updateTestStatusesInDataStore(simulatedResults);
-              
-              setResults(simulatedResults);
-              
-              if (onTestComplete) {
-                onTestComplete(simulatedResults);
-              }
-            }
+            setWaitingForWebhook(false);
+            setError(`Error monitoring workflow: ${err.message}`);
           }
-        } catch (err) {
-          clearInterval(interval);
-          setPollInterval(null);
-          setIsRunning(false);
-          setError(`Error monitoring workflow: ${err.message}`);
-        }
-      }, 5000); // Check every 5 seconds
+        }, 5000); // Check every 5 seconds
+        
+        setPollInterval(interval);
+      }, 30000); // Wait 30 seconds for webhook before falling back to polling
       
-      setPollInterval(interval);
+      setWebhookTimeout(timeout);
       
     } catch (err) {
       setIsRunning(false);
+      setWaitingForWebhook(false);
       setError(`Error triggering workflow: ${err.message}`);
     }
   };
@@ -409,17 +475,17 @@ const TestRunner = ({ requirement, testCases, onTestComplete }) => {
       {/* Run Tests Button */}
       <button
         onClick={handleRunTests}
-        disabled={isRunning || testCases.length === 0}
+        disabled={isRunning || testCases.length === 0 || waitingForWebhook}
         className={`w-full py-2 px-4 rounded flex items-center justify-center ${
-          isRunning || testCases.length === 0
+          isRunning || testCases.length === 0 || waitingForWebhook
             ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
             : 'bg-blue-600 text-white hover:bg-blue-700'
         }`}
       >
-        {isRunning ? (
+        {isRunning || waitingForWebhook ? (
           <>
             <Loader2 className="animate-spin mr-2" size={18} />
-            Running Workflow...
+            {waitingForWebhook ? 'Waiting for results...' : 'Running Workflow...'}
           </>
         ) : (
           <>
@@ -435,6 +501,16 @@ const TestRunner = ({ requirement, testCases, onTestComplete }) => {
           <div className="flex items-center">
             <AlertTriangle className="mr-2" size={18} />
             <span>{error}</span>
+          </div>
+        </div>
+      )}
+      
+      {/* Webhook Status */}
+      {waitingForWebhook && (
+        <div className="my-4 p-3 bg-yellow-50 border border-yellow-200 rounded">
+          <div className="flex items-center">
+            <Loader2 className="animate-spin mr-2 text-yellow-600" size={18} />
+            <span className="text-yellow-700">Waiting for test results from webhook...</span>
           </div>
         </div>
       )}
