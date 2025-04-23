@@ -251,7 +251,9 @@ const TestRunner = ({ requirement, testCases, onTestComplete }) => {
       const { owner, repo } = GitHubService.parseGitHubUrl(config.repoUrl);
       
       // Define the test payload with callback URL
+      const requestId = `req_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
       const payload = {
+        requestId: requestId,  // Add this
         requirementId: requirement.id,
         requirementName: requirement.name,
         testCases: testCases.map(tc => tc.id),
