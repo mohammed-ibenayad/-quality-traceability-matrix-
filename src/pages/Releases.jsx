@@ -4,32 +4,25 @@ import NewReleaseModal from '../components/Releases/NewReleaseModal';
 import ReleaseVersionGrid from '../components/Releases/ReleaseVersionGrid';
 import RefreshQualityGatesButton from '../components/Releases/RefreshQualityGatesButton';
 import EmptyState from '../components/Common/EmptyState';
+import { useVersionContext } from '../context/VersionContext';
 import dataStore from '../services/DataStore';
 
-// Import initial versions for the dropdown
-import versionsData from '../data/versions';
-
 const Releases = () => {
-  const [versions, setVersions] = useState(versionsData);
-  const [selectedVersion, setSelectedVersion] = useState(versions[0]?.id || '');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'table'
+  const [hasData, setHasData] = useState(false);
   
-  // Load versions from DataStore
+  // Use the version context
+  const { selectedVersion, setSelectedVersion, versions } = useVersionContext();
+  
+  // Load data from DataStore
   useEffect(() => {
-    // Initialize versions in DataStore if needed
-    if (!dataStore.getVersions || !dataStore.getVersions().length) {
-      dataStore.setVersions && dataStore.setVersions(versionsData);
-    } else {
-      setVersions(dataStore.getVersions());
-    }
+    // Check if we have any data
+    setHasData(dataStore.hasData());
     
     // Subscribe to DataStore changes
     const unsubscribe = dataStore.subscribe(() => {
-      // Update versions if the method exists
-      if (dataStore.getVersions) {
-        setVersions(dataStore.getVersions());
-      }
+      setHasData(dataStore.hasData());
     });
     
     // Clean up subscription
@@ -39,12 +32,9 @@ const Releases = () => {
   // Handler for adding a new version
   const handleAddVersion = (newVersion) => {
     try {
-      // Use DataStore method if available, otherwise update local state
+      // Use DataStore method if available
       if (dataStore.addVersion) {
         dataStore.addVersion(newVersion);
-      } else {
-        // Fallback to updating local state
-        setVersions(prev => [...prev, newVersion]);
       }
       
       // Switch to the newly created version
@@ -58,14 +48,9 @@ const Releases = () => {
   // Handler for updating a version
   const handleUpdateVersion = (versionId, updateData) => {
     try {
-      // Use DataStore method if available, otherwise update local state
+      // Use DataStore method if available
       if (dataStore.updateVersion) {
         dataStore.updateVersion(versionId, updateData);
-      } else {
-        // Fallback to updating local state
-        setVersions(prev => 
-          prev.map(v => v.id === versionId ? { ...v, ...updateData } : v)
-        );
       }
     } catch (error) {
       console.error("Error updating version:", error);
@@ -77,12 +62,14 @@ const Releases = () => {
   const handleDeleteVersion = (versionId) => {
     if (window.confirm("Are you sure you want to delete this version? This action cannot be undone.")) {
       try {
-        // Use DataStore method if available, otherwise update local state
+        // Use DataStore method if available
         if (dataStore.deleteVersion) {
           dataStore.deleteVersion(versionId);
-        } else {
-          // Fallback to updating local state
-          setVersions(prev => prev.filter(v => v.id !== versionId));
+        }
+        
+        // If the deleted version was selected, switch to unassigned view
+        if (selectedVersion === versionId) {
+          setSelectedVersion('unassigned');
         }
       } catch (error) {
         console.error("Error deleting version:", error);
@@ -105,10 +92,7 @@ const Releases = () => {
   return (
     <MainLayout 
       title="Release Management" 
-      selectedVersion={selectedVersion}
-      setSelectedVersion={setSelectedVersion}
-      versions={versions}
-      hasData={true}
+      hasData={hasData}
       onAddVersion={handleAddVersion}
     >
       <div className="flex justify-between items-center mb-6">

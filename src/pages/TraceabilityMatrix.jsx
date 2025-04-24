@@ -2,11 +2,9 @@ import React, { useState, useEffect } from 'react';
 import MainLayout from '../components/Layout/MainLayout';
 import MatrixTable from '../components/TraceabilityMatrix/MatrixTable';
 import EmptyState from '../components/common/EmptyState';
-import { useRelease } from '../hooks/useRelease';
+import { useVersionContext } from '../context/VersionContext';
+import { calculateCoverage } from '../utils/coverage';
 import dataStore from '../services/DataStore';
-
-// Import only versions data for the header dropdown
-import versionsData from '../data/versions';
 
 const TraceabilityMatrix = () => {
   // State for collapsed test case view
@@ -17,6 +15,10 @@ const TraceabilityMatrix = () => {
   const [requirements, setRequirements] = useState([]);
   const [testCases, setTestCases] = useState([]);
   const [mapping, setMapping] = useState({});
+  const [hasData, setHasData] = useState(false);
+  
+  // Get the version context
+  const { selectedVersion } = useVersionContext();
   
   // Load data from DataStore
   useEffect(() => {
@@ -24,28 +26,32 @@ const TraceabilityMatrix = () => {
     setRequirements(dataStore.getRequirements());
     setTestCases(dataStore.getTestCases());
     setMapping(dataStore.getMapping());
+    setHasData(dataStore.hasData());
     
     // Subscribe to DataStore changes
     const unsubscribe = dataStore.subscribe(() => {
       setRequirements(dataStore.getRequirements());
       setTestCases(dataStore.getTestCases());
       setMapping(dataStore.getMapping());
+      setHasData(dataStore.hasData());
     });
     
     // Clean up subscription
     return () => unsubscribe();
   }, []);
   
-  // Use the custom hook to get release data
-  const { 
-    selectedVersion, 
-    setSelectedVersion, 
-    coverage,
-    versionCoverage,
-    summary,
-    versions,
-    hasData
-  } = useRelease(requirements, testCases, mapping, versionsData, 'unassigned');
+  // Calculate coverage based on current data and selected version
+  const coverage = React.useMemo(() => {
+    return calculateCoverage(requirements, mapping, testCases);
+  }, [requirements, mapping, testCases]);
+  
+  // Version-specific coverage
+  const versionCoverage = React.useMemo(() => {
+    if (selectedVersion === 'unassigned') {
+      return coverage;
+    }
+    return calculateCoverage(requirements, mapping, testCases, selectedVersion);
+  }, [requirements, mapping, testCases, selectedVersion, coverage]);
   
   // Filter requirements and test cases by selected version
   const filteredRequirements = selectedVersion === 'unassigned' 
@@ -67,12 +73,50 @@ const TraceabilityMatrix = () => {
     setExpandedRequirement(expandedRequirement === reqId ? null : reqId);
   };
 
+  // Calculate summary statistics
+  const summary = React.useMemo(() => {
+    if (!hasData) {
+      return {
+        totalRequirements: 0,
+        reqWithTests: 0,
+        reqFullyAutomated: 0,
+        reqFullyPassed: 0,
+        totalTestCases: 0
+      };
+    }
+    
+    const totalRequirements = filteredRequirements.length;
+    
+    // Count requirements with tests
+    const reqWithTests = filteredRequirements.filter(req => 
+      (mapping[req.id] || []).some(tcId => {
+        const tc = testCases.find(t => t.id === tcId);
+        return tc && (selectedVersion === 'unassigned' || !tc.version || tc.version === selectedVersion || tc.version === '');
+      })
+    ).length;
+    
+    // Count fully automated requirements
+    const reqFullyAutomated = versionCoverage.filter(stat => 
+      stat.automationPercentage === 100 && stat.totalTests > 0
+    ).length;
+    
+    // Count fully passed requirements
+    const reqFullyPassed = versionCoverage.filter(stat => 
+      stat.passPercentage === 100 && stat.totalTests > 0
+    ).length;
+
+    return {
+      totalRequirements,
+      reqWithTests,
+      reqFullyAutomated,
+      reqFullyPassed,
+      totalTestCases: filteredTestCases.length
+    };
+  }, [filteredRequirements, filteredTestCases, mapping, testCases, versionCoverage, selectedVersion, hasData]);
+
   return (
     <MainLayout 
       title="Requirements-Test Case Traceability Matrix"
-      selectedVersion={selectedVersion}
-      setSelectedVersion={setSelectedVersion}
-      versions={versions}
       hasData={hasData}
     >
       {!hasData ? (
@@ -219,3 +263,4 @@ const TraceabilityMatrix = () => {
 };
 
 export default TraceabilityMatrix;
+

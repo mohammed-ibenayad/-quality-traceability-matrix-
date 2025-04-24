@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import './App.css';
 import dataStore from './services/DataStore';
+import { VersionProvider } from './context/VersionContext';
 
 // Import API endpoints
 import testResultsApi from './api/testResultsApi';
@@ -79,19 +80,21 @@ window.receiveTestResults({
   }, []);
 
   return (
-    <Router>
-      <Routes>
-        {/* If no data exists, redirect to import page */}
-        <Route path="/" element={hasData ? <Dashboard /> : <Navigate to="/import" />} />
-        <Route path="/matrix" element={hasData ? <TraceabilityMatrix /> : <Navigate to="/import" />} />
-        <Route path="/requirements" element={hasData ? <Requirements /> : <Navigate to="/import" />} />
-        <Route path="/releases" element={hasData ? <Releases /> : <Navigate to="/import" />} />
-        <Route path="/import" element={<ImportData />} />
-        
-        {/* Redirect any unknown paths to dashboard or import based on data presence */}
-        <Route path="*" element={<Navigate to={hasData ? "/" : "/import"} />} />
-      </Routes>
-    </Router>
+    <VersionProvider>
+      <Router>
+        <Routes>
+          {/* If no data exists, redirect to import page */}
+          <Route path="/" element={hasData ? <Dashboard /> : <Navigate to="/import" />} />
+          <Route path="/matrix" element={hasData ? <TraceabilityMatrix /> : <Navigate to="/import" />} />
+          <Route path="/requirements" element={hasData ? <Requirements /> : <Navigate to="/import" />} />
+          <Route path="/releases" element={hasData ? <Releases /> : <Navigate to="/import" />} />
+          <Route path="/import" element={<ImportData />} />
+          
+          {/* Redirect any unknown paths to dashboard or import based on data presence */}
+          <Route path="*" element={<Navigate to={hasData ? "/" : "/import"} />} />
+        </Routes>
+      </Router>
+    </VersionProvider>
   );
 }
 

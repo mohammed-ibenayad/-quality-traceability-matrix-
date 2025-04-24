@@ -4,11 +4,9 @@ import MainLayout from '../components/Layout/MainLayout';
 import EmptyState from '../components/Common/EmptyState';
 import EditRequirementModal from '../components/Requirements/EditRequirementModal';
 import TDFInfoTooltip from '../components/Common/TDFInfoTooltip';
-import { useRelease } from '../hooks/useRelease';
+import { useVersionContext } from '../context/VersionContext';
+import { calculateCoverage } from '../utils/coverage';
 import dataStore from '../services/DataStore';
-
-// Import versions for the header dropdown
-import versionsData from '../data/versions';
 
 const Requirements = () => {
   // State to hold the data from DataStore
@@ -16,6 +14,10 @@ const Requirements = () => {
   const [testCases, setTestCases] = useState([]);
   const [mapping, setMapping] = useState({});
   const [editingRequirement, setEditingRequirement] = useState(null);
+  const [hasData, setHasData] = useState(false);
+  
+  // Get version context
+  const { selectedVersion, versions } = useVersionContext();
   
   // Load data from DataStore
   useEffect(() => {
@@ -23,26 +25,28 @@ const Requirements = () => {
     setRequirements(dataStore.getRequirements());
     setTestCases(dataStore.getTestCases());
     setMapping(dataStore.getMapping());
+    setHasData(dataStore.hasData());
     
     // Subscribe to DataStore changes
     const unsubscribe = dataStore.subscribe(() => {
       setRequirements(dataStore.getRequirements());
       setTestCases(dataStore.getTestCases());
       setMapping(dataStore.getMapping());
+      setHasData(dataStore.hasData());
     });
     
     // Clean up subscription
     return () => unsubscribe();
   }, []);
 
-  // Use the custom hook to get release data
-  const { 
-    selectedVersion, 
-    setSelectedVersion, 
-    versionCoverage,
-    versions,
-    hasData
-  } = useRelease(requirements, testCases, mapping, versionsData, 'unassigned');
+  // Calculate version-specific coverage
+  const versionCoverage = React.useMemo(() => {
+    if (selectedVersion === 'unassigned') {
+      return calculateCoverage(requirements, mapping, testCases);
+    } else {
+      return calculateCoverage(requirements, mapping, testCases, selectedVersion);
+    }
+  }, [requirements, mapping, testCases, selectedVersion]);
 
   // Filter requirements by selected version
   const filteredRequirements = selectedVersion === 'unassigned'
@@ -63,9 +67,6 @@ const Requirements = () => {
   return (
     <MainLayout 
       title="Requirements" 
-      selectedVersion={selectedVersion}
-      setSelectedVersion={setSelectedVersion}
-      versions={versions}
       hasData={hasData}
     >
       {!hasData ? (

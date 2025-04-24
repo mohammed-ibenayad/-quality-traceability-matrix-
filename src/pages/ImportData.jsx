@@ -3,20 +3,20 @@ import { useNavigate } from 'react-router-dom';
 import MainLayout from '../components/Layout/MainLayout';
 import ImportRequirements from '../components/Import/ImportRequirements';
 import ImportTestCases from '../components/Import/ImportTestCases';
+import { useVersionContext } from '../context/VersionContext';
 import dataStore from '../services/DataStore';
-
-// Import versions for the header
-import versionsData from '../data/versions';
 
 /**
  * Page for importing data into the system
  */
 const ImportData = () => {
-  const [selectedVersion, setSelectedVersion] = useState(versionsData[2]?.id || '');
   const [importStatus, setImportStatus] = useState(null);
   const [activeTab, setActiveTab] = useState('requirements'); // 'requirements' or 'testcases'
   const [hasData, setHasData] = useState(false);
   const navigate = useNavigate();
+
+  // Use version context
+  const { selectedVersion } = useVersionContext();
 
   // Check if the system has data
   useEffect(() => {
@@ -85,9 +85,6 @@ const ImportData = () => {
   return (
     <MainLayout
       title="Import Data"
-      selectedVersion={selectedVersion}
-      setSelectedVersion={setSelectedVersion}
-      versions={versionsData}
       hasData={hasData}
     >
       <div className="max-w-4xl mx-auto">
@@ -409,8 +406,6 @@ const ImportData = () => {
             </div>
           </>
         )}
-        
-        {/* Removed original import status section that was at the bottom */}
       </div>
       
       {/* Add CSS for animations */}

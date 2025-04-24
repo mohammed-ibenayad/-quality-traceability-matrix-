@@ -7,22 +7,26 @@ import RiskAreasList from '../components/Dashboard/RiskAreasList';
 import MetricsChart from '../components/Dashboard/MetricsChart';
 import HealthScoreGauge from '../components/Dashboard/HealthScoreGauge';
 import EmptyState from '../components/common/EmptyState';
-import { useRelease } from '../hooks/useRelease';
+import { useVersionContext } from '../context/VersionContext';
 import dataStore from '../services/DataStore';
 import { refreshQualityGates } from '../utils/calculateQualityGates';
-
-// Import initial versions for the dropdown
-import versionsData from '../data/versions';
+import { calculateCoverage } from '../utils/coverage';
+import { calculateReleaseMetrics } from '../utils/metrics';
 
 const Dashboard = () => {
   // State to hold the data from DataStore
   const [requirements, setRequirements] = useState([]);
   const [testCases, setTestCases] = useState([]);
   const [mapping, setMapping] = useState({});
-  const [versions, setVersions] = useState(versionsData);
+  
+  // Get version context
+  const { selectedVersion, versions } = useVersionContext();
   
   // State to trigger metric recalculation
   const [refreshCounter, setRefreshCounter] = useState(0);
+  
+  // Track if data is loaded
+  const [hasData, setHasData] = useState(false);
   
   // Load data from DataStore
   useEffect(() => {
@@ -30,17 +34,7 @@ const Dashboard = () => {
     setRequirements(dataStore.getRequirements());
     setTestCases(dataStore.getTestCases());
     setMapping(dataStore.getMapping());
-    
-    // Initialize versions in DataStore if needed
-    if (typeof dataStore.getVersions === 'function') {
-      if (dataStore.getVersions().length === 0) {
-        if (typeof dataStore.setVersions === 'function') {
-          dataStore.setVersions(versionsData);
-        }
-      } else {
-        setVersions(dataStore.getVersions());
-      }
-    }
+    setHasData(dataStore.hasData());
     
     // Try to refresh quality gates, but don't crash if methods aren't available
     try {
@@ -61,11 +55,7 @@ const Dashboard = () => {
       setRequirements(updatedRequirements);
       setTestCases(updatedTestCases);
       setMapping(updatedMapping);
-      
-      // Update versions if the method exists
-      if (typeof dataStore.getVersions === 'function') {
-        setVersions(dataStore.getVersions());
-      }
+      setHasData(dataStore.hasData());
       
       // Increment the refresh counter to force metrics recalculation
       setRefreshCounter(prev => prev + 1);
@@ -82,17 +72,131 @@ const Dashboard = () => {
     return () => unsubscribe();
   }, []);
 
-  // Use the custom hook to get release data - use our local versions
-  // Pass refreshCounter to force recalculation when DataStore changes
-  const { 
-    selectedVersion, 
-    setSelectedVersion, 
-    metrics,
-    versionCoverage,
-    summary,
-    hasData,
-    refreshCounter: hookRefreshCounter
-  } = useRelease(requirements, testCases, mapping, versions, 'unassigned', refreshCounter);
+  // Calculate overall coverage for all requirements and test cases
+  const coverage = useMemo(() => {
+    if (!hasData) return [];
+    console.log("Recalculating overall coverage with refreshTrigger:", refreshCounter);
+    return calculateCoverage(requirements, mapping, testCases);
+  }, [requirements, mapping, testCases, hasData, refreshCounter]);
+  
+  // Calculate version-specific coverage or all coverage if "unassigned" is selected
+  const versionCoverage = useMemo(() => {
+    if (!hasData) return [];
+    
+    // If "unassigned" is selected, return coverage for all requirements
+    if (selectedVersion === 'unassigned') {
+      return coverage;
+    }
+    
+    // Otherwise, filter by the selected version
+    console.log("Recalculating version-specific coverage for:", selectedVersion);
+    return calculateCoverage(requirements, mapping, testCases, selectedVersion);
+  }, [requirements, mapping, testCases, selectedVersion, coverage, hasData, refreshCounter]);
+  
+  // Calculate release metrics for the selected version
+  const metrics = useMemo(() => {
+    if (!hasData) return null;
+    
+    console.log("Recalculating metrics for version:", selectedVersion);
+    
+    // If "unassigned" is selected, don't calculate specific metrics
+    if (selectedVersion === 'unassigned') {
+      return {
+        version: { id: 'unassigned', name: 'Unassigned/All Items', status: 'N/A' },
+        reqByPriority: {
+          High: requirements.filter(req => req.priority === 'High').length,
+          Medium: requirements.filter(req => req.priority === 'Medium').length,
+          Low: requirements.filter(req => req.priority === 'Low').length
+        },
+        totalRequirements: requirements.length,
+        sufficientCoveragePercentage: 0,
+        passRate: 0,
+        automationRate: 0,
+        healthScore: 0,
+        riskAreas: [],
+        versionCoverage: coverage
+      };
+    }
+    
+    const calculateVersionCoverage = (versionId) => {
+      return calculateCoverage(requirements, mapping, testCases, versionId);
+    };
+    
+    const calculatedMetrics = calculateReleaseMetrics(
+      selectedVersion, 
+      versions, 
+      requirements, 
+      calculateVersionCoverage
+    );
+    
+    // Add versionCoverage to metrics for charts
+    if (calculatedMetrics) {
+      calculatedMetrics.versionCoverage = versionCoverage;
+    }
+    
+    return calculatedMetrics;
+  }, [selectedVersion, versions, requirements, mapping, testCases, versionCoverage, coverage, hasData, refreshCounter]);
+  
+  // Summary statistics - filter by version where appropriate
+  const summary = useMemo(() => {
+    if (!hasData) {
+      return {
+        totalRequirements: 0,
+        reqWithTests: 0,
+        reqFullyAutomated: 0,
+        reqFullyPassed: 0,
+        totalTestCases: 0
+      };
+    }
+    
+    // Filter requirements based on the selected version
+    let versionRequirements;
+    let versionTestCases;
+    
+    if (selectedVersion === 'unassigned') {
+      // For "unassigned", include all requirements and test cases
+      versionRequirements = requirements;
+      versionTestCases = testCases;
+    } else {
+      // Otherwise, filter by the selected version
+      versionRequirements = requirements.filter(req => 
+        req.versions && req.versions.includes(selectedVersion)
+      );
+      
+      // Filter test cases by selected version (empty version means applies to all)
+      versionTestCases = testCases.filter(tc => 
+        !tc.version || tc.version === selectedVersion || tc.version === ''
+      );
+    }
+    
+    const totalRequirements = versionRequirements.length;
+    
+    // Count requirements with tests
+    const reqWithTests = versionRequirements.filter(req => 
+      (mapping[req.id] || []).some(tcId => {
+        const tc = testCases.find(t => t.id === tcId);
+        return tc && (selectedVersion === 'unassigned' || !tc.version || tc.version === selectedVersion || tc.version === '');
+      })
+    ).length;
+    
+    // Count fully automated requirements
+    const reqFullyAutomated = versionCoverage.filter(stat => 
+      stat.automationPercentage === 100 && stat.totalTests > 0
+    ).length;
+    
+    // Count fully passed requirements
+    const reqFullyPassed = versionCoverage.filter(stat => 
+      stat.passPercentage === 100 && stat.totalTests > 0
+    ).length;
+
+    return {
+      totalRequirements,
+      reqWithTests,
+      reqFullyAutomated,
+      reqFullyPassed,
+      totalTestCases: versionTestCases.length
+    };
+  }, [requirements, versionCoverage, mapping, testCases, selectedVersion, hasData, refreshCounter]);
 
   // Calculate direct metrics on test pass rate to mirror TraceabilityMatrix
   const directMetrics = useMemo(() => {
@@ -107,7 +211,7 @@ const Dashboard = () => {
           !tc.version || tc.version === selectedVersion || tc.version === '');
     
     // Calculate pass rate - mirror the calculation in TraceabilityMatrix
-    // UPDATED: Calculate based on tests that have actually been executed, not all tests
+    // Calculate based on tests that have actually been executed, not all tests
     const executedTests = versionTests.filter(tc => tc.status === 'Passed' || tc.status === 'Failed');
     const passedTests = versionTests.filter(tc => tc.status === 'Passed').length;
     const executedCount = executedTests.length;
@@ -176,13 +280,7 @@ const Dashboard = () => {
       // Use DataStore method if available, otherwise update local state
       if (typeof dataStore.addVersion === 'function') {
         dataStore.addVersion(newVersion);
-      } else {
-        // Fallback to updating local state
-        setVersions(prev => [...prev, newVersion]);
       }
-      
-      // Switch to the newly created version
-      setSelectedVersion(newVersion.id);
     } catch (error) {
       console.error("Error adding version:", error);
       // In a real app, show a notification
@@ -212,9 +310,6 @@ const Dashboard = () => {
   return (
     <MainLayout 
       title="Quality Dashboard" 
-      selectedVersion={selectedVersion}
-      setSelectedVersion={setSelectedVersion}
-      versions={versions}
       hasData={hasData}
       onAddVersion={handleAddVersion} // Pass the handler
     >
@@ -250,7 +345,7 @@ const Dashboard = () => {
             </div>
           )}
           
-          {/* Dashboard Cards - Use displayMetrics which includes direct calculations */}
+          {/* Dashboard Cards */}
           <DashboardCards metrics={displayMetrics} />
           
           {selectedVersion !== 'unassigned' ? (

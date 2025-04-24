@@ -1,16 +1,17 @@
 import React from 'react';
 import Sidebar from './Sidebar';
 import Header from './Header';
+import { useVersionContext } from '../../context/VersionContext';
 
 const MainLayout = ({ 
   children, 
   title, 
-  selectedVersion, 
-  setSelectedVersion, 
-  versions,
   hasData = true,
   onAddVersion = null
 }) => {
+  // Use our version context instead of props
+  const { selectedVersion, setSelectedVersion, versions } = useVersionContext();
+
   return (
     <div className="bg-gray-100 min-h-screen">
       <div className="flex min-h-screen">
