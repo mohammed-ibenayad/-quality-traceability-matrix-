@@ -1,14 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import MainLayout from '../components/Layout/MainLayout';
-import NewReleaseModal from '../components/Releases/NewReleaseModal';
 import ReleaseVersionGrid from '../components/Releases/ReleaseVersionGrid';
-import RefreshQualityGatesButton from '../components/Releases/RefreshQualityGatesButton';
 import EmptyState from '../components/Common/EmptyState';
 import { useVersionContext } from '../context/VersionContext';
 import dataStore from '../services/DataStore';
 
 const Releases = () => {
-  const [isModalOpen, setIsModalOpen] = useState(false);
   const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'table'
   const [hasData, setHasData] = useState(false);
   
@@ -29,21 +26,7 @@ const Releases = () => {
     return () => unsubscribe();
   }, []);
 
-  // Handler for adding a new version
-  const handleAddVersion = (newVersion) => {
-    try {
-      // Use DataStore method if available
-      if (dataStore.addVersion) {
-        dataStore.addVersion(newVersion);
-      }
-      
-      // Switch to the newly created version
-      setSelectedVersion(newVersion.id);
-    } catch (error) {
-      console.error("Error adding version:", error);
-      // In a real app, show a notification
-    }
-  };
+  // No longer needed since we removed the new release button
   
   // Handler for updating a version
   const handleUpdateVersion = (versionId, updateData) => {
@@ -93,14 +76,10 @@ const Releases = () => {
     <MainLayout 
       title="Release Management" 
       hasData={hasData}
-      onAddVersion={handleAddVersion}
     >
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold">Release Versions</h2>
         <div className="flex items-center gap-4">
-          {/* Refresh Quality Gates Button */}
-          <RefreshQualityGatesButton />
-          
           {/* View Mode Toggle */}
           <div className="bg-gray-100 rounded-lg p-1 flex">
             <button
@@ -124,14 +103,6 @@ const Releases = () => {
               Table
             </button>
           </div>
-          
-          {/* New Release Button */}
-          <button
-            onClick={() => setIsModalOpen(true)}
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-          >
-            New Release
-          </button>
         </div>
       </div>
 
@@ -224,14 +195,6 @@ const Releases = () => {
           </table>
         </div>
       )}
-
-      {/* New Release Modal */}
-      <NewReleaseModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onSave={handleAddVersion}
-        existingVersions={versions}
-      />
     </MainLayout>
   );
 };
