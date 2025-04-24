@@ -43,6 +43,20 @@ class GitHubService {
       
       console.log("Triggering workflow with payload:", payload);
       
+      // Get list of runs before triggering to compare later
+      const beforeRuns = await octokit.request('GET /repos/{owner}/{repo}/actions/workflows/{workflow_id}/runs', {
+        owner,
+        repo,
+        workflow_id: workflowFile,
+        per_page: 5,
+        headers: {
+          'X-GitHub-Api-Version': '2022-11-28'
+        }
+      });
+      
+      const beforeRunIds = new Set(beforeRuns.data.workflow_runs?.map(run => run.id) || []);
+      console.log("Existing run IDs before trigger:", [...beforeRunIds]);
+      
       // Create a repository dispatch event to trigger the workflow
       await octokit.request('POST /repos/{owner}/{repo}/dispatches?t=' + Date.now(), {
         owner,
@@ -56,11 +70,16 @@ class GitHubService {
       
       console.log("Repository dispatch event sent successfully");
       
-      // Get the latest workflow run for the specified workflow file
+      // Wait a moment for GitHub to create the workflow run
+      console.log("Waiting 2 seconds for GitHub to create the workflow run...");
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // Get the latest workflow runs after triggering
       const { data } = await octokit.request('GET /repos/{owner}/{repo}/actions/workflows/{workflow_id}/runs', {
         owner,
         repo,
         workflow_id: workflowFile,
+        per_page: 10, // Get more runs to increase chances of finding the new one
         headers: {
           'X-GitHub-Api-Version': '2022-11-28'
         }
@@ -70,14 +89,28 @@ class GitHubService {
         throw new Error('No workflow runs found. The workflow may not exist or has not been triggered yet.');
       }
       
-      console.log("Found latest workflow run:", data.workflow_runs[0].id);
+      console.log(`Found ${data.workflow_runs.length} workflow runs`);
       
-      // Return the most recent workflow run
+      // Look for a new run that wasn't in the previous list
+      const newRun = data.workflow_runs.find(run => !beforeRunIds.has(run.id) && 
+                                                   run.event === 'repository_dispatch');
+      
+      if (newRun) {
+        console.log(`Found new workflow run: ${newRun.id} (created at ${newRun.created_at})`);
+        return {
+          id: newRun.id,
+          status: newRun.status,
+          html_url: newRun.html_url,
+          client_payload: payload
+        };
+      }
+      
+      // If we couldn't find a new run, fall back to the most recent one
+      console.log("Could not find a new run, using the most recent one instead:", data.workflow_runs[0].id);
       return {
         id: data.workflow_runs[0].id,
         status: data.workflow_runs[0].status,
         html_url: data.workflow_runs[0].html_url,
-        // Store the payload with the run for later reference
         client_payload: payload
       };
     } catch (error) {
