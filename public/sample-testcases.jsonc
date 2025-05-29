@@ -1,117 +1,836 @@
 [
-    {
-      // Basic authentication test case
-      "id": "TC_001",
-      "name": "Valid Login",
-      "description": "Test valid user login with correct credentials",
-      "steps": [
-        "Navigate to login page",
-        "Enter valid username",
-        "Enter valid password",
-        "Click login button"
-      ],
-      "expectedResult": "User is successfully logged in and redirected to dashboard",
-      
-      // Test execution data
-      "status": "Passed",  // Possible values: Passed, Failed, Not Run, Blocked
-      "automationStatus": "Automated", // Possible values: Automated, Manual, Planned
-      "automationPath": "tests/auth/login.spec.js", // Path to automation script (optional)
-      "lastExecuted": "2025-03-15", // Date of last execution
-      
-      // Requirement mapping - links this test to requirements
-      "requirementIds": ["REQ-001"], // Array of requirement IDs this test covers
-      
-      // Additional metadata (all optional)
-      "version": "v1.0", // Version this test applies to
-      "executedBy": "John Smith", // Person who executed the test
-      "tags": ["Authentication", "Smoke Test"],
-      "priority": "High", // Test priority
-      "estimatedDuration": 2 // Estimated duration in minutes
-    },
-    {
-      "id": "TC_002",
-      "name": "Invalid Password",
-      "description": "Test login with invalid password",
-      "steps": [
-        "Navigate to login page",
-        "Enter valid username",
-        "Enter invalid password",
-        "Click login button"
-      ],
-      "expectedResult": "Error message is displayed and user remains on login page",
-      "status": "Passed",
-      "automationStatus": "Automated",
-      "automationPath": "tests/auth/invalid_login.spec.js",
-      "lastExecuted": "2025-03-15",
-      "requirementIds": ["REQ-001"],
-      "version": "v1.0",
-      "executedBy": "John Smith",
-      "tags": ["Authentication", "Validation"]
-    },
-    {
-      // Password reset test
-      "id": "TC_004",
-      "name": "Password Reset Link",
-      "description": "Test password reset link functionality",
-      "steps": [
-        "Navigate to login page",
-        "Click 'Forgot Password' link",
-        "Enter email address",
-        "Click submit button"
-      ],
-      "expectedResult": "System displays confirmation message that email was sent",
-      "status": "Passed",
-      "automationStatus": "Automated",
-      "lastExecuted": "2025-03-15",
-      "requirementIds": ["REQ-002"],
-      "version": "v1.0"
-    },
-    {
-      // Manual test example
-      "id": "TC_005",
-      "name": "Password Reset Validation",
-      "description": "Test password reset form validation",
-      "steps": [
-        "Navigate to password reset page via email link",
-        "Enter new password that doesn't meet requirements",
-        "Attempt to submit form"
-      ],
-      "expectedResult": "Form shows validation errors and prevents submission",
-      "status": "Not Run",
-      "automationStatus": "Manual",
-      "requirementIds": ["REQ-002", "REQ-004"],
-      "version": "v1.0"
-    },
-    {
-      // Planned automation example
-      "id": "TC_007",
-      "name": "Verify Password Requirements",
-      "description": "Verify password meets complexity requirements",
-      "steps": [
-        "Navigate to registration page",
-        "Enter password with various combinations to test each requirement",
-        "Check validation feedback"
-      ],
-      "expectedResult": "System provides feedback for each password requirement",
-      "status": "Not Run",
-      "automationStatus": "Planned",
-      "requirementIds": ["REQ-004"],
-      "priority": "Medium"
-    },
-    {
-      // Planned automation example
-      "id": "TC_008",
-      "name": "Verify Password Requirements",
-      "description": "Verify password meets complexity requirements",
-      "steps": [
-        "Navigate to registration page",
-        "Enter password with various combinations to test each requirement",
-        "Check validation feedback"
-      ],
-      "expectedResult": "System provides feedback for each password requirement",
-      "status": "Not Run",
-      "automationStatus": "Planned",
-      "requirementIds": ["REQ-008"],
-      "priority": "Medium"
-    }
-  ]
+  {
+    "id": "TC_001",
+    "name": "Verify that the homepage loads successfully",
+    "description": "Verify that the homepage loads successfully and contains expected elements like search box and content area.",
+    "steps": [
+      "Navigate to the OpenCart homepage URL.",
+      "Check that the page title is not empty.",
+      "Verify that the search box is displayed.",
+      "Verify that the content area is displayed."
+    ],
+    "expectedResult": "Homepage loads successfully with all key elements present and visible.",
+    "status": "Not Run",
+    "automationStatus": "Automated",
+    "automationPath": "tests/TestOpenCart/test_homepage_loads.py",
+    "lastExecuted": "",
+    "requirementIds": [
+      "REQ-004"
+    ],
+    "version": "v1.0",
+    "executedBy": "Pytest",
+    "tags": [
+      "Homepage",
+      "Navigation"
+    ],
+    "priority": "High",
+    "estimatedDuration": 1
+  },
+  {
+    "id": "TC_002",
+    "name": "Verify product search functionality",
+    "description": "Verify that users can search for products using the search box and relevant results are displayed.",
+    "steps": [
+      "Navigate to the OpenCart homepage.",
+      "Enter search term 'phone' in the search box.",
+      "Click on the search button or press Enter.",
+      "Wait for search results page to load.",
+      "Verify that search results contain the search term or product listings."
+    ],
+    "expectedResult": "Search results page loads and displays relevant products based on the search term.",
+    "status": "Not Run",
+    "automationStatus": "Automated",
+    "automationPath": "tests/TestOpenCart/test_product_search.py",
+    "lastExecuted": "",
+    "requirementIds": [
+      "REQ-005"
+    ],
+    "version": "v1.0",
+    "executedBy": "Pytest",
+    "tags": [
+      "Search",
+      "Product"
+    ],
+    "priority": "High",
+    "estimatedDuration": 2
+  },
+  {
+    "id": "TC_003",
+    "name": "Verify add to cart functionality",
+    "description": "Verify that users can add products to the shopping cart from product pages.",
+    "steps": [
+      "Navigate to the OpenCart homepage.",
+      "Navigate to a product category by clicking on a category link.",
+      "Select a product by clicking on it.",
+      "Wait for the product page to load.",
+      "Click on the 'Add to Cart' button.",
+      "Verify that the product is added to the cart through success message or cart icon update."
+    ],
+    "expectedResult": "Product is successfully added to the cart with confirmation message or cart icon update.",
+    "status": "Not Run",
+    "automationStatus": "Automated",
+    "automationPath": "tests/TestOpenCart/test_add_to_cart.py",
+    "lastExecuted": "",
+    "requirementIds": [
+      "REQ-002"
+    ],
+    "version": "v1.0",
+    "executedBy": "Pytest",
+    "tags": [
+      "Cart",
+      "Product",
+      "Purchase"
+    ],
+    "priority": "Critical",
+    "estimatedDuration": 3
+  },
+  {
+    "id": "TC_004",
+    "name": "Verify user login functionality",
+    "description": "Verify that users can log in with valid credentials and access their account area.",
+    "steps": [
+      "Navigate to the OpenCart homepage.",
+      "Click on 'My Account' dropdown.",
+      "Select 'Login' from the dropdown menu.",
+      "Enter valid email address and password.",
+      "Click on the login button.",
+      "Verify that login is successful and user is redirected to account area."
+    ],
+    "expectedResult": "User is successfully logged in and redirected to account area with account information visible.",
+    "status": "Not Run",
+    "automationStatus": "Automated",
+    "automationPath": "tests/TestOpenCart/test_user_login.py",
+    "lastExecuted": "",
+    "requirementIds": [
+      "REQ-007"
+    ],
+    "version": "v1.0",
+    "executedBy": "Pytest",
+    "tags": [
+      "Authentication",
+      "Account",
+      "Security"
+    ],
+    "priority": "Critical",
+    "estimatedDuration": 2
+  },
+  {
+    "id": "TC_005",
+    "name": "Verify add to wishlist functionality",
+    "description": "Verify that logged-in users can add products to their wishlist.",
+    "steps": [
+      "Login to a user account.",
+      "Navigate to a product page.",
+      "Click on the 'Add to Wish List' button.",
+      "Verify success message or navigate to wishlist page to confirm product was added."
+    ],
+    "expectedResult": "Product is successfully added to the wishlist with confirmation message or visible in wishlist page.",
+    "status": "Not Run",
+    "automationStatus": "Automated",
+    "automationPath": "tests/TestOpenCart/test_wishlist_functionality.py",
+    "lastExecuted": "",
+    "requirementIds": [
+      "REQ-008"
+    ],
+    "version": "v1.0",
+    "executedBy": "Pytest",
+    "tags": [
+      "Wishlist",
+      "Product",
+      "User Experience"
+    ],
+    "priority": "Medium",
+    "estimatedDuration": 3
+  },
+  {
+    "id": "TC_006",
+    "name": "Verify remove from wishlist functionality",
+    "description": "Verify that logged-in users can remove products from their wishlist.",
+    "steps": [
+      "Login to a user account.",
+      "Add a product to the wishlist.",
+      "Navigate to the wishlist page.",
+      "Click on the 'Remove' button for the product.",
+      "Verify that the product is removed from the wishlist."
+    ],
+    "expectedResult": "Product is successfully removed from the wishlist with confirmation message or no longer visible in wishlist page.",
+    "status": "Not Run",
+    "automationStatus": "Automated",
+    "automationPath": "tests/TestOpenCart/test_remove_from_wishlist.py",
+    "lastExecuted": "",
+    "requirementIds": [
+      "REQ-008"
+    ],
+    "version": "v1.0",
+    "executedBy": "Pytest",
+    "tags": [
+      "Wishlist",
+      "Product",
+      "User Experience"
+    ],
+    "priority": "Medium",
+    "estimatedDuration": 3
+  },
+  {
+    "id": "TC_007",
+    "name": "Verify admin login functionality",
+    "description": "Verify that administrators can log in to the admin panel with valid credentials.",
+    "steps": [
+      "Navigate to the OpenCart admin login page.",
+      "Enter valid admin username and password.",
+      "Click on the login button.",
+      "Verify that login is successful and admin is redirected to dashboard."
+    ],
+    "expectedResult": "Admin is successfully logged in and redirected to dashboard with dashboard information visible.",
+    "status": "Not Run",
+    "automationStatus": "Automated",
+    "automationPath": "tests/test_admin.py",
+    "lastExecuted": "",
+    "requirementIds": [
+      "REQ-001"
+    ],
+    "version": "v1.0",
+    "executedBy": "Pytest",
+    "tags": [
+      "Admin",
+      "Authentication",
+      "Security"
+    ],
+    "priority": "Critical",
+    "estimatedDuration": 2
+  },
+  {
+    "id": "TC_008",
+    "name": "Verify admin logout functionality",
+    "description": "Verify that administrators can log out from the admin panel.",
+    "steps": [
+      "Login to the admin panel.",
+      "Click on the logout link in the navigation menu.",
+      "Verify that logout is successful and admin is redirected to login page."
+    ],
+    "expectedResult": "Admin is successfully logged out and redirected to login page.",
+    "status": "Not Run",
+    "automationStatus": "Automated",
+    "automationPath": "tests/test_admin.py",
+    "lastExecuted": "",
+    "requirementIds": [
+      "REQ-001"
+    ],
+    "version": "v1.0",
+    "executedBy": "Pytest",
+    "tags": [
+      "Admin",
+      "Authentication",
+      "Security"
+    ],
+    "priority": "High",
+    "estimatedDuration": 1
+  },
+  {
+    "id": "TC_009",
+    "name": "Verify product deletion functionality",
+    "description": "Verify that administrators can delete products from the catalog.",
+    "steps": [
+      "Login to the admin panel.",
+      "Navigate to Products page.",
+      "Search for a specific product.",
+      "Select the product and click Delete.",
+      "Confirm deletion in the alert dialog.",
+      "Verify success message for product deletion."
+    ],
+    "expectedResult": "Product is successfully deleted with confirmation message.",
+    "status": "Not Run",
+    "automationStatus": "Automated",
+    "automationPath": "tests/test_admin.py",
+    "lastExecuted": "",
+    "requirementIds": [
+      "REQ-002"
+    ],
+    "version": "v1.0",
+    "executedBy": "Pytest",
+    "tags": [
+      "Admin",
+      "Product",
+      "Management"
+    ],
+    "priority": "High",
+    "estimatedDuration": 3
+  },
+  {
+    "id": "TC_010",
+    "name": "Verify category creation functionality",
+    "description": "Verify that administrators can create new product categories.",
+    "steps": [
+      "Login to the admin panel.",
+      "Navigate to Categories page.",
+      "Click on Add New button.",
+      "Fill in category details in the General tab.",
+      "Fill in SEO details if needed.",
+      "Save the new category.",
+      "Verify success message for category creation."
+    ],
+    "expectedResult": "Category is successfully created with confirmation message.",
+    "status": "Not Run",
+    "automationStatus": "Automated",
+    "automationPath": "tests/test_admin.py",
+    "lastExecuted": "",
+    "requirementIds": [
+      "REQ-003"
+    ],
+    "version": "v1.0",
+    "executedBy": "Pytest",
+    "tags": [
+      "Admin",
+      "Category",
+      "Management"
+    ],
+    "priority": "High",
+    "estimatedDuration": 3
+  },
+  {
+    "id": "TC_011",
+    "name": "Verify admin login with invalid credentials",
+    "description": "Verify that the system displays an appropriate error message when an admin attempts to log in with invalid credentials.",
+    "steps": [
+      "Navigate to the OpenCart admin login page.",
+      "Enter invalid username and password.",
+      "Click on the login button.",
+      "Verify that an error message is displayed and the admin remains on the login page."
+    ],
+    "expectedResult": "Error message displayed stating 'No match for Username and/or Password', and admin remains on login page.",
+    "status": "Not Run",
+    "automationStatus": "Automated",
+    "automationPath": "tests/test_admin.py",
+    "lastExecuted": "",
+    "requirementIds": [
+      "REQ-001"
+    ],
+    "version": "v1.0",
+    "executedBy": "Pytest",
+    "tags": [
+      "Admin",
+      "Authentication",
+      "Security"
+    ],
+    "priority": "High",
+    "estimatedDuration": 2
+  },
+  {
+    "id": "TC_012",
+    "name": "Verify admin login with invalid username",
+    "description": "Verify that the system displays an appropriate error message when an admin attempts to log in with an invalid username but correct password.",
+    "steps": [
+      "Navigate to the OpenCart admin login page.",
+      "Enter invalid username but correct password.",
+      "Click on the login button.",
+      "Verify that an error message is displayed and the admin remains on the login page."
+    ],
+    "expectedResult": "Error message displayed stating 'No match for Username and/or Password', and admin remains on login page.",
+    "status": "Not Run",
+    "automationStatus": "Automated",
+    "automationPath": "tests/test_admin.py",
+    "lastExecuted": "",
+    "requirementIds": [
+      "REQ-001"
+    ],
+    "version": "v1.0",
+    "executedBy": "Pytest",
+    "tags": [
+      "Admin",
+      "Authentication",
+      "Security"
+    ],
+    "priority": "High",
+    "estimatedDuration": 2
+  },
+  {
+    "id": "TC_013",
+    "name": "Verify admin login with invalid password",
+    "description": "Verify that the system displays an appropriate error message when an admin attempts to log in with a valid username but incorrect password.",
+    "steps": [
+      "Navigate to the OpenCart admin login page.",
+      "Enter valid admin username but incorrect password.",
+      "Click on the login button.",
+      "Verify that an error message is displayed and the admin remains on the login page."
+    ],
+    "expectedResult": "Error message displayed stating 'No match for Username and/or Password', and admin remains on login page.",
+    "status": "Not Run",
+    "automationStatus": "Automated",
+    "automationPath": "tests/test_admin.py",
+    "lastExecuted": "",
+    "requirementIds": [
+      "REQ-001"
+    ],
+    "version": "v1.0",
+    "executedBy": "Pytest",
+    "tags": [
+      "Admin",
+      "Authentication",
+      "Security"
+    ],
+    "priority": "High",
+    "estimatedDuration": 2
+  },
+  {
+    "id": "TC_014",
+    "name": "Verify admin login with empty fields",
+    "description": "Verify that the system displays validation messages when an admin attempts to log in with empty username and password fields.",
+    "steps": [
+      "Navigate to the OpenCart admin login page.",
+      "Leave username and password fields empty.",
+      "Click on the login button.",
+      "Verify that validation error messages are displayed."
+    ],
+    "expectedResult": "Validation error messages displayed for empty fields, and admin remains on login page.",
+    "status": "Not Run",
+    "automationStatus": "Automated",
+    "automationPath": "tests/test_admin.py",
+    "lastExecuted": "",
+    "requirementIds": [
+      "REQ-001"
+    ],
+    "version": "v1.0",
+    "executedBy": "Pytest",
+    "tags": [
+      "Admin",
+      "Authentication",
+      "Security",
+      "Form Validation"
+    ],
+    "priority": "Medium",
+    "estimatedDuration": 1
+  },
+  {
+    "id": "TC_015",
+    "name": "Verify admin redirect to dashboard after login",
+    "description": "Verify that after successful login, the admin is redirected to the dashboard page.",
+    "steps": [
+      "Navigate to the OpenCart admin login page.",
+      "Enter valid admin username and password.",
+      "Click on the login button.",
+      "Verify that admin is redirected to the dashboard page.",
+      "Verify that the URL contains '/dashboard' or similar endpoint.",
+      "Verify that dashboard elements are visible."
+    ],
+    "expectedResult": "After successful login, admin is redirected to dashboard page with dashboard elements visible.",
+    "status": "Not Run",
+    "automationStatus": "Automated",
+    "automationPath": "tests/test_admin.py",
+    "lastExecuted": "",
+    "requirementIds": [
+      "REQ-001"
+    ],
+    "version": "v1.0",
+    "executedBy": "Pytest",
+    "tags": [
+      "Admin",
+      "Authentication",
+      "Security",
+      "Navigation"
+    ],
+    "priority": "High",
+    "estimatedDuration": 2
+  },
+  {
+    "id": "TC_016",
+    "name": "Verify password masking during admin login",
+    "description": "Verify that the password is masked (displayed as dots or asterisks) when entered in the password field on the admin login page.",
+    "steps": [
+      "Navigate to the OpenCart admin login page.",
+      "Enter text in the password field.",
+      "Verify that the password is masked and not displayed as plain text.",
+      "Verify that the password field has type attribute set to 'password'."
+    ],
+    "expectedResult": "Password is masked when entered in the password field and not visible as plain text.",
+    "status": "Not Run",
+    "automationStatus": "Automated",
+    "automationPath": "tests/test_admin.py",
+    "lastExecuted": "",
+    "requirementIds": [
+      "REQ-001"
+    ],
+    "version": "v1.0",
+    "executedBy": "Pytest",
+    "tags": [
+      "Admin",
+      "Authentication",
+      "Security",
+      "UI"
+    ],
+    "priority": "Medium",
+    "estimatedDuration": 1
+  },
+  {
+    "id": "TC_017",
+    "name": "Verify browser back button after admin logout",
+    "description": "Verify that using the browser back button after admin logout doesn't allow access to protected admin pages.",
+    "steps": [
+      "Navigate to the OpenCart admin login page.",
+      "Log in with valid admin credentials.",
+      "Navigate to any admin page (e.g., Products).",
+      "Click on the logout link in the navigation menu.",
+      "Verify logout is successful and admin is redirected to login page.",
+      "Click the browser back button.",
+      "Verify that the admin is not able to access protected admin pages and is redirected to login."
+    ],
+    "expectedResult": "After logout, the browser back button doesn't allow access to protected admin pages and redirects to the login page.",
+    "status": "Not Run",
+    "automationStatus": "Automated",
+    "automationPath": "tests/test_admin.py",
+    "lastExecuted": "",
+    "requirementIds": [
+      "REQ-001"
+    ],
+    "version": "v1.0",
+    "executedBy": "Pytest",
+    "tags": [
+      "Admin",
+      "Authentication",
+      "Security",
+      "Session Management"
+    ],
+    "priority": "High",
+    "estimatedDuration": 2
+  },
+  {
+    "id": "TC_018",
+    "name": "Concurrent Admin User Login Test",
+    "description": "Test behavior when same admin account logs in from multiple locations.",
+    "steps": [
+      "Login to admin panel on Browser A.",
+      "Without logging out, login with same admin credentials on Browser B.",
+      "Verify behavior - whether both sessions remain active or if one is terminated.",
+      "Test actions in both sessions to verify their independence."
+    ],
+    "expectedResult": "System handles concurrent logins according to security policy.",
+    "status": "Not Run",
+    "automationStatus": "Manual",
+    "automationPath": "",
+    "lastExecuted": "",
+    "requirementIds": [
+      "REQ-001"
+    ],
+    "version": "v1.0",
+    "executedBy": "",
+    "tags": [
+      "Admin",
+      "Authentication",
+      "Security",
+      "Session Management",
+      "Manual Testing"
+    ],
+    "priority": "Medium",
+    "estimatedDuration": 15
+  },
+  {
+    "id": "TC_019",
+    "name": "Verify Shopping Cart Persistence Across Sessions",
+    "description": "Verify that products added to the shopping cart remain in the cart after user logs out and logs back in.",
+    "steps": [
+      "Login to a user account",
+      "Add multiple products to the shopping cart",
+      "Logout from the account",
+      "Login to the same user account",
+      "Navigate to the shopping cart",
+      "Verify that all previously added products are still present in the cart"
+    ],
+    "expectedResult": "All products added to the cart before logout should still be present in the cart after logging back in.",
+    "status": "Not Run",
+    "automationStatus": "Automated",
+    "automationPath": "tests/TestOpenCart/test_cart_persistence.py",
+    "lastExecuted": "",
+    "requirementIds": [
+      "REQ-002"
+    ],
+    "version": "v1.0",
+    "executedBy": "Pytest",
+    "tags": [
+      "Cart",
+      "Product",
+      "Session Management"
+    ],
+    "priority": "Medium",
+    "estimatedDuration": 3
+  },
+  {
+    "id": "TC_020",
+    "name": "Verify Maximum Product Quantity Validation in Cart",
+    "description": "Verify that the shopping cart validates maximum allowed product quantity and displays appropriate error messages.",
+    "steps": [
+      "Navigate to a product page",
+      "Try to add a quantity exceeding the stock availability or system limit",
+      "Verify that an appropriate error message is displayed",
+      "Add a valid quantity to the cart",
+      "Navigate to the shopping cart",
+      "Try to update the quantity to exceed the maximum allowed limit",
+      "Verify that an appropriate error message is displayed"
+    ],
+    "expectedResult": "System prevents adding quantities exceeding maximum limits with clear error messages.",
+    "status": "Not Run",
+    "automationStatus": "Automated",
+    "automationPath": "tests/TestOpenCart/test_cart_quantity_validation.py",
+    "lastExecuted": "",
+    "requirementIds": [
+      "REQ-002"
+    ],
+    "version": "v1.0",
+    "executedBy": "Pytest",
+    "tags": [
+      "Cart",
+      "Validation",
+      "Error Handling"
+    ],
+    "priority": "High",
+    "estimatedDuration": 3
+  },
+  {
+    "id": "TC_021",
+    "name": "Verify Multiple Product Addition to Cart",
+    "description": "Verify that multiple different products can be added to the shopping cart and are displayed correctly.",
+    "steps": [
+      "Navigate to the first product page",
+      "Add the product to the cart",
+      "Navigate to a different product page",
+      "Add the second product to the cart",
+      "Navigate to a third product page",
+      "Add the third product to the cart",
+      "Navigate to the shopping cart",
+      "Verify that all three products are displayed correctly with accurate quantities and prices"
+    ],
+    "expectedResult": "All added products appear in the cart with correct details and quantities.",
+    "status": "Not Run",
+    "automationStatus": "Automated",
+    "automationPath": "tests/TestOpenCart/test_multiple_products_cart.py",
+    "lastExecuted": "",
+    "requirementIds": [
+      "REQ-002"
+    ],
+    "version": "v1.0",
+    "executedBy": "Pytest",
+    "tags": [
+      "Cart",
+      "Product",
+      "Functionality"
+    ],
+    "priority": "High",
+    "estimatedDuration": 4
+  },
+  {
+    "id": "TC_022",
+    "name": "Verify Cart Update and Recalculation",
+    "description": "Verify that changing product quantities in the cart recalculates subtotal, taxes, and total correctly.",
+    "steps": [
+      "Add a product to the cart",
+      "Navigate to the shopping cart",
+      "Note the initial subtotal, taxes, and total",
+      "Update the product quantity",
+      "Verify that subtotal, taxes, and total are recalculated correctly based on the new quantity"
+    ],
+    "expectedResult": "All price calculations update correctly when cart quantities change.",
+    "status": "Not Run",
+    "automationStatus": "Automated",
+    "automationPath": "tests/TestOpenCart/test_cart_recalculation.py",
+    "lastExecuted": "",
+    "requirementIds": [
+      "REQ-002"
+    ],
+    "version": "v1.0",
+    "executedBy": "Pytest",
+    "tags": [
+      "Cart",
+      "Pricing",
+      "Calculation"
+    ],
+    "priority": "High",
+    "estimatedDuration": 3
+  },
+  {
+    "id": "TC_023",
+    "name": "Verify Mini-Cart Functionality",
+    "description": "Verify that the mini-cart in the header displays correct product count and updates when products are added or removed.",
+    "steps": [
+      "Observe the initial state of the mini-cart in the header",
+      "Add a product to the cart",
+      "Verify that the mini-cart updates with the correct product count and total",
+      "Add another product",
+      "Verify that the mini-cart updates accordingly",
+      "Navigate to the cart and remove a product",
+      "Verify that the mini-cart updates to reflect the removal"
+    ],
+    "expectedResult": "Mini-cart in header updates in real-time with correct product count and total.",
+    "status": "Not Run",
+    "automationStatus": "Automated",
+    "automationPath": "tests/TestOpenCart/test_mini_cart_functionality.py",
+    "lastExecuted": "",
+    "requirementIds": [
+      "REQ-002"
+    ],
+    "version": "v1.0",
+    "executedBy": "Pytest",
+    "tags": [
+      "Cart",
+      "UI",
+      "Real-time Updates"
+    ],
+    "priority": "Medium",
+    "estimatedDuration": 3
+  },
+  {
+    "id": "TC_024",
+    "name": "Verify Credit Card Payment Method",
+    "description": "Verify that users can complete purchases using a valid credit card payment method.",
+    "steps": [
+      "Add products to the cart",
+      "Proceed to checkout",
+      "Complete shipping information if required",
+      "Select credit card as the payment method",
+      "Enter valid credit card details",
+      "Complete the order",
+      "Verify that order confirmation is displayed",
+      "Verify that the order appears in the user's order history"
+    ],
+    "expectedResult": "Order is successfully processed with credit card payment method.",
+    "status": "Not Run",
+    "automationStatus": "Automated",
+    "automationPath": "tests/TestOpenCart/test_credit_card_payment.py",
+    "lastExecuted": "",
+    "requirementIds": [
+      "REQ-003"
+    ],
+    "version": "v1.0",
+    "executedBy": "Pytest",
+    "tags": [
+      "Payment",
+      "Credit Card",
+      "Checkout"
+    ],
+    "priority": "Critical",
+    "estimatedDuration": 4
+  },
+  {
+    "id": "TC_025",
+    "name": "Verify Digital Wallet Payment Method",
+    "description": "Verify that users can complete purchases using a digital wallet payment method.",
+    "steps": [
+      "Add products to the cart",
+      "Proceed to checkout",
+      "Complete shipping information if required",
+      "Select digital wallet (e.g., PayPal) as the payment method",
+      "Complete authentication and authorization on the payment provider's site",
+      "Return to the store and verify order confirmation",
+      "Verify that the order appears in the user's order history"
+    ],
+    "expectedResult": "Order is successfully processed with digital wallet payment method.",
+    "status": "Not Run",
+    "automationStatus": "Automated",
+    "automationPath": "tests/TestOpenCart/test_digital_wallet_payment.py",
+    "lastExecuted": "",
+    "requirementIds": [
+      "REQ-003"
+    ],
+    "version": "v1.0",
+    "executedBy": "Pytest",
+    "tags": [
+      "Payment",
+      "Digital Wallet",
+      "Checkout"
+    ],
+    "priority": "Critical",
+    "estimatedDuration": 4
+  },
+  {
+    "id": "TC_026",
+    "name": "Verify Payment Error Handling",
+    "description": "Verify that the system handles payment errors appropriately and displays clear error messages.",
+    "steps": [
+      "Add products to the cart",
+      "Proceed to checkout",
+      "Complete shipping information if required",
+      "Select credit card as the payment method",
+      "Enter invalid credit card details (e.g., expired card)",
+      "Attempt to complete the order",
+      "Verify that an appropriate error message is displayed",
+      "Verify that the user can retry with different payment details"
+    ],
+    "expectedResult": "System displays clear error messages for payment failures and allows retry.",
+    "status": "Not Run",
+    "automationStatus": "Automated",
+    "automationPath": "tests/TestOpenCart/test_payment_error_handling.py",
+    "lastExecuted": "",
+    "requirementIds": [
+      "REQ-003"
+    ],
+    "version": "v1.0",
+    "executedBy": "Pytest",
+    "tags": [
+      "Payment",
+      "Error Handling",
+      "Validation"
+    ],
+    "priority": "High",
+    "estimatedDuration": 3
+  },
+  {
+    "id": "TC_027",
+    "name": "Verify Payment Security Features",
+    "description": "Verify that payment processing includes essential security features like HTTPS, masked card numbers, and CVV verification.",
+    "steps": [
+      "Add products to the cart",
+      "Proceed to checkout",
+      "Verify that the checkout page uses HTTPS (secure connection)",
+      "Select credit card as the payment method",
+      "Enter credit card details",
+      "Verify that the card number is masked after entry",
+      "Verify that CVV is required and validated",
+      "Verify that sensitive data is not stored in HTML source or browser storage"
+    ],
+    "expectedResult": "Payment processing includes all required security features.",
+    "status": "Not Run",
+    "automationStatus": "Manual",
+    "automationPath": "",
+    "lastExecuted": "",
+    "requirementIds": [
+      "REQ-003"
+    ],
+    "version": "v1.0",
+    "executedBy": "",
+    "tags": [
+      "Payment",
+      "Security",
+      "Compliance"
+    ],
+    "priority": "Critical",
+    "estimatedDuration": 5
+  },
+  {
+    "id": "TC_028",
+    "name": "Verify Multiple Payment Methods Availability",
+    "description": "Verify that the system offers all supported payment methods and allows the user to choose between them.",
+    "steps": [
+      "Add products to the cart",
+      "Proceed to checkout",
+      "Complete shipping information if required",
+      "Navigate to the payment method selection step",
+      "Verify that all supported payment methods (credit cards, digital wallets, other online payment services) are available",
+      "Select each payment method one by one",
+      "Verify that each selection shows the appropriate payment form or redirects to the correct payment provider"
+    ],
+    "expectedResult": "All supported payment methods are available and selectable during checkout.",
+    "status": "Not Run",
+    "automationStatus": "Automated",
+    "automationPath": "tests/TestOpenCart/test_payment_methods_availability.py",
+    "lastExecuted": "",
+    "requirementIds": [
+      "REQ-003"
+    ],
+    "version": "v1.0",
+    "executedBy": "Pytest",
+    "tags": [
+      "Payment",
+      "Methods",
+      "Options"
+    ],
+    "priority": "High",
+    "estimatedDuration": 5
+  }
+]
