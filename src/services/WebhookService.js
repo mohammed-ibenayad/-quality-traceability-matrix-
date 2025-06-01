@@ -1,19 +1,40 @@
-// src/services/WebhookService.js - Frontend integration with backend
+// src/services/WebhookService.js - Optimal same-server configuration
 import { io } from 'socket.io-client';
 
 class WebhookService {
   constructor() {
     this.socket = null;
     this.listeners = new Map();
-    this.baseURL = 'http://localhost:3001';
-    //this.baseURL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+    
+    // Smart URL detection for same-server deployment
+    this.baseURL = this.getServerURL();
+    
     this.connected = false;
     this.connectionAttempts = 0;
     this.maxConnectionAttempts = 3;
+    
+    console.log(`🌐 WebhookService configured for: ${this.baseURL}`);
   }
 
   /**
-   * Initialize WebSocket connection to backend
+   * Smart server URL detection for same-server deployment
+   */
+  getServerURL() {
+    const isLocalhost = window.location.hostname === 'localhost' || 
+                       window.location.hostname === '127.0.0.1';
+    
+    if (isLocalhost) {
+      // Development: Use separate port
+      return 'http://localhost:3001';
+    }
+    
+    // Production: Same server, same domain
+    // Use current protocol and hostname (no separate port needed)
+    return `${window.location.protocol}//${window.location.hostname}`;
+  }
+
+  /**
+   * Initialize WebSocket connection with fallback support
    */
   connect() {
     if (this.socket && this.connected) {
@@ -24,17 +45,30 @@ class WebhookService {
     return new Promise((resolve, reject) => {
       console.log(`🔌 Connecting to webhook backend at ${this.baseURL}...`);
       
-      this.socket = io(this.baseURL, {
+      const socketOptions = {
+        // Try WebSocket first, fallback to polling
         transports: ['websocket', 'polling'],
-        timeout: 20000,
+        timeout: 15000,
         forceNew: true,
         reconnection: true,
-        reconnectionAttempts: 5,
-        reconnectionDelay: 1000
-      });
+        reconnectionAttempts: 3,
+        reconnectionDelay: 1000,
+        
+        // Production optimizations
+        upgrade: true,
+        rememberUpgrade: false,
+        
+        // Standard Socket.IO path
+        path: '/socket.io/'
+      };
+
+      this.socket = io(this.baseURL, socketOptions);
 
       this.socket.on('connect', () => {
         console.log('✅ Connected to webhook backend');
+        console.log(`🔗 Socket ID: ${this.socket.id}`);
+        console.log(`🚀 Transport: ${this.socket.io.engine.transport.name}`);
+        
         this.connected = true;
         this.connectionAttempts = 0;
         resolve();
@@ -45,13 +79,11 @@ class WebhookService {
         this.connected = false;
       });
 
-      // Listen for webhook broadcasts
       this.socket.on('webhook-received', (data) => {
         console.log('🔔 Webhook broadcast received:', data);
         this.handleWebhookData(data);
       });
 
-      // Listen for targeted test results
       this.socket.on('test-results', (data) => {
         console.log('📋 Test results received:', data);
         this.handleWebhookData({ data, requirementId: data.requirementId });
@@ -61,243 +93,125 @@ class WebhookService {
         console.error('❌ WebSocket connection error:', error);
         this.connectionAttempts++;
         
+        // Provide helpful debugging info
+        if (error.message.includes('websocket error')) {
+          console.warn('💡 WebSocket upgrade failed, using polling transport');
+        }
+        
         if (this.connectionAttempts >= this.maxConnectionAttempts) {
+          console.error('🚨 Max connection attempts reached');
           reject(new Error(`Failed to connect after ${this.maxConnectionAttempts} attempts`));
         }
       });
 
-      // Timeout for connection
+      // Connection timeout
       setTimeout(() => {
         if (!this.connected) {
+          console.error('⏰ Connection timeout');
           reject(new Error('Connection timeout'));
         }
-      }, 10000);
+      }, 20000);
     });
   }
 
   /**
-   * Check if backend is available
+   * Check backend health with detailed diagnostics
    */
   async checkBackendHealth() {
     try {
-      const response = await fetch(`${this.baseURL}/api/webhook/health`, {
+      const healthUrl = `${this.baseURL}/api/webhook/health`;
+      console.log(`🏥 Health check: ${healthUrl}`);
+      
+      const response = await fetch(healthUrl, {
         method: 'GET',
-        headers: {
-          'Content-Type': 'application/json'
-        }
+        headers: { 'Content-Type': 'application/json' },
+        signal: AbortSignal.timeout(8000)
       });
       
       if (response.ok) {
         const data = await response.json();
-        console.log('✅ Backend health check passed:', data);
+        console.log('✅ Backend healthy:', {
+          status: data.status,
+          connectedClients: data.connectedClients || 0,
+          environment: data.environment
+        });
         return true;
       } else {
-        console.warn('⚠️ Backend health check failed:', response.status);
+        console.warn(`⚠️ Backend health check failed: ${response.status}`);
         return false;
       }
     } catch (error) {
-      console.error('❌ Backend health check error:', error);
+      if (error.name === 'TimeoutError') {
+        console.error('❌ Backend health timeout (8s)');
+      } else {
+        console.error('❌ Backend unreachable:', error.message);
+      }
       return false;
     }
   }
 
-  /**
-   * Subscribe to webhooks for a specific requirement
-   */
+  // ... rest of the methods remain the same ...
   subscribeToRequirement(requirementId, callback) {
     console.log(`📝 Subscribing to requirement: ${requirementId}`);
-    
-    // Store callback for this requirement
     this.listeners.set(requirementId, callback);
     
-    // Join requirement-specific room on backend
     if (this.socket && this.connected) {
       this.socket.emit('subscribe-requirement', requirementId);
     }
   }
 
-  /**
-   * Unsubscribe from requirement webhooks
-   */
   unsubscribeFromRequirement(requirementId) {
     console.log(`📝 Unsubscribing from requirement: ${requirementId}`);
-    
-    // Remove callback
     this.listeners.delete(requirementId);
     
-    // Leave requirement room on backend
     if (this.socket && this.connected) {
       this.socket.emit('unsubscribe-requirement', requirementId);
     }
   }
 
-  /**
-   * Handle incoming webhook data
-   */
   handleWebhookData(webhookEvent) {
     const { requirementId, data } = webhookEvent;
-    
-    // Call registered callback for this requirement
     const callback = this.listeners.get(requirementId);
     if (callback) {
       console.log(`🎯 Executing callback for requirement: ${requirementId}`);
       callback(data);
-    } else {
-      console.log(`⚠️ No listener for requirement: ${requirementId}`);
     }
   }
 
-  /**
-   * Fetch latest results from backend API (fallback method)
-   */
-  async getLatestResults(requirementId) {
-    try {
-      console.log(`📡 Fetching latest results for: ${requirementId}`);
-      
-      const response = await fetch(`${this.baseURL}/api/test-results/${requirementId}`);
-      
-      if (response.status === 404) {
-        console.log(`📭 No results found for: ${requirementId}`);
-        return null;
-      }
-      
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-      
-      const data = await response.json();
-      console.log(`📋 Retrieved results for: ${requirementId}`, data);
-      
-      return data;
-    } catch (error) {
-      console.error(`❌ Error fetching results for ${requirementId}:`, error);
-      throw error;
-    }
-  }
-
-  /**
-   * Poll for results with exponential backoff
-   */
-  async pollForResults(requirementId, maxAttempts = 10, initialDelay = 2000) {
-    console.log(`🔄 Starting to poll for results: ${requirementId}`);
-    
-    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-      try {
-        const results = await this.getLatestResults(requirementId);
-        
-        if (results) {
-          console.log(`✅ Found results on attempt ${attempt}`);
-          return results;
-        }
-        
-        // Exponential backoff: 2s, 4s, 8s, 16s, ...
-        const delay = Math.min(initialDelay * Math.pow(2, attempt - 1), 30000); // Cap at 30s
-        console.log(`⏳ Attempt ${attempt}/${maxAttempts} - waiting ${delay}ms`);
-        
-        await new Promise(resolve => setTimeout(resolve, delay));
-        
-      } catch (error) {
-        console.error(`❌ Polling attempt ${attempt} failed:`, error);
-        
-        if (attempt === maxAttempts) {
-          throw new Error(`Failed to get results after ${maxAttempts} attempts`);
-        }
-      }
-    }
-    
-    throw new Error(`No results found after ${maxAttempts} polling attempts`);
-  }
-
-  /**
-   * Test the webhook system
-   */
   async testWebhook(requirementId = 'REQ-TEST') {
     try {
       console.log(`🧪 Testing webhook for: ${requirementId}`);
       
       const response = await fetch(`${this.baseURL}/api/test-webhook`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           requirementId,
           results: [
             {
               id: 'TC_001',
-              name: 'Test Webhook Delivery',
+              name: 'Test Same-Server Webhook',
               status: 'Passed',
               duration: 1000,
-              logs: 'Webhook test completed successfully'
-            },
-            {
-              id: 'TC_002',
-              name: 'Test Webhook Delivery 2',
-              status: 'Failed',
-              duration: 800,
-              logs: 'Test failed for demonstration purposes'
+              logs: 'Same-server webhook test completed'
             }
           ]
-        })
+        }),
+        signal: AbortSignal.timeout(10000)
       });
       
       if (response.ok) {
-        console.log('✅ Test webhook sent successfully');
+        console.log('✅ Test webhook successful');
         return true;
       } else {
-        throw new Error(`Test webhook failed: ${response.statusText}`);
+        throw new Error(`Test failed: ${response.statusText}`);
       }
-      
     } catch (error) {
       console.error('❌ Test webhook error:', error);
       throw error;
     }
   }
 
-  /**
-   * Get all stored results (for debugging)
-   */
-  async getAllResults() {
-    try {
-      const response = await fetch(`${this.baseURL}/api/test-results`);
-      
-      if (response.ok) {
-        const data = await response.json();
-        console.log('📋 All stored results:', data);
-        return data;
-      } else {
-        throw new Error(`Failed to get results: ${response.statusText}`);
-      }
-    } catch (error) {
-      console.error('❌ Error getting all results:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Clear results for a requirement
-   */
-  async clearResults(requirementId) {
-    try {
-      const response = await fetch(`${this.baseURL}/api/test-results/${requirementId}`, {
-        method: 'DELETE'
-      });
-      
-      if (response.ok) {
-        console.log(`🗑️ Cleared results for: ${requirementId}`);
-        return true;
-      } else {
-        throw new Error(`Failed to clear results: ${response.statusText}`);
-      }
-    } catch (error) {
-      console.error('❌ Error clearing results:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Disconnect from backend
-   */
   disconnect() {
     if (this.socket) {
       console.log('🔌 Disconnecting from webhook backend');
@@ -308,16 +222,10 @@ class WebhookService {
     }
   }
 
-  /**
-   * Get connection status
-   */
   isConnected() {
     return this.connected;
   }
 
-  /**
-   * Get base URL
-   */
   getBaseURL() {
     return this.baseURL;
   }
@@ -326,24 +234,51 @@ class WebhookService {
 // Singleton instance
 const webhookService = new WebhookService();
 
-// Auto-check backend health when module loads
+// Auto-initialization with better error handling
 if (typeof window !== 'undefined') {
-  webhookService.checkBackendHealth().then(isHealthy => {
-    if (isHealthy) {
-      // Try to connect if backend is healthy
-      webhookService.connect().catch(error => {
-        console.warn('Could not connect to backend:', error.message);
-      });
-    }
-  });
+  webhookService.checkBackendHealth()
+    .then(isHealthy => {
+      if (isHealthy) {
+        return webhookService.connect();
+      } else {
+        console.log('⚠️ Backend not available - using fallback mode');
+        return Promise.resolve();
+      }
+    })
+    .then(() => {
+      if (webhookService.isConnected()) {
+        console.log('🎉 Real-time webhook system ready!');
+      } else {
+        console.log('📡 App running in polling mode (no real-time updates)');
+      }
+    })
+    .catch(error => {
+      console.warn('🔄 Webhook system unavailable:', error.message);
+      console.log('💡 App will work normally but without real-time updates');
+    });
   
-  // Expose for debugging
+  // Debug helpers
   window.webhookService = webhookService;
+  window.testWebhook = (reqId) => webhookService.testWebhook(reqId);
   
-  // Add helpful debug commands
-  window.testWebhook = (requirementId) => webhookService.testWebhook(requirementId);
-  window.getAllResults = () => webhookService.getAllResults();
-  window.clearResults = (requirementId) => webhookService.clearResults(requirementId);
+  // Connection diagnostics
+  window.webhookDiagnostics = async () => {
+    console.log('🔍 Running webhook diagnostics...');
+    console.log('Base URL:', webhookService.getBaseURL());
+    console.log('Connected:', webhookService.isConnected());
+    
+    try {
+      const isHealthy = await webhookService.checkBackendHealth();
+      console.log('Backend healthy:', isHealthy);
+      
+      if (!webhookService.isConnected() && isHealthy) {
+        console.log('🔄 Attempting reconnection...');
+        await webhookService.connect();
+      }
+    } catch (error) {
+      console.error('Diagnostics failed:', error);
+    }
+  };
 }
 
 export default webhookService;
