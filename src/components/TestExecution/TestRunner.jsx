@@ -8,6 +8,15 @@ import { refreshQualityGates } from '../../utils/calculateQualityGates';
 // Import WebhookService - this will work now that you have the backend
 import webhookService from '../../services/WebhookService';
 
+// For automatic environment detection, you could also use:
+const getCallbackUrl = () => {
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    return 'http://localhost:3001/api/webhook/test-results';
+  }
+  // Production - use same domain as frontend
+  return `${window.location.protocol}//${window.location.hostname}/api/webhook/test-results`;
+};
+
 const TestRunner = ({ requirement, testCases, onTestComplete }) => {
   // Detect if we have backend support
   const [hasBackendSupport, setHasBackendSupport] = useState(false);
@@ -22,7 +31,8 @@ const TestRunner = ({ requirement, testCases, onTestComplete }) => {
       workflowId: 'quality-tracker-tests.yml',
       ghToken: '',
       // Point to your backend server
-      callbackUrl: 'http://localhost:3001/api/webhook/test-results'
+      // callbackUrl: 'http://localhost:3001/api/webhook/test-results'
+      callbackUrl: getCallbackUrl()
     };
     
     return savedConfig ? { ...defaultConfig, ...JSON.parse(savedConfig) } : defaultConfig;
