@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import MainLayout from '../components/Layout/MainLayout';
 import MatrixTable from '../components/TraceabilityMatrix/MatrixTable';
-import EmptyState from '../components/common/EmptyState';
+import EmptyState from '../components/Common/EmptyState';
 import { useVersionContext } from '../context/VersionContext';
 import { calculateCoverage } from '../utils/coverage';
 import dataStore from '../services/DataStore';
