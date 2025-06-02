@@ -6,7 +6,7 @@ import QualityGatesTable from '../components/Dashboard/QualityGatesTable';
 import RiskAreasList from '../components/Dashboard/RiskAreasList';
 import MetricsChart from '../components/Dashboard/MetricsChart';
 import HealthScoreGauge from '../components/Dashboard/HealthScoreGauge';
-import EmptyState from '../components/common/EmptyState';
+import EmptyState from '../components/Common/EmptyState';
 import { useVersionContext } from '../context/VersionContext';
 import dataStore from '../services/DataStore';
 import { refreshQualityGates } from '../utils/calculateQualityGates';
