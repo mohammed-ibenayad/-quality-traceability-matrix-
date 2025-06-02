@@ -1,20 +1,44 @@
+// src/components/TestExecution/TestRunner.jsx - Updated imports and backend detection
 import React, { useState, useEffect } from 'react';
-import { GitBranch, Play, Check, AlertTriangle, X, Loader2, ChevronDown, ChevronRight, Save } from 'lucide-react';
+import { GitBranch, Play, Check, AlertTriangle, X, Loader2, ChevronDown, ChevronRight, Save, Wifi, WifiOff } from 'lucide-react';
 import GitHubService from '../../services/GitHubService';
 import dataStore from '../../services/DataStore';
 import { refreshQualityGates } from '../../utils/calculateQualityGates';
 
+// Import WebhookService - this will work now that you have the backend
+import webhookService from '../../services/WebhookService';
+
+// For automatic environment detection, you could also use:
+const getCallbackUrl = () => {
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    return 'http://localhost:3001/api/webhook/test-results';
+  }
+  // Production - use same domain as frontend
+  return `${window.location.protocol}//${window.location.hostname}/api/webhook/test-results`;
+};
+
 const TestRunner = ({ requirement, testCases, onTestComplete }) => {
+  // Detect if we have backend support
+  const [hasBackendSupport, setHasBackendSupport] = useState(false);
+  const [backendStatus, setBackendStatus] = useState('checking'); // 'checking', 'connected', 'disconnected'
+
   // State for GitHub configuration
-  const [config, setConfig] = useState({
-    repoUrl: '',
-    branch: 'main',
-    workflowId: 'quality-tracker-tests.yml',
-    ghToken: '',
-    callbackUrl: window.location.origin + '/api/test-results' // Default to app URL
+  const [config, setConfig] = useState(() => {
+    const savedConfig = localStorage.getItem('testRunnerConfig');
+    const defaultConfig = {
+      repoUrl: '',
+      branch: 'main',
+      workflowId: 'quality-tracker-tests.yml',
+      ghToken: '',
+      // Point to your backend server
+      // callbackUrl: 'http://localhost:3001/api/webhook/test-results'
+      callbackUrl: getCallbackUrl()
+    };
+    
+    return savedConfig ? { ...defaultConfig, ...JSON.parse(savedConfig) } : defaultConfig;
   });
   
-  // State for UI
+  // UI State
   const [isConfigExpanded, setIsConfigExpanded] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
   const [workflowRun, setWorkflowRun] = useState(null);
@@ -25,78 +49,76 @@ const TestRunner = ({ requirement, testCases, onTestComplete }) => {
   const [waitingForWebhook, setWaitingForWebhook] = useState(false);
   const [webhookTimeout, setWebhookTimeout] = useState(null);
 
-  // Load saved configuration on component mount
+  // Check backend availability on component mount
   useEffect(() => {
-    try {
-      const savedConfig = localStorage.getItem('testRunnerConfig');
-      if (savedConfig) {
-        const parsedConfig = JSON.parse(savedConfig);
-        setConfig(parsedConfig);
-      }
+    checkBackendAvailability();
+  }, []);
+
+  // Set up webhook listener when component mounts
+  useEffect(() => {
+    if (hasBackendSupport && webhookService) {
+      console.log(`🎯 Setting up backend webhook listener for: ${requirement.id}`);
       
-      // Set up enhanced webhook result listener with detailed logging
+      // Subscribe to webhooks for this requirement
+      webhookService.subscribeToRequirement(requirement.id, handleWebhookResults);
+      
+      // Cleanup on unmount
+      return () => {
+        console.log(`🧹 Cleaning up webhook listener for: ${requirement.id}`);
+        webhookService.unsubscribeFromRequirement(requirement.id);
+      };
+    } else {
+      // Fallback to old window-based listener
+      console.log(`🎯 Setting up fallback webhook listener for: ${requirement.id}`);
+      
       window.onTestWebhookReceived = (webhookData) => {
-        // Create a collapsible group in the console for webhook data
-        console.group("%c🔔 WEBHOOK RECEIVED IN TEST RUNNER", "background: #673AB7; color: white; font-size: 14px; font-weight: bold; padding: 5px 10px; border-radius: 5px;");
+        console.log("🔔 WEBHOOK RECEIVED (fallback mode):", webhookData);
         
-        // Log the webhook data in a structured way
-        console.log("%cTimestamp:", "font-weight: bold;", new Date().toISOString());
-        console.log("%cRequirement ID:", "font-weight: bold;", webhookData.requirementId);
-        console.log("%cExpected Requirement:", "font-weight: bold;", requirement?.id);
-        console.log("%cMatches current requirement:", "font-weight: bold;", webhookData.requirementId === requirement?.id ? "✅ YES" : "❌ NO");
-        
-        // Log test results in a table if available
-        if (webhookData.results && Array.isArray(webhookData.results)) {
-          console.log("%cTest Results:", "font-weight: bold;");
-          console.table(webhookData.results.map(r => ({
-            "Test ID": r.id,
-            "Name": r.name,
-            "Status": r.status,
-            "Duration (ms)": r.duration || 0
-          })));
-        }
-        
-        // Log the complete webhook payload
-        console.log("%cComplete Webhook Payload:", "font-weight: bold;");
-        console.log(webhookData);
-        
-        // Close the group
-        console.groupEnd();
-        
-        // Process webhook if it matches the current requirement
         if (webhookData && webhookData.requirementId === requirement?.id) {
-          console.log("%c✅ Processing webhook for current requirement", "color: green; font-weight: bold;");
+          console.log("✅ Processing webhook for current requirement");
           
-          // Clear webhook timeout
           if (webhookTimeout) {
             clearTimeout(webhookTimeout);
             setWebhookTimeout(null);
           }
           
-          // Process webhook results
           handleWebhookResults(webhookData);
         } else {
-          console.log("%c❌ Webhook doesn't match current requirement - ignoring", "color: orange; font-weight: bold;");
+          console.log("❌ Webhook doesn't match current requirement - ignoring");
         }
       };
-    } catch (err) {
-      console.error('Error loading saved configuration:', err);
+      
+      return () => {
+        window.onTestWebhookReceived = null;
+        if (webhookTimeout) clearTimeout(webhookTimeout);
+      };
     }
-    
-    // Cleanup function
-    return () => {
-      // Remove webhook listener
-      window.onTestWebhookReceived = null;
-      
-      // Clear any polling intervals
-      if (pollInterval) clearInterval(pollInterval);
-      
-      // Clear webhook timeout
-      if (webhookTimeout) clearTimeout(webhookTimeout);
-    };
-  }, [requirement, webhookTimeout, pollInterval]);
+  }, [requirement, hasBackendSupport, webhookTimeout]);
 
-  // Helper function to process webhook results
+  const checkBackendAvailability = async () => {
+    try {
+      setBackendStatus('checking');
+      
+      // Check if backend is healthy
+      const isHealthy = await webhookService.checkBackendHealth();
+      
+      if (isHealthy) {
+        // Try to connect to WebSocket
+        await webhookService.connect();
+        
+        setHasBackendSupport(true);
+        setBackendStatus('connected');
+        console.log('✅ Backend webhook service available and connected');
+      } else {
+        throw new Error('Backend health check failed');
+      }
+    } catch (error) {
+      console.log('📡 Backend not available, using fallback mode:', error.message);
+      setHasBackendSupport(false);
+      setBackendStatus('disconnected');
+    }
+  };
+
   const handleWebhookResults = (webhookData) => {
     console.log("Processing webhook results:", webhookData);
     setWaitingForWebhook(false);
@@ -104,11 +126,10 @@ const TestRunner = ({ requirement, testCases, onTestComplete }) => {
     if (webhookData && webhookData.results && Array.isArray(webhookData.results)) {
       const testResults = webhookData.results;
       
-      // Check for "Not Run" status - this indicates real webhook data
+      // Check for "Not Run" status - indicates real webhook data
       const hasNotRun = testResults.some(r => r.status === 'Not Run');
       if (hasNotRun) {
-        console.log("%c📢 DETECTED REAL WEBHOOK DATA WITH 'NOT RUN' STATUS", 
-          "background: #FF9800; color: white; font-size: 14px; font-weight: bold; padding: 5px 10px; border-radius: 5px;");
+        console.log("📢 DETECTED REAL WEBHOOK DATA WITH 'NOT RUN' STATUS");
       }
       
       // Update test statuses in DataStore
@@ -125,37 +146,28 @@ const TestRunner = ({ requirement, testCases, onTestComplete }) => {
     }
   };
 
-  // Helper function to directly update test statuses in the DataStore
   const updateTestStatusesInDataStore = (testResults) => {
     try {
-      // Get current test cases from DataStore
       const currentTestCases = dataStore.getTestCases();
       
-      // Log all test case IDs for debugging
       console.log("Current test case IDs:", currentTestCases.map(tc => tc.id));
       console.log("Test result IDs:", testResults.map(r => r.id));
       
-      // Flag to track if we found any "Not Run" status
       let hasNotRunStatus = false;
       
-      // Update test cases based on results
       const updatedTestCases = currentTestCases.map(tc => {
-        // Find matching result by exact ID only (TC_XXX format)
         const matchingResult = testResults.find(r => r.id === tc.id);
         
         if (matchingResult) {
-          // Check if this is a "Not Run" status, which likely came from a real webhook
           if (matchingResult.status === 'Not Run') {
             hasNotRunStatus = true;
-            console.log(`%c⚠️ Found "Not Run" status for ${tc.id} - this is likely real webhook data, not simulated`, 
-              "background: #FFC107; color: black; font-weight: bold; padding: 2px 4px; border-radius: 2px;");
+            console.log(`⚠️ Found "Not Run" status for ${tc.id} - likely real webhook data`);
           }
           
           console.log(`Found matching result for ${tc.id}, updating status to ${matchingResult.status}`);
           return {
             ...tc,
             status: matchingResult.status,
-            // Only update lastExecuted if status is not "Not Run"
             lastExecuted: matchingResult.status !== 'Not Run' ? new Date().toISOString() : tc.lastExecuted,
             executionTime: matchingResult.duration || 0
           };
@@ -164,31 +176,22 @@ const TestRunner = ({ requirement, testCases, onTestComplete }) => {
         return tc;
       });
       
-      // If we found any "Not Run" statuses, log a special notice
       if (hasNotRunStatus) {
-        console.log(`%c🔔 DETECTED REAL WEBHOOK DATA WITH "NOT RUN" STATUS`, 
-          "background: #FF9800; color: white; font-size: 14px; font-weight: bold; padding: 5px 10px; border-radius: 5px;");
-        console.log(`%cThis likely means you received actual webhook data rather than simulated results.`, 
-          "color: #FF9800; font-weight: bold;");
+        console.log("🔔 DETECTED REAL WEBHOOK DATA WITH 'NOT RUN' STATUS");
       }
       
-      // Update test cases in DataStore
       dataStore.setTestCases(updatedTestCases);
       
-      // Force a recalculation of quality gates
       try {
-        console.log("Refreshing quality gates to update dashboard metrics");
         refreshQualityGates(dataStore);
       } catch (refreshError) {
         console.warn("Error refreshing quality gates:", refreshError);
       }
       
-      // Force a DataStore notification
       if (typeof dataStore._notifyListeners === 'function') {
         dataStore._notifyListeners();
       }
       
-      // Count how many were actually updated
       const updatedCount = updatedTestCases.filter((tc, idx) => 
         tc.status !== currentTestCases[idx].status ||
         tc.lastExecuted !== currentTestCases[idx].lastExecuted
@@ -202,28 +205,20 @@ const TestRunner = ({ requirement, testCases, onTestComplete }) => {
     }
   };
 
-  // Handle input changes
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setConfig(prev => ({
       ...prev,
       [name]: value
     }));
-    
-    // Reset saved indicator when changes are made
     setIsSaved(false);
   };
 
-  // Save configuration to localStorage
   const saveConfiguration = () => {
     try {
       localStorage.setItem('testRunnerConfig', JSON.stringify(config));
       setIsSaved(true);
-      
-      // Show saved indicator for 2 seconds
-      setTimeout(() => {
-        setIsSaved(false);
-      }, 2000);
+      setTimeout(() => setIsSaved(false), 2000);
     } catch (err) {
       console.error('Error saving configuration:', err);
     }
@@ -247,13 +242,11 @@ const TestRunner = ({ requirement, testCases, onTestComplete }) => {
     setWaitingForWebhook(false);
 
     try {
-      // Extract owner and repo from URL
       const { owner, repo } = GitHubService.parseGitHubUrl(config.repoUrl);
       
-      // Define the test payload with callback URL
       const requestId = `req_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
       const payload = {
-        requestId: requestId,  // Add this
+        requestId: requestId,
         requirementId: requirement.id,
         requirementName: requirement.name,
         testCases: testCases.map(tc => tc.id),
@@ -261,21 +254,21 @@ const TestRunner = ({ requirement, testCases, onTestComplete }) => {
       };
       
       console.log("Sending payload to GitHub Actions:", payload);
+      console.log("Backend support:", hasBackendSupport ? 'Available' : 'Using fallback');
       
-      // For quick feedback during development, simulate results immediately
-      // In a real scenario, you'd wait for GitHub Actions to complete
-      const useSimulatedResults = !config.repoUrl || config.repoUrl.includes('example');
+      // Check if we should use simulated results (development mode)
+      const useSimulatedResults = !config.repoUrl || 
+                                config.repoUrl.includes('example') ||
+                                (!hasBackendSupport && config.callbackUrl.includes('webhook.site'));
       
       if (useSimulatedResults) {
-        // Set a flag to indicate we're waiting for results
+        console.log("Using simulated results for development");
         setWaitingForWebhook(true);
         
-        // Set a timeout - if we don't get webhook results within 10 seconds, use simulated ones
         const timeout = setTimeout(() => {
-          console.log("Webhook timeout reached, using simulated results");
+          console.log("Simulated test execution completed");
           
           if (waitingForWebhook) {
-            // Generate simulated test results for demo purposes
             const simulatedResults = testCases.map(tc => ({
               id: tc.id,
               name: tc.name,
@@ -284,9 +277,7 @@ const TestRunner = ({ requirement, testCases, onTestComplete }) => {
               logs: `Executing test ${tc.id}: ${tc.name}\n${Math.random() > 0.2 ? 'PASSED' : 'FAILED: Assertion error'}`
             }));
             
-            // Update test statuses in DataStore
             updateTestStatusesInDataStore(simulatedResults);
-            
             setResults(simulatedResults);
             setIsRunning(false);
             setWaitingForWebhook(false);
@@ -295,30 +286,46 @@ const TestRunner = ({ requirement, testCases, onTestComplete }) => {
               onTestComplete(simulatedResults);
             }
           }
-        }, 10000);
+        }, 8000); // 8 seconds for simulation
         
         setWebhookTimeout(timeout);
         return;
       }
       
-      // Trigger the workflow dispatch event
+      // Trigger real GitHub Actions workflow
       const run = await GitHubService.triggerWorkflow(
-        owner, 
-        repo, 
-        config.workflowId, 
-        config.branch, 
-        config.ghToken, 
-        payload
+        owner, repo, config.workflowId, config.branch, config.ghToken, payload
       );
       
       setWorkflowRun(run);
       setWaitingForWebhook(true);
       
-      // Set a timeout for the webhook callback
-      const timeout = setTimeout(() => {
-        console.log("Webhook timeout reached, using GitHub API to check status");
+      console.log(`✅ Workflow triggered: ${run.id}`);
+      console.log(`⏳ Waiting for webhook at: ${config.callbackUrl}`);
+      
+      // Set timeout based on backend availability
+      const webhookTimeoutDuration = hasBackendSupport ? 120000 : 30000; // 2 min vs 30 sec
+      
+      const timeout = setTimeout(async () => {
+        console.log("Webhook timeout reached");
         
-        // Start polling for workflow status
+        if (hasBackendSupport && webhookService) {
+          // Try polling backend
+          try {
+            console.log("🔄 Trying to poll backend for results");
+            const polledResults = await webhookService.pollForResults(requirement.id, 5, 3000);
+            
+            if (polledResults) {
+              handleWebhookResults(polledResults);
+              return;
+            }
+          } catch (pollError) {
+            console.error("Backend polling failed:", pollError);
+          }
+        }
+        
+        // Fallback to GitHub API polling
+        console.log("Falling back to GitHub API polling");
         const interval = setInterval(async () => {
           try {
             const status = await GitHubService.getWorkflowStatus(owner, repo, run.id, config.ghToken);
@@ -329,65 +336,14 @@ const TestRunner = ({ requirement, testCases, onTestComplete }) => {
               setIsRunning(false);
               setWaitingForWebhook(false);
               
-              console.log("%c✅ GitHub workflow completed", "background: #4CAF50; color: white; font-weight: bold; padding: 3px 6px; border-radius: 3px;");
+              console.log("✅ GitHub workflow completed - fetching results");
               
-              // Now that we know the workflow is complete, fetch results from the callback URL
-              if (config.callbackUrl && !config.callbackUrl.includes('webhook.site')) {
-                try {
-                  console.log("%c🔄 Fetching results directly from callback URL", "background: #2196F3; color: white; font-weight: bold; padding: 3px 6px; border-radius: 3px;");
-                  
-                  // Prepare the URL with a query parameter for this specific run
-                  const resultsUrl = new URL(config.callbackUrl);
-                  resultsUrl.searchParams.append('runId', run.id);
-                  resultsUrl.searchParams.append('requirementId', requirement.id);
-                  
-                  // Fetch the results
-                  const resultsResponse = await fetch(resultsUrl.toString(), {
-                    method: 'GET',
-                    headers: {
-                      'Content-Type': 'application/json',
-                      'Accept': 'application/json'
-                    }
-                  });
-                  
-                  if (resultsResponse.ok) {
-                    const callbackResults = await resultsResponse.json();
-                    console.log("%c📊 Retrieved test results from callback URL", "background: #4CAF50; color: white; font-weight: bold; padding: 3px 6px; border-radius: 3px;");
-                    console.log(callbackResults);
-                    
-                    // Process the results if they match our expected format
-                    if (callbackResults.results && Array.isArray(callbackResults.results)) {
-                      // Update test statuses in DataStore
-                      updateTestStatusesInDataStore(callbackResults.results);
-                      
-                      setResults(callbackResults.results);
-                      
-                      if (onTestComplete) {
-                        onTestComplete(callbackResults.results);
-                      }
-                      return;
-                    } else {
-                      console.warn("Results from callback URL don't match expected format:", callbackResults);
-                    }
-                  } else {
-                    console.warn("Failed to retrieve results from callback URL:", resultsResponse.statusText);
-                  }
-                } catch (fetchError) {
-                  console.error("Error fetching results from callback URL:", fetchError);
-                }
-              }
-              
-              // If we couldn't get results from the callback URL, fall back to GitHub Actions API
               try {
-                console.log("%c🔄 Fetching results from GitHub Actions API", "background: #FF9800; color: white; font-weight: bold; padding: 3px 6px; border-radius: 3px;");
-                
                 const actionResults = await GitHubService.getWorkflowResults(
                   owner, repo, run.id, config.ghToken, run.client_payload
                 );
                 
-                // Update test statuses in DataStore
                 updateTestStatusesInDataStore(actionResults);
-                
                 setResults(actionResults);
                 
                 if (onTestComplete) {
@@ -395,26 +351,7 @@ const TestRunner = ({ requirement, testCases, onTestComplete }) => {
                 }
               } catch (resultsError) {
                 console.error('Error getting workflow results:', resultsError);
-                
-                // Fallback to simulated results
-                console.log("%c🔄 Falling back to simulated results", "background: #F44336; color: white; font-weight: bold; padding: 3px 6px; border-radius: 3px;");
-                
-                const simulatedResults = testCases.map(tc => ({
-                  id: tc.id,
-                  name: tc.name,
-                  status: Math.random() > 0.2 ? 'Passed' : 'Failed',
-                  duration: Math.floor(Math.random() * 1000) + 100,
-                  logs: `Executing test ${tc.id}: ${tc.name}\n${Math.random() > 0.2 ? 'PASSED' : 'FAILED: Assertion error'}`
-                }));
-                
-                // Update test statuses in DataStore
-                updateTestStatusesInDataStore(simulatedResults);
-                
-                setResults(simulatedResults);
-                
-                if (onTestComplete) {
-                  onTestComplete(simulatedResults);
-                }
+                setError('Tests completed but results could not be retrieved. Check GitHub Actions logs.');
               }
             }
           } catch (err) {
@@ -424,10 +361,10 @@ const TestRunner = ({ requirement, testCases, onTestComplete }) => {
             setWaitingForWebhook(false);
             setError(`Error monitoring workflow: ${err.message}`);
           }
-        }, 5000); // Check every 5 seconds
+        }, 10000); // Check every 10 seconds
         
         setPollInterval(interval);
-      }, 30000); // Wait 30 seconds for webhook before falling back to polling
+      }, webhookTimeoutDuration);
       
       setWebhookTimeout(timeout);
       
@@ -443,9 +380,33 @@ const TestRunner = ({ requirement, testCases, onTestComplete }) => {
 
   return (
     <div className="bg-white rounded-lg shadow-md p-6">
-      <h2 className="text-xl font-semibold mb-4">Run Tests via GitHub Actions</h2>
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-xl font-semibold">Run Tests via GitHub Actions</h2>
+        
+        {/* Backend Status Indicator */}
+        <div className="flex items-center space-x-2 text-sm">
+          {backendStatus === 'checking' && (
+            <>
+              <Loader2 className="animate-spin w-4 h-4 text-gray-500" />
+              <span className="text-gray-500">Checking backend...</span>
+            </>
+          )}
+          {backendStatus === 'connected' && (
+            <>
+              <Wifi className="w-4 h-4 text-green-600" />
+              <span className="text-green-600">Backend connected</span>
+            </>
+          )}
+          {backendStatus === 'disconnected' && (
+            <>
+              <WifiOff className="w-4 h-4 text-orange-600" />
+              <span className="text-orange-600">Fallback mode</span>
+            </>
+          )}
+        </div>
+      </div>
       
-      {/* GitHub configuration section (collapsible) */}
+      {/* Configuration section */}
       <div className="mb-4 border rounded-md">
         <button 
           className="w-full px-4 py-2 flex items-center justify-between bg-gray-50 border-b"
@@ -544,19 +505,22 @@ const TestRunner = ({ requirement, testCases, onTestComplete }) => {
               
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Callback URL (Optional)
+                  Callback URL
                 </label>
                 <input
                   type="text"
                   name="callbackUrl"
                   value={config.callbackUrl}
                   onChange={handleInputChange}
-                  placeholder="https://your-app.com/api/test-results"
+                  placeholder="https://your-app.com/api/webhook/test-results"
                   className="w-full p-2 border border-gray-300 rounded"
                   disabled={isRunning}
                 />
                 <p className="text-xs text-gray-500 mt-1">
-                  URL where test results should be sent (leave empty to use simulated results)
+                  {hasBackendSupport 
+                    ? 'Using backend webhook service for real-time updates' 
+                    : 'Backend unavailable - webhook.site or manual simulation recommended for testing'
+                  }
                 </p>
               </div>
             </div>
@@ -606,7 +570,7 @@ const TestRunner = ({ requirement, testCases, onTestComplete }) => {
         )}
       </button>
 
-      {/* Error Message */}
+      {/* Status Messages */}
       {error && (
         <div className="my-4 p-3 bg-red-50 border border-red-200 rounded text-red-700">
           <div className="flex items-center">
@@ -616,17 +580,20 @@ const TestRunner = ({ requirement, testCases, onTestComplete }) => {
         </div>
       )}
       
-      {/* Webhook Status */}
       {waitingForWebhook && (
         <div className="my-4 p-3 bg-yellow-50 border border-yellow-200 rounded">
           <div className="flex items-center">
             <Loader2 className="animate-spin mr-2 text-yellow-600" size={18} />
-            <span className="text-yellow-700">Waiting for test results from webhook...</span>
+            <span className="text-yellow-700">
+              {hasBackendSupport 
+                ? 'Waiting for test results via backend webhook service...' 
+                : 'Waiting for test results via fallback method...'
+              }
+            </span>
           </div>
         </div>
       )}
       
-      {/* Workflow Run Status */}
       {workflowRun && isRunning && (
         <div className="my-4 p-3 bg-blue-50 border border-blue-200 rounded">
           <div className="flex justify-between items-center">
@@ -702,6 +669,19 @@ const TestRunner = ({ requirement, testCases, onTestComplete }) => {
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Test Backend Button (if available) */}
+      {hasBackendSupport && webhookService && (
+        <div className="mt-4 pt-4 border-t">
+          <button
+            onClick={() => webhookService.testWebhook(requirement.id)}
+            className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 text-sm"
+            disabled={isRunning}
+          >
+            Test Backend Webhook
+          </button>
         </div>
       )}
     </div>

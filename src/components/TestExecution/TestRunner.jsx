@@ -1,28 +1,27 @@
-// src/components/TestExecution/TestRunner.jsx - Updated imports and backend detection
+// src/components/TestExecution/TestRunner.jsx - Fixed version with request isolation
 import React, { useState, useEffect } from 'react';
 import { GitBranch, Play, Check, AlertTriangle, X, Loader2, ChevronDown, ChevronRight, Save, Wifi, WifiOff } from 'lucide-react';
 import GitHubService from '../../services/GitHubService';
 import dataStore from '../../services/DataStore';
 import { refreshQualityGates } from '../../utils/calculateQualityGates';
-
-// Import WebhookService - this will work now that you have the backend
 import webhookService from '../../services/WebhookService';
 
-// For automatic environment detection, you could also use:
 const getCallbackUrl = () => {
   if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
     return 'http://localhost:3001/api/webhook/test-results';
   }
-  // Production - use same domain as frontend
   return `${window.location.protocol}//${window.location.hostname}/api/webhook/test-results`;
 };
 
 const TestRunner = ({ requirement, testCases, onTestComplete }) => {
-  // Detect if we have backend support
+  // Backend support detection
   const [hasBackendSupport, setHasBackendSupport] = useState(false);
-  const [backendStatus, setBackendStatus] = useState('checking'); // 'checking', 'connected', 'disconnected'
+  const [backendStatus, setBackendStatus] = useState('checking');
 
-  // State for GitHub configuration
+  // FIXED: Track current request ID for proper isolation
+  const [currentRequestId, setCurrentRequestId] = useState(null);
+
+  // Configuration state
   const [config, setConfig] = useState(() => {
     const savedConfig = localStorage.getItem('testRunnerConfig');
     const defaultConfig = {
@@ -30,8 +29,6 @@ const TestRunner = ({ requirement, testCases, onTestComplete }) => {
       branch: 'main',
       workflowId: 'quality-tracker-tests.yml',
       ghToken: '',
-      // Point to your backend server
-      // callbackUrl: 'http://localhost:3001/api/webhook/test-results'
       callbackUrl: getCallbackUrl()
     };
     
@@ -54,28 +51,36 @@ const TestRunner = ({ requirement, testCases, onTestComplete }) => {
     checkBackendAvailability();
   }, []);
 
-  // Set up webhook listener when component mounts
+  // FIXED: Set up request-specific webhook listener
   useEffect(() => {
-    if (hasBackendSupport && webhookService) {
-      console.log(`🎯 Setting up backend webhook listener for: ${requirement.id}`);
+    if (hasBackendSupport && webhookService && currentRequestId) {
+      console.log(`🎯 Setting up webhook listener for request: ${currentRequestId}`);
       
-      // Subscribe to webhooks for this requirement
+      // Subscribe to this specific request ID for precise targeting
+      webhookService.subscribeToRequest(currentRequestId, handleWebhookResults);
+      
+      // Also subscribe to the general requirement (backup)
       webhookService.subscribeToRequirement(requirement.id, handleWebhookResults);
       
-      // Cleanup on unmount
+      // Cleanup on unmount or when request changes
       return () => {
-        console.log(`🧹 Cleaning up webhook listener for: ${requirement.id}`);
+        console.log(`🧹 Cleaning up webhook listeners for request: ${currentRequestId}`);
+        webhookService.unsubscribeFromRequest(currentRequestId);
         webhookService.unsubscribeFromRequirement(requirement.id);
       };
-    } else {
-      // Fallback to old window-based listener
+    } else if (!hasBackendSupport) {
+      // Fallback to window-based listener
       console.log(`🎯 Setting up fallback webhook listener for: ${requirement.id}`);
       
       window.onTestWebhookReceived = (webhookData) => {
         console.log("🔔 WEBHOOK RECEIVED (fallback mode):", webhookData);
         
-        if (webhookData && webhookData.requirementId === requirement?.id) {
-          console.log("✅ Processing webhook for current requirement");
+        // FIXED: Check both requirementId and requestId for matching
+        const matchesRequirement = webhookData?.requirementId === requirement?.id;
+        const matchesRequest = currentRequestId && webhookData?.requestId === currentRequestId;
+        
+        if (matchesRequirement || matchesRequest) {
+          console.log("✅ Processing webhook for current execution");
           
           if (webhookTimeout) {
             clearTimeout(webhookTimeout);
@@ -84,7 +89,9 @@ const TestRunner = ({ requirement, testCases, onTestComplete }) => {
           
           handleWebhookResults(webhookData);
         } else {
-          console.log("❌ Webhook doesn't match current requirement - ignoring");
+          console.log("❌ Webhook doesn't match current execution - ignoring");
+          console.log("Expected:", { requirementId: requirement?.id, requestId: currentRequestId });
+          console.log("Received:", { requirementId: webhookData?.requirementId, requestId: webhookData?.requestId });
         }
       };
       
@@ -93,19 +100,16 @@ const TestRunner = ({ requirement, testCases, onTestComplete }) => {
         if (webhookTimeout) clearTimeout(webhookTimeout);
       };
     }
-  }, [requirement, hasBackendSupport, webhookTimeout]);
+  }, [requirement.id, hasBackendSupport, currentRequestId, webhookTimeout]);
 
   const checkBackendAvailability = async () => {
     try {
       setBackendStatus('checking');
       
-      // Check if backend is healthy
       const isHealthy = await webhookService.checkBackendHealth();
       
       if (isHealthy) {
-        // Try to connect to WebSocket
         await webhookService.connect();
-        
         setHasBackendSupport(true);
         setBackendStatus('connected');
         console.log('✅ Backend webhook service available and connected');
@@ -143,6 +147,9 @@ const TestRunner = ({ requirement, testCases, onTestComplete }) => {
       if (onTestComplete) {
         onTestComplete(testResults);
       }
+      
+      // FIXED: Clean up the current request tracking
+      setCurrentRequestId(null);
     }
   };
 
@@ -235,6 +242,10 @@ const TestRunner = ({ requirement, testCases, onTestComplete }) => {
       return;
     }
 
+    // FIXED: Generate unique request ID for this execution
+    const requestId = `req_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
+    setCurrentRequestId(requestId);
+
     setIsRunning(true);
     setError(null);
     setResults(null);
@@ -244,9 +255,8 @@ const TestRunner = ({ requirement, testCases, onTestComplete }) => {
     try {
       const { owner, repo } = GitHubService.parseGitHubUrl(config.repoUrl);
       
-      const requestId = `req_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
       const payload = {
-        requestId: requestId,
+        requestId: requestId, // FIXED: Include unique request ID
         requirementId: requirement.id,
         requirementName: requirement.name,
         testCases: testCases.map(tc => tc.id),
@@ -255,6 +265,12 @@ const TestRunner = ({ requirement, testCases, onTestComplete }) => {
       
       console.log("Sending payload to GitHub Actions:", payload);
       console.log("Backend support:", hasBackendSupport ? 'Available' : 'Using fallback');
+      console.log("Request ID:", requestId);
+      
+      // FIXED: Register this request with the webhook service
+      if (hasBackendSupport && webhookService) {
+        webhookService.registerTestExecution(requirement.id, requestId);
+      }
       
       // Check if we should use simulated results (development mode)
       const useSimulatedResults = !config.repoUrl || 
@@ -269,6 +285,7 @@ const TestRunner = ({ requirement, testCases, onTestComplete }) => {
           console.log("Simulated test execution completed");
           
           if (waitingForWebhook) {
+            // FIXED: Include requestId in simulated results
             const simulatedResults = testCases.map(tc => ({
               id: tc.id,
               name: tc.name,
@@ -277,16 +294,16 @@ const TestRunner = ({ requirement, testCases, onTestComplete }) => {
               logs: `Executing test ${tc.id}: ${tc.name}\n${Math.random() > 0.2 ? 'PASSED' : 'FAILED: Assertion error'}`
             }));
             
-            updateTestStatusesInDataStore(simulatedResults);
-            setResults(simulatedResults);
-            setIsRunning(false);
-            setWaitingForWebhook(false);
+            const simulatedWebhookData = {
+              requirementId: requirement.id,
+              requestId: requestId,
+              timestamp: new Date().toISOString(),
+              results: simulatedResults
+            };
             
-            if (onTestComplete) {
-              onTestComplete(simulatedResults);
-            }
+            handleWebhookResults(simulatedWebhookData);
           }
-        }, 8000); // 8 seconds for simulation
+        }, 8000);
         
         setWebhookTimeout(timeout);
         return;
@@ -302,21 +319,33 @@ const TestRunner = ({ requirement, testCases, onTestComplete }) => {
       
       console.log(`✅ Workflow triggered: ${run.id}`);
       console.log(`⏳ Waiting for webhook at: ${config.callbackUrl}`);
+      console.log(`📝 Request ID: ${requestId}`);
       
       // Set timeout based on backend availability
       const webhookTimeoutDuration = hasBackendSupport ? 120000 : 30000; // 2 min vs 30 sec
       
       const timeout = setTimeout(async () => {
-        console.log("Webhook timeout reached");
+        console.log("Webhook timeout reached for request:", requestId);
         
         if (hasBackendSupport && webhookService) {
-          // Try polling backend
+          // FIXED: Try polling for the specific request ID
           try {
-            console.log("🔄 Trying to poll backend for results");
-            const polledResults = await webhookService.pollForResults(requirement.id, 5, 3000);
+            console.log("🔄 Polling backend for specific request results");
+            const polledResults = await webhookService.fetchResultsByRequestId(requestId);
             
             if (polledResults) {
+              console.log("✅ Found results via polling");
               handleWebhookResults(polledResults);
+              return;
+            }
+            
+            // Fallback to general requirement polling
+            console.log("🔄 Trying general requirement polling");
+            const generalResults = await webhookService.fetchLatestResultsForRequirement(requirement.id);
+            
+            if (generalResults) {
+              console.log("⚠️ Using latest results for requirement (may not be from current execution)");
+              handleWebhookResults(generalResults);
               return;
             }
           } catch (pollError) {
@@ -343,12 +372,15 @@ const TestRunner = ({ requirement, testCases, onTestComplete }) => {
                   owner, repo, run.id, config.ghToken, run.client_payload
                 );
                 
-                updateTestStatusesInDataStore(actionResults);
-                setResults(actionResults);
+                // FIXED: Wrap results with proper structure including requestId
+                const structuredResults = {
+                  requirementId: requirement.id,
+                  requestId: requestId,
+                  timestamp: new Date().toISOString(),
+                  results: actionResults
+                };
                 
-                if (onTestComplete) {
-                  onTestComplete(actionResults);
-                }
+                handleWebhookResults(structuredResults);
               } catch (resultsError) {
                 console.error('Error getting workflow results:', resultsError);
                 setError('Tests completed but results could not be retrieved. Check GitHub Actions logs.');
@@ -361,7 +393,7 @@ const TestRunner = ({ requirement, testCases, onTestComplete }) => {
             setWaitingForWebhook(false);
             setError(`Error monitoring workflow: ${err.message}`);
           }
-        }, 10000); // Check every 10 seconds
+        }, 10000);
         
         setPollInterval(interval);
       }, webhookTimeoutDuration);
@@ -371,6 +403,7 @@ const TestRunner = ({ requirement, testCases, onTestComplete }) => {
     } catch (err) {
       setIsRunning(false);
       setWaitingForWebhook(false);
+      setCurrentRequestId(null);
       setError(`Error triggering workflow: ${err.message}`);
     }
   };
@@ -383,8 +416,15 @@ const TestRunner = ({ requirement, testCases, onTestComplete }) => {
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-xl font-semibold">Run Tests via GitHub Actions</h2>
         
-        {/* Backend Status Indicator */}
-        <div className="flex items-center space-x-2 text-sm">
+        {/* Backend Status and Request ID Indicator */}
+        <div className="flex items-center space-x-4 text-sm">
+          {currentRequestId && (
+            <div className="flex items-center space-x-2">
+              <span className="text-xs text-gray-500">Request:</span>
+              <code className="text-xs bg-gray-100 px-2 py-1 rounded">{currentRequestId.slice(-8)}</code>
+            </div>
+          )}
+          
           {backendStatus === 'checking' && (
             <>
               <Loader2 className="animate-spin w-4 h-4 text-gray-500" />
@@ -518,8 +558,8 @@ const TestRunner = ({ requirement, testCases, onTestComplete }) => {
                 />
                 <p className="text-xs text-gray-500 mt-1">
                   {hasBackendSupport 
-                    ? 'Using backend webhook service for real-time updates' 
-                    : 'Backend unavailable - webhook.site or manual simulation recommended for testing'
+                    ? 'Using backend webhook service with request isolation for real-time updates' 
+                    : 'Backend unavailable - using fallback mode (results may be cached)'
                   }
                 </p>
               </div>
@@ -586,7 +626,7 @@ const TestRunner = ({ requirement, testCases, onTestComplete }) => {
             <Loader2 className="animate-spin mr-2 text-yellow-600" size={18} />
             <span className="text-yellow-700">
               {hasBackendSupport 
-                ? 'Waiting for test results via backend webhook service...' 
+                ? `Waiting for results via backend (Request: ${currentRequestId?.slice(-8)})...` 
                 : 'Waiting for test results via fallback method...'
               }
             </span>
@@ -672,15 +712,37 @@ const TestRunner = ({ requirement, testCases, onTestComplete }) => {
         </div>
       )}
 
-      {/* Test Backend Button (if available) */}
+      {/* Test Backend Button and Clear Cache (if available) */}
       {hasBackendSupport && webhookService && (
-        <div className="mt-4 pt-4 border-t">
+        <div className="mt-4 pt-4 border-t flex space-x-2">
           <button
             onClick={() => webhookService.testWebhook(requirement.id)}
             className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 text-sm"
             disabled={isRunning}
           >
             Test Backend Webhook
+          </button>
+          
+          {/* FIXED: Clear cached results button */}
+          <button
+            onClick={async () => {
+              try {
+                // Clear latest results for this requirement
+                const latestResults = await webhookService.fetchLatestResultsForRequirement(requirement.id);
+                if (latestResults && latestResults.requestId) {
+                  await webhookService.clearResults(latestResults.requestId);
+                  console.log('✅ Cleared cached results');
+                } else {
+                  console.log('📭 No cached results to clear');
+                }
+              } catch (error) {
+                console.error('❌ Error clearing cache:', error);
+              }
+            }}
+            className="px-4 py-2 bg-orange-600 text-white rounded hover:bg-orange-700 text-sm"
+            disabled={isRunning}
+          >
+            Clear Cache
           </button>
         </div>
       )}

@@ -1,14 +1,14 @@
-// src/services/WebhookService.js - Fixed version with request isolation
+// src/services/WebhookService.js - Optimal same-server configuration
 import { io } from 'socket.io-client';
 
 class WebhookService {
   constructor() {
     this.socket = null;
-    this.listeners = new Map(); // Key: requirementId, Value: callback
-    this.requestListeners = new Map(); // Key: requestId, Value: callback
-    this.activeRequests = new Map(); // Key: requirementId, Value: Set of requestIds
+    this.listeners = new Map();
     
+    // Smart URL detection for same-server deployment
     this.baseURL = this.getServerURL();
+    
     this.connected = false;
     this.connectionAttempts = 0;
     this.maxConnectionAttempts = 3;
@@ -16,17 +16,26 @@ class WebhookService {
     console.log(`🌐 WebhookService configured for: ${this.baseURL}`);
   }
 
+  /**
+   * Smart server URL detection for same-server deployment
+   */
   getServerURL() {
     const isLocalhost = window.location.hostname === 'localhost' || 
                        window.location.hostname === '127.0.0.1';
     
     if (isLocalhost) {
+      // Development: Use separate port
       return 'http://localhost:3001';
     }
     
+    // Production: Same server, same domain
+    // Use current protocol and hostname (no separate port needed)
     return `${window.location.protocol}//${window.location.hostname}`;
   }
 
+  /**
+   * Initialize WebSocket connection with fallback support
+   */
   connect() {
     if (this.socket && this.connected) {
       console.log('🔌 Already connected to webhook backend');
@@ -37,14 +46,19 @@ class WebhookService {
       console.log(`🔌 Connecting to webhook backend at ${this.baseURL}...`);
       
       const socketOptions = {
+        // Try WebSocket first, fallback to polling
         transports: ['websocket', 'polling'],
         timeout: 15000,
         forceNew: true,
         reconnection: true,
         reconnectionAttempts: 3,
         reconnectionDelay: 1000,
+        
+        // Production optimizations
         upgrade: true,
         rememberUpgrade: false,
+        
+        // Standard Socket.IO path
         path: '/socket.io/'
       };
 
@@ -72,17 +86,14 @@ class WebhookService {
 
       this.socket.on('test-results', (data) => {
         console.log('📋 Test results received:', data);
-        this.handleWebhookData({ 
-          data, 
-          requirementId: data.requirementId,
-          requestId: data.requestId 
-        });
+        this.handleWebhookData({ data, requirementId: data.requirementId });
       });
 
       this.socket.on('connect_error', (error) => {
         console.error('❌ WebSocket connection error:', error);
         this.connectionAttempts++;
         
+        // Provide helpful debugging info
         if (error.message.includes('websocket error')) {
           console.warn('💡 WebSocket upgrade failed, using polling transport');
         }
@@ -93,6 +104,7 @@ class WebhookService {
         }
       });
 
+      // Connection timeout
       setTimeout(() => {
         if (!this.connected) {
           console.error('⏰ Connection timeout');
@@ -102,6 +114,9 @@ class WebhookService {
     });
   }
 
+  /**
+   * Check backend health with detailed diagnostics
+   */
   async checkBackendHealth() {
     try {
       const healthUrl = `${this.baseURL}/api/webhook/health`;
@@ -118,8 +133,7 @@ class WebhookService {
         console.log('✅ Backend healthy:', {
           status: data.status,
           connectedClients: data.connectedClients || 0,
-          storedResults: data.storedResults || 0,
-          activeRequests: data.activeRequests || []
+          environment: data.environment
         });
         return true;
       } else {
@@ -136,38 +150,13 @@ class WebhookService {
     }
   }
 
-  // FIXED: Subscribe to both requirement and specific request
+  // ... rest of the methods remain the same ...
   subscribeToRequirement(requirementId, callback) {
     console.log(`📝 Subscribing to requirement: ${requirementId}`);
     this.listeners.set(requirementId, callback);
     
     if (this.socket && this.connected) {
       this.socket.emit('subscribe-requirement', requirementId);
-    }
-  }
-
-  // NEW: Subscribe to specific request for precise targeting
-  subscribeToRequest(requestId, callback) {
-    console.log(`📝 Subscribing to specific request: ${requestId}`);
-    this.requestListeners.set(requestId, callback);
-    
-    if (this.socket && this.connected) {
-      this.socket.emit('subscribe-request', requestId);
-    }
-  }
-
-  // FIXED: Register a new test execution request
-  registerTestExecution(requirementId, requestId) {
-    console.log(`📝 Registering test execution: ${requirementId} -> ${requestId}`);
-    
-    if (!this.activeRequests.has(requirementId)) {
-      this.activeRequests.set(requirementId, new Set());
-    }
-    this.activeRequests.get(requirementId).add(requestId);
-    
-    // Subscribe to this specific request
-    if (this.socket && this.connected) {
-      this.socket.emit('subscribe-request', requestId);
     }
   }
 
@@ -180,116 +169,13 @@ class WebhookService {
     }
   }
 
-  // NEW: Unsubscribe from specific request
-  unsubscribeFromRequest(requestId) {
-    console.log(`📝 Unsubscribing from specific request: ${requestId}`);
-    this.requestListeners.delete(requestId);
-    
-    if (this.socket && this.connected) {
-      this.socket.emit('unsubscribe-request', requestId);
-    }
-  }
-
-  // FIXED: Handle webhook data with both requirement and request targeting
   handleWebhookData(webhookEvent) {
-    const { requirementId, requestId, data } = webhookEvent;
-    
-    // Try request-specific callback first (more precise)
-    if (requestId) {
-      const requestCallback = this.requestListeners.get(requestId);
-      if (requestCallback) {
-        console.log(`🎯 Executing request-specific callback for: ${requestId}`);
-        requestCallback(data);
-        return;
-      }
+    const { requirementId, data } = webhookEvent;
+    const callback = this.listeners.get(requirementId);
+    if (callback) {
+      console.log(`🎯 Executing callback for requirement: ${requirementId}`);
+      callback(data);
     }
-    
-    // Fall back to requirement callback
-    const requirementCallback = this.listeners.get(requirementId);
-    if (requirementCallback) {
-      console.log(`🎯 Executing requirement callback for: ${requirementId}`);
-      requirementCallback(data);
-    }
-  }
-
-  // FIXED: Fetch results by requestId (more precise)
-  async fetchResultsByRequestId(requestId) {
-    try {
-      const response = await fetch(`${this.baseURL}/api/test-results/request/${requestId}`, {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
-        signal: AbortSignal.timeout(10000)
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        console.log(`✅ Retrieved results for request: ${requestId}`);
-        return data;
-      } else if (response.status === 404) {
-        console.log(`📭 No results found for request: ${requestId}`);
-        return null;
-      } else {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-    } catch (error) {
-      console.error(`❌ Error fetching results for request ${requestId}:`, error);
-      throw error;
-    }
-  }
-
-  // Fetch latest results for a requirement (might return cached results)
-  async fetchLatestResultsForRequirement(requirementId) {
-    try {
-      const response = await fetch(`${this.baseURL}/api/test-results/${requirementId}`, {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
-        signal: AbortSignal.timeout(10000)
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        console.log(`✅ Retrieved latest results for requirement: ${requirementId}`);
-        return data;
-      } else if (response.status === 404) {
-        console.log(`📭 No results found for requirement: ${requirementId}`);
-        return null;
-      } else {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-    } catch (error) {
-      console.error(`❌ Error fetching latest results for requirement ${requirementId}:`, error);
-      throw error;
-    }
-  }
-
-  // FIXED: Poll for results with requestId support
-  async pollForResults(requestId, maxAttempts = 5, intervalMs = 3000) {
-    console.log(`🔄 Polling for results: ${requestId} (max ${maxAttempts} attempts)`);
-    
-    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-      try {
-        const results = await this.fetchResultsByRequestId(requestId);
-        
-        if (results) {
-          console.log(`✅ Poll successful on attempt ${attempt}`);
-          return results;
-        }
-        
-        if (attempt < maxAttempts) {
-          console.log(`⏳ Attempt ${attempt}/${maxAttempts} - waiting ${intervalMs}ms`);
-          await new Promise(resolve => setTimeout(resolve, intervalMs));
-        }
-      } catch (error) {
-        console.error(`❌ Poll attempt ${attempt} failed:`, error.message);
-        
-        if (attempt < maxAttempts) {
-          await new Promise(resolve => setTimeout(resolve, intervalMs));
-        }
-      }
-    }
-    
-    console.log(`❌ Polling failed after ${maxAttempts} attempts`);
-    return null;
   }
 
   async testWebhook(requirementId = 'REQ-TEST') {
@@ -304,10 +190,10 @@ class WebhookService {
           results: [
             {
               id: 'TC_001',
-              name: 'Test Backend Webhook',
+              name: 'Test Same-Server Webhook',
               status: 'Passed',
               duration: 1000,
-              logs: 'Backend webhook test completed successfully'
+              logs: 'Same-server webhook test completed'
             }
           ]
         }),
@@ -315,36 +201,13 @@ class WebhookService {
       });
       
       if (response.ok) {
-        const result = await response.json();
-        console.log('✅ Test webhook successful:', result);
+        console.log('✅ Test webhook successful');
         return true;
       } else {
         throw new Error(`Test failed: ${response.statusText}`);
       }
     } catch (error) {
       console.error('❌ Test webhook error:', error);
-      throw error;
-    }
-  }
-
-  // FIXED: Clear results for a specific request
-  async clearResults(requestId) {
-    try {
-      const response = await fetch(`${this.baseURL}/api/test-results/request/${requestId}`, {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        signal: AbortSignal.timeout(10000)
-      });
-      
-      if (response.ok) {
-        const result = await response.json();
-        console.log(`🗑️ Cleared results for request: ${requestId}`);
-        return result;
-      } else {
-        throw new Error(`Clear failed: ${response.statusText}`);
-      }
-    } catch (error) {
-      console.error(`❌ Error clearing results for request ${requestId}:`, error);
       throw error;
     }
   }
@@ -356,8 +219,6 @@ class WebhookService {
       this.socket = null;
       this.connected = false;
       this.listeners.clear();
-      this.requestListeners.clear();
-      this.activeRequests.clear();
     }
   }
 
@@ -368,17 +229,12 @@ class WebhookService {
   getBaseURL() {
     return this.baseURL;
   }
-
-  // FIXED: Get active request IDs for a requirement
-  getActiveRequestIds(requirementId) {
-    return this.activeRequests.get(requirementId) || new Set();
-  }
 }
 
 // Singleton instance
 const webhookService = new WebhookService();
 
-// Auto-initialization
+// Auto-initialization with better error handling
 if (typeof window !== 'undefined') {
   webhookService.checkBackendHealth()
     .then(isHealthy => {
@@ -405,12 +261,11 @@ if (typeof window !== 'undefined') {
   window.webhookService = webhookService;
   window.testWebhook = (reqId) => webhookService.testWebhook(reqId);
   
-  // Enhanced diagnostics
+  // Connection diagnostics
   window.webhookDiagnostics = async () => {
     console.log('🔍 Running webhook diagnostics...');
     console.log('Base URL:', webhookService.getBaseURL());
     console.log('Connected:', webhookService.isConnected());
-    console.log('Active Requests:', Object.fromEntries(webhookService.activeRequests));
     
     try {
       const isHealthy = await webhookService.checkBackendHealth();
