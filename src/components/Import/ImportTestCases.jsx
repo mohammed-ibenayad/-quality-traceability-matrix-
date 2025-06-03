@@ -321,6 +321,29 @@ const ImportTestCases = ({ onImportSuccess }) => {
         )}
       </div>
       
+      {/* Sample File Section - Moved here for better visibility */}
+      <div className="mb-4 text-sm bg-gray-50 p-3 rounded border border-gray-200">
+        <p className="font-medium mb-1">Need a sample file?</p>
+        <div className="flex items-center justify-between">
+          <a 
+            href="/sample-testcases.jsonc" 
+            download 
+            className="text-blue-600 hover:underline flex items-center"
+          >
+            <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+              <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd"></path>
+            </svg>
+            Download sample
+          </a>
+          <button
+            className="px-2 py-1 bg-gray-200 text-gray-700 rounded text-xs hover:bg-gray-300"
+            onClick={() => window.loadSampleData && window.loadSampleData()}
+          >
+            Load Sample Data
+          </button>
+        </div>
+      </div>
+      
       {/* Validation Status */}
       {isValidating && (
         <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded">
@@ -413,27 +436,6 @@ const ImportTestCases = ({ onImportSuccess }) => {
         >
           Reset
         </button>
-      </div>
-      
-      {/* Help Text */}
-      <div className="mt-6 text-xs text-gray-500 border-t pt-3">
-        <p className="font-medium mb-1">Expected Format:</p>
-        <pre className="p-2 bg-gray-50 rounded overflow-x-auto">
-{`[
-  {
-    "id": "TC-001",
-    "name": "Valid Login",
-    "description": "Test valid user login",
-    "steps": ["Enter username", "Enter password", "Click login"],
-    "expectedResult": "User logged in successfully",
-    "status": "Passed", // Passed, Failed, Not Run, Blocked
-    "automationStatus": "Automated", // Automated, Manual, Planned
-    "lastExecuted": "2025-03-15",
-    "requirementIds": ["REQ-001", "REQ-002"] // Optional, for mapping
-  },
-  // More test cases...
-]`}
-        </pre>
       </div>
     </div>
   );

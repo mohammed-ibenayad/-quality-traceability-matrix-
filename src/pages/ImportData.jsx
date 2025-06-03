@@ -242,56 +242,6 @@ const ImportData = () => {
                 )}
               </div>
             )}
-            
-            {/* Instructions moved below the import component */}
-            <div className="mt-6 bg-white p-6 rounded shadow">
-              <h2 className="text-lg font-semibold mb-3">How to Import Requirements</h2>
-              <p className="mb-3">
-                Use this page to import requirements data in JSONC format. The system will:
-              </p>
-              <ul className="list-disc list-inside mb-4 text-gray-700 space-y-1">
-                <li>Validate your file structure</li>
-                <li>Calculate Test Depth Factor (TDF) for each requirement</li>
-                <li>Determine the minimum test cases needed</li>
-                <li>Update the requirements data in the application</li>
-              </ul>
-              
-              <div className="bg-blue-50 p-4 rounded border border-blue-200 mb-4">
-                <h3 className="font-semibold text-blue-700 mb-2">Required Fields:</h3>
-                <div className="grid grid-cols-2 gap-2 text-sm text-blue-800">
-                  <div>• id (format: REQ-XXX)</div>
-                  <div>• name</div>
-                  <div>• description</div>
-                  <div>• priority (High/Medium/Low)</div>
-                  <div>• businessImpact (1-5)</div>
-                  <div>• technicalComplexity (1-5)</div>
-                  <div>• regulatoryFactor (1-5)</div>
-                  <div>• usageFrequency (1-5)</div>
-                </div>
-              </div>
-              
-              <div className="text-sm bg-gray-50 p-3 rounded border border-gray-200">
-                <p className="font-medium mb-1">Need a sample file?</p>
-                <div className="flex items-center justify-between">
-                  <a 
-                    href="/sample-requirements.jsonc" 
-                    download 
-                    className="text-blue-600 hover:underline flex items-center"
-                  >
-                    <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-                      <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd"></path>
-                    </svg>
-                    Download sample
-                  </a>
-                  <button
-                    className="px-2 py-1 bg-gray-200 text-gray-700 rounded text-xs hover:bg-gray-300"
-                    onClick={() => window.loadSampleData && window.loadSampleData()}
-                  >
-                    Load Sample Data
-                  </button>
-                </div>
-              </div>
-            </div>
           </>
         )}
         
@@ -349,61 +299,6 @@ const ImportData = () => {
                 )}
               </div>
             )}
-            
-            {/* Instructions moved below the import component */}
-            <div className="mt-6 bg-white p-6 rounded shadow">
-              <h2 className="text-lg font-semibold mb-3">How to Import Test Cases</h2>
-              <p className="mb-3">
-                Use this page to import test case data in JSONC format. The system will:
-              </p>
-              <ul className="list-disc list-inside mb-4 text-gray-700 space-y-1">
-                <li>Validate your test case file structure</li>
-                <li>Optionally map test cases to requirements</li>
-                <li>Update the test case data in the application</li>
-                <li>Preserve existing requirement-test mappings</li>
-              </ul>
-              
-              <div className="bg-blue-50 p-4 rounded border border-blue-200 mb-4">
-                <h3 className="font-semibold text-blue-700 mb-2">Required Fields:</h3>
-                <div className="grid grid-cols-2 gap-2 text-sm text-blue-800">
-                  <div>• id (format: TC-XXX)</div>
-                  <div>• name</div>
-                </div>
-                <h3 className="font-semibold text-blue-700 mt-3 mb-2">Optional Fields:</h3>
-                <div className="grid grid-cols-2 gap-2 text-sm text-blue-800">
-                  <div>• description</div>
-                  <div>• steps (array)</div>
-                  <div>• expectedResult</div>
-                  <div>• status (Passed/Failed/Not Run/Blocked)</div>
-                  <div>• automationStatus (Automated/Manual/Planned)</div>
-                  <div>• lastExecuted (date)</div>
-                  <div>• requirementIds (array)</div>
-                  <div>• version</div>
-                </div>
-              </div>
-              
-              <div className="text-sm bg-gray-50 p-3 rounded border border-gray-200">
-                <p className="font-medium mb-1">Need a sample file?</p>
-                <div className="flex items-center justify-between">
-                  <a 
-                    href="/sample-testcases.jsonc" 
-                    download 
-                    className="text-blue-600 hover:underline flex items-center"
-                  >
-                    <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-                      <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd"></path>
-                    </svg>
-                    Download sample
-                  </a>
-                  <button
-                    className="px-2 py-1 bg-gray-200 text-gray-700 rounded text-xs hover:bg-gray-300"
-                    onClick={() => window.loadSampleData && window.loadSampleData()}
-                  >
-                    Load Sample Data
-                  </button>
-                </div>
-              </div>
-            </div>
           </>
         )}
       </div>
