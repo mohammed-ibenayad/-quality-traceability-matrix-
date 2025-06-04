@@ -1,4 +1,4 @@
-// src/components/TestExecution/TestRunner.jsx - Fixed version with request isolation
+// src/components/TestExecution/TestRunner.jsx - Updated to load sample data from .env
 import React, { useState, useEffect } from 'react';
 import { GitBranch, Play, Check, AlertTriangle, X, Loader2, ChevronDown, ChevronRight, Save, Wifi, WifiOff } from 'lucide-react';
 import GitHubService from '../../services/GitHubService';
@@ -11,6 +11,23 @@ const getCallbackUrl = () => {
     return 'http://localhost:3001/api/webhook/test-results';
   }
   return `${window.location.protocol}//${window.location.hostname}/api/webhook/test-results`;
+};
+
+// Load sample configuration from environment variables
+const getSampleConfig = () => {
+  // Use your existing API URL structure for the callback
+  const callbackUrl = process.env.REACT_APP_SAMPLE_CALLBACK_URL || 
+                      (process.env.REACT_APP_API_URL ? 
+                        `${process.env.REACT_APP_API_URL}/api/webhook/test-results` : 
+                        getCallbackUrl());
+  
+  return {
+    repoUrl: process.env.REACT_APP_SAMPLE_REPO_URL || '',
+    branch: process.env.REACT_APP_SAMPLE_BRANCH || 'main',
+    workflowId: process.env.REACT_APP_SAMPLE_WORKFLOW_ID || 'quality-tracker-tests.yml',
+    ghToken: process.env.REACT_APP_SAMPLE_GITHUB_TOKEN || '',
+    callbackUrl: callbackUrl
+  };
 };
 
 const TestRunner = ({ requirement, testCases, onTestComplete }) => {
@@ -45,6 +62,43 @@ const TestRunner = ({ requirement, testCases, onTestComplete }) => {
   const [isSaved, setIsSaved] = useState(false);
   const [waitingForWebhook, setWaitingForWebhook] = useState(false);
   const [webhookTimeout, setWebhookTimeout] = useState(null);
+
+  // Function to load sample data (called from global loadSampleData function)
+  const loadSampleData = () => {
+    const sampleConfig = getSampleConfig();
+    
+    // Check if essential environment variables are missing
+    const missingVars = [];
+    if (!sampleConfig.repoUrl) missingVars.push('REACT_APP_SAMPLE_REPO_URL');
+    if (!sampleConfig.ghToken) missingVars.push('REACT_APP_SAMPLE_GITHUB_TOKEN');
+    
+    if (missingVars.length > 0) {
+      setError(`Missing environment variables: ${missingVars.join(', ')}. Please add them to your .env file.`);
+      console.warn('Missing environment variables for sample data:', missingVars);
+    } else {
+      setError(null); // Clear any existing errors
+    }
+    
+    setConfig(sampleConfig);
+    setIsConfigExpanded(true); // Expand config section to show the loaded data
+    
+    // Show feedback to user
+    console.log('Sample configuration loaded from environment variables:', sampleConfig);
+    
+    // Show save confirmation
+    setIsSaved(true);
+    setTimeout(() => setIsSaved(false), 3000);
+  };
+
+  // Expose loadSampleData function globally 
+  useEffect(() => {
+    // Always expose this function when the component mounts
+    window.loadTestRunnerSampleData = loadSampleData;
+    
+    return () => {
+      delete window.loadTestRunnerSampleData;
+    };
+  }, []);
 
   // Check backend availability on component mount
   useEffect(() => {

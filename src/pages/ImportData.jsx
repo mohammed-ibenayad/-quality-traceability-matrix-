@@ -28,10 +28,18 @@ const ImportData = () => {
     });
     
     // Expose a function to load sample data
-    window.loadSampleData = () => {
-      dataStore.initWithDefaultData();
-      navigate('/');
-    };
+window.loadSampleData = () => {
+  // Load sample requirements and test cases
+  dataStore.initWithDefaultData();
+  
+  // Also populate any open test runner modals with GitHub config
+  if (typeof window.loadTestRunnerSampleData === 'function') {
+    console.log('Loading sample GitHub configuration in test runner...');
+    window.loadTestRunnerSampleData();
+  }
+  
+  navigate('/');
+};
     
     return () => {
       unsubscribe();
