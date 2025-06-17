@@ -13,7 +13,8 @@ const Sidebar = () => {
     { name: 'Test Cases', path: '#', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4', active: false },
     { name: 'Releases', path: '/releases', icon: 'M11 17l-5-5m0 0l5-5m-5 5h12', active: true },
     { name: 'Reports', path: '#', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z', active: false },
-    { name: 'Import Data', path: '/import', icon: 'M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12', active: true }
+    { name: 'Import Data', path: '/import', icon: 'M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12', active: true },
+    { name: 'Roadmap', path: '/roadmap', icon: 'M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-1.447-.894L15 9m0 8V9m0 0H9', active: true }
   ];
   
   return (
@@ -35,7 +36,7 @@ const Sidebar = () => {
               key={item.path}
               to={item.path} 
               className={`flex items-center px-4 py-3 ${
-                (path === item.path || (item.path === '/' && path === '')) 
+                path === item.path || (item.path === '/' && path === '')
                   ? 'bg-gray-700 text-white border-l-4 border-blue-500' 
                   : 'text-gray-300 hover:bg-gray-700 hover:text-white'
               }`}

@@ -1,0 +1,18 @@
+{
+  "theme": {
+    "title": "Q3 2025 Development Focus",
+    "subtitle": "User Experience & Integration", 
+    "description": "Our Q3 roadmap focuses on enhancing user onboarding and workflow efficiency with key features designed to make Quality Tracker more accessible and powerful for development teams.",
+    "summary": "Making quality management accessible to more teams through better file format support, streamlined workflows, and direct integration with development tools."
+  },
+  "futureRoadmap": [
+    {
+      "period": "Q4 2025",
+      "description": "AI-powered quality insights, advanced analytics, mobile app"
+    },
+    {
+      "period": "2026", 
+      "description": "Enterprise features, white-label options, advanced integrations"
+    }
+  ]
+}

@@ -29,7 +29,15 @@ const ImportData = () => {
     
     // Expose a function to load sample data
     window.loadSampleData = () => {
+      // Load sample requirements and test cases
       dataStore.initWithDefaultData();
+      
+      // Also populate any open test runner modals with GitHub config
+      if (typeof window.loadTestRunnerSampleData === 'function') {
+        console.log('Loading sample GitHub configuration in test runner...');
+        window.loadTestRunnerSampleData();
+      }
+      
       navigate('/');
     };
     
@@ -88,106 +96,51 @@ const ImportData = () => {
       hasData={hasData}
     >
       <div className="max-w-4xl mx-auto">
-        {/* Empty state guidance when no data */}
+        {/* Quick Start Notice - Streamlined version */}
         {!hasData && (
-          <div className="bg-white p-8 rounded-lg shadow-lg mb-8">
-            <div className="text-center mb-6">
-              <h1 className="text-2xl font-bold text-gray-800 mb-3">Welcome to Quality Tracker</h1>
-              <p className="text-gray-600 max-w-2xl mx-auto">
-                Get started by importing your requirements and test cases to begin tracking the quality of your software releases.
-              </p>
-            </div>
-            
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-5 mb-6">
-              <h2 className="text-lg font-semibold text-blue-800 mb-2">Getting Started</h2>
-              <ol className="space-y-3">
-                <li className="flex items-start">
-                  <div className="flex-shrink-0 h-5 w-5 text-blue-600 mr-2">
-                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path>
-                    </svg>
-                  </div>
-                  <span className="text-blue-700">Import your requirements using the Requirements tab below</span>
-                </li>
-                <li className="flex items-start">
-                  <div className="flex-shrink-0 h-5 w-5 text-blue-600 mr-2">
-                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>
-                    </svg>
-                  </div>
-                  <span className="text-blue-700">Import your test cases using the Test Cases tab</span>
-                </li>
-                <li className="flex items-start">
-                  <div className="flex-shrink-0 h-5 w-5 text-blue-600 mr-2">
-                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path>
-                    </svg>
-                  </div>
-                  <span className="text-blue-700">View the Traceability Matrix to see the relationship between requirements and tests</span>
-                </li>
-                <li className="flex items-start">
-                  <div className="flex-shrink-0 h-5 w-5 text-blue-600 mr-2">
-                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-                    </svg>
-                  </div>
-                  <span className="text-blue-700">Check the Dashboard for quality metrics and release health</span>
-                </li>
-              </ol>
-            </div>
-            
-            <div className="mt-4 text-center">
-              <p className="text-sm text-gray-500">Select a tab below to get started</p>
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+            <div className="flex items-start">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5 text-blue-400 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <h3 className="text-sm font-medium text-blue-800">Getting Started</h3>
+                <div className="mt-1 text-sm text-blue-700">
+                  <p>Import your requirements and test cases to begin tracking quality metrics. Need help? Check the <a href="/roadmap" className="underline hover:text-blue-900">Roadmap page</a> for detailed information about Quality Tracker.</p>
+                </div>
+              </div>
             </div>
           </div>
         )}
-        
-        <h1 className="text-2xl font-bold mb-6">Import Data</h1>
-        
+
         {/* Tab Navigation */}
         <div className="mb-6">
-          <div className="border-b border-gray-200">
-            <nav className="-mb-px flex" aria-label="Tabs">
-              <button
-                onClick={() => {
-                  setActiveTab('requirements');
-                  setImportStatus(null); // Clear previous import status when changing tabs
-                }}
-                className={`w-1/2 py-4 px-1 text-center border-b-2 font-medium text-sm ${
-                  activeTab === 'requirements'
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                <div className="flex items-center justify-center">
-                  <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path>
-                  </svg>
-                  Import Requirements
-                </div>
-              </button>
-              <button
-                onClick={() => {
-                  setActiveTab('testcases');
-                  setImportStatus(null); // Clear previous import status when changing tabs
-                }}
-                className={`w-1/2 py-4 px-1 text-center border-b-2 font-medium text-sm ${
-                  activeTab === 'testcases'
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                <div className="flex items-center justify-center">
-                  <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>
-                  </svg>
-                  Import Test Cases
-                </div>
-              </button>
-            </nav>
-          </div>
+          <nav className="flex space-x-8" aria-label="Tabs">
+            <button
+              onClick={() => setActiveTab('requirements')}
+              className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${
+                activeTab === 'requirements'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              Requirements
+            </button>
+            <button
+              onClick={() => setActiveTab('testcases')}
+              className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${
+                activeTab === 'testcases'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              Test Cases
+            </button>
+          </nav>
         </div>
-        
+
         {/* Requirements Import Interface */}
         {activeTab === 'requirements' && (
           <>
@@ -303,15 +256,13 @@ const ImportData = () => {
         )}
       </div>
       
-      {/* Add CSS for animations */}
-      <style>
-        {`
-          @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
-          }
-        `}
-      </style>
+      {/* Inline CSS for fade animation */}
+      <style>{`
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
     </MainLayout>
   );
 };

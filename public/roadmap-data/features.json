@@ -1,0 +1,88 @@
+{
+  "currentFeatures": [
+    {
+      "title": "Requirements Management",
+      "description": "Import, manage, and track requirements with priority and business impact scoring",
+      "status": "completed"
+    },
+    {
+      "title": "Test Case Management", 
+      "description": "Import and organize test cases with automation status and execution tracking",
+      "status": "completed"
+    },
+    {
+      "title": "Traceability Matrix",
+      "description": "Visual mapping between requirements and test cases with coverage analysis",
+      "status": "completed"
+    },
+    {
+      "title": "Quality Dashboard",
+      "description": "Real-time metrics, health scores, and quality gates monitoring",
+      "status": "completed"
+    },
+    {
+      "title": "Release Management",
+      "description": "Version control and release-specific quality tracking",
+      "status": "completed"
+    },
+    {
+      "title": "Real-time Test Results",
+      "description": "Webhook integration for live test execution updates",
+      "status": "completed"
+    },
+    {
+      "title": "Quality Gates",
+      "description": "Configurable quality thresholds and automated gate evaluation",
+      "status": "completed"
+    },
+    {
+      "title": "JSONC File Import",
+      "description": "Current support for JSON/JSONC file formats with validation",
+      "status": "completed"
+    }
+  ],
+  "q3Features": [
+    {
+      "title": "Enhanced File Import System",
+      "description": "Support for Excel (.xlsx) and CSV file formats for both requirements and test cases",
+      "status": "planned",
+      "priority": "high",
+      "deliveryQ": "Q3 2025"
+    },
+    {
+      "title": "Bulk Test Execution",
+      "description": "Execute multiple test cases at once with batch processing and progress tracking",
+      "status": "planned",
+      "priority": "high",
+      "deliveryQ": "Q3 2025"
+    },
+    {
+      "title": "Individual Test Execution",
+      "description": "Run single test cases independently from any view, not just the traceability matrix",
+      "status": "planned",
+      "priority": "medium", 
+      "deliveryQ": "Q3 2025"
+    },
+    {
+      "title": "GitHub Repository Integration",
+      "description": "Direct import of test cases from GitHub automation repositories with sync capabilities",
+      "status": "planned",
+      "priority": "high",
+      "deliveryQ": "Q3 2025"
+    },
+    {
+      "title": "Onboarding Wizard",
+      "description": "Step-by-step guided setup for new users to quickly get started with the platform",
+      "status": "planned",
+      "priority": "medium",
+      "deliveryQ": "Q3 2025"
+    },
+    {
+      "title": "Smart Data Validation",
+      "description": "Enhanced validation with auto-correction suggestions and format standardization",
+      "status": "planned",
+      "priority": "medium",
+      "deliveryQ": "Q3 2025"
+    }
+  ]
+}

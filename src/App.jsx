@@ -13,6 +13,7 @@ import TraceabilityMatrix from './pages/TraceabilityMatrix';
 import Requirements from './pages/Requirements';
 import ImportData from './pages/ImportData';
 import Releases from './pages/Releases';
+import Roadmap from './pages/Roadmap';
 
 function App() {
   const [hasData, setHasData] = useState(false);
@@ -88,7 +89,10 @@ window.receiveTestResults({
           <Route path="/matrix" element={hasData ? <TraceabilityMatrix /> : <Navigate to="/import" />} />
           <Route path="/requirements" element={hasData ? <Requirements /> : <Navigate to="/import" />} />
           <Route path="/releases" element={hasData ? <Releases /> : <Navigate to="/import" />} />
+          
+          {/* These routes are always accessible regardless of data */}
           <Route path="/import" element={<ImportData />} />
+          <Route path="/roadmap" element={<Roadmap />} />
           
           {/* Redirect any unknown paths to dashboard or import based on data presence */}
           <Route path="*" element={<Navigate to={hasData ? "/" : "/import"} />} />

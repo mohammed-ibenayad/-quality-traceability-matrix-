@@ -1,0 +1,53 @@
+{
+  "title": "About Quality Tracker",
+  "description": "Quality Tracker is a comprehensive quality management platform designed to help development teams maintain high software quality standards while accelerating delivery timelines. Our tool bridges the gap between requirements management and test execution, providing clear visibility into quality metrics and release readiness.",
+  "mission": {
+    "title": "Our Mission",
+    "content": "To empower development teams to ship high-quality software with confidence by providing clear visibility into requirement coverage, test execution, and release readiness through automated metrics and intuitive dashboards."
+  },
+  "benefits": {
+    "title": "Key Benefits",
+    "items": [
+      {
+        "title": "Traceability",
+        "description": "Complete visibility from requirements to test execution"
+      },
+      {
+        "title": "Quality Gates", 
+        "description": "Automated quality thresholds to prevent low-quality releases"
+      },
+      {
+        "title": "Real-time Metrics",
+        "description": "Live dashboards showing quality health and progress"
+      },
+      {
+        "title": "Release Confidence",
+        "description": "Data-driven insights for go/no-go decisions"
+      },
+      {
+        "title": "Team Collaboration",
+        "description": "Centralized quality information for all stakeholders"
+      }
+    ]
+  },
+  "targetUsers": {
+    "title": "Target Users",
+    "users": [
+      {
+        "title": "QA Teams",
+        "description": "Comprehensive test management and execution tracking",
+        "color": "blue"
+      },
+      {
+        "title": "Development Teams", 
+        "description": "Quality visibility integrated into development workflows",
+        "color": "green"
+      },
+      {
+        "title": "Project Managers",
+        "description": "Release readiness insights and quality reporting", 
+        "color": "purple"
+      }
+    ]
+  }
+}

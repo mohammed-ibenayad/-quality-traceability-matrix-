@@ -1,0 +1,52 @@
+{
+  "knownIssues": [
+    {
+      "title": "Limited File Format Support",
+      "description": "Currently only supports JSONC/JSON formats. Excel and CSV support needed for broader adoption.",
+      "severity": "medium",
+      "impact": "User onboarding friction",
+      "workaround": "Users must convert Excel/CSV files to JSON format manually",
+      "plannedFix": "Q3 2025 - Enhanced Import System"
+    },
+    {
+      "title": "Test Execution Limited to Matrix View",
+      "description": "Test cases can only be executed through the traceability matrix, limiting workflow flexibility.",
+      "severity": "medium",
+      "impact": "Reduced user efficiency", 
+      "workaround": "Navigate to traceability matrix to execute tests",
+      "plannedFix": "Q3 2025 - Individual Test Execution"
+    },
+    {
+      "title": "No GitHub Integration",
+      "description": "Cannot directly sync with automation repositories, requiring manual test case maintenance.",
+      "severity": "high",
+      "impact": "Manual effort for automation teams",
+      "workaround": "Manual export/import of test automation data",
+      "plannedFix": "Q3 2025 - GitHub Repository Integration"
+    },
+    {
+      "title": "Complex Initial Setup",
+      "description": "New users face learning curve without guided onboarding process.",
+      "severity": "low",
+      "impact": "User adoption challenges",
+      "workaround": "Documentation and support assistance",
+      "plannedFix": "Q3 2025 - Onboarding Wizard"
+    },
+    {
+      "title": "Health Score Calculation Edge Cases",
+      "description": "Health scores may show unexpected values when no test cases are mapped to requirements.",
+      "severity": "low",
+      "impact": "Potential confusion in metrics",
+      "workaround": "Ensure all requirements have mapped test cases",
+      "plannedFix": "Q3 2025 - Enhanced Metrics Calculation"
+    },
+    {
+      "title": "Batch Operations Missing",
+      "description": "No support for bulk test execution or batch status updates.",
+      "severity": "medium",
+      "impact": "Time-consuming for large test suites", 
+      "workaround": "Execute tests individually through matrix",
+      "plannedFix": "Q3 2025 - Bulk Test Execution"
+    }
+  ]
+}
