@@ -1,16 +1,25 @@
 import React, { useState, useRef } from 'react';
+import { GitBranch } from 'lucide-react';
 import dataStore from '../../services/DataStore';
+import GitHubImportTestCases from './GitHubImportTestCases';
 
 /**
- * Component for importing test case data via JSONC file upload
+ * Enhanced component for importing test case data via multiple sources
+ * This adds GitHub import as a new tab to your existing import interface
  */
 const ImportTestCases = ({ onImportSuccess }) => {
+  // Check if this is being used in a tabbed interface
+  const [showGitHubImport, setShowGitHubImport] = useState(false);
+  
+  console.log('🔄 ImportTestCases render - showGitHubImport:', showGitHubImport);
+  
+  // File import state (existing functionality)
   const [file, setFile] = useState(null);
   const [isValidating, setIsValidating] = useState(false);
   const [validationErrors, setValidationErrors] = useState([]);
   const [validationSuccess, setValidationSuccess] = useState(false);
   const [processedData, setProcessedData] = useState(null);
-  const [importOption, setImportOption] = useState('withMapping'); // 'withMapping' or 'onlyTestCases'
+  const [importOption, setImportOption] = useState('withMapping');
   const fileInputRef = useRef(null);
 
   // Handle file selection
@@ -89,10 +98,8 @@ const ImportTestCases = ({ onImportSuccess }) => {
   // Process test case data 
   const processTestCaseData = (testCases) => {
     return testCases.map(tc => {
-      // Add any derived fields or processing here
       return {
         ...tc,
-        // Ensure default values for optional fields
         automationStatus: tc.automationStatus || 'Manual',
         status: tc.status || 'Not Run',
         lastExecuted: tc.lastExecuted || ''
@@ -124,32 +131,23 @@ const ImportTestCases = ({ onImportSuccess }) => {
   const validateTestCaseData = (data) => {
     const errors = [];
     
-    // Check if data is an array
     if (!Array.isArray(data)) {
       errors.push('Test case data must be an array');
       return errors;
     }
 
-    // Required fields
     const requiredFields = ['id', 'name'];
-    
-    // Valid statuses and automation statuses
     const validStatuses = ['Passed', 'Failed', 'Not Run', 'Blocked'];
     const validAutomationStatuses = ['Automated', 'Manual', 'Planned'];
-    
-    // Track IDs to check for duplicates
     const ids = new Set();
     
-    // Validate each test case
     data.forEach((tc, index) => {
-      // Check required fields
       requiredFields.forEach(field => {
         if (tc[field] === undefined) {
           errors.push(`Test case at index ${index} (${tc.id || 'unknown'}) is missing required field '${field}'`);
         }
       });
       
-      // Check for duplicate IDs
       if (tc.id) {
         if (ids.has(tc.id)) {
           errors.push(`Duplicate ID '${tc.id}' found`);
@@ -157,23 +155,19 @@ const ImportTestCases = ({ onImportSuccess }) => {
           ids.add(tc.id);
         }
         
-        // Check ID format (TC_XXX)
         if (!/^TC_\d+$/.test(tc.id)) {
           errors.push(`Invalid ID format for '${tc.id}'. Expected format: TC_XXX where XXX is a number`);
         }
       }
       
-      // Validate status if provided
       if (tc.status && !validStatuses.includes(tc.status)) {
         errors.push(`Invalid status '${tc.status}' for ${tc.id || `test case at index ${index}`}. Must be one of: ${validStatuses.join(', ')}`);
       }
       
-      // Validate automation status if provided
       if (tc.automationStatus && !validAutomationStatuses.includes(tc.automationStatus)) {
         errors.push(`Invalid automationStatus '${tc.automationStatus}' for ${tc.id || `test case at index ${index}`}. Must be one of: ${validAutomationStatuses.join(', ')}`);
       }
       
-      // Validate requirement IDs if provided
       if (tc.requirementIds) {
         if (!Array.isArray(tc.requirementIds)) {
           errors.push(`requirementIds for ${tc.id || `test case at index ${index}`} must be an array`);
@@ -186,7 +180,6 @@ const ImportTestCases = ({ onImportSuccess }) => {
         }
       }
       
-      // Validate lastExecuted date format if provided
       if (tc.lastExecuted && tc.lastExecuted !== '') {
         if (isNaN(Date.parse(tc.lastExecuted))) {
           errors.push(`Invalid date format for lastExecuted '${tc.lastExecuted}' for ${tc.id || `test case at index ${index}`}`);
@@ -210,7 +203,6 @@ const ImportTestCases = ({ onImportSuccess }) => {
         const mappings = extractMappings(processedData);
         
         // Update the mapping in the DataStore
-        // This preserves existing mappings for requirements not in the current import
         if (Object.keys(mappings).length > 0) {
           dataStore.updateMappings(mappings);
         }
@@ -242,9 +234,71 @@ const ImportTestCases = ({ onImportSuccess }) => {
     }
   };
 
+  // Handle GitHub import success
+  const handleGitHubImportSuccess = (importedTestCases) => {
+    console.log('✅ GitHub import success called with:', importedTestCases);
+    if (onImportSuccess) {
+      onImportSuccess(importedTestCases);
+    }
+    // Switch back to file import view after successful GitHub import
+    console.log('🔄 Switching back to file import view');
+    setShowGitHubImport(false);
+  };
+
+  // Handle GitHub button click
+  const handleGitHubButtonClick = () => {
+    console.log('🔵 GitHub button clicked! Current showGitHubImport:', showGitHubImport);
+    console.log('🔄 Setting showGitHubImport to true...');
+    setShowGitHubImport(true);
+    console.log('✅ setShowGitHubImport(true) called');
+  };
+
+  // Handle back button click
+  const handleBackButtonClick = () => {
+    console.log('⬅️ Back button clicked!');
+    console.log('🔄 Setting showGitHubImport to false...');
+    setShowGitHubImport(false);
+    console.log('✅ setShowGitHubImport(false) called');
+  };
+
+  console.log('🎯 Before render - showGitHubImport is:', showGitHubImport);
+
+  // If showing GitHub import, render that component
+  if (showGitHubImport) {
+    console.log('🎨 Rendering GitHub import interface');
+    return (
+      <div className="bg-white p-6 rounded shadow">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-xl font-semibold">Import Test Cases from GitHub</h2>
+          <button
+            onClick={handleBackButtonClick}
+            className="text-sm text-gray-600 hover:text-gray-800 underline"
+          >
+            ← Back to File Import
+          </button>
+        </div>
+        <GitHubImportTestCases onImportSuccess={handleGitHubImportSuccess} />
+      </div>
+    );
+  }
+
+  console.log('🎨 Rendering file import interface');
+
+  // Default file import view (your existing UI)
   return (
     <div className="bg-white p-6 rounded shadow">
-      <h2 className="text-xl font-semibold mb-4">Import Test Cases</h2>
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-xl font-semibold">Import Test Cases</h2>
+        {!showGitHubImport && (
+          <button
+            onClick={handleGitHubButtonClick}
+            className="flex items-center px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm"
+          >
+            <GitBranch className="h-4 w-4 mr-2" />
+            Import from GitHub
+          </button>
+        )}
+      </div>
       
       {/* Import Options */}
       <div className="mb-4">
@@ -285,43 +339,47 @@ const ImportTestCases = ({ onImportSuccess }) => {
       {/* File Upload Area */}
       <div 
         className={`mb-4 border-2 border-dashed rounded-lg p-6 text-center ${
-          file ? 'border-blue-300 bg-blue-50' : 'border-gray-300'
+          file ? 'border-blue-300 bg-blue-50' : 'border-gray-300 hover:border-gray-400'
         }`}
         onDrop={handleDrop}
         onDragOver={handleDragOver}
       >
-        <div className="mb-3">
-          <svg className="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true">
-            <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4h-12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-          <p className="mt-1 text-sm text-gray-600">
-            Drag and drop your JSONC file here, or
-          </p>
-        </div>
-        
         <input
+          ref={fileInputRef}
           type="file"
           accept=".json,.jsonc"
           onChange={handleFileChange}
-          ref={fileInputRef}
           className="hidden"
-          id="test-case-file-upload"
         />
-        <label
-          htmlFor="test-case-file-upload"
-          className="cursor-pointer inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-        >
-          Select File
-        </label>
         
-        {file && (
-          <div className="mt-3 text-sm text-gray-600">
-            Selected file: <span className="font-medium">{file.name}</span> ({(file.size / 1024).toFixed(1)} KB)
+        {file ? (
+          <div>
+            <svg className="mx-auto h-12 w-12 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            <p className="mt-2 text-sm font-medium text-blue-600">{file.name}</p>
+            <p className="text-xs text-gray-500">File selected - ready for validation</p>
+          </div>
+        ) : (
+          <div>
+            <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            <p className="mt-2 text-sm text-gray-600">
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="font-medium text-blue-600 hover:text-blue-500"
+              >
+                Click to upload
+              </button>
+              {' '}or drag and drop
+            </p>
+            <p className="text-xs text-gray-500">JSON or JSONC files only</p>
           </div>
         )}
       </div>
-      
-      {/* Sample File Section - Moved here for better visibility */}
+
+      {/* Sample File Section */}
       <div className="mb-4 text-sm bg-gray-50 p-3 rounded border border-gray-200">
         <p className="font-medium mb-1">Need a sample file?</p>
         <div className="flex items-center justify-between">
