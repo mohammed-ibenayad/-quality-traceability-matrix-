@@ -22,12 +22,13 @@ class DataStoreService {
   }
   
   /**
-   * Check if there is any data in the system
-   * @returns {boolean} True if there is data, false otherwise
-   */
-  hasData() {
-    return this._requirements.length > 0;
-  }
+ * Check if there is any data in the system
+ * FIXED: Now checks for either requirements OR test cases
+ * @returns {boolean} True if there is data, false otherwise
+ */
+hasData() {
+  return this._requirements.length > 0 || this._testCases.length > 0;
+}
 
   /**
    * Check if there are test cases specifically

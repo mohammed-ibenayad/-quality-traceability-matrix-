@@ -1,5 +1,5 @@
 // src/pages/TestCases.jsx - Complete Fixed Version
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Play, 
   Pause, 
@@ -54,83 +54,66 @@ const TestCases = () => {
       setTestCases(dataStore.getTestCases());
       setRequirements(dataStore.getRequirements());
       setMapping(dataStore.getMapping());
-      setHasTestCases(dataStore.hasTestCases()); // FIXED: Use specific test case check
+      setHasTestCases(dataStore.getTestCases().length > 0);
     };
-
-    // Initial load
+    
     updateData();
     
     // Subscribe to DataStore changes
     const unsubscribe = dataStore.subscribe(updateData);
     
+    // Clean up subscription
     return () => unsubscribe();
   }, []);
 
-  // Filtered test cases
+  // Filter test cases based on various criteria
   const filteredTestCases = useMemo(() => {
-    return testCases.filter(tc => {
-      const matchesSearch = tc.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                           tc.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                           (tc.description && tc.description.toLowerCase().includes(searchQuery.toLowerCase()));
-      
-      const matchesStatus = statusFilter === 'All' || tc.status === statusFilter;
-      const matchesAutomation = automationFilter === 'All' || tc.automationStatus === automationFilter;
-      const matchesPriority = priorityFilter === 'All' || tc.priority === priorityFilter;
-      const matchesVersion = versionFilter === 'All' || tc.version === versionFilter;
-      
-      // Determine if test case has requirement links
-      const hasRequirementLinks = tc.requirementIds && tc.requirementIds.length > 0;
-      
-      const matchesTraceability = traceabilityMode === 'standalone' || 
-                                 (traceabilityMode === 'linked' && hasRequirementLinks) ||
-                                 (traceabilityMode === 'unlinked' && !hasRequirementLinks);
+    return testCases.filter(testCase => {
+      // Search filter
+      if (searchQuery && !testCase.name.toLowerCase().includes(searchQuery.toLowerCase()) &&
+          !testCase.id.toLowerCase().includes(searchQuery.toLowerCase())) {
+        return false;
+      }
 
-      return matchesSearch && matchesStatus && matchesAutomation && 
-             matchesPriority && matchesVersion && matchesTraceability;
+      // Status filter
+      if (statusFilter !== 'All' && testCase.status !== statusFilter) {
+        return false;
+      }
+
+      // Automation filter
+      if (automationFilter !== 'All' && testCase.automationStatus !== automationFilter) {
+        return false;
+      }
+
+      // Priority filter
+      if (priorityFilter !== 'All' && testCase.priority !== priorityFilter) {
+        return false;
+      }
+
+      // Version filter
+      if (selectedVersion !== 'unassigned' && testCase.version !== selectedVersion) {
+        return false;
+      }
+
+      // Traceability mode filter
+      if (traceabilityMode === 'linked' && (!testCase.requirementIds || testCase.requirementIds.length === 0)) {
+        return false;
+      }
+      if (traceabilityMode === 'unlinked' && testCase.requirementIds && testCase.requirementIds.length > 0) {
+        return false;
+      }
+
+      return true;
     });
-  }, [testCases, searchQuery, statusFilter, automationFilter, priorityFilter, versionFilter, traceabilityMode]);
+  }, [testCases, searchQuery, statusFilter, automationFilter, priorityFilter, selectedVersion, traceabilityMode]);
 
-  // Get unique values for filters
-  const uniqueVersions = [...new Set(testCases.map(tc => tc.version).filter(Boolean))];
-  const statuses = ['All', 'Passed', 'Failed', 'Not Run', 'Blocked'];
-  const automationStatuses = ['All', 'Automated', 'Manual', 'Planned'];
-  const priorities = ['All', 'High', 'Medium', 'Low'];
-
-  // Status styling
-  const getStatusStyle = (status) => {
-    switch (status) {
-      case 'Passed': return 'bg-green-100 text-green-800';
-      case 'Failed': return 'bg-red-100 text-red-800';
-      case 'Blocked': return 'bg-yellow-100 text-yellow-800';
-      case 'Not Run': return 'bg-gray-100 text-gray-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const getAutomationStyle = (automation) => {
-    switch (automation) {
-      case 'Automated': return 'bg-blue-100 text-blue-800';
-      case 'Planned': return 'bg-orange-100 text-orange-800';
-      case 'Manual': return 'bg-purple-100 text-purple-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const getPriorityStyle = (priority) => {
-    switch (priority) {
-      case 'High': return 'bg-red-100 text-red-800';
-      case 'Medium': return 'bg-yellow-100 text-yellow-800';
-      case 'Low': return 'bg-green-100 text-green-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  // Summary statistics
+  // Calculate summary statistics
   const summaryStats = useMemo(() => {
     const total = filteredTestCases.length;
-    const passed = filteredTestCases.filter(tc => tc.status === 'Passed').length;
-    const failed = filteredTestCases.filter(tc => tc.status === 'Failed').length;
+    const passed = filteredTestCases.filter(tc => tc.status === 'Pass').length;
+    const failed = filteredTestCases.filter(tc => tc.status === 'Fail').length;
     const notRun = filteredTestCases.filter(tc => tc.status === 'Not Run').length;
+    const blocked = filteredTestCases.filter(tc => tc.status === 'Blocked').length;
     const automated = filteredTestCases.filter(tc => tc.automationStatus === 'Automated').length;
     const linked = filteredTestCases.filter(tc => tc.requirementIds && tc.requirementIds.length > 0).length;
 
@@ -139,6 +122,7 @@ const TestCases = () => {
       passed,
       failed,
       notRun,
+      blocked,
       automated,
       linked,
       passRate: total > 0 ? Math.round((passed / total) * 100) : 0,
@@ -289,6 +273,7 @@ const TestCases = () => {
               </button>
             </div>
           </div>
+
           {/* Summary Cards */}
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
             <div className="bg-white p-4 rounded-lg shadow">
@@ -308,153 +293,113 @@ const TestCases = () => {
               <div className="text-sm text-gray-500">Not Run</div>
             </div>
             <div className="bg-white p-4 rounded-lg shadow">
-              <div className="text-2xl font-bold text-blue-600">{summaryStats.passRate}%</div>
-              <div className="text-sm text-gray-500">Pass Rate</div>
+              <div className="text-2xl font-bold text-yellow-600">{summaryStats.blocked}</div>
+              <div className="text-sm text-gray-500">Blocked</div>
             </div>
             <div className="bg-white p-4 rounded-lg shadow">
-              <div className="text-2xl font-bold text-purple-600">{summaryStats.automationRate}%</div>
+              <div className="text-2xl font-bold text-blue-600">{summaryStats.automationRate}%</div>
               <div className="text-sm text-gray-500">Automated</div>
             </div>
             <div className="bg-white p-4 rounded-lg shadow">
-              <div className="text-2xl font-bold text-orange-600">{summaryStats.linkageRate}%</div>
+              <div className="text-2xl font-bold text-purple-600">{summaryStats.linkageRate}%</div>
               <div className="text-sm text-gray-500">Linked</div>
             </div>
           </div>
 
-          {/* No Requirements Warning */}
-          {requirements.length === 0 && (
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-              <div className="flex">
-                <div className="flex-shrink-0">
-                  <svg className="h-5 w-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                  </svg>
-                </div>
-                <div className="ml-3">
-                  <h3 className="text-sm font-medium text-yellow-800">No Requirements Found</h3>
-                  <div className="mt-2 text-sm text-yellow-700">
-                    <p>You have test cases but no requirements. Some features like requirement linking and traceability analysis will be limited. Consider importing requirements to enable full functionality.</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Filters and Controls */}
+          {/* Filters */}
           <div className="bg-white p-4 rounded-lg shadow">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
               {/* Search */}
-              <div className="relative">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Search test cases..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
+              <div className="lg:col-span-2">
+                <div className="relative">
+                  <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                  <input
+                    type="text"
+                    placeholder="Search test cases..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-10 w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
               </div>
 
               {/* Status Filter */}
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               >
-                {statuses.map(status => (
-                  <option key={status} value={status}>{status}</option>
-                ))}
+                <option value="All">All Statuses</option>
+                <option value="Not Run">Not Run</option>
+                <option value="Pass">Pass</option>
+                <option value="Fail">Fail</option>
+                <option value="Blocked">Blocked</option>
+                <option value="Skip">Skip</option>
               </select>
 
               {/* Automation Filter */}
               <select
                 value={automationFilter}
                 onChange={(e) => setAutomationFilter(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               >
-                {automationStatuses.map(status => (
-                  <option key={status} value={status}>{status}</option>
-                ))}
+                <option value="All">All Types</option>
+                <option value="Manual">Manual</option>
+                <option value="Automated">Automated</option>
+                <option value="Semi-Automated">Semi-Automated</option>
               </select>
 
               {/* Priority Filter */}
               <select
                 value={priorityFilter}
                 onChange={(e) => setPriorityFilter(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               >
-                {priorities.map(priority => (
-                  <option key={priority} value={priority}>{priority}</option>
-                ))}
+                <option value="All">All Priorities</option>
+                <option value="High">High</option>
+                <option value="Medium">Medium</option>
+                <option value="Low">Low</option>
+              </select>
+
+              {/* Traceability Mode */}
+              <select
+                value={traceabilityMode}
+                onChange={(e) => setTraceabilityMode(e.target.value)}
+                className="p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="standalone">All Test Cases</option>
+                <option value="linked">Linked to Requirements</option>
+                <option value="unlinked">Orphaned Test Cases</option>
               </select>
             </div>
+          </div>
 
-            <div className="flex flex-wrap items-center justify-between gap-4">
-              {/* Traceability Mode Toggle - Only show if requirements exist */}
-              {requirements.length > 0 && (
-                <div className="flex items-center space-x-2">
-                  <span className="text-sm font-medium text-gray-700">View Mode:</span>
-                  <div className="bg-gray-100 rounded-lg p-1 flex">
-                    <button
-                      onClick={() => setTraceabilityMode('linked')}
-                      className={`px-3 py-1 rounded-md text-sm ${
-                        traceabilityMode === 'linked' 
-                          ? 'bg-white shadow-sm text-blue-600' 
-                          : 'text-gray-600 hover:bg-gray-200'
-                      }`}
-                    >
-                      <Link className="inline mr-1" size={14} />
-                      Linked Only
-                    </button>
-                    <button
-                      onClick={() => setTraceabilityMode('unlinked')}
-                      className={`px-3 py-1 rounded-md text-sm ${
-                        traceabilityMode === 'unlinked' 
-                          ? 'bg-white shadow-sm text-orange-600' 
-                          : 'text-gray-600 hover:bg-gray-200'
-                      }`}
-                    >
-                      <Unlink className="inline mr-1" size={14} />
-                      Unlinked Only
-                    </button>
-                    <button
-                      onClick={() => setTraceabilityMode('standalone')}
-                      className={`px-3 py-1 rounded-md text-sm ${
-                        traceabilityMode === 'standalone' 
-                          ? 'bg-white shadow-sm text-green-600' 
-                          : 'text-gray-600 hover:bg-gray-200'
-                      }`}
-                    >
-                      <Eye className="inline mr-1" size={14} />
-                      All Test Cases
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* Bulk Actions */}
-              {selectedTestCases.size > 0 && (
-                <div className="flex items-center space-x-2">
-                  <span className="text-sm text-gray-600">
-                    {selectedTestCases.size} selected
-                  </span>
+          {/* Bulk Actions */}
+          {selectedTestCases.size > 0 && (
+            <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+              <div className="flex items-center justify-between">
+                <span className="text-blue-800">
+                  {selectedTestCases.size} test case(s) selected
+                </span>
+                <div className="flex space-x-2">
                   <button
                     onClick={executeSelectedTests}
-                    className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm flex items-center"
+                    className="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 flex items-center"
                   >
                     <Play className="mr-1" size={14} />
-                    Run Selected
+                    Execute
                   </button>
-                  <button 
+                  <button
                     onClick={handleBulkDelete}
-                    className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-sm"
+                    className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 flex items-center"
                   >
-                    Delete Selected
+                    <Trash2 className="mr-1" size={14} />
+                    Delete
                   </button>
                 </div>
-              )}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Test Cases Table */}
           <div className="bg-white rounded-lg shadow overflow-hidden">
@@ -465,9 +410,9 @@ const TestCases = () => {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       <input
                         type="checkbox"
-                        checked={selectedTestCases.size === filteredTestCases.length && filteredTestCases.length > 0}
+                        checked={filteredTestCases.length > 0 && selectedTestCases.size === filteredTestCases.length}
                         onChange={(e) => handleSelectAll(e.target.checked)}
-                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        className="rounded border-gray-300"
                       />
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -477,18 +422,13 @@ const TestCases = () => {
                       Status
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Priority
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Automation
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Priority
-                    </th>
-                    {requirements.length > 0 && (
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Requirements
-                      </th>
-                    )}
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Last Executed
+                      Requirements
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Actions
@@ -498,16 +438,16 @@ const TestCases = () => {
                 <tbody className="bg-white divide-y divide-gray-200">
                   {filteredTestCases.map((testCase) => (
                     <React.Fragment key={testCase.id}>
-                      <tr className="hover:bg-gray-50">
+                      <tr className={selectedTestCases.has(testCase.id) ? 'bg-blue-50' : 'hover:bg-gray-50'}>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <input
                             type="checkbox"
                             checked={selectedTestCases.has(testCase.id)}
                             onChange={(e) => handleTestCaseSelection(testCase.id, e.target.checked)}
-                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                            className="rounded border-gray-300"
                           />
                         </td>
-                        <td className="px-6 py-4">
+                        <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center">
                             <button
                               onClick={() => toggleRowExpansion(testCase.id)}
@@ -526,122 +466,135 @@ const TestCases = () => {
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusStyle(testCase.status)}`}>
+                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                            testCase.status === 'Pass' ? 'bg-green-100 text-green-800' :
+                            testCase.status === 'Fail' ? 'bg-red-100 text-red-800' :
+                            testCase.status === 'Blocked' ? 'bg-yellow-100 text-yellow-800' :
+                            'bg-gray-100 text-gray-800'
+                          }`}>
                             {testCase.status}
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getAutomationStyle(testCase.automationStatus)}`}>
+                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                            testCase.priority === 'High' ? 'bg-red-100 text-red-800' :
+                            testCase.priority === 'Medium' ? 'bg-yellow-100 text-yellow-800' :
+                            'bg-green-100 text-green-800'
+                          }`}>
+                            {testCase.priority}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                            testCase.automationStatus === 'Automated' ? 'bg-blue-100 text-blue-800' :
+                            testCase.automationStatus === 'Semi-Automated' ? 'bg-purple-100 text-purple-800' :
+                            'bg-gray-100 text-gray-800'
+                          }`}>
                             {testCase.automationStatus}
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getPriorityStyle(testCase.priority)}`}>
-                            {testCase.priority}
-                          </span>
-                        </td>
-                        {requirements.length > 0 && (
-                          <td className="px-6 py-4">
-                            <div className="flex flex-wrap gap-1">
-                              {testCase.requirementIds && testCase.requirementIds.length > 0 ? (
-                                testCase.requirementIds.map(reqId => (
-                                  <span key={reqId} className="inline-flex px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded">
-                                    {reqId}
-                                  </span>
-                                ))
-                              ) : (
-                                <span className="text-xs text-gray-400 italic">No requirements linked</span>
-                              )}
-                            </div>
-                          </td>
-                        )}
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {testCase.lastExecuted ? (
-                            <div>
-                              <div>{new Date(testCase.lastExecuted).toLocaleDateString()}</div>
-                              <div className="text-xs">{testCase.executionTime}</div>
-                            </div>
-                          ) : (
-                            <span className="text-gray-400">Never</span>
-                          )}
+                          <div className="text-sm text-gray-900">
+                            {testCase.requirementIds && testCase.requirementIds.length > 0 ? (
+                              <span className="flex items-center text-green-600">
+                                <Link size={14} className="mr-1" />
+                                {testCase.requirementIds.length}
+                              </span>
+                            ) : (
+                              <span className="flex items-center text-gray-400">
+                                <Unlink size={14} className="mr-1" />
+                                None
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                          <div className="flex items-center space-x-2">
-                            <button 
+                          <div className="flex space-x-2">
+                            <button
                               onClick={() => handleExecuteTestCase(testCase)}
-                              className="text-blue-600 hover:text-blue-900"
-                              title="Execute test case"
+                              className="text-green-600 hover:text-green-900"
+                              title="Execute Test"
                             >
                               <Play size={16} />
                             </button>
-                            <button 
+                            <button
                               onClick={() => handleEditTestCase(testCase)}
-                              className="text-gray-600 hover:text-gray-900"
-                              title="Edit test case"
+                              className="text-blue-600 hover:text-blue-900"
+                              title="Edit Test Case"
                             >
                               <Edit size={16} />
                             </button>
-                            <button 
+                            <button
                               onClick={() => handleDeleteTestCase(testCase.id)}
                               className="text-red-600 hover:text-red-900"
-                              title="Delete test case"
+                              title="Delete Test Case"
                             >
                               <Trash2 size={16} />
                             </button>
                           </div>
                         </td>
                       </tr>
+                      
+                      {/* Expanded Row Details */}
                       {expandedRows.has(testCase.id) && (
                         <tr>
-                          <td colSpan={requirements.length > 0 ? "8" : "7"} className="px-6 py-4 bg-gray-50">
-                            <div className="space-y-3">
+                          <td colSpan="7" className="px-6 py-4 bg-gray-50">
+                            <div className="space-y-4">
                               <div>
-                                <h4 className="text-sm font-medium text-gray-900 mb-1">Description</h4>
-                                <p className="text-sm text-gray-700">{testCase.description || 'No description available'}</p>
+                                <h4 className="font-medium text-gray-900">Description</h4>
+                                <p className="text-sm text-gray-600">{testCase.description || 'No description provided'}</p>
                               </div>
-                              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                              
+                              {testCase.steps && testCase.steps.length > 0 && (
                                 <div>
-                                  <h4 className="text-sm font-medium text-gray-900 mb-1">Version</h4>
-                                  <p className="text-sm text-gray-700">{testCase.version || 'Not specified'}</p>
+                                  <h4 className="font-medium text-gray-900">Test Steps</h4>
+                                  <ol className="list-decimal list-inside text-sm text-gray-600 space-y-1">
+                                    {testCase.steps.map((step, index) => (
+                                      <li key={index}>{step}</li>
+                                    ))}
+                                  </ol>
                                 </div>
+                              )}
+                              
+                              {testCase.expectedResult && (
                                 <div>
-                                  <h4 className="text-sm font-medium text-gray-900 mb-1">Assignee</h4>
-                                  <p className="text-sm text-gray-700">{testCase.assignee || 'Not assigned'}</p>
+                                  <h4 className="font-medium text-gray-900">Expected Result</h4>
+                                  <p className="text-sm text-gray-600">{testCase.expectedResult}</p>
                                 </div>
+                              )}
+                              
+                              {testCase.tags && testCase.tags.length > 0 && (
                                 <div>
-                                  <h4 className="text-sm font-medium text-gray-900 mb-1">Tags</h4>
-                                  <div className="flex flex-wrap gap-1">
-                                    {testCase.tags && testCase.tags.length > 0 ? (
-                                      testCase.tags.map(tag => (
-                                        <span key={tag} className="inline-flex px-2 py-1 text-xs bg-gray-200 text-gray-700 rounded">
-                                          {tag}
-                                        </span>
-                                      ))
-                                    ) : (
-                                      <span className="text-xs text-gray-500 italic">No tags</span>
-                                    )}
+                                  <h4 className="font-medium text-gray-900">Tags</h4>
+                                  <div className="flex flex-wrap gap-2">
+                                    {testCase.tags.map((tag, index) => (
+                                      <span key={index} className="inline-flex px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded">
+                                        {tag}
+                                      </span>
+                                    ))}
                                   </div>
                                 </div>
-                                {requirements.length > 0 && (
-                                  <div>
-                                    <h4 className="text-sm font-medium text-gray-900 mb-1">Requirements</h4>
-                                    <div className="space-y-1">
-                                      {testCase.requirementIds && testCase.requirementIds.length > 0 ? (
-                                        testCase.requirementIds.map(reqId => {
-                                          const req = requirements.find(r => r.id === reqId);
-                                          return (
-                                            <div key={reqId} className="text-sm text-gray-700">
-                                              <span className="font-medium">{reqId}</span>
-                                              {req && <span className="text-gray-500"> - {req.name}</span>}
-                                            </div>
-                                          );
-                                        })
-                                      ) : (
-                                        <p className="text-sm text-gray-500 italic">Not linked to any requirements</p>
-                                      )}
-                                    </div>
-                                  </div>
-                                )}
+                              )}
+                              
+                              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                                <div>
+                                  <span className="font-medium text-gray-900">Version:</span>
+                                  <span className="ml-1 text-gray-600">{testCase.version || 'N/A'}</span>
+                                </div>
+                                <div>
+                                  <span className="font-medium text-gray-900">Assignee:</span>
+                                  <span className="ml-1 text-gray-600">{testCase.assignee || 'Unassigned'}</span>
+                                </div>
+                                <div>
+                                  <span className="font-medium text-gray-900">Duration:</span>
+                                  <span className="ml-1 text-gray-600">{testCase.estimatedDuration || 'N/A'} min</span>
+                                </div>
+                                <div>
+                                  <span className="font-medium text-gray-900">Last Executed:</span>
+                                  <span className="ml-1 text-gray-600">
+                                    {testCase.lastExecuted ? new Date(testCase.lastExecuted).toLocaleDateString() : 'Never'}
+                                  </span>
+                                </div>
                               </div>
                             </div>
                           </td>
@@ -652,35 +605,19 @@ const TestCases = () => {
                 </tbody>
               </table>
             </div>
-
-            {filteredTestCases.length === 0 && (
-              <div className="text-center py-12">
-                <div className="text-gray-500">
-                  <Clock className="mx-auto h-12 w-12 mb-4" />
-                  <h3 className="text-lg font-medium mb-2">No test cases found</h3>
-                  <p>Try adjusting your filters or import some test cases to get started.</p>
-                </div>
-              </div>
-            )}
           </div>
 
-          {/* Mode Description - Only show if requirements exist */}
-          {requirements.length > 0 && (
-            <div className="bg-blue-50 p-4 rounded-lg">
-              <h3 className="text-sm font-medium text-blue-900 mb-2">Current View Mode: {traceabilityMode}</h3>
+          {/* Traceability Mode Info */}
+          {traceabilityMode !== 'standalone' && (
+            <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
               {traceabilityMode === 'linked' && (
                 <p className="text-sm text-blue-800">
-                  Showing only test cases that are linked to requirements. Use this mode to focus on requirement coverage and traceability analysis.
+                  Showing only test cases that are linked to requirements. Use this mode to focus on traced test cases.
                 </p>
               )}
               {traceabilityMode === 'unlinked' && (
                 <p className="text-sm text-blue-800">
                   Showing only test cases that are NOT linked to any requirements. Use this mode to identify orphaned test cases that may need requirement mapping.
-                </p>
-              )}
-              {traceabilityMode === 'standalone' && (
-                <p className="text-sm text-blue-800">
-                  Showing all test cases regardless of requirement linkage. Use this mode for comprehensive test case management without focusing on traceability.
                 </p>
               )}
             </div>
@@ -727,7 +664,7 @@ const TestCases = () => {
   );
 };
 
-// Test Case Edit Modal Component
+// FIXED Test Case Edit Modal Component with proper scrolling layout
 const TestCaseEditModal = ({ testCase, requirements, onSave, onCancel }) => {
   const [formData, setFormData] = useState(testCase);
   const [selectedRequirements, setSelectedRequirements] = useState(new Set(testCase.requirementIds || []));
@@ -740,6 +677,14 @@ const TestCaseEditModal = ({ testCase, requirements, onSave, onCancel }) => {
       requirementIds: Array.from(selectedRequirements),
       tags: formData.tags || []
     });
+  };
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
   };
 
   const toggleRequirement = (reqId) => {
@@ -770,300 +715,577 @@ const TestCaseEditModal = ({ testCase, requirements, onSave, onCancel }) => {
   };
 
   return (
-    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-      <div className="relative top-10 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white">
-        <form onSubmit={handleSubmit}>
-          <div className="mb-4">
-            <h3 className="text-lg font-medium text-gray-900">
-              {testCase.id ? 'Edit Test Case' : 'New Test Case'}
-            </h3>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Test Case Name *
-              </label>
+    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg shadow-lg w-full max-w-2xl max-h-screen flex flex-col">
+        {/* Fixed Header */}
+        <div className="p-6 pb-4 border-b border-gray-200">
+          <h3 className="text-xl font-semibold">
+            {testCase.id ? 'Edit Test Case' : 'Create New Test Case'}
+          </h3>
+        </div>
+        
+        {/* Scrollable Form Content */}
+        <div className="flex-1 overflow-y-auto p-6 pt-4">
+          <form onSubmit={handleSubmit} id="test-case-form">
+            {/* ID Field */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">ID</label>
               <input
                 type="text"
-                required
-                value={formData.name}
-                onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                name="id"
+                value={formData.id || ''}
+                onChange={handleChange}
+                className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder={!formData.id ? "Auto-generated" : ""}
+                disabled={!!formData.id}
               />
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Priority
-              </label>
-              <select
-                value={formData.priority}
-                onChange={(e) => setFormData(prev => ({ ...prev, priority: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-              >
-                <option value="Low">Low</option>
-                <option value="Medium">Medium</option>
-                <option value="High">High</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Description
-            </label>
-            <textarea
-              value={formData.description || ''}
-              onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-              rows={3}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-            />
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Status
-              </label>
-              <select
-                value={formData.status}
-                onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-              >
-                <option value="Not Run">Not Run</option>
-                <option value="Passed">Passed</option>
-                <option value="Failed">Failed</option>
-                <option value="Blocked">Blocked</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Automation Status
-              </label>
-              <select
-                value={formData.automationStatus}
-                onChange={(e) => setFormData(prev => ({ ...prev, automationStatus: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-              >
-                <option value="Manual">Manual</option>
-                <option value="Planned">Planned</option>
-                <option value="Automated">Automated</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Version
-              </label>
-              <input
-                type="text"
-                value={formData.version || ''}
-                onChange={(e) => setFormData(prev => ({ ...prev, version: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                placeholder="e.g., v1.0"
-              />
-            </div>
-          </div>
-
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Assignee
-            </label>
-            <input
-              type="email"
-              value={formData.assignee || ''}
-              onChange={(e) => setFormData(prev => ({ ...prev, assignee: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-              placeholder="assignee@company.com"
-            />
-          </div>
-
-          {/* Only show requirements section if requirements exist */}
-          {requirements.length > 0 && (
+            {/* Name Field */}
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Requirements Linkage
+                Name <span className="text-red-500">*</span>
               </label>
-              <div className="border border-gray-300 rounded-md p-3 max-h-32 overflow-y-auto">
-                {requirements.map(req => (
-                  <label key={req.id} className="flex items-center mb-2 last:mb-0">
-                    <input
-                      type="checkbox"
-                      checked={selectedRequirements.has(req.id)}
-                      onChange={() => toggleRequirement(req.id)}
-                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 mr-2"
-                    />
-                    <span className="text-sm">
-                      <span className="font-medium">{req.id}</span> - {req.name}
-                    </span>
-                  </label>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Tags
-            </label>
-            <div className="flex flex-wrap gap-2 mb-2">
-              {(formData.tags || []).map(tag => (
-                <span key={tag} className="inline-flex items-center px-2 py-1 text-xs bg-gray-200 text-gray-700 rounded">
-                  {tag}
-                  <button
-                    type="button"
-                    onClick={() => removeTag(tag)}
-                    className="ml-1 text-gray-500 hover:text-gray-700"
-                  >
-                    ×
-                  </button>
-                </span>
-              ))}
-            </div>
-            <div className="flex">
               <input
                 type="text"
-                value={tagInput}
-                onChange={(e) => setTagInput(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addTag())}
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-l-md focus:ring-blue-500 focus:border-blue-500"
-                placeholder="Add tag"
+                name="name"
+                value={formData.name || ''}
+                onChange={handleChange}
+                className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                required
+                placeholder="Enter test case name"
               />
-              <button
-                type="button"
-                onClick={addTag}
-                className="px-4 py-2 bg-gray-600 text-white rounded-r-md hover:bg-gray-700"
-              >
-                Add
-              </button>
             </div>
-          </div>
 
-          <div className="flex justify-end space-x-3">
+            {/* Description Field */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Description <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                name="description"
+                value={formData.description || ''}
+                onChange={handleChange}
+                className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                rows="3"
+                required
+                placeholder="Enter test case description"
+              />
+            </div>
+
+            {/* Status and Priority */}
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                <select
+                  name="status"
+                  value={formData.status || 'Not Run'}
+                  onChange={handleChange}
+                  className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="Not Run">Not Run</option>
+                  <option value="Pass">Pass</option>
+                  <option value="Fail">Fail</option>
+                  <option value="Blocked">Blocked</option>
+                  <option value="Skip">Skip</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Priority</label>
+                <select
+                  name="priority"
+                  value={formData.priority || 'Medium'}
+                  onChange={handleChange}
+                  className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="High">High</option>
+                  <option value="Medium">Medium</option>
+                  <option value="Low">Low</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Automation Status and Version */}
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Automation Status</label>
+                <select
+                  name="automationStatus"
+                  value={formData.automationStatus || 'Manual'}
+                  onChange={handleChange}
+                  className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="Manual">Manual</option>
+                  <option value="Automated">Automated</option>
+                  <option value="Semi-Automated">Semi-Automated</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Version</label>
+                <input
+                  type="text"
+                  name="version"
+                  value={formData.version || ''}
+                  onChange={handleChange}
+                  className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="e.g., v1.0"
+                />
+              </div>
+            </div>
+
+            {/* Assignee */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Assignee</label>
+              <input
+                type="text"
+                name="assignee"
+                value={formData.assignee || ''}
+                onChange={handleChange}
+                className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Enter assignee name"
+              />
+            </div>
+
+            {/* Test Steps */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Test Steps</label>
+              <textarea
+                name="steps"
+                value={Array.isArray(formData.steps) ? formData.steps.join('\n') : (formData.steps || '')}
+                onChange={(e) => setFormData(prev => ({
+                  ...prev,
+                  steps: e.target.value.split('\n').filter(step => step.trim())
+                }))}
+                className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                rows="4"
+                placeholder="Enter test steps (one per line)"
+              />
+            </div>
+
+            {/* Expected Result */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Expected Result</label>
+              <textarea
+                name="expectedResult"
+                value={formData.expectedResult || ''}
+                onChange={handleChange}
+                className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                rows="2"
+                placeholder="Enter expected result"
+              />
+            </div>
+
+            {/* Estimated Duration */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Estimated Duration (minutes)</label>
+              <input
+                type="number"
+                name="estimatedDuration"
+                value={formData.estimatedDuration || ''}
+                onChange={handleChange}
+                className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                min="1"
+                placeholder="Enter estimated duration in minutes"
+              />
+            </div>
+
+            {/* Linked Requirements */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">Linked Requirements</label>
+              <div className="border rounded p-3 max-h-40 overflow-y-auto bg-gray-50">
+                {requirements && requirements.length > 0 ? (
+                  requirements.map(req => (
+                    <label key={req.id} className="flex items-center mb-2">
+                      <input
+                        type="checkbox"
+                        checked={selectedRequirements.has(req.id)}
+                        onChange={() => toggleRequirement(req.id)}
+                        className="mr-2"
+                      />
+                      <span className="text-sm">
+                        <strong>{req.id}</strong>: {req.name}
+                      </span>
+                    </label>
+                  ))
+                ) : (
+                  <p className="text-sm text-gray-500">No requirements available</p>
+                )}
+              </div>
+            </div>
+
+            {/* Tags Section */}
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 mb-2">Tags</label>
+              <div className="flex flex-wrap gap-2 mb-2 min-h-[2rem]">
+                {(formData.tags || []).length > 0 ? (
+                  (formData.tags || []).map((tag, index) => (
+                    <div key={index} className="inline-flex items-center bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">
+                      {tag}
+                      <button
+                        type="button"
+                        onClick={() => removeTag(tag)}
+                        className="ml-1 text-blue-600 hover:text-blue-800 font-bold"
+                        title="Remove tag"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))
+                ) : (
+                  <span className="text-xs text-gray-400 italic">No tags added</span>
+                )}
+              </div>
+              <div className="flex">
+                <input
+                  type="text"
+                  value={tagInput}
+                  onChange={(e) => setTagInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      addTag();
+                    }
+                  }}
+                  placeholder="Add a tag..."
+                  className="flex-1 p-2 border border-r-0 rounded-l focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+                <button
+                  type="button"
+                  onClick={addTag}
+                  disabled={!tagInput.trim()}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-r hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                >
+                  Add
+                </button>
+              </div>
+              <p className="text-xs text-gray-500 mt-1">Press Enter or click Add to add a tag</p>
+            </div>
+          </form>
+        </div>
+        
+        {/* Fixed Footer with Action Buttons */}
+        <div className="flex-shrink-0 p-6 pt-4 border-t border-gray-200 bg-gray-50">
+          <div className="flex justify-end gap-3">
             <button
               type="button"
               onClick={onCancel}
-              className="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400"
+              className="px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-50 focus:ring-2 focus:ring-gray-500"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+              form="test-case-form"
+              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 focus:ring-2 focus:ring-blue-500"
             >
               {testCase.id ? 'Update' : 'Create'} Test Case
             </button>
           </div>
-        </form>
+        </div>
       </div>
     </div>
   );
 };
 
-// Test Execution Modal Component
+// Test Execution Modal Component with Live Status and Cancel Capability
 const TestExecutionModal = ({ testCases, onComplete, onCancel }) => {
   const [executing, setExecuting] = useState(false);
-  const [currentTest, setCurrentTest] = useState(0);
-  const [results, setResults] = useState([]);
+  const [cancelled, setCancelled] = useState(false);
+  const [currentTestIndex, setCurrentTestIndex] = useState(-1);
+  const [testResults, setTestResults] = useState([]);
+  const [executionStarted, setExecutionStarted] = useState(false);
+  const [completedTests, setCompletedTests] = useState(0);
 
+  // Initialize test results with "Not Started" status
+  useEffect(() => {
+    const initialResults = testCases.map(testCase => ({
+      id: testCase.id,
+      name: testCase.name,
+      status: 'Not Started',
+      duration: 0,
+      startTime: null,
+      endTime: null
+    }));
+    setTestResults(initialResults);
+  }, [testCases]);
+
+  // Execute tests sequentially with live updates
   const executeTests = async () => {
+    if (cancelled) return;
+    
     setExecuting(true);
-    const newResults = [];
+    setExecutionStarted(true);
+    setCompletedTests(0);
 
     for (let i = 0; i < testCases.length; i++) {
-      setCurrentTest(i);
+      if (cancelled) {
+        // Mark remaining tests as cancelled
+        setTestResults(prev => prev.map((result, index) => 
+          index >= i ? { ...result, status: 'Cancelled' } : result
+        ));
+        break;
+      }
+
+      setCurrentTestIndex(i);
       
-      // Simulate test execution
-      await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 2000));
+      // Update status to "Running"
+      setTestResults(prev => prev.map((result, index) => 
+        index === i ? { 
+          ...result, 
+          status: 'Running', 
+          startTime: new Date().toISOString() 
+        } : result
+      ));
+
+      // Simulate test execution time (1-4 seconds)
+      const executionTime = 1000 + Math.random() * 3000;
+      await new Promise(resolve => setTimeout(resolve, executionTime));
+
+      if (cancelled) {
+        setTestResults(prev => prev.map((result, index) => 
+          index === i ? { ...result, status: 'Cancelled' } : result
+        ));
+        break;
+      }
+
+      // Generate random result (70% pass rate)
+      const passed = Math.random() > 0.3;
+      const endTime = new Date().toISOString();
       
-      const result = {
-        testCaseId: testCases[i].id,
-        status: Math.random() > 0.3 ? 'Passed' : 'Failed',
-        executionTime: `${(Math.random() * 5 + 0.5).toFixed(1)}s`
-      };
-      
-      newResults.push(result);
-      setResults([...newResults]);
+      // Update with final result
+      setTestResults(prev => prev.map((result, index) => 
+        index === i ? {
+          ...result,
+          status: passed ? 'Pass' : 'Fail',
+          duration: Math.round(executionTime),
+          endTime: endTime
+        } : result
+      ));
+
+      setCompletedTests(i + 1);
     }
 
     setExecuting(false);
-    setTimeout(() => onComplete(newResults), 1500);
+    setCurrentTestIndex(-1);
+
+    // Auto-close after showing results for 3 seconds (unless cancelled)
+    if (!cancelled) {
+      setTimeout(() => {
+        const finalResults = testResults.map(result => ({
+          testCaseId: result.id,
+          status: result.status,
+          duration: result.duration
+        }));
+        onComplete(finalResults);
+      }, 3000);
+    }
   };
 
+  // Start execution when modal opens
   useEffect(() => {
-    executeTests();
-  }, []);
+    if (testCases.length > 0 && !executionStarted) {
+      // Small delay to show the initial state
+      setTimeout(() => {
+        executeTests();
+      }, 500);
+    }
+  }, [testCases, executionStarted]);
 
-  const passedCount = results.filter(r => r.status === 'Passed').length;
-  const failedCount = results.filter(r => r.status === 'Failed').length;
+  // Handle cancellation
+  const handleCancel = () => {
+    setCancelled(true);
+    setExecuting(false);
+    setCurrentTestIndex(-1);
+  };
+
+  // Calculate progress
+  const progress = testCases.length > 0 ? (completedTests / testCases.length) * 100 : 0;
+  
+  // Add progress logging and test results logging
+  useEffect(() => {
+    console.log('📊 Progress calculation:', {
+      completedTests,
+      totalTests: testCases.length,
+      progress: Math.round(progress),
+      cancelled,
+      executing
+    });
+  }, [completedTests, testCases.length, progress, cancelled, executing]);
+
+  // Log test results changes with detailed status info
+  useEffect(() => {
+    console.log('📋 Test results updated:', testResults.map(r => ({ 
+      id: r.id, 
+      status: r.status, 
+      duration: r.duration,
+      startTime: r.startTime ? 'set' : 'null',
+      endTime: r.endTime ? 'set' : 'null'
+    })));
+  }, [testResults]);
+
+  // Get status icon and color for each test
+  const getStatusDisplay = (status) => {
+    switch (status) {
+      case 'Not Started':
+        return { icon: Clock, color: 'text-gray-400', bgColor: 'bg-gray-100' };
+      case 'Running':
+        return { icon: 'spinner', color: 'text-blue-600', bgColor: 'bg-blue-100' };
+      case 'Pass':
+        return { icon: CheckCircle, color: 'text-green-600', bgColor: 'bg-green-100' };
+      case 'Fail':
+        return { icon: XCircle, color: 'text-red-600', bgColor: 'bg-red-100' };
+      case 'Cancelled':
+        return { icon: Pause, color: 'text-orange-600', bgColor: 'bg-orange-100' };
+      default:
+        return { icon: Clock, color: 'text-gray-400', bgColor: 'bg-gray-100' };
+    }
+  };
 
   return (
-    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-      <div className="relative top-10 mx-auto p-5 border w-full max-w-lg shadow-lg rounded-md bg-white">
-        <div className="text-center">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">
-            Test Execution
+    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg shadow-lg w-full max-w-2xl max-h-screen flex flex-col">
+        {/* Fixed Header */}
+        <div className="p-6 pb-4 border-b border-gray-200">
+          <h3 className="text-xl font-semibold text-gray-900">
+            Test Execution {cancelled ? '(Cancelled)' : executing ? '(Running)' : '(Complete)'}
           </h3>
-
-          {executing ? (
-            <div className="mb-4">
-              <div className="text-sm text-gray-600 mb-2">
-                Executing test {currentTest + 1} of {testCases.length}
-              </div>
-              <div className="text-sm font-medium mb-2">
-                {testCases[currentTest]?.name}
-              </div>
-              <div className="w-full bg-gray-200 rounded-full h-2">
-                <div 
-                  className="bg-blue-600 h-2 rounded-full transition-all duration-300" 
-                  style={{ width: `${((currentTest + 1) / testCases.length) * 100}%` }}
-                />
-              </div>
+          
+          {/* Progress Bar */}
+          <div className="mt-4">
+            <div className="flex justify-between text-sm text-gray-600 mb-2">
+              <span>Progress: {completedTests} of {testCases.length} tests</span>
+              <span>{Math.round(progress)}%</span>
             </div>
-          ) : (
-            <div className="mb-4">
-              <div className="text-lg font-semibold text-green-600 mb-2">
-                Execution Complete!
-              </div>
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div className="bg-green-100 p-2 rounded">
-                  <div className="font-semibold text-green-800">{passedCount}</div>
-                  <div className="text-green-600">Passed</div>
-                </div>
-                <div className="bg-red-100 p-2 rounded">
-                  <div className="font-semibold text-red-800">{failedCount}</div>
-                  <div className="text-red-600">Failed</div>
-                </div>
-              </div>
+            <div className="w-full bg-gray-200 rounded-full h-2">
+              <div 
+                className={`h-2 rounded-full transition-all duration-300 ${
+                  cancelled ? 'bg-orange-500' : executing ? 'bg-blue-600' : 'bg-green-500'
+                }`}
+                style={{ width: `${progress}%` }}
+              ></div>
             </div>
-          )}
-
-          <div className="space-y-2 mb-4 max-h-64 overflow-y-auto">
-            {results.map((result, index) => (
-              <div key={result.testCaseId} className="flex justify-between items-center text-sm">
-                <span className="text-left">{testCases[index]?.name}</span>
-                <div className="flex items-center space-x-2">
-                  <span className="text-gray-500">{result.executionTime}</span>
-                  <span className={`px-2 py-1 rounded text-xs ${
-                    result.status === 'Passed' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                  }`}>
-                    {result.status}
-                  </span>
-                </div>
+            {cancelled && (
+              <div className="text-xs text-orange-600 mt-1 font-medium">
+                Execution cancelled at {Math.round(progress)}%
               </div>
-            ))}
+            )}
           </div>
+        </div>
 
-          {!executing && (
-            <button
-              onClick={onCancel}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-            >
-              Close
-            </button>
-          )}
+        {/* Scrollable Test Results */}
+        <div className="flex-1 overflow-y-auto p-6 pt-4">
+          <div className="space-y-3">
+            {testResults.map((result, index) => {
+              const statusDisplay = getStatusDisplay(result.status);
+              const StatusIcon = statusDisplay.icon;
+              const isCurrentTest = index === currentTestIndex;
+              
+              return (
+                <div 
+                  key={result.id}
+                  className={`p-4 rounded-lg border transition-all duration-200 ${
+                    isCurrentTest 
+                      ? 'border-blue-300 bg-blue-50 shadow-md' 
+                      : 'border-gray-200 bg-white'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className={`p-2 rounded-full ${statusDisplay.bgColor}`}>
+                        {StatusIcon === 'spinner' ? (
+                          <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                        ) : (
+                          <StatusIcon className={`w-4 h-4 ${statusDisplay.color}`} />
+                        )}
+                      </div>
+                      <div>
+                        <div className="font-medium text-gray-900">{result.id}</div>
+                        <div className="text-sm text-gray-600 truncate max-w-md">{result.name}</div>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center space-x-4 text-sm">
+                      {result.duration > 0 && (
+                        <span className="text-gray-500">
+                          {(result.duration / 1000).toFixed(1)}s
+                        </span>
+                      )}
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                        result.status === 'Pass' ? 'bg-green-100 text-green-800' :
+                        result.status === 'Fail' ? 'bg-red-100 text-red-800' :
+                        result.status === 'Running' ? 'bg-blue-100 text-blue-800' :
+                        result.status === 'Cancelled' ? 'bg-orange-100 text-orange-800' :
+                        'bg-gray-100 text-gray-800'
+                      }`}>
+                        {result.status}
+                      </span>
+                    </div>
+                  </div>
+                  
+                  {isCurrentTest && executing && (
+                    <div className="mt-2 text-xs text-blue-600 font-medium">
+                      Currently executing...
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Fixed Footer */}
+        <div className="flex-shrink-0 p-6 pt-4 border-t border-gray-200 bg-gray-50">
+          <div className="flex justify-between items-center">
+            <div className="text-sm text-gray-600">
+              {executing ? (
+                <span className="flex items-center">
+                  <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mr-2"></div>
+                  Execution in progress...
+                </span>
+              ) : cancelled ? (
+                <span className="text-orange-600">Execution cancelled</span>
+              ) : (
+                <span className="text-green-600">Execution completed</span>
+              )}
+            </div>
+            
+            <div className="flex gap-3">
+              {executing ? (
+                <button
+                  onClick={handleCancel}
+                  className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 focus:ring-2 focus:ring-red-500"
+                >
+                  Cancel Execution
+                </button>
+              ) : (
+                <>
+                  <button
+                    onClick={onCancel}
+                    className="px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-50 focus:ring-2 focus:ring-gray-500"
+                  >
+                    Close
+                  </button>
+                  {!cancelled && (
+                    <button
+                      onClick={() => {
+                        const finalResults = testResults
+                          .filter(result => result.status === 'Pass' || result.status === 'Fail')
+                          .map(result => ({
+                            testCaseId: result.id,
+                            status: result.status,
+                            duration: result.duration
+                          }));
+                        onComplete(finalResults);
+                      }}
+                      className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 focus:ring-2 focus:ring-blue-500"
+                    >
+                      Apply Results
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </div>
