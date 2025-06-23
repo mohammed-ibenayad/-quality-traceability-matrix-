@@ -282,22 +282,13 @@ const TestCases = () => {
             <div className="flex items-center space-x-3">
               <button 
                 onClick={handleNewTestCase}
-                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center"
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center"
               >
                 <Plus className="mr-2" size={16} />
-                New Test Case
-              </button>
-              <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center">
-                <Upload className="mr-2" size={16} />
-                Import
-              </button>
-              <button className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 flex items-center">
-                <Download className="mr-2" size={16} />
-                Export
+                Add
               </button>
             </div>
           </div>
-
           {/* Summary Cards */}
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
             <div className="bg-white p-4 rounded-lg shadow">
