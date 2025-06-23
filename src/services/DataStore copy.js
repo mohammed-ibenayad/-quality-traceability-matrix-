@@ -1,4 +1,4 @@
-// src/services/DataStore.js - Original with ONLY hasData() fix
+// src/services/DataStore.js - Enhanced with full test case management
 
 import defaultRequirements from '../data/requirements';
 import defaultTestCases from '../data/testcases';
@@ -23,26 +23,9 @@ class DataStoreService {
   
   /**
    * Check if there is any data in the system
-   * FIXED: Now checks for either requirements OR test cases
    * @returns {boolean} True if there is data, false otherwise
    */
   hasData() {
-    return this._requirements.length > 0 || this._testCases.length > 0;
-  }
-
-  /**
-   * Check if there are test cases in the system
-   * @returns {boolean} True if there are test cases
-   */
-  hasTestCases() {
-    return this._testCases.length > 0;
-  }
-
-  /**
-   * Check if there are requirements in the system  
-   * @returns {boolean} True if there are requirements
-   */
-  hasRequirements() {
     return this._requirements.length > 0;
   }
   
@@ -377,6 +360,118 @@ class DataStoreService {
   }
 
   /**
+   * Add a new requirement
+   * @param {Object} requirementData - Requirement data
+   * @returns {Object} Created requirement
+   */
+  addRequirement(requirementData) {
+    if (!requirementData || typeof requirementData !== 'object') {
+      throw new Error('Requirement data must be an object');
+    }
+
+    // Validate required fields
+    if (!requirementData.name) {
+      throw new Error('Requirement name is required');
+    }
+
+    // Generate ID if not provided
+    let requirementId = requirementData.id;
+    if (!requirementId) {
+      const maxNum = this._requirements
+        .map(req => req.id.match(/REQ-(\d+)/))
+        .filter(match => match)
+        .map(match => parseInt(match[1]))
+        .reduce((max, num) => Math.max(max, num), 0);
+      requirementId = `REQ-${String(maxNum + 1).padStart(3, '0')}`;
+    }
+
+    // Check for duplicate ID
+    if (this._requirements.find(req => req.id === requirementId)) {
+      throw new Error(`Requirement with ID ${requirementId} already exists`);
+    }
+
+    // Process the requirement data to add calculated fields
+    const processed = this.processRequirements([{
+      ...requirementData,
+      id: requirementId
+    }])[0];
+    
+    // Add the requirement
+    this._requirements.push(processed);
+    
+    // Mark data as initialized
+    this._hasInitializedData = true;
+    
+    // Notify listeners of data change
+    this._notifyListeners();
+    
+    return processed;
+  }
+  
+  /**
+   * Update an existing requirement
+   * @param {string} requirementId - ID of the requirement to update
+   * @param {Object} updateData - Data to update
+   * @returns {Object} Updated requirement
+   */
+  updateRequirement(requirementId, updateData) {
+    const index = this._requirements.findIndex(req => req.id === requirementId);
+    
+    if (index === -1) {
+      throw new Error(`Requirement with ID ${requirementId} not found`);
+    }
+
+    // Update the requirement
+    const updatedRequirement = {
+      ...this._requirements[index],
+      ...updateData,
+      id: requirementId // Ensure ID doesn't change
+    };
+
+    // Process to recalculate fields if needed
+    const processed = this.processRequirements([updatedRequirement])[0];
+    this._requirements[index] = processed;
+    
+    // Notify listeners of data change
+    this._notifyListeners();
+    
+    return processed;
+  }
+  
+  /**
+   * Delete a requirement
+   * @param {string} reqId - ID of the requirement to delete
+   * @returns {boolean} True if successful
+   */
+  deleteRequirement(reqId) {
+    const index = this._requirements.findIndex(req => req.id === reqId);
+    
+    if (index === -1) {
+      throw new Error(`Requirement with ID ${reqId} not found`);
+    }
+    
+    // Remove the requirement
+    this._requirements.splice(index, 1);
+    
+    // Remove related mappings
+    if (this._mapping[reqId]) {
+      delete this._mapping[reqId];
+    }
+    
+    // Remove requirement from test cases
+    this._testCases.forEach(tc => {
+      if (tc.requirementIds && tc.requirementIds.includes(reqId)) {
+        tc.requirementIds = tc.requirementIds.filter(id => id !== reqId);
+      }
+    });
+    
+    // Notify listeners of data change
+    this._notifyListeners();
+    
+    return true;
+  }
+
+  /**
    * Get requirement-test mapping
    * @returns {Object} Mapping between requirements and test cases
    */
@@ -390,6 +485,81 @@ class DataStoreService {
    */
   getVersions() {
     return [...this._versions];
+  }
+
+  /**
+   * Add a new version
+   * @param {Object} versionData - Version data
+   * @returns {Object} Created version
+   */
+  addVersion(versionData) {
+    if (!versionData || typeof versionData !== 'object') {
+      throw new Error('Version data must be an object');
+    }
+
+    if (!versionData.id) {
+      throw new Error('Version ID is required');
+    }
+
+    // Check for duplicate ID
+    if (this._versions.find(v => v.id === versionData.id)) {
+      throw new Error(`Version with ID ${versionData.id} already exists`);
+    }
+
+    const newVersion = {
+      id: versionData.id,
+      name: versionData.name || versionData.id,
+      description: versionData.description || '',
+      status: versionData.status || 'Planned',
+      createdAt: versionData.createdAt || new Date().toISOString(),
+      ...versionData
+    };
+
+    this._versions.push(newVersion);
+    this._notifyListeners();
+    
+    return newVersion;
+  }
+
+  /**
+   * Update a version
+   * @param {string} versionId - Version ID
+   * @param {Object} updateData - Data to update
+   * @returns {Object} Updated version
+   */
+  updateVersion(versionId, updateData) {
+    const index = this._versions.findIndex(v => v.id === versionId);
+    
+    if (index === -1) {
+      throw new Error(`Version with ID ${versionId} not found`);
+    }
+
+    this._versions[index] = {
+      ...this._versions[index],
+      ...updateData,
+      id: versionId // Ensure ID doesn't change
+    };
+    
+    this._notifyListeners();
+    return this._versions[index];
+  }
+
+  /**
+   * Delete a version
+   * @param {string} versionId - Version ID
+   * @returns {boolean} True if successful
+   */
+  deleteVersion(versionId) {
+    const index = this._versions.findIndex(v => v.id === versionId);
+    
+    if (index === -1) {
+      throw new Error(`Version with ID ${versionId} not found`);
+    }
+    
+    this._versions.splice(index, 1);
+    this._notifyListeners();
+    
+    return true;
   }
 
   /**
@@ -580,6 +750,71 @@ class DataStoreService {
     });
     
     return mappings;
+  }
+
+  /**
+   * Import data from multiple sources
+   * @param {Object} data - Object containing requirements, testCases, mappings, etc.
+   * @returns {Object} Status of import operation
+   */
+  importData(data) {
+    const results = {
+      requirements: 0,
+      testCases: 0,
+      mappings: 0,
+      errors: []
+    };
+
+    try {
+      // Import requirements
+      if (data.requirements && Array.isArray(data.requirements)) {
+        this.setRequirements(data.requirements);
+        results.requirements = data.requirements.length;
+      }
+
+      // Import test cases
+      if (data.testCases && Array.isArray(data.testCases)) {
+        this.setTestCases(data.testCases);
+        results.testCases = data.testCases.length;
+        
+        // Extract mappings from test cases if no explicit mapping provided
+        if (!data.mappings && data.testCases.some(tc => tc.requirementIds)) {
+          const extractedMappings = this.extractMappingsFromTestCases(data.testCases);
+          this.updateMappings(extractedMappings);
+          results.mappings = Object.keys(extractedMappings).length;
+        }
+      }
+
+      // Import explicit mappings
+      if (data.mappings && typeof data.mappings === 'object') {
+        this.updateMappings(data.mappings);
+        results.mappings = Object.keys(data.mappings).length;
+      }
+
+      // Import versions
+      if (data.versions && Array.isArray(data.versions)) {
+        this._versions = [...data.versions];
+      }
+
+    } catch (error) {
+      results.errors.push(error.message);
+    }
+
+    return results;
+  }
+
+  /**
+   * Export all data
+   * @returns {Object} All data in the store
+   */
+  exportData() {
+    return {
+      requirements: this.getRequirements(),
+      testCases: this.getTestCases(),
+      mappings: this.getMapping(),
+      versions: this.getVersions(),
+      exportedAt: new Date().toISOString()
+    };
   }
 
   /**
