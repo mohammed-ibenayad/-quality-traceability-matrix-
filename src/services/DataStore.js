@@ -259,6 +259,59 @@ class DataStoreService {
   }
 
   /**
+ * Delete a requirement
+ * @param {string} requirementId - ID of the requirement to delete
+ * @returns {boolean} True if successful
+ */
+deleteRequirement(requirementId) {
+  const index = this._requirements.findIndex(req => req.id === requirementId);
+  
+  if (index === -1) {
+    throw new Error(`Requirement with ID ${requirementId} not found`);
+  }
+
+  const requirement = this._requirements[index];
+
+  // Remove from requirements array
+  this._requirements.splice(index, 1);
+
+  // Clean up mappings - remove any test case mappings to this requirement
+  if (this._mapping[requirementId]) {
+    // For each test case that was mapped to this requirement,
+    // remove this requirement from their requirementIds array
+    const mappedTestCaseIds = this._mapping[requirementId];
+    
+    mappedTestCaseIds.forEach(testCaseId => {
+      const testCase = this._testCases.find(tc => tc.id === testCaseId);
+      if (testCase && testCase.requirementIds) {
+        testCase.requirementIds = testCase.requirementIds.filter(reqId => reqId !== requirementId);
+      }
+    });
+    
+    // Remove the mapping entry
+    delete this._mapping[requirementId];
+  }
+
+  // Also check for any test cases that have this requirement in their requirementIds array
+  // and remove it (defensive cleanup)
+  this._testCases.forEach(testCase => {
+    if (testCase.requirementIds && testCase.requirementIds.includes(requirementId)) {
+      testCase.requirementIds = testCase.requirementIds.filter(reqId => reqId !== requirementId);
+    }
+  });
+
+  // Save to localStorage
+  this._saveToLocalStorage('requirements', this._requirements);
+  this._saveToLocalStorage('testCases', this._testCases);
+  this._saveToLocalStorage('mapping', this._mapping);
+
+  // Notify listeners of data change
+  this._notifyListeners();
+
+  return true;
+}
+
+  /**
    * Process requirements to add calculated fields
    * @param {Array} requirements - Raw requirements data
    * @returns {Array} Processed requirements
