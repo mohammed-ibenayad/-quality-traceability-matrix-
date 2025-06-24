@@ -1,3 +1,4 @@
+// src/components/TraceabilityMatrix/RequirementRow.jsx - Updated to use Unified Modal
 import React, { useState } from 'react';
 import { Play } from 'lucide-react';
 import CoverageIndicator from './CoverageIndicator';
@@ -42,15 +43,12 @@ const RequirementRow = ({ req, coverage, mapping, testCases, expanded, onToggleE
   // Calculate coverage percentage
   const coveragePercentage = coverage ? coverage.coverageRatio : 0;
   
-  // Handle test completion
+  // Handle test completion - Updated for unified modal
   const handleTestComplete = (results) => {
-    // In a real application, this would update the test case statuses in your data store
-    console.log(`Test execution completed for ${req.id}:`, results);
-    
-    // Close the modal after a short delay
-    setTimeout(() => {
-      setIsTestModalOpen(false);
-    }, 2000);
+    console.log(`Test execution completed for requirement ${req.id}:`, results);
+    // The unified modal handles all DataStore updates automatically
+    // Just close the modal
+    setIsTestModalOpen(false);
   };
 
   return (
@@ -128,19 +126,19 @@ const RequirementRow = ({ req, coverage, mapping, testCases, expanded, onToggleE
         <td className="border p-2">
           {coverage ? (
             <div className="flex flex-col">
-              <div className="text-xs mb-1">Pass: {coverage.passPercentage}%</div>
+              <div className="text-xs mb-1">Pass: {coverage.passPercentage || 0}%</div>
               <div className="w-full bg-gray-200 rounded-full h-1.5 mb-2">
                 <div 
                   className="bg-green-600 h-1.5 rounded-full" 
-                  style={{width: `${coverage.passPercentage}%`}}
+                  style={{width: `${coverage.passPercentage || 0}%`}}
                 ></div>
               </div>
               
-              <div className="text-xs mb-1">Auto: {coverage.automationPercentage}%</div>
+              <div className="text-xs mb-1">Auto: {coverage.automationPercentage || 0}%</div>
               <div className="w-full bg-gray-200 rounded-full h-1.5">
                 <div 
                   className="bg-blue-600 h-1.5 rounded-full" 
-                  style={{width: `${coverage.automationPercentage}%`}}
+                  style={{width: `${coverage.automationPercentage || 0}%`}}
                 ></div>
               </div>
             </div>
@@ -149,13 +147,13 @@ const RequirementRow = ({ req, coverage, mapping, testCases, expanded, onToggleE
           )}
         </td>
         
-        {/* Add new column for actions */}
+        {/* Run Tests button */}
         <td className="border p-2 text-center">
           <button
             onClick={() => setIsTestModalOpen(true)}
             className="inline-flex items-center px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 text-xs"
-            disabled={mappedTests.length === 0}
-            title={mappedTests.length === 0 ? "No test cases to run" : "Run tests for this requirement"}
+            disabled={mappedTestObjects.length === 0}
+            title={mappedTestObjects.length === 0 ? "No test cases to run" : "Run tests for this requirement"}
           >
             <Play className="mr-1" size={12} />
             Run Tests
@@ -163,18 +161,17 @@ const RequirementRow = ({ req, coverage, mapping, testCases, expanded, onToggleE
         </td>
       </tr>
       
+      {/* Expanded row details */}
       {expanded && (
         <tr>
-          <td colSpan="8" className="border p-0">
-            <div className="p-3 bg-gray-50">
-              <h4 className="font-medium mb-2">Test Cases for {req.id}: {req.name}</h4>
-              {mappedTests.length === 0 ? (
-                <p className="text-gray-500 italic">No test cases associated with this requirement for the selected version.</p>
-              ) : (
-                <table className="w-full border-collapse text-sm">
+          <td colSpan="8" className="border-l border-r border-b bg-gray-50 p-4">
+            <div className="text-sm">
+              <h4 className="font-medium mb-2">Test Case Details:</h4>
+              {mappedTestObjects.length > 0 ? (
+                <table className="w-full text-xs border-collapse">
                   <thead>
                     <tr className="bg-gray-100">
-                      <th className="border p-1">Test ID</th>
+                      <th className="border p-1">ID</th>
                       <th className="border p-1">Name</th>
                       <th className="border p-1">Status</th>
                       <th className="border p-1">Automation</th>
@@ -182,47 +179,46 @@ const RequirementRow = ({ req, coverage, mapping, testCases, expanded, onToggleE
                     </tr>
                   </thead>
                   <tbody>
-                    {mappedTests.map(tcId => {
-                      const tc = testCases.find(t => t.id === tcId);
-                      return tc ? (
-                        <tr key={tc.id}>
-                          <td className="border p-1">{tc.id}</td>
-                          <td className="border p-1">{tc.name}</td>
-                          <td className="border p-1">
-                            <span className={`inline-block px-2 py-0.5 rounded-full text-xs ${
-                              tc.status === 'Passed' ? 'bg-green-100 text-green-800' : 
-                              tc.status === 'Failed' ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800'
-                            }`}>
-                              {tc.status}
-                            </span>
-                          </td>
-                          <td className="border p-1">
-                            <span className={`inline-block px-2 py-0.5 rounded-full text-xs ${
-                              tc.automationStatus === 'Automated' ? 'bg-blue-100 text-blue-800' : 
-                              tc.automationStatus === 'Planned' ? 'bg-orange-100 text-orange-800' : 'bg-gray-100 text-gray-800'
-                            }`}>
-                              {tc.automationStatus}
-                            </span>
-                          </td>
-                          <td className="border p-1">
-                            <span className="text-xs">
-                              {tc.version || 'All Versions'}
-                            </span>
-                          </td>
-                        </tr>
-                      ) : null;
-                    })}
+                    {mappedTestObjects.map(tc => tc ? (
+                      <tr key={tc.id}>
+                        <td className="border p-1">{tc.id}</td>
+                        <td className="border p-1">{tc.name}</td>
+                        <td className="border p-1">
+                          <span className={`inline-block px-2 py-0.5 rounded-full text-xs ${
+                            tc.status === 'Passed' ? 'bg-green-100 text-green-800' : 
+                            tc.status === 'Failed' ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800'
+                          }`}>
+                            {tc.status}
+                          </span>
+                        </td>
+                        <td className="border p-1">
+                          <span className={`inline-block px-2 py-0.5 rounded-full text-xs ${
+                            tc.automationStatus === 'Automated' ? 'bg-blue-100 text-blue-800' : 
+                            tc.automationStatus === 'Planned' ? 'bg-orange-100 text-orange-800' : 'bg-gray-100 text-gray-800'
+                          }`}>
+                            {tc.automationStatus}
+                          </span>
+                        </td>
+                        <td className="border p-1">
+                          <span className="text-xs">
+                            {tc.version || 'All Versions'}
+                          </span>
+                        </td>
+                      </tr>
+                    ) : null)}
                   </tbody>
                 </table>
+              ) : (
+                <p className="text-gray-500">No test cases linked to this requirement.</p>
               )}
             </div>
           </td>
         </tr>
       )}
       
-      {/* Test Execution Modal */}
+      {/* UNIFIED Test Execution Modal - Same as TestCases page */}
       <TestExecutionModal
-        requirement={req}
+        requirement={req} // Pass the requirement for context
         testCases={mappedTestObjects}
         isOpen={isTestModalOpen}
         onClose={() => setIsTestModalOpen(false)}

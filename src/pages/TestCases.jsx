@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import MainLayout from '../components/Layout/MainLayout';
 import EmptyState from '../components/Common/EmptyState';
+import TestExecutionModal from '../components/TestExecution/TestExecutionModal';
 import { useVersionContext } from '../context/VersionContext';
 import dataStore from '../services/DataStore';
 
@@ -674,16 +675,20 @@ const TestCases = () => {
           </div>
         )}
 
-        {/* Test Execution Modal (ORIGINAL PRESERVED) */}
+        {/* Test Execution Modal - USE UNIFIED COMPONENT */}
         {showExecutionModal && (
           <TestExecutionModal
+            requirement={null} // null for bulk execution from Test Cases page
             testCases={Array.from(selectedTestCases).map(id => filteredTestCases.find(tc => tc.id === id)).filter(Boolean)}
-            onComplete={(results) => {
-              console.log('Test execution results:', results);
+            isOpen={showExecutionModal}
+            onClose={() => {
               setShowExecutionModal(false);
               setSelectedTestCases(new Set());
             }}
-            onCancel={() => {
+            onTestComplete={(results) => {
+              console.log('Test execution completed in TestCases page:', results);
+              // The unified TestExecutionModal handles all DataStore updates
+              // Just clean up UI state here
               setShowExecutionModal(false);
               setSelectedTestCases(new Set());
             }}
@@ -862,199 +867,6 @@ const EditTestCaseModal = ({ testCase, onSave, onCancel }) => {
               </button>
             </div>
           </form>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// Test Execution Modal Component with Live Status and Cancel Capability (ORIGINAL PRESERVED)
-const TestExecutionModal = ({ testCases, onComplete, onCancel }) => {
-  const [executing, setExecuting] = useState(false);
-  const [cancelled, setCancelled] = useState(false);
-  const [currentTestIndex, setCurrentTestIndex] = useState(-1);
-  const [testResults, setTestResults] = useState([]);
-  const [executionStarted, setExecutionStarted] = useState(false);
-  const [completedTests, setCompletedTests] = useState(0);
-
-  // Initialize test results with "Not Started" status
-  useEffect(() => {
-    const initialResults = testCases.map(testCase => ({
-      id: testCase.id,
-      name: testCase.name,
-      status: 'Not Started',
-      duration: 0,
-      startTime: null,
-      endTime: null
-    }));
-    setTestResults(initialResults);
-  }, [testCases]);
-
-  // Execute tests sequentially with live updates
-  const executeTests = async () => {
-    if (cancelled) return;
-    
-    setExecuting(true);
-    setExecutionStarted(true);
-    setCompletedTests(0);
-
-    for (let i = 0; i < testCases.length; i++) {
-      if (cancelled) {
-        // Mark remaining tests as cancelled
-        setTestResults(prev => prev.map((result, index) => 
-          index >= i ? { ...result, status: 'Cancelled' } : result
-        ));
-        break;
-      }
-
-      setCurrentTestIndex(i);
-      
-      // Update status to "Running"
-      setTestResults(prev => prev.map((result, index) => 
-        index === i ? { ...result, status: 'Running', startTime: new Date() } : result
-      ));
-
-      // Simulate test execution with random duration
-      const duration = Math.random() * 3000 + 1000; // 1-4 seconds
-      await new Promise(resolve => setTimeout(resolve, duration));
-
-      if (cancelled) break;
-
-      // Random result (80% pass rate)
-      const passed = Math.random() > 0.2;
-      const status = passed ? 'Passed' : 'Failed';
-
-      // Update final result
-      setTestResults(prev => prev.map((result, index) => 
-        index === i ? { 
-          ...result, 
-          status, 
-          duration: Math.round(duration / 1000),
-          endTime: new Date()
-        } : result
-      ));
-
-      setCompletedTests(i + 1);
-    }
-
-    setExecuting(false);
-    setCurrentTestIndex(-1);
-
-    // Auto-close after 2 seconds if not cancelled
-    if (!cancelled) {
-      setTimeout(() => {
-        onComplete(testResults);
-      }, 2000);
-    }
-  };
-
-  const handleCancel = () => {
-    setCancelled(true);
-    setExecuting(false);
-    onCancel();
-  };
-
-  const getStatusIcon = (status) => {
-    switch (status) {
-      case 'Passed':
-        return <CheckCircle className="text-green-500" size={16} />;
-      case 'Failed':
-        return <XCircle className="text-red-500" size={16} />;
-      case 'Running':
-        return <Clock className="text-blue-500 animate-pulse" size={16} />;
-      case 'Cancelled':
-        return <Pause className="text-gray-500" size={16} />;
-      default:
-        return <Clock className="text-gray-400" size={16} />;
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-      <div className="relative top-20 mx-auto p-5 border w-11/12 max-w-4xl shadow-lg rounded-md bg-white">
-        <div className="mt-3">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-medium text-gray-900">
-              Test Execution - {testCases.length} Test Case(s)
-            </h3>
-            {!executionStarted && (
-              <button
-                onClick={executeTests}
-                className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 focus:ring-2 focus:ring-green-500"
-              >
-                Start Execution
-              </button>
-            )}
-          </div>
-
-          {/* Progress bar */}
-          {executionStarted && (
-            <div className="mb-4">
-              <div className="flex justify-between text-sm text-gray-600 mb-1">
-                <span>Progress: {completedTests}/{testCases.length}</span>
-                <span>{Math.round((completedTests / testCases.length) * 100)}%</span>
-              </div>
-              <div className="w-full bg-gray-200 rounded-full h-2">
-                <div 
-                  className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                  style={{ width: `${(completedTests / testCases.length) * 100}%` }}
-                ></div>
-              </div>
-            </div>
-          )}
-
-          {/* Test results table */}
-          <div className="max-h-96 overflow-y-auto border rounded">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50 sticky top-0">
-                <tr>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Test Case</th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Duration</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {testResults.map((result, index) => (
-                  <tr key={result.id} className={currentTestIndex === index ? 'bg-blue-50' : ''}>
-                    <td className="px-4 py-2 text-sm text-gray-900">{result.name}</td>
-                    <td className="px-4 py-2 text-sm">
-                      <div className="flex items-center">
-                        {getStatusIcon(result.status)}
-                        <span className="ml-2">{result.status}</span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-2 text-sm text-gray-500">
-                      {result.duration > 0 ? `${result.duration}s` : '-'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Footer */}
-          <div className="flex justify-between items-center mt-4 pt-4 border-t">
-            <div className="text-sm text-gray-600">
-              {executing ? 'Execution in progress...' : 
-               executionStarted ? 'Execution completed' : 'Ready to execute'}
-            </div>
-            <div className="flex space-x-2">
-              {executing && (
-                <button
-                  onClick={handleCancel}
-                  className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 focus:ring-2 focus:ring-red-500"
-                >
-                  Cancel
-                </button>
-              )}
-              <button
-                onClick={onCancel}
-                className="px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-50 focus:ring-2 focus:ring-gray-500"
-              >
-                Close
-              </button>
-            </div>
-          </div>
         </div>
       </div>
     </div>

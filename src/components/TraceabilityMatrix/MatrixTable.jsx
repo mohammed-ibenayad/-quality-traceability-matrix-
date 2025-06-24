@@ -1,3 +1,4 @@
+// src/components/TraceabilityMatrix/MatrixTable.jsx - Updated to use Unified Modal
 import React, { useState } from 'react';
 import RequirementRow from './RequirementRow';
 import CoverageIndicator from './CoverageIndicator';
@@ -16,7 +17,7 @@ const MatrixTable = ({
   toggleTestCaseView,
   selectedVersion
 }) => {
-  // State for test execution modal
+  // State for test execution modal (for full matrix view)
   const [testModalState, setTestModalState] = useState({
     isOpen: false,
     requirement: null,
@@ -27,7 +28,7 @@ const MatrixTable = ({
   const hasRequirements = requirements && requirements.length > 0;
   const hasTestCases = testCases && testCases.length > 0;
   
-  // Handler for opening test execution modal
+  // Handler for opening test execution modal (for full matrix view)
   const handleOpenTestModal = (requirement) => {
     // Get test cases for this requirement
     const reqTestIds = mapping[requirement.id] || [];
@@ -42,14 +43,12 @@ const MatrixTable = ({
     });
   };
   
-  // Handler for test completion
+  // Handler for test completion (for full matrix view)
   const handleTestComplete = (results) => {
-    console.log('Test execution completed:', results);
-    
-    // Close modal after a short delay
-    setTimeout(() => {
-      setTestModalState(prev => ({ ...prev, isOpen: false }));
-    }, 2000);
+    console.log('Test execution completed in MatrixTable:', results);
+    // The unified modal handles all DataStore updates automatically
+    // Just close the modal
+    setTestModalState(prev => ({ ...prev, isOpen: false }));
   };
   
   // If no requirements, show empty state
@@ -90,7 +89,7 @@ const MatrixTable = ({
       
       {/* The matrix table - Different display based on collapsed state and availability of test cases */}
       {hasTestCases && collapseTestCases && (
-        // Summary view with collapsible rows
+        // Summary view with collapsible rows - Uses RequirementRow with unified modal
         <table className="min-w-full border-collapse">
           <thead>
             <tr className="bg-gray-100">
@@ -101,7 +100,7 @@ const MatrixTable = ({
               <th className="border p-2">Test Coverage</th>
               <th className="border p-2">Test Cases</th>
               <th className="border p-2">Execution Details</th>
-              <th className="border p-2">Actions</th> {/* New column for Run Tests button */}
+              <th className="border p-2">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -141,40 +140,26 @@ const MatrixTable = ({
                     tc.automationStatus === 'Automated' ? 'text-blue-600' : 
                     tc.automationStatus === 'Planned' ? 'text-orange-600' : 'text-gray-600'
                   }`}>
-                    {tc.automationStatus.charAt(0)}
+                    {tc.automationStatus === 'Automated' ? 'A' : 
+                     tc.automationStatus === 'Planned' ? 'P' : 'M'}
                   </span>
                 </th>
               ))}
-              <th className="border p-2 w-40">Execution Details</th>
-              <th className="border p-2 w-24">Actions</th> {/* New column for Run Tests button */}
+              <th className="border p-2 w-20">Actions</th>
             </tr>
           </thead>
           <tbody>
             {requirements.map(req => {
-              // Filter test cases based on the selected version for test cell display
-              const filteredTestCases = selectedVersion === 'unassigned' 
-                ? testCases 
-                : testCases.filter(tc => !tc.version || tc.version === selectedVersion || tc.version === '');
-              
-              // Get coverage data
               const reqCoverage = coverage.find(c => c.reqId === req.id);
-              const coveragePercentage = reqCoverage ? reqCoverage.coverageRatio : 0;
+              const mappedTests = mapping[req.id] || [];
               
-              // Get all mapped test cases for this requirement
-              const allMappedTests = mapping[req.id] || [];
-              
-              // Filter test cases based on the selected version
-              const mappedTests = selectedVersion === 'unassigned'
-                ? allMappedTests
-                : allMappedTests.filter(tcId => {
+              // Filter mapped tests based on selected version
+              const versionFilteredTests = selectedVersion === 'unassigned' 
+                ? mappedTests
+                : mappedTests.filter(tcId => {
                     const tc = testCases.find(t => t.id === tcId);
                     return tc && (!tc.version || tc.version === selectedVersion || tc.version === '');
                   });
-              
-              // Get test case objects for this requirement
-              const mappedTestObjects = mappedTests.map(tcId => 
-                testCases.find(tc => tc.id === tcId)
-              ).filter(Boolean);
               
               return (
                 <tr key={req.id} className="hover:bg-gray-50">
@@ -189,36 +174,21 @@ const MatrixTable = ({
                     </span>
                   </td>
                   <td className="border p-2 text-center">
-                    <div className="flex flex-col items-center">
-                      <span className="text-xs text-gray-500">{mappedTests.length}/{req.minTestCases} tests</span>
-                      <div className={`mt-1 w-4 h-4 rounded-full flex items-center justify-center ${
-                        mappedTests.length >= req.minTestCases 
-                          ? 'bg-green-500 text-white' 
-                          : 'bg-orange-500 text-white'
-                      }`}>
-                        {mappedTests.length >= req.minTestCases ? '✓' : '!'}
-                      </div>
-                      
-                      {/* Coverage percentage displayed here */}
-                      {reqCoverage && (
-                        <div className={`text-xs font-medium mt-1 ${
-                          reqCoverage.meetsMinimum 
-                            ? 'text-green-600' 
-                            : 'text-orange-600'
-                        }`}>
-                          {coveragePercentage}% coverage
-                        </div>
-                      )}
-                    </div>
+                    <CoverageIndicator 
+                      coverage={reqCoverage} 
+                      requirement={req}
+                      mappedTests={versionFilteredTests}
+                    />
                   </td>
                   
-                  {filteredTestCases.map(tc => {
-                    const isLinked = (mapping[req.id] || []).includes(tc.id);
-                    const status = isLinked ? getCellStatus(req.id, tc.id, testCases) : 'none';
+                  {/* Test case columns */}
+                  {testCases.map(tc => {
+                    const isMapped = versionFilteredTests.includes(tc.id);
+                    const status = isMapped ? getCellStatus(tc) : null;
                     
                     return (
-                      <td key={`${req.id}-${tc.id}`} className="border p-2 text-center">
-                        {isLinked ? (
+                      <td key={tc.id} className="border p-2 text-center">
+                        {isMapped ? (
                           <div className={`w-4 h-4 mx-auto rounded-full ${
                             status === 'passed' ? 'bg-green-500' : 
                             status === 'failed' ? 'bg-red-500' : 'bg-gray-300'
@@ -259,8 +229,8 @@ const MatrixTable = ({
                     <button
                       onClick={() => handleOpenTestModal(req)}
                       className="inline-flex items-center px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 text-xs"
-                      disabled={mappedTests.length === 0}
-                      title={mappedTests.length === 0 ? "No test cases to run" : "Run tests for this requirement"}
+                      disabled={versionFilteredTests.length === 0}
+                      title={versionFilteredTests.length === 0 ? "No test cases to run" : "Run tests for this requirement"}
                     >
                       <Play className="mr-1" size={12} />
                       Run
@@ -273,7 +243,7 @@ const MatrixTable = ({
         </table>
       )}
 
-      {/* Test Execution Modal */}
+      {/* UNIFIED Test Execution Modal - Same as TestCases page and RequirementRow */}
       <TestExecutionModal
         requirement={testModalState.requirement}
         testCases={testModalState.testCases}
