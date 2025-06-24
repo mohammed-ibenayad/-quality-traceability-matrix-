@@ -1,4 +1,4 @@
-// src/pages/TestCases.jsx - Complete Enhanced Version with Version Filtering
+// src/pages/TestCases.jsx - Complete Enhanced Version with Version Filtering and ID Column
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Play, 
@@ -115,8 +115,8 @@ const TestCases = () => {
   // Calculate summary statistics (ORIGINAL BEHAVIOR PRESERVED)
   const summaryStats = useMemo(() => {
     const total = filteredTestCases.length;
-    const passed = filteredTestCases.filter(tc => tc.status === 'Pass').length;
-    const failed = filteredTestCases.filter(tc => tc.status === 'Fail').length;
+    const passed = filteredTestCases.filter(tc => tc.status === 'Passed').length;
+    const failed = filteredTestCases.filter(tc => tc.status === 'Failed').length;
     const notRun = filteredTestCases.filter(tc => tc.status === 'Not Run').length;
     const blocked = filteredTestCases.filter(tc => tc.status === 'Blocked').length;
     const automated = filteredTestCases.filter(tc => tc.automationStatus === 'Automated').length;
@@ -328,19 +328,20 @@ const TestCases = () => {
           </div>
         </div>
 
-        {/* Filters (ORIGINAL STRUCTURE PRESERVED) */}
+        {/* Filters Section (ORIGINAL STRUCTURE PRESERVED) */}
         <div className="bg-white p-4 rounded-lg shadow">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4 items-end">
             {/* Search */}
             <div className="lg:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Search</label>
               <div className="relative">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
                 <input
                   type="text"
                   placeholder="Search test cases..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="pl-10 p-2 border rounded-lg w-full focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
             </div>
@@ -352,11 +353,10 @@ const TestCases = () => {
               className="p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
               <option value="All">All Statuses</option>
+              <option value="Passed">Passed</option>
+              <option value="Failed">Failed</option>
               <option value="Not Run">Not Run</option>
-              <option value="Pass">Pass</option>
-              <option value="Fail">Fail</option>
               <option value="Blocked">Blocked</option>
-              <option value="Skip">Skip</option>
             </select>
 
             {/* Automation Filter */}
@@ -365,9 +365,9 @@ const TestCases = () => {
               onChange={(e) => setAutomationFilter(e.target.value)}
               className="p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
-              <option value="All">All Types</option>
-              <option value="Manual">Manual</option>
+              <option value="All">All Automation</option>
               <option value="Automated">Automated</option>
+              <option value="Manual">Manual</option>
               <option value="Semi-Automated">Semi-Automated</option>
             </select>
 
@@ -423,7 +423,7 @@ const TestCases = () => {
           </div>
         )}
 
-        {/* Test Cases Table (COMPACT FIXED LAYOUT) */}
+        {/* Test Cases Table (UPDATED WITH ID COLUMN) */}
         <div className="bg-white shadow overflow-hidden sm:rounded-md">
           <div className="overflow-x-auto">
             <table className="min-w-full table-fixed divide-y divide-gray-200">
@@ -437,7 +437,11 @@ const TestCases = () => {
                       className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                     />
                   </th>
-                  <th scope="col" className="w-96 px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  {/* NEW: ID column */}
+                  <th scope="col" className="w-32 px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    ID
+                  </th>
+                  <th scope="col" className="w-80 px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     TEST CASE
                   </th>
                   <th scope="col" className="w-20 px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -473,26 +477,35 @@ const TestCases = () => {
                             className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                           />
                         </td>
-                        <td className="w-96 px-3 py-3">
-                          <div className="flex items-start">
+                        {/* NEW: ID column with expand/collapse button */}
+                        <td className="w-32 px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
+                          <div className="flex items-center">
                             <button
                               onClick={() => toggleRowExpansion(testCase.id)}
-                              className="mr-2 mt-0.5 text-gray-400 hover:text-gray-600 flex-shrink-0"
+                              className="mr-2 p-1 hover:bg-gray-200 rounded"
                             >
-                              {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                              {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
                             </button>
+                            {testCase.id}
+                          </div>
+                        </td>
+                        <td className="w-80 px-3 py-3">
+                          <div className="flex items-start">
                             <div className="min-w-0 flex-1">
                               <div className="text-sm font-medium text-gray-900 truncate" title={testCase.name}>
                                 {testCase.name}
                               </div>
-                              <div className="text-xs text-gray-500">{testCase.id}</div>
+                              <div className="text-xs text-gray-500">
+                                {testCase.description && testCase.description.substring(0, 100)}
+                                {testCase.description && testCase.description.length > 100 && '...'}
+                              </div>
                             </div>
                           </div>
                         </td>
                         <td className="w-20 px-2 py-3 whitespace-nowrap">
                           <span className={`inline-flex px-1.5 py-0.5 text-xs font-medium rounded ${
-                            testCase.status === 'Pass' ? 'bg-green-100 text-green-800' :
-                            testCase.status === 'Fail' ? 'bg-red-100 text-red-800' :
+                            testCase.status === 'Passed' ? 'bg-green-100 text-green-800' :
+                            testCase.status === 'Failed' ? 'bg-red-100 text-red-800' :
                             testCase.status === 'Blocked' ? 'bg-yellow-100 text-yellow-800' :
                             'bg-gray-100 text-gray-800'
                           }`}>
@@ -519,21 +532,24 @@ const TestCases = () => {
                           </span>
                         </td>
                         <td className="w-24 px-2 py-3 whitespace-nowrap">
-                          <div className="text-sm text-gray-900">
+                          <div className="text-xs text-gray-500">
                             {testCase.requirementIds && testCase.requirementIds.length > 0 ? (
-                              <span className="flex items-center text-green-600">
-                                <Link size={12} className="mr-1" />
-                                <span className="text-xs">{testCase.requirementIds.length}</span>
-                              </span>
+                              <div className="flex flex-wrap gap-1">
+                                {testCase.requirementIds.slice(0, 2).map(reqId => (
+                                  <span key={reqId} className="px-1 py-0.5 bg-blue-100 text-blue-800 rounded text-xs">
+                                    {reqId}
+                                  </span>
+                                ))}
+                                {testCase.requirementIds.length > 2 && (
+                                  <span className="text-gray-400">+{testCase.requirementIds.length - 2}</span>
+                                )}
+                              </div>
                             ) : (
-                              <span className="flex items-center text-gray-400">
-                                <Unlink size={12} className="mr-1" />
-                                <span className="text-xs">0</span>
-                              </span>
+                              <span className="text-gray-400">No links</span>
                             )}
                           </div>
                         </td>
-                        <td className="w-20 px-2 py-3 whitespace-nowrap text-right">
+                        <td className="w-20 px-2 py-3 whitespace-nowrap text-right text-sm font-medium">
                           <div className="flex items-center justify-end space-x-1">
                             <button
                               onClick={() => handleExecuteTestCase(testCase)}
@@ -560,10 +576,10 @@ const TestCases = () => {
                         </td>
                       </tr>
 
-                      {/* Expanded Row Content (ORIGINAL STRUCTURE PRESERVED) */}
+                      {/* Expanded Row Content (UPDATED COLSPAN) */}
                       {isExpanded && (
                         <tr>
-                          <td colSpan="7" className="px-4 py-4 bg-gray-50">
+                          <td colSpan="8" className="px-4 py-4 bg-gray-50">
                             <div className="space-y-4">
                               <div>
                                 <h4 className="font-medium text-gray-900">Description</h4>
@@ -591,9 +607,9 @@ const TestCases = () => {
                               {testCase.tags && testCase.tags.length > 0 && (
                                 <div>
                                   <h4 className="font-medium text-gray-900">Tags</h4>
-                                  <div className="flex flex-wrap gap-2 mt-1">
-                                    {testCase.tags.map((tag, index) => (
-                                      <span key={index} className="inline-flex px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded">
+                                  <div className="flex flex-wrap gap-1 mt-1">
+                                    {testCase.tags.map(tag => (
+                                      <span key={tag} className="px-2 py-1 bg-gray-200 text-gray-700 rounded text-xs">
                                         {tag}
                                       </span>
                                     ))}
@@ -604,7 +620,7 @@ const TestCases = () => {
                               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                                 <div>
                                   <span className="font-medium text-gray-900">Version:</span>
-                                  <span className="ml-1 text-gray-600">{testCase.version || 'N/A'}</span>
+                                  <span className="ml-1 text-gray-600">{testCase.version || 'Unassigned'}</span>
                                 </div>
                                 <div>
                                   <span className="font-medium text-gray-900">Assignee:</span>
@@ -612,12 +628,13 @@ const TestCases = () => {
                                 </div>
                                 <div>
                                   <span className="font-medium text-gray-900">Duration:</span>
-                                  <span className="ml-1 text-gray-600">{testCase.estimatedDuration || 'N/A'} min</span>
+                                  <span className="ml-1 text-gray-600">{testCase.estimatedDuration || 0} min</span>
                                 </div>
                                 <div>
                                   <span className="font-medium text-gray-900">Last Executed:</span>
                                   <span className="ml-1 text-gray-600">
-                                    {testCase.lastExecuted ? new Date(testCase.lastExecuted).toLocaleDateString() : 'Never'}
+                                    {testCase.lastExecuted ? 
+                                      new Date(testCase.lastExecuted).toLocaleDateString() : 'Never'}
                                   </span>
                                 </div>
                               </div>
@@ -733,15 +750,28 @@ const EditTestCaseModal = ({ testCase, onSave, onCancel }) => {
           </h3>
           
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Name *</label>
-              <input
-                type="text"
-                value={formData.name}
-                onChange={(e) => setFormData({...formData, name: e.target.value})}
-                className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
-                required
-              />
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Name *</label>
+                <input
+                  type="text"
+                  required
+                  value={formData.name}
+                  onChange={(e) => setFormData({...formData, name: e.target.value})}
+                  className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700">ID</label>
+                <input
+                  type="text"
+                  value={formData.id}
+                  onChange={(e) => setFormData({...formData, id: e.target.value})}
+                  placeholder="Auto-generated if empty"
+                  className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
             </div>
 
             <div>
@@ -754,7 +784,7 @@ const EditTestCaseModal = ({ testCase, onSave, onCancel }) => {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-3 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700">Status</label>
                 <select
@@ -763,10 +793,9 @@ const EditTestCaseModal = ({ testCase, onSave, onCancel }) => {
                   className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
                 >
                   <option value="Not Run">Not Run</option>
-                  <option value="Pass">Pass</option>
-                  <option value="Fail">Fail</option>
+                  <option value="Passed">Passed</option>
+                  <option value="Failed">Failed</option>
                   <option value="Blocked">Blocked</option>
-                  <option value="Skip">Skip</option>
                 </select>
               </div>
 
@@ -782,11 +811,9 @@ const EditTestCaseModal = ({ testCase, onSave, onCancel }) => {
                   <option value="Low">Low</option>
                 </select>
               </div>
-            </div>
 
-            <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700">Automation Status</label>
+                <label className="block text-sm font-medium text-gray-700">Automation</label>
                 <select
                   value={formData.automationStatus}
                   onChange={(e) => setFormData({...formData, automationStatus: e.target.value})}
@@ -797,16 +824,16 @@ const EditTestCaseModal = ({ testCase, onSave, onCancel }) => {
                   <option value="Semi-Automated">Semi-Automated</option>
                 </select>
               </div>
+            </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Version</label>
-                <input
-                  type="text"
-                  value={formData.version}
-                  onChange={(e) => setFormData({...formData, version: e.target.value})}
-                  className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
-                />
-              </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Version</label>
+              <input
+                type="text"
+                value={formData.version}
+                onChange={(e) => setFormData({...formData, version: e.target.value})}
+                className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
+              />
             </div>
 
             <div>
@@ -884,35 +911,26 @@ const TestExecutionModal = ({ testCases, onComplete, onCancel }) => {
       
       // Update status to "Running"
       setTestResults(prev => prev.map((result, index) => 
-        index === i ? { 
-          ...result, 
-          status: 'Running', 
-          startTime: new Date().toISOString() 
-        } : result
+        index === i ? { ...result, status: 'Running', startTime: new Date() } : result
       ));
 
-      // Simulate test execution time (1-4 seconds)
-      const executionTime = 1000 + Math.random() * 3000;
-      await new Promise(resolve => setTimeout(resolve, executionTime));
+      // Simulate test execution with random duration
+      const duration = Math.random() * 3000 + 1000; // 1-4 seconds
+      await new Promise(resolve => setTimeout(resolve, duration));
 
-      if (cancelled) {
-        setTestResults(prev => prev.map((result, index) => 
-          index === i ? { ...result, status: 'Cancelled' } : result
-        ));
-        break;
-      }
+      if (cancelled) break;
 
-      // Generate random result (70% pass rate)
-      const passed = Math.random() > 0.3;
-      const endTime = new Date().toISOString();
-      
-      // Update with final result
+      // Random result (80% pass rate)
+      const passed = Math.random() > 0.2;
+      const status = passed ? 'Passed' : 'Failed';
+
+      // Update final result
       setTestResults(prev => prev.map((result, index) => 
-        index === i ? {
-          ...result,
-          status: passed ? 'Pass' : 'Fail',
-          duration: Math.round(executionTime / 1000),
-          endTime
+        index === i ? { 
+          ...result, 
+          status, 
+          duration: Math.round(duration / 1000),
+          endTime: new Date()
         } : result
       ));
 
@@ -921,22 +939,33 @@ const TestExecutionModal = ({ testCases, onComplete, onCancel }) => {
 
     setExecuting(false);
     setCurrentTestIndex(-1);
+
+    // Auto-close after 2 seconds if not cancelled
+    if (!cancelled) {
+      setTimeout(() => {
+        onComplete(testResults);
+      }, 2000);
+    }
   };
 
-  // Handle cancel
   const handleCancel = () => {
     setCancelled(true);
     setExecuting(false);
+    onCancel();
   };
 
-  // Get status icon
   const getStatusIcon = (status) => {
     switch (status) {
-      case 'Pass': return <CheckCircle className="text-green-500" size={16} />;
-      case 'Fail': return <XCircle className="text-red-500" size={16} />;
-      case 'Running': return <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />;
-      case 'Cancelled': return <XCircle className="text-orange-500" size={16} />;
-      default: return <Clock className="text-gray-400" size={16} />;
+      case 'Passed':
+        return <CheckCircle className="text-green-500" size={16} />;
+      case 'Failed':
+        return <XCircle className="text-red-500" size={16} />;
+      case 'Running':
+        return <Clock className="text-blue-500 animate-pulse" size={16} />;
+      case 'Cancelled':
+        return <Pause className="text-gray-500" size={16} />;
+      default:
+        return <Clock className="text-gray-400" size={16} />;
     }
   };
 
@@ -1006,55 +1035,24 @@ const TestExecutionModal = ({ testCases, onComplete, onCancel }) => {
           {/* Footer */}
           <div className="flex justify-between items-center mt-4 pt-4 border-t">
             <div className="text-sm text-gray-600">
-              {executing ? (
-                <span className="flex items-center">
-                  <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mr-2"></div>
-                  Execution in progress...
-                </span>
-              ) : cancelled ? (
-                <span className="text-orange-600">Execution cancelled</span>
-              ) : executionStarted ? (
-                <span className="text-green-600">Execution completed</span>
-              ) : (
-                <span>Ready to execute {testCases.length} test case(s)</span>
-              )}
+              {executing ? 'Execution in progress...' : 
+               executionStarted ? 'Execution completed' : 'Ready to execute'}
             </div>
-            
-            <div className="flex gap-3">
-              {executing ? (
+            <div className="flex space-x-2">
+              {executing && (
                 <button
                   onClick={handleCancel}
                   className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 focus:ring-2 focus:ring-red-500"
                 >
-                  Cancel Execution
+                  Cancel
                 </button>
-              ) : (
-                <>
-                  <button
-                    onClick={onCancel}
-                    className="px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-50 focus:ring-2 focus:ring-gray-500"
-                  >
-                    Close
-                  </button>
-                  {executionStarted && !cancelled && (
-                    <button
-                      onClick={() => {
-                        const finalResults = testResults
-                          .filter(result => result.status === 'Pass' || result.status === 'Fail')
-                          .map(result => ({
-                            testCaseId: result.id,
-                            status: result.status,
-                            duration: result.duration
-                          }));
-                        onComplete(finalResults);
-                      }}
-                      className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 focus:ring-2 focus:ring-blue-500"
-                    >
-                      Apply Results
-                    </button>
-                  )}
-                </>
               )}
+              <button
+                onClick={onCancel}
+                className="px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-50 focus:ring-2 focus:ring-gray-500"
+              >
+                Close
+              </button>
             </div>
           </div>
         </div>
