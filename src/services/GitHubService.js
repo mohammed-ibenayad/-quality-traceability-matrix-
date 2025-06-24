@@ -729,42 +729,222 @@ class GitHubService {
   /**
    * Download and process artifact content
    */
-  async downloadAndProcessArtifact(artifact, token, requirementId, clientPayload) {
-    try {
-      const octokit = new Octokit({ auth: token });
+  // Update this method in src/services/GitHubService.js
+
+/**
+ * Download and process artifact content
+ */
+async downloadAndProcessArtifact(artifact, token, requirementId, clientPayload) {
+  try {
+    const octokit = new Octokit({ auth: token });
+    
+    // Download the artifact
+    const downloadResponse = await octokit.request('GET /repos/{owner}/{repo}/actions/artifacts/{artifact_id}/{archive_format}', {
+      owner: artifact.repository?.owner?.login,
+      repo: artifact.repository?.name,
+      artifact_id: artifact.id,
+      archive_format: 'zip',
+      headers: {
+        'X-GitHub-Api-Version': '2022-11-28'
+      }
+    });
+    
+    console.log('Artifact downloaded successfully, processing...');
+    
+    // Import JSZip dynamically
+    const JSZip = (await import('jszip')).default;
+    
+    // Convert response to ArrayBuffer and extract ZIP
+    const arrayBuffer = await new Response(downloadResponse.data).arrayBuffer();
+    const zip = new JSZip();
+    const zipContents = await zip.loadAsync(arrayBuffer);
+    
+    console.log('ZIP contents:', Object.keys(zipContents.files));
+    
+    // Look for test results files (common patterns)
+    const possibleFiles = [
+      'test-results.json',
+      'results.json', 
+      'junit.xml',
+      'test-output.json',
+      'results.xml'
+    ];
+    
+    let resultsFile = null;
+    for (const fileName of possibleFiles) {
+      if (zipContents.files[fileName]) {
+        resultsFile = zipContents.files[fileName];
+        break;
+      }
+    }
+    
+    // If no exact match, find any file with 'result' in the name
+    if (!resultsFile) {
+      const resultFiles = Object.keys(zipContents.files).filter(name => 
+        name.toLowerCase().includes('result') || 
+        name.toLowerCase().includes('test') ||
+        name.endsWith('.json') ||
+        name.endsWith('.xml')
+      );
       
-      // Download the artifact
-      const downloadResponse = await octokit.request('GET /repos/{owner}/{repo}/actions/artifacts/{artifact_id}/{archive_format}', {
-        owner: artifact.owner?.login,
-        repo: artifact.repository?.name,
-        artifact_id: artifact.id,
-        archive_format: 'zip',
-        headers: {
-          'X-GitHub-Api-Version': '2022-11-28'
+      if (resultFiles.length > 0) {
+        resultsFile = zipContents.files[resultFiles[0]];
+      }
+    }
+    
+    if (!resultsFile) {
+      console.warn('No test results file found in artifact');
+      // Return results based on requested test cases with 'Not Run' status
+      const requestedTestIds = clientPayload?.testCases || [];
+      return requestedTestIds.map(testId => ({
+        id: testId,
+        name: `Test ${testId}`,
+        status: 'Not Run',
+        duration: 0,
+        logs: 'No test results file found in artifact'
+      }));
+    }
+    
+    // Extract and parse the results file
+    const resultsContent = await resultsFile.async('text');
+    console.log('Raw results content:', resultsContent.substring(0, 500) + '...');
+    
+    // Parse based on file type
+    let testResults;
+    if (resultsFile.name.endsWith('.json')) {
+      testResults = JSON.parse(resultsContent);
+    } else if (resultsFile.name.endsWith('.xml')) {
+      // For XML files (like JUnit), you'd need to parse XML
+      // For now, return basic structure
+      testResults = { tests: [] };
+    }
+    
+    // Transform results to match your expected format
+    return this.transformTestResults(testResults, clientPayload);
+    
+  } catch (error) {
+    console.error('Error processing artifact:', error);
+    
+    // Fallback: return requested test cases with error status
+    const requestedTestIds = clientPayload?.testCases || [];
+    return requestedTestIds.map(testId => ({
+      id: testId,
+      name: `Test ${testId}`,
+      status: 'Failed',
+      duration: 0,
+      logs: `Error processing artifact: ${error.message}`
+    }));
+  }
+}
+
+/**
+ * Transform raw test results to application format
+ */
+transformTestResults(rawResults, clientPayload) {
+  const requestedTestIds = clientPayload?.testCases || [];
+  
+  console.log('Transforming results for test IDs:', requestedTestIds);
+  console.log('Raw results structure:', Object.keys(rawResults));
+  
+  return requestedTestIds.map(testId => {
+    // Try different result structures
+    let testResult = null;
+    
+    // Structure 1: Direct array of tests
+    if (Array.isArray(rawResults)) {
+      testResult = rawResults.find(t => 
+        t.id === testId || 
+        t.name?.includes(testId) ||
+        t.title?.includes(testId)
+      );
+    }
+    
+    // Structure 2: Object with tests array
+    if (!testResult && rawResults.tests) {
+      testResult = rawResults.tests.find(t => 
+        t.id === testId || 
+        t.name?.includes(testId) ||
+        t.title?.includes(testId)
+      );
+    }
+    
+    // Structure 3: Object with results array
+    if (!testResult && rawResults.results) {
+      testResult = rawResults.results.find(t => 
+        t.id === testId || 
+        t.name?.includes(testId) ||
+        t.title?.includes(testId)
+      );
+    }
+    
+    // Structure 4: Jest-like structure
+    if (!testResult && rawResults.testResults) {
+      for (const testFile of rawResults.testResults) {
+        if (testFile.assertionResults) {
+          testResult = testFile.assertionResults.find(t => 
+            t.title?.includes(testId) ||
+            t.fullName?.includes(testId)
+          );
+          if (testResult) break;
         }
-      });
-      
-      // Process the downloaded content (simplified for this example)
-      // In a real implementation, you would extract and parse the ZIP file
-      console.log('Artifact downloaded successfully');
-      
-      // Return mock results for now - in production this would parse actual test results
-      return [
-        {
-          id: 'TC_001',
-          name: 'Sample Test Case',
-          status: 'Passed',
-          duration: 150,
-          logs: 'Test executed successfully'
-        }
-      ];
-      
-    } catch (error) {
-      console.error('Error downloading artifact:', error);
-      throw new Error(`Failed to download artifact: ${error.message}`);
+      }
+    }
+    
+    // If no specific result found, create a default one
+    if (!testResult) {
+      console.warn(`No result found for test ID: ${testId}`);
+      return {
+        id: testId,
+        name: `Test ${testId}`,
+        status: 'Not Run',
+        duration: 0,
+        logs: 'Test result not found in artifact'
+      };
+    }
+    
+    // Transform to standard format
+    const status = this.normalizeTestStatus(testResult);
+    
+    return {
+      id: testId,
+      name: testResult.title || testResult.name || `Test ${testId}`,
+      status: status,
+      duration: testResult.duration || testResult.time || 0,
+      logs: testResult.failureMessage || 
+            testResult.error?.message || 
+            testResult.message ||
+            (status === 'Passed' ? 'Test passed successfully' : 'Test completed')
+    };
+  });
+}
+
+/**
+ * Normalize different test status formats
+ */
+normalizeTestStatus(testResult) {
+  const state = testResult.status || testResult.state || testResult.result || '';
+  
+  if (typeof state === 'string') {
+    const lowerState = state.toLowerCase();
+    if (lowerState.includes('pass') || lowerState === 'passed' || lowerState === 'ok') {
+      return 'Passed';
+    }
+    if (lowerState.includes('fail') || lowerState === 'failed' || lowerState === 'error') {
+      return 'Failed';
+    }
+    if (lowerState.includes('skip') || lowerState === 'skipped' || lowerState === 'pending') {
+      return 'Skipped';
     }
   }
-
+  
+  // Check for failure indicators
+  if (testResult.failureMessage || testResult.error || testResult.failed) {
+    return 'Failed';
+  }
+  
+  // Default to passed if no failure indicators
+  return 'Passed';
+}
   /**
    * Get centralized test file patterns
    */
