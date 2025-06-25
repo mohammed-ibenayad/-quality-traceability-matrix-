@@ -1,4 +1,4 @@
-// src/components/TestExecution/TestExecutionModal.jsx - Unified Component
+// src/components/TestExecution/TestExecutionModal.jsx - Complete Revised Version
 import React, { useState, useEffect } from 'react';
 import { 
   Play, 
@@ -69,6 +69,10 @@ const TestExecutionModal = ({
   const [error, setError] = useState(null);
   const [workflowRun, setWorkflowRun] = useState(null);
   const [currentRequestId, setCurrentRequestId] = useState(null);
+  
+  // NEW: Added state for polling management
+  const [pollInterval, setPollInterval] = useState(null);
+  const [webhookTimeout, setWebhookTimeout] = useState(null);
 
   // UI state
   const [showSettings, setShowSettings] = useState(false);
@@ -101,20 +105,56 @@ const TestExecutionModal = ({
       setError(null);
       setProcessingStatus(null);
       setIsProcessing(false);
+      setCurrentRequestId(null);
+      
+      // NEW: Clear intervals and timeouts
+      if (pollInterval) {
+        clearInterval(pollInterval);
+        setPollInterval(null);
+      }
+      if (webhookTimeout) {
+        clearTimeout(webhookTimeout);
+        setWebhookTimeout(null);
+      }
 
       console.log('Test execution modal opened for:', requirement ? `requirement ${requirement.id}` : 'bulk execution');
       console.log('Test cases to run:', testCases);
     }
   }, [isOpen, testCases, requirement]);
 
-  // Check backend support
+  // NEW: Enhanced backend support detection with webhook service
   useEffect(() => {
     const checkBackend = async () => {
       try {
+        setBackendStatus('checking');
+        
+        // Check basic health endpoint
         const response = await fetch('/api/health');
-        setHasBackendSupport(response.ok);
-        setBackendStatus(response.ok ? 'connected' : 'disconnected');
+        const isBasicHealthy = response.ok;
+        
+        if (isBasicHealthy && webhookService) {
+          // Try to connect to webhook service
+          try {
+            const isWebhookHealthy = await webhookService.checkBackendHealth();
+            if (isWebhookHealthy) {
+              await webhookService.connect();
+              setHasBackendSupport(true);
+              setBackendStatus('connected');
+              console.log('✅ Backend webhook service available and connected');
+            } else {
+              throw new Error('Webhook service not healthy');
+            }
+          } catch (webhookError) {
+            console.log('📡 Webhook service unavailable, using fallback mode:', webhookError.message);
+            setHasBackendSupport(false);
+            setBackendStatus('fallback');
+          }
+        } else {
+          setHasBackendSupport(false);
+          setBackendStatus('disconnected');
+        }
       } catch (error) {
+        console.log('📡 Backend not available, using fallback mode:', error.message);
         setHasBackendSupport(false);
         setBackendStatus('disconnected');
       }
@@ -124,6 +164,49 @@ const TestExecutionModal = ({
       checkBackend();
     }
   }, [isOpen]);
+
+  // NEW: Enhanced webhook result handling with proper cleanup
+  useEffect(() => {
+    if (!isOpen || !requirement) return;
+
+    console.log(`🔔 Setting up webhook listener for requirement: ${requirement.id}`);
+    
+    // Set up global webhook handler
+    window.onTestWebhookReceived = (webhookData) => {
+      console.log("🔔 WEBHOOK RECEIVED (fallback mode):", webhookData);
+      
+      // Check both requirementId and requestId for matching
+      const matchesRequirement = webhookData?.requirementId === requirement?.id;
+      const matchesRequest = currentRequestId && webhookData?.requestId === currentRequestId;
+      
+      if (matchesRequirement || matchesRequest) {
+        console.log("✅ Processing webhook for current execution");
+        
+        if (webhookTimeout) {
+          clearTimeout(webhookTimeout);
+          setWebhookTimeout(null);
+        }
+        
+        handleWebhookResults(webhookData);
+      } else {
+        console.log("❌ Webhook doesn't match current execution - ignoring");
+        console.log("Expected:", { requirementId: requirement?.id, requestId: currentRequestId });
+        console.log("Received:", { requirementId: webhookData?.requirementId, requestId: webhookData?.requestId });
+      }
+    };
+    
+    return () => {
+      window.onTestWebhookReceived = null;
+      if (webhookTimeout) {
+        clearTimeout(webhookTimeout);
+        setWebhookTimeout(null);
+      }
+      if (pollInterval) {
+        clearInterval(pollInterval);
+        setPollInterval(null);
+      }
+    };
+  }, [requirement?.id, hasBackendSupport, currentRequestId, webhookTimeout, pollInterval]);
 
   // Save configuration
   const saveConfiguration = () => {
@@ -188,7 +271,7 @@ const TestExecutionModal = ({
     }
   };
 
-  // Execute tests with GitHub Actions
+  // NEW: Complete executeTestsGitHub with all missing logic from TestRunner
   const executeTestsGitHub = async () => {
     if (!config.repoUrl || !config.ghToken) {
       setError('GitHub repository URL and token are required');
@@ -196,10 +279,14 @@ const TestExecutionModal = ({
     }
 
     try {
+      console.log("%c🚀 EXECUTE TESTS GITHUB STARTED", "background: #4CAF50; color: white; font-size: 16px; font-weight: bold; padding: 8px 15px; border-radius: 5px;");
+      console.log("=".repeat(80));
+      
       setIsRunning(true);
       setError(null);
       setResults(null);
 
+      // FIXED: Generate unique request ID for this execution
       const requestId = `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       setCurrentRequestId(requestId);
 
@@ -221,16 +308,47 @@ const TestExecutionModal = ({
       };
 
       console.log('GitHub execution payload:', payload);
+      console.log("Backend support:", hasBackendSupport ? 'Available' : 'Using fallback');
+      console.log("Request ID:", requestId);
 
-      // Check if we should use simulated results
-      const useSimulatedResults = config.repoUrl.includes('example') || 
-                                  !hasBackendSupport;
+      // NEW: Register with webhook service if available
+      if (hasBackendSupport && webhookService) {
+        console.log("🔗 Registering with webhook service");
+        webhookService.registerTestExecution(requirement?.id || payload.requirementId, requestId);
+      } else {
+        console.log("⚠️ Skipping webhook service registration (backend unavailable)");
+      }
+
+      // NEW: Enhanced decision logic from TestRunner
+      const useSimulatedResults = !config.repoUrl || 
+                                config.repoUrl.includes('example') ||
+                                (!hasBackendSupport && config.callbackUrl.includes('webhook.site'));
+
+      // NEW: Enhanced logging for decision process
+      console.log("%c🎯 EXECUTION MODE DECISION", "background: #9C27B0; color: white; font-weight: bold; padding: 5px 10px;");
+      
+      const condition1 = !config.repoUrl;
+      const condition2 = config.repoUrl?.includes('example');
+      const condition3 = (!hasBackendSupport && config.callbackUrl?.includes('webhook.site'));
+      
+      console.log("Decision Conditions:");
+      console.log("  1. No repo URL (!config.repoUrl):", condition1);
+      console.log("  2. Contains 'example' (config.repoUrl.includes('example')):", condition2);
+      console.log("  3. Backend unavailable + webhook.site ((!hasBackendSupport && config.callbackUrl.includes('webhook.site'))):", condition3);
+      console.log("Backend Support:", hasBackendSupport);
+      console.log("Webhook URL:", config.callbackUrl);
+      console.log("Repository URL:", config.repoUrl);
+      
+      console.log("Final Decision: useSimulatedResults =", useSimulatedResults);
+      console.log("Execution Path:", useSimulatedResults ? "🎭 Simulated Results" : "🐙 Real GitHub Workflow → Artifact Download");
 
       if (useSimulatedResults) {
+        const reason = condition1 ? "No repo URL" : condition2 ? "Contains 'example'" : "Backend unavailable + webhook.site";
+        console.log("Reason for simulation:", reason);
         console.log('Using simulated GitHub results');
         setWaitingForWebhook(true);
         
-        setTimeout(() => {
+        const timeout = setTimeout(() => {
           const simulatedResults = testCases.map(tc => ({
             id: tc.id,
             name: tc.name,
@@ -245,8 +363,12 @@ const TestExecutionModal = ({
             results: simulatedResults
           });
         }, 5000);
+        
+        setWebhookTimeout(timeout);
         return;
       }
+
+      console.log("📋 Will trigger real GitHub workflow and wait for webhook timeout to download artifacts");
 
       // Trigger real GitHub Actions workflow
       const run = await GitHubService.triggerWorkflow(
@@ -258,96 +380,344 @@ const TestExecutionModal = ({
       
       console.log(`✅ Workflow triggered: ${run.id}`);
       console.log(`⏳ Waiting for webhook at: ${config.callbackUrl}`);
+      console.log(`📝 Request ID: ${requestId}`);
 
-      // Set timeout for webhook
-      setTimeout(() => {
-        if (waitingForWebhook) {
-          setError('Timeout waiting for test results');
+      // NEW: Complete webhook timeout logic with GitHub API polling fallback
+      const webhookTimeoutDuration = hasBackendSupport ? 120000 : 30000; // 2 min vs 30 sec
+
+      console.log("%c⏰ WEBHOOK TIMEOUT CONFIGURATION", "background: #FF5722; color: white; font-weight: bold; padding: 5px 10px;");
+      console.log("Timeout Duration:", webhookTimeoutDuration + "ms");
+      console.log("Timeout Reason:", hasBackendSupport ? "Backend available (2 min)" : "Backend unavailable (30 sec)");
+      console.log("Waiting for webhook at:", config.callbackUrl || "(empty - will timeout and poll)");
+
+      const timeout = setTimeout(async () => {
+        console.log("%c🚨 WEBHOOK TIMEOUT REACHED", "background: #F44336; color: white; font-size: 14px; font-weight: bold; padding: 8px 15px; border-radius: 5px;");
+        console.log("=".repeat(80));
+        console.log("Request ID:", requestId);
+        console.log("Time elapsed:", webhookTimeoutDuration + "ms");
+        
+        // DEBUG: Check variables availability
+        console.log("🔍 DEBUG: Checking variables availability:");
+        console.log("waitingForWebhook:", waitingForWebhook);
+        console.log("workflowRun:", workflowRun);
+        console.log("owner:", owner);
+        console.log("repo:", repo);
+        console.log("hasBackendSupport:", hasBackendSupport);
+        console.log("webhookService:", !!webhookService);
+        
+        // Check if we're still waiting for webhook
+        if (!waitingForWebhook) {
+          console.log("⚠️ No longer waiting for webhook, exiting timeout");
+          return;
+        }
+
+        // Check if we have the necessary data
+        if (!workflowRun || !workflowRun.id) {
+          console.error("❌ No workflow run available for polling");
+          setError('Cannot poll workflow status: Missing workflow run data');
           setIsRunning(false);
           setWaitingForWebhook(false);
+          return;
         }
-      }, 300000); // 5 minutes
+        
+        // STEP 1: Try backend polling first (if available)
+        if (hasBackendSupport && webhookService) {
+          console.log("%c🔄 ATTEMPTING BACKEND POLLING", "background: #3F51B5; color: white; font-weight: bold; padding: 5px 10px;");
+          try {
+            console.log("🔍 Polling backend for specific request results");
+            const polledResults = await webhookService.fetchResultsByRequestId(requestId);
+            
+            if (polledResults) {
+              console.log("✅ Found results via backend polling");
+              handleWebhookResults(polledResults);
+              return;
+            }
+            
+            console.log("🔍 Trying general requirement polling");
+            const generalResults = await webhookService.fetchLatestResultsForRequirement(
+              requirement?.id || payload.requirementId
+            );
+            
+            if (generalResults) {
+              console.log("⚠️ Using latest results for requirement (may not be from current execution)");
+              handleWebhookResults(generalResults);
+              return;
+            }
+            
+            console.log("❌ No results found via backend polling");
+          } catch (pollError) {
+            console.error("❌ Backend polling failed:", pollError);
+          }
+        } else {
+          console.log("%c⏭️ SKIPPING BACKEND POLLING", "background: #607D8B; color: white; font-weight: bold; padding: 5px 10px;");
+          console.log("Reason: hasBackendSupport =", hasBackendSupport, "| webhookService available =", !!webhookService);
+        }
+        
+        // STEP 2: GitHub API polling fallback (🎯 THIS IS WHERE ARTIFACT DOWNLOAD HAPPENS!)
+        console.log("%c🔄 STARTING GITHUB API POLLING", "background: #000; color: white; font-weight: bold; padding: 5px 10px;");
+        console.log("Polling workflow:", workflowRun.id);
+        console.log("Repository:", owner + "/" + repo);
+        console.log("Poll interval: 2 seconds");
+        
+        let pollCount = 0;
+        const maxPolls = 150; // 5 minutes of polling (150 * 2 seconds)
+        
+        const interval = setInterval(async () => {
+          pollCount++;
+          
+          try {
+            console.log(`🔍 Poll #${pollCount}: Checking workflow status...`);
+            
+            // Check workflow status
+            const status = await GitHubService.getWorkflowStatus(owner, repo, workflowRun.id, config.ghToken);
+            
+            console.log(`📊 Workflow ${workflowRun.id} status: ${status.status} | conclusion: ${status.conclusion || 'N/A'}`);
+            
+            if (status.status === 'completed') {
+              clearInterval(interval);
+              setPollInterval(null);
+              setIsRunning(false);
+              setWaitingForWebhook(false);
+              
+              console.log("%c🎉 GITHUB WORKFLOW COMPLETED", "background: #4CAF50; color: white; font-size: 14px; font-weight: bold; padding: 8px 15px; border-radius: 5px;");
+              console.log("=".repeat(80));
+              console.log("Final Status:", status.status);
+              console.log("Conclusion:", status.conclusion);
+              console.log("Total Polls:", pollCount);
+              
+              try {
+                console.log("%c📥 FETCHING ARTIFACTS AND RESULTS", "background: #673AB7; color: white; font-weight: bold; padding: 5px 10px;");
+                
+                // 🎯 THIS IS THE KEY PART - Downloads and processes GitHub artifacts!
+                const actionResults = await GitHubService.getWorkflowResults(
+                  owner, 
+                  repo, 
+                  workflowRun.id, 
+                  config.ghToken, 
+                  { 
+                    requirementId: payload.requirementId,
+                    testCases: payload.testCases,
+                    requestId: requestId 
+                  }
+                );
+                
+                console.log("✅ Artifacts processed successfully");
+                console.log("Results count:", actionResults.length);
+                console.log("Detailed results:", actionResults);
+                
+                // Structure results for processing
+                const structuredResults = {
+                  requirementId: payload.requirementId,
+                  requestId: requestId,
+                  timestamp: new Date().toISOString(),
+                  results: actionResults,
+                  source: 'github-api-polling'
+                };
+                
+                console.log("%c📤 STRUCTURED RESULTS PREPARED", "background: #2E7D32; color: white; font-weight: bold; padding: 5px 10px;");
+                console.log("Structured results:", structuredResults);
+                
+                // Process the results using existing handler
+                handleWebhookResults(structuredResults);
+                
+              } catch (resultsError) {
+                console.error("%c❌ ERROR GETTING WORKFLOW RESULTS", "background: #D32F2F; color: white; font-weight: bold; padding: 5px 10px;");
+                console.error("Error details:", resultsError);
+                console.error("Error stack:", resultsError.stack);
+                
+                // Show detailed error to user
+                setError(`Tests completed but results could not be retrieved: ${resultsError.message}. Check GitHub Actions logs and ensure artifacts are generated.`);
+                setIsRunning(false);
+                setWaitingForWebhook(false);
+              }
+              
+            } else if (status.status === 'failure' || status.conclusion === 'failure') {
+              console.warn(`⚠️ Workflow failed but continuing to poll (status: ${status.status}, conclusion: ${status.conclusion})`);
+              // Continue polling - sometimes artifacts are still generated even if workflow "fails"
+              
+            } else if (pollCount >= maxPolls) {
+              // Timeout after maximum polls
+              console.error("%c🛑 POLLING TIMEOUT", "background: #D32F2F; color: white; font-weight: bold; padding: 5px 10px;");
+              console.error(`Reached maximum polls (${maxPolls}) after ${(maxPolls * 2) / 60} minutes`);
+              
+              clearInterval(interval);
+              setPollInterval(null);
+              setError(`Polling timeout: Workflow took too long to complete (${(maxPolls * 2) / 60} minutes). Check GitHub Actions for status.`);
+              setIsRunning(false);
+              setWaitingForWebhook(false);
+            }
+            
+          } catch (pollError) {
+            console.error(`❌ Poll #${pollCount} failed:`, pollError);
+            
+            // If we get too many consecutive poll errors, give up
+            if (pollCount > 10 && pollError.message.includes('404')) {
+              console.error("%c🛑 WORKFLOW NOT FOUND", "background: #D32F2F; color: white; font-weight: bold; padding: 5px 10px;");
+              clearInterval(interval);
+              setPollInterval(null);
+              setError('Workflow run not found. It may have been deleted or the repository access was revoked.');
+              setIsRunning(false);
+              setWaitingForWebhook(false);
+            }
+          }
+        }, 2000); // Poll every 2 seconds
+        
+        setPollInterval(interval);
+      }, webhookTimeoutDuration);
+      
+      setWebhookTimeout(timeout);
 
     } catch (error) {
-      console.error('Error executing GitHub tests:', error);
+      console.error("%c💥 EXECUTE TESTS ERROR", "background: #D32F2F; color: white; font-size: 14px; font-weight: bold; padding: 8px 15px; border-radius: 5px;");
+      console.error("Error details:", error);
       setError(error.message);
       setIsRunning(false);
     }
   };
 
-  // Handle webhook results from GitHub
+  // NEW: Enhanced webhook results handler with comprehensive logging
   const handleWebhookResults = (webhookData) => {
+    console.log("%c📨 HANDLE WEBHOOK RESULTS STARTED", "background: #E91E63; color: white; font-size: 16px; font-weight: bold; padding: 8px 15px; border-radius: 5px;");
+    console.log("=".repeat(80));
+    console.log("%c📋 WEBHOOK DATA RECEIVED", "background: #3F51B5; color: white; font-weight: bold; padding: 5px 10px;");
+    console.log("Webhook Data:", JSON.stringify(webhookData, null, 2));
+    
     console.log('Processing webhook results:', webhookData);
     setWaitingForWebhook(false);
     setIsRunning(false);
     
+    // Clear any active polling
+    if (pollInterval) {
+      clearInterval(pollInterval);
+      setPollInterval(null);
+    }
+    if (webhookTimeout) {
+      clearTimeout(webhookTimeout);
+      setWebhookTimeout(null);
+    }
+    
+    console.log("%c🔄 UI STATE UPDATED", "background: #4CAF50; color: white; font-weight: bold; padding: 5px 10px;");
+    console.log("waitingForWebhook:", false);
+    console.log("isRunning:", false);
+    
     if (webhookData && webhookData.results && Array.isArray(webhookData.results)) {
       const githubResults = webhookData.results;
       
+      console.log("%c📊 PROCESSING RESULTS", "background: #FF9800; color: white; font-weight: bold; padding: 5px 10px;");
+      console.log("Results count:", githubResults.length);
+      console.log("Results details:");
+      githubResults.forEach((result, index) => {
+        console.log(`  ${index + 1}. ${result.id}: ${result.status} (${result.duration || 0}ms)`);
+      });
+      
       // Update DataStore
+      console.log("%c💾 UPDATING DATASTORE", "background: #673AB7; color: white; font-weight: bold; padding: 5px 10px;");
       updateTestStatusesInDataStore(githubResults);
       
       // Update UI
+      console.log("%c🖥️ UPDATING UI", "background: #009688; color: white; font-weight: bold; padding: 5px 10px;");
       setResults(githubResults);
       
       if (onTestComplete) {
+        console.log("🔄 Calling onTestComplete callback");
         onTestComplete(githubResults);
       }
       
       setCurrentRequestId(null);
+      console.log("🧹 Cleared currentRequestId");
+      
+      console.log("%c✅ WEBHOOK RESULTS PROCESSING COMPLETE", "background: #4CAF50; color: white; font-size: 14px; font-weight: bold; padding: 8px 15px; border-radius: 5px;");
+      
+    } else {
+      console.warn("%c⚠️ INVALID WEBHOOK DATA", "background: #FF5722; color: white; font-weight: bold; padding: 5px 10px;");
+      console.warn("Expected: { results: [...] }");
+      console.warn("Received:", webhookData);
     }
   };
 
-  // Update test statuses in DataStore (unified logic)
+  // NEW: Enhanced DataStore update logic with comprehensive logging
   const updateTestStatusesInDataStore = (results) => {
+    console.log("%c💾 UPDATE TEST STATUSES IN DATASTORE", "background: #673AB7; color: white; font-size: 16px; font-weight: bold; padding: 8px 15px; border-radius: 5px;");
+    console.log("=".repeat(80));
+    
     try {
       setProcessingStatus("Updating test statuses...");
       setIsProcessing(true);
 
+      console.log("%c📋 INPUT RESULTS", "background: #3F51B5; color: white; font-weight: bold; padding: 5px 10px;");
+      console.log("Results to process:", results.length);
+      results.forEach((result, index) => {
+        console.log(`  ${index + 1}. ${result.id}: ${result.status} (${result.duration || 0}ms)`);
+      });
+
       const currentTestCases = dataStore.getTestCases();
-      console.log("Current test cases before update:", currentTestCases.map(tc => ({ id: tc.id, status: tc.status })));
+      console.log("%c📊 CURRENT DATASTORE STATE", "background: #FF9800; color: white; font-weight: bold; padding: 5px 10px;");
+      console.log("Total test cases in DataStore:", currentTestCases.length);
+      console.log("Current test statuses:");
+      currentTestCases.forEach(tc => {
+        console.log(`  - ${tc.id}: ${tc.status} (last executed: ${tc.lastExecuted || 'never'})`);
+      });
       
+      let updatedCount = 0;
       const updatedTestCases = currentTestCases.map(tc => {
         const matchingResult = results.find(r => r.id === tc.id);
         
         if (matchingResult) {
-          console.log(`Updating test case ${tc.id} status to ${matchingResult.status}`);
+          const oldStatus = tc.status;
+          updatedCount++;
+          
+          console.log(`🔄 Updating ${tc.id}: "${oldStatus}" → "${matchingResult.status}"`);
+          
           return {
             ...tc,
             status: matchingResult.status,
             lastExecuted: new Date().toISOString(),
-            executionTime: matchingResult.duration || 0
+            executionTime: matchingResult.duration || 0,
+            logs: matchingResult.logs || ''
           };
         }
         return tc;
       });
+
+      console.log("%c📈 UPDATE SUMMARY", "background: #4CAF50; color: white; font-weight: bold; padding: 5px 10px;");
+      console.log("Test cases updated:", updatedCount);
+      console.log("Test cases unchanged:", currentTestCases.length - updatedCount);
       
-      // Update DataStore
-      dataStore.setTestCases(updatedTestCases);
-      console.log("Test cases after update:", updatedTestCases.map(tc => ({ id: tc.id, status: tc.status })));
-      
-      // Refresh quality gates
-      try {
-        refreshQualityGates(dataStore);
-      } catch (error) {
-        console.warn('Error refreshing quality gates:', error);
-      }
-      
-      // Force DataStore notification
-      if (typeof dataStore._notifyListeners === 'function') {
-        dataStore._notifyListeners();
+      if (updatedCount > 0) {
+        console.log("🔄 Saving updated test cases to DataStore...");
+        dataStore.setTestCases(updatedTestCases);
+        console.log("✅ DataStore updated successfully");
         
-        setTimeout(() => {
+        // Refresh quality gates
+        try {
+          refreshQualityGates(dataStore);
+          console.log("🚪 Quality gates refreshed");
+        } catch (refreshError) {
+          console.warn('Error refreshing quality gates:', refreshError);
+        }
+        
+        // Force DataStore notification
+        if (typeof dataStore._notifyListeners === 'function') {
           dataStore._notifyListeners();
-        }, 100);
+          
+          // Trigger a second notification after a short delay
+          setTimeout(() => {
+            console.log("📢 Sending secondary notification to ensure UI updates");
+            dataStore._notifyListeners();
+          }, 100);
+        }
+      } else {
+        console.log("⚠️ No test cases were updated");
       }
       
       setProcessingStatus("Test statuses updated successfully!");
-      setIsProcessing(false);
+      console.log("%c✅ DATASTORE UPDATE COMPLETE", "background: #4CAF50; color: white; font-size: 14px; font-weight: bold; padding: 8px 15px; border-radius: 5px;");
       
     } catch (error) {
-      console.error("Error updating test statuses:", error);
+      console.error("%c💥 DATASTORE UPDATE ERROR", "background: #D32F2F; color: white; font-size: 14px; font-weight: bold; padding: 8px 15px; border-radius: 5px;");
+      console.error("Error details:", error);
       setProcessingStatus(`Error: ${error.message}`);
+    } finally {
       setIsProcessing(false);
     }
   };
@@ -366,6 +736,17 @@ const TestExecutionModal = ({
     setExecuting(false);
     setIsRunning(false);
     setWaitingForWebhook(false);
+    
+    // NEW: Clear intervals and timeouts
+    if (pollInterval) {
+      clearInterval(pollInterval);
+      setPollInterval(null);
+    }
+    if (webhookTimeout) {
+      clearTimeout(webhookTimeout);
+      setWebhookTimeout(null);
+    }
+    
     if (onClose) onClose();
   };
 
@@ -458,11 +839,14 @@ const TestExecutionModal = ({
             <div className="mb-6 p-4 bg-gray-50 rounded-lg border">
               <h4 className="text-md font-medium text-gray-900 mb-3">Execution Settings</h4>
               
-              {/* Backend Status */}
+              {/* NEW: Enhanced Backend Status Display */}
               <div className="mb-4 flex items-center">
                 {hasBackendSupport ? <Wifi className="text-green-500 mr-2" size={16} /> : <WifiOff className="text-red-500 mr-2" size={16} />}
                 <span className="text-sm">
-                  Backend: {backendStatus === 'checking' ? 'Checking...' : hasBackendSupport ? 'Available' : 'Not Available'}
+                  Backend: {backendStatus === 'checking' ? 'Checking...' : 
+                           backendStatus === 'connected' ? 'Connected (Webhook + Polling)' :
+                           backendStatus === 'fallback' ? 'Fallback Mode (GitHub API Only)' :
+                           'Disconnected (GitHub API Only)'}
                 </span>
               </div>
 
@@ -478,7 +862,7 @@ const TestExecutionModal = ({
                   <span className="text-sm font-medium">Use GitHub Actions (real execution)</span>
                 </label>
                 <p className="text-xs text-gray-500 ml-6">
-                  {useGitHub ? 'Execute tests via GitHub Actions workflow' : 'Use simulated test execution'}
+                  {useGitHub ? 'Execute tests via GitHub Actions workflow with artifact download' : 'Use simulated test execution'}
                 </p>
               </div>
 
@@ -532,11 +916,15 @@ const TestExecutionModal = ({
                   </div>
                   
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">Webhook URL</label>
+                    <label className="block text-sm font-medium text-gray-700">
+                      Webhook URL
+                      <span className="text-xs text-gray-500 ml-1">(Leave empty to force GitHub API polling)</span>
+                    </label>
                     <input
                       type="text"
                       value={config.callbackUrl}
                       onChange={(e) => setConfig({...config, callbackUrl: e.target.value})}
+                      placeholder="https://your-webhook-url.com/webhook"
                       className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
                     />
                   </div>
@@ -555,7 +943,7 @@ const TestExecutionModal = ({
             </div>
           )}
 
-          {/* GitHub Workflow Status */}
+          {/* NEW: Enhanced GitHub Workflow Status */}
           {useGitHub && workflowRun && (
             <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded">
               <div className="flex items-center justify-between">
@@ -564,6 +952,9 @@ const TestExecutionModal = ({
                   <div>
                     <p className="text-blue-800 font-medium">GitHub Workflow Triggered</p>
                     <p className="text-blue-600 text-sm">Run ID: {workflowRun.id}</p>
+                    {currentRequestId && (
+                      <p className="text-blue-500 text-xs">Request ID: {currentRequestId}</p>
+                    )}
                   </div>
                 </div>
                 <a
@@ -578,7 +969,9 @@ const TestExecutionModal = ({
               </div>
               {isWaiting && (
                 <div className="mt-2 text-blue-600 text-sm">
-                  ⏳ Waiting for workflow to complete and send results...
+                  ⏳ {hasBackendSupport ? 
+                      'Waiting for webhook (2 min timeout) → GitHub API polling...' : 
+                      'Waiting for webhook (30 sec timeout) → GitHub API polling...'}
                 </div>
               )}
             </div>
@@ -603,7 +996,10 @@ const TestExecutionModal = ({
             <div className="mb-4">
               <div className="flex justify-between text-sm text-gray-600 mb-1">
                 <span>
-                  {isWaiting ? 'Waiting for results...' : `Progress: ${completedTests}/${testCases.length}`}
+                  {isWaiting ? 
+                    (hasBackendSupport ? 'Waiting for results (webhook → backend polling → GitHub polling)...' : 
+                     'Waiting for results (webhook → GitHub polling)...') : 
+                    `Progress: ${completedTests}/${testCases.length}`}
                 </span>
                 <span>
                   {isWaiting ? 'GitHub Actions' : `${Math.round((completedTests / testCases.length) * 100)}%`}
@@ -704,6 +1100,25 @@ const TestExecutionModal = ({
       </div>
     </div>
   );
+};
+
+// NEW: Add console helper for debugging
+window.logCurrentTestFlow = () => {
+  console.log("%c🔍 CURRENT TEST FLOW STATE", "background: #607D8B; color: white; font-size: 16px; font-weight: bold; padding: 8px 15px; border-radius: 5px;");
+  console.log("=".repeat(80));
+  
+  console.log("Backend Support:", hasBackendSupport);
+  console.log("Webhook URL:", config.callbackUrl);
+  console.log("Repository URL:", config.repoUrl);
+  console.log("Current Request ID:", currentRequestId);
+  console.log("Workflow Run:", workflowRun);
+  console.log("Waiting for Webhook:", waitingForWebhook);
+  console.log("Is Running:", isRunning);
+  console.log("Error:", error);
+  console.log("Results:", results);
+  
+  console.log("Test Cases:", testCases.map(tc => ({ id: tc.id, name: tc.name })));
+  console.log("DataStore Test Cases:", dataStore.getTestCases().map(tc => ({ id: tc.id, status: tc.status })));
 };
 
 export default TestExecutionModal;

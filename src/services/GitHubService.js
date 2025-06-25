@@ -665,67 +665,117 @@ class GitHubService {
    * Get workflow results from artifacts (existing functionality)
    */
   async getWorkflowResults(owner, repo, runId, token, clientPayload) {
-    try {
-      console.log(`Fetching workflow results for run ${runId}`);
-      const octokit = new Octokit({ auth: token });
-      
-      const requirementId = clientPayload?.requirementId;
-      const requestedTestIds = clientPayload?.testCases || [];
-      
-      // First check if the run completed successfully
-      const { data: runData } = await octokit.request('GET /repos/{owner}/{repo}/actions/runs/{run_id}', {
-        owner,
-        repo,
-        run_id: runId,
-        headers: {
-          'X-GitHub-Api-Version': '2022-11-28'
-        }
-      });
-      
-      console.log(`Workflow run status: ${runData.status}, conclusion: ${runData.conclusion}`);
-      
-      if (runData.status !== 'completed') {
-        throw new Error('Workflow run has not completed yet');
-      }
-      
-      // Get workflow artifacts
-      const { data: artifactsData } = await octokit.request('GET /repos/{owner}/{repo}/actions/runs/{run_id}/artifacts', {
-        owner,
-        repo,
-        run_id: runId,
-        headers: {
-          'X-GitHub-Api-Version': '2022-11-28'
-        }
-      });
-      
-      this.updateRateLimit(artifactsData.headers);
-      
-      console.log(`Found ${artifactsData.artifacts?.length || 0} artifacts`);
-      
-      // Look for test results artifacts
-      const resultsArtifacts = artifactsData.artifacts?.filter(artifact => 
-        artifact.name.includes('test-results') || 
-        artifact.name.includes('results') ||
-        artifact.name.toLowerCase().includes('junit')
-      ) || [];
-      
-      if (resultsArtifacts.length === 0) {
-        console.warn('No test results artifacts found');
-        return [];
-      }
-      
-      // Process the first results artifact
-      const artifact = resultsArtifacts[0];
-      console.log(`Processing artifact: ${artifact.name}`);
-      
-      return await this.downloadAndProcessArtifact(artifact, token, requirementId, clientPayload);
-      
-    } catch (error) {
-      console.error('Error getting workflow results:', error);
-      throw new Error(`Failed to get workflow results: ${error.message}`);
+  console.log("%c📥 GET WORKFLOW RESULTS STARTED", "background: #673AB7; color: white; font-size: 16px; font-weight: bold; padding: 8px 15px; border-radius: 5px;");
+  console.log("=".repeat(80));
+  
+  try {
+    console.log("%c📋 INPUT PARAMETERS", "background: #3F51B5; color: white; font-weight: bold; padding: 5px 10px;");
+    console.log("Owner:", owner);
+    console.log("Repository:", repo);
+    console.log("Run ID:", runId);
+    console.log("Client Payload:", clientPayload);
+    
+    const octokit = new Octokit({ auth: token });
+    
+    const requirementId = clientPayload?.requirementId;
+    const requestedTestIds = clientPayload?.testCases || [];
+    
+    console.log("Requirement ID:", requirementId);
+    console.log("Requested Test IDs:", requestedTestIds);
+    
+    // Check workflow status
+    console.log("%c🔍 CHECKING WORKFLOW STATUS", "background: #FF9800; color: white; font-weight: bold; padding: 5px 10px;");
+    const { data: runData } = await octokit.request('GET /repos/{owner}/{repo}/actions/runs/{run_id}', {
+      owner,
+      repo,
+      run_id: runId,
+      headers: { 'X-GitHub-Api-Version': '2022-11-28' }
+    });
+    
+    console.log("✅ Workflow status check complete");
+    console.log("Status:", runData.status);
+    console.log("Conclusion:", runData.conclusion);
+    console.log("Created at:", runData.created_at);
+    console.log("Updated at:", runData.updated_at);
+    console.log("HTML URL:", runData.html_url);
+    
+    if (runData.status !== 'completed') {
+      const error = new Error(`Workflow run has not completed yet. Current status: ${runData.status}`);
+      console.error("❌", error.message);
+      throw error;
     }
+    
+    // Get artifacts
+    console.log("%c📦 FETCHING ARTIFACTS", "background: #4CAF50; color: white; font-weight: bold; padding: 5px 10px;");
+    const { data: artifactsData } = await octokit.request('GET /repos/{owner}/{repo}/actions/runs/{run_id}/artifacts', {
+      owner,
+      repo,
+      run_id: runId,
+      headers: { 'X-GitHub-Api-Version': '2022-11-28' }
+    });
+    
+    this.updateRateLimit(artifactsData.headers);
+    
+    console.log("✅ Artifacts fetch complete");
+    console.log("Total artifacts found:", artifactsData.artifacts?.length || 0);
+    
+    if (artifactsData.artifacts?.length > 0) {
+      console.log("📋 All artifacts:");
+      artifactsData.artifacts.forEach((artifact, index) => {
+        console.log(`  ${index + 1}. ${artifact.name} (ID: ${artifact.id}, Size: ${artifact.size_in_bytes} bytes, Expires: ${artifact.expires_at})`);
+      });
+    }
+    
+    // Filter test results artifacts
+    const resultsArtifacts = artifactsData.artifacts?.filter(artifact => 
+      artifact.name.includes('test-results') || 
+      artifact.name.includes('results') ||
+      artifact.name.toLowerCase().includes('junit')
+    ) || [];
+    
+    console.log("%c🎯 FILTERING TEST RESULTS ARTIFACTS", "background: #9C27B0; color: white; font-weight: bold; padding: 5px 10px;");
+    console.log("Test results artifacts found:", resultsArtifacts.length);
+    
+    if (resultsArtifacts.length > 0) {
+      console.log("📋 Test results artifacts:");
+      resultsArtifacts.forEach((artifact, index) => {
+        console.log(`  ${index + 1}. ${artifact.name} (ID: ${artifact.id})`);
+      });
+    }
+    
+    if (resultsArtifacts.length === 0) {
+      console.warn("⚠️ No test results artifacts found");
+      console.log("Creating fallback results for requested test IDs:", requestedTestIds);
+      return requestedTestIds.map(testId => ({
+        id: testId,
+        name: `Test ${testId}`,
+        status: 'Not Run',
+        duration: 0,
+        logs: 'No test results artifacts found'
+      }));
+    }
+    
+    // Process first artifact
+    const artifact = resultsArtifacts[0];
+    console.log("%c🔧 PROCESSING ARTIFACT", "background: #FF5722; color: white; font-weight: bold; padding: 5px 10px;");
+    console.log("Selected artifact:", artifact.name);
+    console.log("Artifact ID:", artifact.id);
+    console.log("Artifact size:", artifact.size_in_bytes, "bytes");
+    
+    const results = await this.downloadAndProcessArtifact(artifact, token, requirementId, clientPayload);
+    
+    console.log("%c✅ WORKFLOW RESULTS COMPLETE", "background: #4CAF50; color: white; font-size: 14px; font-weight: bold; padding: 8px 15px; border-radius: 5px;");
+    console.log("Final results count:", results.length);
+    console.log("Final results:", results);
+    
+    return results;
+    
+  } catch (error) {
+    console.error("%c💥 GET WORKFLOW RESULTS ERROR", "background: #D32F2F; color: white; font-size: 14px; font-weight: bold; padding: 8px 15px; border-radius: 5px;");
+    console.error("Error details:", error);
+    throw new Error(`Failed to get workflow results: ${error.message}`);
   }
-
+}
   /**
    * Download and process artifact content
    */
@@ -735,33 +785,55 @@ class GitHubService {
  * Download and process artifact content
  */
 async downloadAndProcessArtifact(artifact, token, requirementId, clientPayload) {
+  console.log("%c📥 DOWNLOAD AND PROCESS ARTIFACT STARTED", "background: #FF5722; color: white; font-size: 16px; font-weight: bold; padding: 8px 15px; border-radius: 5px;");
+  console.log("=".repeat(80));
+  
   try {
+    console.log("%c📋 ARTIFACT DETAILS", "background: #795548; color: white; font-weight: bold; padding: 5px 10px;");
+    console.log("Artifact Name:", artifact.name);
+    console.log("Artifact ID:", artifact.id);
+    console.log("Artifact Size:", artifact.size_in_bytes, "bytes");
+    console.log("Expires At:", artifact.expires_at);
+    console.log("Requirement ID:", requirementId);
+    console.log("Client Payload:", clientPayload);
+    
     const octokit = new Octokit({ auth: token });
     
-    // Download the artifact
+    // Download artifact
+    console.log("%c⬇️ DOWNLOADING ARTIFACT", "background: #2196F3; color: white; font-weight: bold; padding: 5px 10px;");
+    const downloadStart = Date.now();
+    
     const downloadResponse = await octokit.request('GET /repos/{owner}/{repo}/actions/artifacts/{artifact_id}/{archive_format}', {
       owner: artifact.repository?.owner?.login,
       repo: artifact.repository?.name,
       artifact_id: artifact.id,
       archive_format: 'zip',
-      headers: {
-        'X-GitHub-Api-Version': '2022-11-28'
-      }
+      headers: { 'X-GitHub-Api-Version': '2022-11-28' }
     });
     
-    console.log('Artifact downloaded successfully, processing...');
+    const downloadTime = Date.now() - downloadStart;
+    console.log("✅ Artifact downloaded successfully");
+    console.log("Download time:", downloadTime + "ms");
+    console.log("Response data type:", typeof downloadResponse.data);
+    console.log("Response data size:", downloadResponse.data.byteLength || 'unknown', "bytes");
     
-    // Import JSZip dynamically
+    // Process ZIP
+    console.log("%c📦 PROCESSING ZIP FILE", "background: #9C27B0; color: white; font-weight: bold; padding: 5px 10px;");
     const JSZip = (await import('jszip')).default;
     
-    // Convert response to ArrayBuffer and extract ZIP
     const arrayBuffer = await new Response(downloadResponse.data).arrayBuffer();
+    console.log("ArrayBuffer size:", arrayBuffer.byteLength, "bytes");
+    
     const zip = new JSZip();
     const zipContents = await zip.loadAsync(arrayBuffer);
     
-    console.log('ZIP contents:', Object.keys(zipContents.files));
+    const fileNames = Object.keys(zipContents.files);
+    console.log("✅ ZIP processed successfully");
+    console.log("Files in ZIP:", fileNames.length);
+    console.log("ZIP contents:", fileNames);
     
-    // Look for test results files (common patterns)
+    // Find test results file
+    console.log("%c🔍 FINDING TEST RESULTS FILE", "background: #FF9800; color: white; font-weight: bold; padding: 5px 10px;");
     const possibleFiles = [
       'test-results.json',
       'results.json', 
@@ -770,32 +842,38 @@ async downloadAndProcessArtifact(artifact, token, requirementId, clientPayload) 
       'results.xml'
     ];
     
+    console.log("Looking for files matching patterns:", possibleFiles);
+    
     let resultsFile = null;
     for (const fileName of possibleFiles) {
       if (zipContents.files[fileName]) {
         resultsFile = zipContents.files[fileName];
+        console.log("✅ Found exact match:", fileName);
         break;
       }
     }
     
-    // If no exact match, find any file with 'result' in the name
     if (!resultsFile) {
-      const resultFiles = Object.keys(zipContents.files).filter(name => 
+      console.log("❌ No exact matches found, searching by patterns...");
+      const resultFiles = fileNames.filter(name => 
         name.toLowerCase().includes('result') || 
         name.toLowerCase().includes('test') ||
         name.endsWith('.json') ||
         name.endsWith('.xml')
       );
       
+      console.log("Pattern matches found:", resultFiles);
+      
       if (resultFiles.length > 0) {
         resultsFile = zipContents.files[resultFiles[0]];
+        console.log("✅ Using pattern match:", resultFiles[0]);
       }
     }
     
     if (!resultsFile) {
-      console.warn('No test results file found in artifact');
-      // Return results based on requested test cases with 'Not Run' status
+      console.warn("⚠️ No test results file found in artifact");
       const requestedTestIds = clientPayload?.testCases || [];
+      console.log("Creating fallback results for:", requestedTestIds);
       return requestedTestIds.map(testId => ({
         id: testId,
         name: `Test ${testId}`,
@@ -805,28 +883,53 @@ async downloadAndProcessArtifact(artifact, token, requirementId, clientPayload) 
       }));
     }
     
-    // Extract and parse the results file
+    // Extract and parse results
+    console.log("%c📄 EXTRACTING AND PARSING RESULTS", "background: #4CAF50; color: white; font-weight: bold; padding: 5px 10px;");
+    console.log("Processing file:", resultsFile.name);
+    
     const resultsContent = await resultsFile.async('text');
-    console.log('Raw results content:', resultsContent.substring(0, 500) + '...');
+    console.log("✅ File extracted successfully");
+    console.log("Content length:", resultsContent.length, "characters");
+    console.log("Content preview:", resultsContent.substring(0, 500) + (resultsContent.length > 500 ? '...' : ''));
     
     // Parse based on file type
     let testResults;
     if (resultsFile.name.endsWith('.json')) {
-      testResults = JSON.parse(resultsContent);
+      console.log("📋 Parsing as JSON...");
+      try {
+        testResults = JSON.parse(resultsContent);
+        console.log("✅ JSON parsed successfully");
+        console.log("Parsed structure keys:", Object.keys(testResults));
+      } catch (parseError) {
+        console.error("❌ JSON parse failed:", parseError);
+        testResults = { parseError: parseError.message, rawContent: resultsContent };
+      }
     } else if (resultsFile.name.endsWith('.xml')) {
-      // For XML files (like JUnit), you'd need to parse XML
-      // For now, return basic structure
-      testResults = { tests: [] };
+      console.log("📋 Parsing as XML (basic)...");
+      testResults = { tests: [] }; // Basic XML parsing
+      console.log("⚠️ XML parsing is basic - consider implementing full XML parser");
+    } else {
+      console.log("📋 Unknown format, treating as raw content...");
+      testResults = { rawContent: resultsContent };
     }
     
-    // Transform results to match your expected format
-    return this.transformTestResults(testResults, clientPayload);
+    // Transform results
+    console.log("%c🔄 TRANSFORMING RESULTS", "background: #673AB7; color: white; font-weight: bold; padding: 5px 10px;");
+    const transformedResults = this.transformTestResults(testResults, clientPayload);
+    
+    console.log("%c✅ ARTIFACT PROCESSING COMPLETE", "background: #4CAF50; color: white; font-size: 14px; font-weight: bold; padding: 8px 15px; border-radius: 5px;");
+    console.log("Transformed results count:", transformedResults.length);
+    console.log("Final transformed results:", transformedResults);
+    
+    return transformedResults;
     
   } catch (error) {
-    console.error('Error processing artifact:', error);
+    console.error("%c💥 ARTIFACT PROCESSING ERROR", "background: #D32F2F; color: white; font-size: 14px; font-weight: bold; padding: 8px 15px; border-radius: 5px;");
+    console.error("Error details:", error);
     
-    // Fallback: return requested test cases with error status
+    // Return fallback results
     const requestedTestIds = clientPayload?.testCases || [];
+    console.log("Creating error fallback results for:", requestedTestIds);
     return requestedTestIds.map(testId => ({
       id: testId,
       name: `Test ${testId}`,
@@ -841,13 +944,21 @@ async downloadAndProcessArtifact(artifact, token, requirementId, clientPayload) 
  * Transform raw test results to application format
  */
 transformTestResults(rawResults, clientPayload) {
+  console.log("%c🔄 TRANSFORM TEST RESULTS", "background: #9C27B0; color: white; font-size: 16px; font-weight: bold; padding: 8px 15px; border-radius: 5px;");
+  console.log("=".repeat(80));
+  
   const requestedTestIds = clientPayload?.testCases || [];
   
-  console.log('Transforming results for test IDs:', requestedTestIds);
-  console.log('Raw results structure:', Object.keys(rawResults));
+  console.log("%c📋 TRANSFORMATION INPUT", "background: #3F51B5; color: white; font-weight: bold; padding: 5px 10px;");
+  console.log("Requested Test IDs:", requestedTestIds);
+  console.log("Raw Results Type:", typeof rawResults);
+  console.log("Raw Results Keys:", rawResults ? Object.keys(rawResults) : 'null');
+  console.log("Raw Results Structure:", rawResults);
   
-  return requestedTestIds.map(testId => {
-    // Try different result structures
+  const transformedResults = requestedTestIds.map(testId => {
+    console.log(`🔍 Processing test ID: ${testId}`);
+    
+    // Try different result structures (your existing logic)
     let testResult = null;
     
     // Structure 1: Direct array of tests
@@ -857,42 +968,48 @@ transformTestResults(rawResults, clientPayload) {
         t.name?.includes(testId) ||
         t.title?.includes(testId)
       );
+      if (testResult) console.log(`  ✅ Found in direct array: ${testResult.name || testResult.title}`);
     }
     
     // Structure 2: Object with tests array
-    if (!testResult && rawResults.tests) {
+    if (!testResult && rawResults?.tests) {
       testResult = rawResults.tests.find(t => 
         t.id === testId || 
         t.name?.includes(testId) ||
         t.title?.includes(testId)
       );
+      if (testResult) console.log(`  ✅ Found in .tests array: ${testResult.name || testResult.title}`);
     }
     
     // Structure 3: Object with results array
-    if (!testResult && rawResults.results) {
+    if (!testResult && rawResults?.results) {
       testResult = rawResults.results.find(t => 
         t.id === testId || 
         t.name?.includes(testId) ||
         t.title?.includes(testId)
       );
+      if (testResult) console.log(`  ✅ Found in .results array: ${testResult.name || testResult.title}`);
     }
     
     // Structure 4: Jest-like structure
-    if (!testResult && rawResults.testResults) {
+    if (!testResult && rawResults?.testResults) {
       for (const testFile of rawResults.testResults) {
         if (testFile.assertionResults) {
           testResult = testFile.assertionResults.find(t => 
             t.title?.includes(testId) ||
             t.fullName?.includes(testId)
           );
-          if (testResult) break;
+          if (testResult) {
+            console.log(`  ✅ Found in Jest structure: ${testResult.title}`);
+            break;
+          }
         }
       }
     }
     
     // If no specific result found, create a default one
     if (!testResult) {
-      console.warn(`No result found for test ID: ${testId}`);
+      console.log(`  ⚠️ No result found for test ID: ${testId} - creating default`);
       return {
         id: testId,
         name: `Test ${testId}`,
@@ -904,18 +1021,41 @@ transformTestResults(rawResults, clientPayload) {
     
     // Transform to standard format
     const status = this.normalizeTestStatus(testResult);
+    const duration = testResult.duration || testResult.time || 0;
+    const logs = testResult.failureMessage || 
+                testResult.error?.message || 
+                testResult.message ||
+                (status === 'Passed' ? 'Test completed successfully' : 'Test execution completed');
     
-    return {
+    const transformed = {
       id: testId,
       name: testResult.title || testResult.name || `Test ${testId}`,
       status: status,
-      duration: testResult.duration || testResult.time || 0,
-      logs: testResult.failureMessage || 
-            testResult.error?.message || 
-            testResult.message ||
-            (status === 'Passed' ? 'Test passed successfully' : 'Test completed')
+      duration: duration,
+      logs: logs
     };
+    
+    console.log(`  🔄 Transformed: ${testId} → ${status} (${duration}ms)`);
+    
+    return transformed;
   });
+  
+  console.log("%c📊 TRANSFORMATION SUMMARY", "background: #4CAF50; color: white; font-weight: bold; padding: 5px 10px;");
+  console.log("Input test IDs:", requestedTestIds.length);
+  console.log("Output results:", transformedResults.length);
+  console.log("Status breakdown:");
+  const statusCounts = transformedResults.reduce((acc, result) => {
+    acc[result.status] = (acc[result.status] || 0) + 1;
+    return acc;
+  }, {});
+  Object.entries(statusCounts).forEach(([status, count]) => {
+    console.log(`  - ${status}: ${count}`);
+  });
+  
+  console.log("%c✅ TRANSFORMATION COMPLETE", "background: #4CAF50; color: white; font-size: 14px; font-weight: bold; padding: 8px 15px; border-radius: 5px;");
+  console.log("Final transformed results:", transformedResults);
+  
+  return transformedResults;
 }
 
 /**
