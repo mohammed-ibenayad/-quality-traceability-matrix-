@@ -610,53 +610,54 @@ const TestExecutionModal = ({
               console.log("Total Polls:", pollCount);
 
               try {
-                console.log("%c📥 FETCHING ARTIFACTS AND RESULTS", "background: #673AB7; color: white; font-weight: bold; padding: 5px 10px;");
-                console.log(`Attempting to get results for run ID ${run.id} from ${owner}/${repo}`);
+  console.log("%c📥 FETCHING ARTIFACTS AND RESULTS", "background: #673AB7; color: white; font-weight: bold; padding: 5px 10px;");
+  console.log(`Attempting to get results for run ID ${run.id} from ${owner}/${repo}`);
 
-                // 🎯 THIS IS THE KEY PART - Downloads and processes GitHub artifacts!
-                // ✅ Use local `run` variable
-                const actionResults = await GitHubService.getWorkflowResults(
-                  owner,
-                  repo,
-                  run.id,
-                  config.ghToken,
-                  {
-                    requirementId: payload.requirementId,
-                    testCases: payload.testCases,
-                    requestId: requestId
-                  }
-                );
+  // 🔧 FIX: Set the token in GitHubService before calling getWorkflowResults
+  GitHubService.setToken(config.ghToken);
+  
+  // 🎯 CORRECTED CALL - Remove the token parameter, it's now set via setToken()
+  const actionResults = await GitHubService.getWorkflowResults(
+    owner,
+    repo,
+    run.id,
+    {
+      requirementId: payload.requirementId,
+      testCases: payload.testCases,
+      requestId: requestId
+    }
+  );
 
-                console.log("✅ Artifacts processed successfully");
-                console.log("Raw results from getWorkflowResults:", actionResults);
+  console.log("✅ Artifacts processed successfully");
+  console.log("Raw results from getWorkflowResults:", actionResults);
 
-                // Structure results for processing
-                const structuredResults = {
-                  requirementId: payload.requirementId,
-                  requestId: requestId,
-                  timestamp: new Date().toISOString(),
-                  results: actionResults,
-                  source: 'github-api-polling'
-                };
+  // Structure results for processing
+  const structuredResults = {
+    requirementId: payload.requirementId,
+    requestId: requestId,
+    timestamp: new Date().toISOString(),
+    results: actionResults,
+    source: 'github-api-polling'
+  };
 
-                console.log("%c📤 STRUCTURED RESULTS PREPARED FOR PROCESSING", "background: #2E7D32; color: white; font-weight: bold; padding: 5px 10px;");
-                console.log("Structured results:", structuredResults);
+  console.log("%c📤 STRUCTURED RESULTS PREPARED FOR PROCESSING", "background: #2E7D32; color: white; font-weight: bold; padding: 5px 10px;");
+  console.log("Structured results:", structuredResults);
 
-                // Process the results using existing handler
-                processWebhookResults(structuredResults);
+  // Process the results using existing handler
+  processWebhookResults(structuredResults);
 
-              } catch (resultsError) {
-                console.error("%c❌ ERROR GETTING WORKFLOW RESULTS", "background: #D32F2F; color: white; font-weight: bold; padding: 5px 10px;");
-                console.error("Error details:", resultsError);
-                console.error("Error stack:", resultsError.stack);
+} catch (resultsError) {
+  console.error("%c❌ ERROR GETTING WORKFLOW RESULTS", "background: #D32F2F; color: white; font-weight: bold; padding: 5px 10px;");
+  console.error("Error details:", resultsError);
+  console.error("Error stack:", resultsError.stack);
 
-                // Show detailed error to user
-                setError(`Tests completed but results could not be retrieved: ${resultsError.message}. Check GitHub Actions logs and ensure artifacts are generated.`);
-                setIsRunning(false);
-                setWaitingForWebhook(false);
-                waitingForWebhookRef.current = false; // Sync ref
-                setProcessingStatus('error');
-              }
+  // Show detailed error to user
+  setError(`Tests completed but results could not be retrieved: ${resultsError.message}. Check GitHub Actions logs and ensure artifacts are generated.`);
+  setIsRunning(false);
+  setWaitingForWebhook(false);
+  waitingForWebhookRef.current = false;
+  setProcessingStatus('error');
+}
 
             } else if (status.status === 'in_progress' || status.status === 'queued') {
               console.log(`Workflow ${run.id} is still ${status.status}. Continuing to poll.`);

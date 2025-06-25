@@ -669,9 +669,9 @@ updateRateLimit(headers) {
   }
 
   /**
-   * Get workflow results from artifacts (existing functionality)
-   */
-  async getWorkflowResults(owner, repo, runId, token, clientPayload) {
+ * Get workflow results from artifacts (updated to pass owner/repo)
+ */
+async getWorkflowResults(owner, repo, runId, token, clientPayload) {
   console.log("%c📥 GET WORKFLOW RESULTS STARTED", "background: #673AB7; color: white; font-size: 16px; font-weight: bold; padding: 8px 15px; border-radius: 5px;");
   console.log("=".repeat(80));
   
@@ -680,6 +680,7 @@ updateRateLimit(headers) {
     console.log("Owner:", owner);
     console.log("Repository:", repo);
     console.log("Run ID:", runId);
+    console.log("Token provided:", !!token);
     console.log("Client Payload:", clientPayload);
     
     const octokit = new Octokit({ auth: token });
@@ -769,7 +770,8 @@ updateRateLimit(headers) {
     console.log("Artifact ID:", artifact.id);
     console.log("Artifact size:", artifact.size_in_bytes, "bytes");
     
-    const results = await this.downloadAndProcessArtifact(artifact, token, requirementId, clientPayload);
+    // 🔧 FIX: Pass owner and repo to downloadAndProcessArtifact
+    const results = await this.downloadAndProcessArtifact(artifact, token, requirementId, clientPayload, owner, repo);
     
     console.log("%c✅ WORKFLOW RESULTS COMPLETE", "background: #4CAF50; color: white; font-size: 14px; font-weight: bold; padding: 8px 15px; border-radius: 5px;");
     console.log("Final results count:", results.length);
@@ -783,15 +785,11 @@ updateRateLimit(headers) {
     throw new Error(`Failed to get workflow results: ${error.message}`);
   }
 }
-  /**
-   * Download and process artifact content
-   */
-  // Update this method in src/services/GitHubService.js
 
-/**
- * Download and process artifact content
+  /**
+ * Download and process artifact content (updated to accept owner/repo parameters)
  */
-async downloadAndProcessArtifact(artifact, token, requirementId, clientPayload) {
+async downloadAndProcessArtifact(artifact, token, requirementId, clientPayload, owner, repo) {
   console.log("%c📥 DOWNLOAD AND PROCESS ARTIFACT STARTED", "background: #FF5722; color: white; font-size: 16px; font-weight: bold; padding: 8px 15px; border-radius: 5px;");
   console.log("=".repeat(80));
   
@@ -801,18 +799,28 @@ async downloadAndProcessArtifact(artifact, token, requirementId, clientPayload) 
     console.log("Artifact ID:", artifact.id);
     console.log("Artifact Size:", artifact.size_in_bytes, "bytes");
     console.log("Expires At:", artifact.expires_at);
+    console.log("Owner:", owner);
+    console.log("Repo:", repo);
     console.log("Requirement ID:", requirementId);
     console.log("Client Payload:", clientPayload);
+    
+    // 🔧 FIX: Validate that owner and repo are provided
+    if (!owner || !repo) {
+      throw new Error(`Missing repository information: owner=${owner}, repo=${repo}`);
+    }
     
     const octokit = new Octokit({ auth: token });
     
     // Download artifact
     console.log("%c⬇️ DOWNLOADING ARTIFACT", "background: #2196F3; color: white; font-weight: bold; padding: 5px 10px;");
+    console.log(`Constructing URL: /repos/${owner}/${repo}/actions/artifacts/${artifact.id}/zip`);
+    
     const downloadStart = Date.now();
     
+    // 🔧 FIX: Use the provided owner and repo parameters instead of artifact.repository
     const downloadResponse = await octokit.request('GET /repos/{owner}/{repo}/actions/artifacts/{artifact_id}/{archive_format}', {
-      owner: artifact.repository?.owner?.login,
-      repo: artifact.repository?.name,
+      owner: owner,  // Use parameter
+      repo: repo,    // Use parameter
       artifact_id: artifact.id,
       archive_format: 'zip',
       headers: { 'X-GitHub-Api-Version': '2022-11-28' }
@@ -822,13 +830,35 @@ async downloadAndProcessArtifact(artifact, token, requirementId, clientPayload) 
     console.log("✅ Artifact downloaded successfully");
     console.log("Download time:", downloadTime + "ms");
     console.log("Response data type:", typeof downloadResponse.data);
-    console.log("Response data size:", downloadResponse.data.byteLength || 'unknown', "bytes");
+    console.log("Response data size:", downloadResponse.data.byteLength || downloadResponse.data.size || 'unknown', "bytes");
     
     // Process ZIP
     console.log("%c📦 PROCESSING ZIP FILE", "background: #9C27B0; color: white; font-weight: bold; padding: 5px 10px;");
-    const JSZip = (await import('jszip')).default;
     
-    const arrayBuffer = await new Response(downloadResponse.data).arrayBuffer();
+    // Handle JSZip import for both browser and Node.js environments
+    let JSZip;
+    try {
+      // Try dynamic import first
+      JSZip = (await import('jszip')).default;
+    } catch (importError) {
+      // Fallback for browser environments
+      if (typeof window !== 'undefined' && window.JSZip) {
+        JSZip = window.JSZip;
+      } else {
+        throw new Error('JSZip is not available. Please ensure jszip is installed or included.');
+      }
+    }
+    
+    // Convert response data to ArrayBuffer
+    let arrayBuffer;
+    if (downloadResponse.data instanceof ArrayBuffer) {
+      arrayBuffer = downloadResponse.data;
+    } else if (downloadResponse.data.arrayBuffer) {
+      arrayBuffer = await downloadResponse.data.arrayBuffer();
+    } else {
+      arrayBuffer = await new Response(downloadResponse.data).arrayBuffer();
+    }
+    
     console.log("ArrayBuffer size:", arrayBuffer.byteLength, "bytes");
     
     const zip = new JSZip();
@@ -913,7 +943,7 @@ async downloadAndProcessArtifact(artifact, token, requirementId, clientPayload) 
       }
     } else if (resultsFile.name.endsWith('.xml')) {
       console.log("📋 Parsing as XML (basic)...");
-      testResults = { tests: [] }; // Basic XML parsing
+      testResults = { tests: [] }; // Basic XML parsing - could be enhanced
       console.log("⚠️ XML parsing is basic - consider implementing full XML parser");
     } else {
       console.log("📋 Unknown format, treating as raw content...");
@@ -933,6 +963,7 @@ async downloadAndProcessArtifact(artifact, token, requirementId, clientPayload) 
   } catch (error) {
     console.error("%c💥 ARTIFACT PROCESSING ERROR", "background: #D32F2F; color: white; font-size: 14px; font-weight: bold; padding: 8px 15px; border-radius: 5px;");
     console.error("Error details:", error);
+    console.error("Error stack:", error.stack);
     
     // Return fallback results
     const requestedTestIds = clientPayload?.testCases || [];
