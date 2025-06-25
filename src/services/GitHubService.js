@@ -668,8 +668,8 @@ updateRateLimit(headers) {
     }
   }
 
-  /**
- * Get workflow results from artifacts (updated to pass owner/repo)
+/**
+ * Get workflow results from artifacts (updated method signature)
  */
 async getWorkflowResults(owner, repo, runId, token, clientPayload) {
   console.log("%c📥 GET WORKFLOW RESULTS STARTED", "background: #673AB7; color: white; font-size: 16px; font-weight: bold; padding: 8px 15px; border-radius: 5px;");
@@ -681,7 +681,13 @@ async getWorkflowResults(owner, repo, runId, token, clientPayload) {
     console.log("Repository:", repo);
     console.log("Run ID:", runId);
     console.log("Token provided:", !!token);
+    console.log("Token type:", typeof token);
     console.log("Client Payload:", clientPayload);
+    
+    // Validate token
+    if (!token || typeof token !== 'string' || token.trim() === '') {
+      throw new Error('Invalid GitHub token provided');
+    }
     
     const octokit = new Octokit({ auth: token });
     
@@ -770,7 +776,7 @@ async getWorkflowResults(owner, repo, runId, token, clientPayload) {
     console.log("Artifact ID:", artifact.id);
     console.log("Artifact size:", artifact.size_in_bytes, "bytes");
     
-    // 🔧 FIX: Pass owner and repo to downloadAndProcessArtifact
+    // Pass owner and repo to downloadAndProcessArtifact
     const results = await this.downloadAndProcessArtifact(artifact, token, requirementId, clientPayload, owner, repo);
     
     console.log("%c✅ WORKFLOW RESULTS COMPLETE", "background: #4CAF50; color: white; font-size: 14px; font-weight: bold; padding: 8px 15px; border-radius: 5px;");
@@ -785,7 +791,6 @@ async getWorkflowResults(owner, repo, runId, token, clientPayload) {
     throw new Error(`Failed to get workflow results: ${error.message}`);
   }
 }
-
   /**
  * Download and process artifact content (updated to accept owner/repo parameters)
  */

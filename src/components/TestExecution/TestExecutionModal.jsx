@@ -613,15 +613,16 @@ const TestExecutionModal = ({
   console.log("%c📥 FETCHING ARTIFACTS AND RESULTS", "background: #673AB7; color: white; font-weight: bold; padding: 5px 10px;");
   console.log(`Attempting to get results for run ID ${run.id} from ${owner}/${repo}`);
 
-  // 🔧 FIX: Set the token in GitHubService before calling getWorkflowResults
-  GitHubService.setToken(config.ghToken);
+  // 🔧 FIX: Don't call initialize() since we're passing the token directly
+  // Remove this line: GitHubService.initialize(config.ghToken);
   
-  // 🎯 CORRECTED CALL - Remove the token parameter, it's now set via setToken()
+  // 🎯 CORRECTED CALL - Pass token and clientPayload correctly
   const actionResults = await GitHubService.getWorkflowResults(
     owner,
     repo,
     run.id,
-    {
+    config.ghToken,  // Pass token as 4th parameter
+    {                // Pass clientPayload as 5th parameter
       requirementId: payload.requirementId,
       testCases: payload.testCases,
       requestId: requestId
@@ -657,7 +658,7 @@ const TestExecutionModal = ({
   setWaitingForWebhook(false);
   waitingForWebhookRef.current = false;
   setProcessingStatus('error');
-}
+} 
 
             } else if (status.status === 'in_progress' || status.status === 'queued') {
               console.log(`Workflow ${run.id} is still ${status.status}. Continuing to poll.`);
