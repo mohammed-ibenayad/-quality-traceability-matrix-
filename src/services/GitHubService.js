@@ -537,15 +537,22 @@ class GitHubService {
   /**
    * Update rate limit information from response headers
    */
-  updateRateLimit(headers) {
-    if (headers['x-ratelimit-remaining']) {
-      this.rateLimitRemaining = parseInt(headers['x-ratelimit-remaining']);
-    }
-    if (headers['x-ratelimit-reset']) {
-      this.rateLimitReset = new Date(parseInt(headers['x-ratelimit-reset']) * 1000);
-    }
+  /**
+ * Update rate limit information from response headers
+ */
+updateRateLimit(headers) {
+  // Add null/undefined check
+  if (!headers) {
+    return;
   }
-
+  
+  if (headers['x-ratelimit-remaining']) {
+    this.rateLimitRemaining = parseInt(headers['x-ratelimit-remaining']);
+  }
+  if (headers['x-ratelimit-reset']) {
+    this.rateLimitReset = new Date(parseInt(headers['x-ratelimit-reset']) * 1000);
+  }
+}
   /**
    * Get current rate limit status
    */
