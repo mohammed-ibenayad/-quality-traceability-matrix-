@@ -167,9 +167,37 @@ const TestExecutionModal = ({
         console.log("Received:", { requirementId: webhookData?.requirementId, requestId: webhookData?.requestId });
       }
     };
+
+    // Set up webhook listener based on backend support
+    if (hasBackendSupport && webhookService) {
+      console.log(`🎯 Setting up webhook listener for request: ${currentRequestId}`);
+      
+      // Subscribe to this specific request ID for precise targeting
+      webhookService.subscribeToRequest(currentRequestId, handleWebhookResults);
+      
+      // Also subscribe to the general requirement (backup)
+      if (requirement?.id) {
+        webhookService.subscribeToRequirement(requirement.id, handleWebhookResults);
+      }
+    } else {
+      // Fallback to window-based listener
+      console.log(`🎯 Setting up fallback webhook listener`);
+      window.onTestWebhookReceived = handleWebhookResults;
+    }
     
     return () => {
-      window.onTestWebhookReceived = null;
+      // Cleanup webhook listeners
+      if (hasBackendSupport && webhookService) {
+        console.log(`🧹 Cleaning up webhook listeners for request: ${currentRequestId}`);
+        webhookService.unsubscribeFromRequest(currentRequestId);
+        if (requirement?.id) {
+          webhookService.unsubscribeFromRequirement(requirement.id);
+        }
+      } else {
+        window.onTestWebhookReceived = null;
+      }
+      
+      // Clear timeouts and intervals
       if (webhookTimeout) {
         clearTimeout(webhookTimeout);
         setWebhookTimeout(null);
