@@ -236,7 +236,7 @@ const TestExecutionModal = ({
   // ✅ FIXED: Process webhook results with incremental update support
   const processWebhookResults = (webhookData) => {
     console.log("%c🔧 PROCESSING WEBHOOK RESULTS:", "background: #673AB7; color: white; font-weight: bold; padding: 5px 10px;", webhookData);
-
+    console.log("🔍 WEBHOOK DATA STRUCTURE:", JSON.stringify(webhookData, null, 2));
     if (!webhookData?.results || !Array.isArray(webhookData.results)) {
       console.warn("⚠️ Invalid webhook data received");
       return;
