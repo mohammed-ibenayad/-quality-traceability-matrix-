@@ -240,97 +240,93 @@ const GitHubImportTestCases = ({ onImportSuccess }) => {
   };
 
   // Extract test cases from file content
-  const extractTestCases = (content, filePath, filename) => {
-    const tests = [];
-    const lines = content.split('\n');
+const extractTestCases = (content, filePath, filename) => {
+  const tests = [];
+  const lines = content.split('\n');
+  
+  // Generate unique IDs across all files by using file path in hash
+  const fileHash = filePath.split('').reduce((a, b) => {
+    a = ((a << 5) - a) + b.charCodeAt(0);
+    return a & a;
+  }, 0);
+  
+  const baseId = Math.abs(fileHash) % 9000 + 1000; // Generate base between 1000-9999
+  let currentTestId = baseId;
+
+  console.log(`🔍 Processing ${filename}: Base ID = ${baseId}`);
+
+  // Different patterns for different test frameworks
+  const testPatterns = [
+    // JavaScript/TypeScript (Jest, Mocha, etc.)
+    /(?:it|test|describe)\s*\(\s*['"`]([^'"`]+)['"`]/g,
+    // Python (pytest, unittest)
+    /def\s+(test_[a-zA-Z0-9_]+)/g,
+    // Java (JUnit)
+    /@Test\s*\n\s*(?:public\s+)?(?:void\s+)?([a-zA-Z0-9_]+)/g,
+    // C# (MSTest, NUnit)
+    /\[Test(?:Method)?\]\s*\n\s*(?:public\s+)?(?:void\s+)?([a-zA-Z0-9_]+)/g,
+    // Go
+    /func\s+(Test[a-zA-Z0-9_]+)/g,
+    // Ruby (RSpec)
+    /(?:it|describe|context)\s+['"`]([^'"`]+)['"`]/g
+  ];
+
+  const processedTests = new Set(); // Track processed test names per file
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
     
-    // Generate unique IDs across all files by using file path in hash
-    const fileHash = filePath.split('').reduce((a, b) => {
-      a = ((a << 5) - a) + b.charCodeAt(0);
-      return a & a;
-    }, 0);
-    
-    const baseId = Math.abs(fileHash) % 9000 + 1000; // Generate base between 1000-9999
-    let currentTestId = baseId;
-
-    console.log(`🔍 Processing ${filename}: Base ID = ${baseId}`);
-
-    // Different patterns for different test frameworks
-    const testPatterns = [
-      // JavaScript/TypeScript (Jest, Mocha, etc.)
-      /(?:it|test|describe)\s*\(\s*['"`]([^'"`]+)['"`]/g,
-      // Python (pytest, unittest)
-      /def\s+(test_[a-zA-Z0-9_]+)/g,
-      // Java (JUnit)
-      /@Test\s*\n\s*(?:public\s+)?(?:void\s+)?([a-zA-Z0-9_]+)/g,
-      // C# (MSTest, NUnit)
-      /\[Test(?:Method)?\]\s*\n\s*(?:public\s+)?(?:void\s+)?([a-zA-Z0-9_]+)/g,
-      // Go
-      /func\s+(Test[a-zA-Z0-9_]+)/g,
-      // Ruby (RSpec)
-      /(?:it|describe|context)\s+['"`]([^'"`]+)['"`]/g
-    ];
-
-    const processedTests = new Set(); // Track processed test names per file
-
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i].trim();
+    for (const pattern of testPatterns) {
+      let match;
+      const globalPattern = new RegExp(pattern.source, 'g');
       
-      for (const pattern of testPatterns) {
-        let match;
-        const globalPattern = new RegExp(pattern.source, 'g');
-        
-        while ((match = globalPattern.exec(line)) !== null) {
-          const testName = match[1];
-          if (testName && testName.length > 0) {
-            
-            // Skip if we already processed this test name in this file
-            const testKey = `${testName}_${i}`;
-            if (processedTests.has(testKey)) {
-              continue;
-            }
-            processedTests.add(testKey);
-
-            // Generate unique test case ID
-            const testId = `TC_${String(currentTestId).padStart(4, '0')}`;
-            currentTestId++;
-
-            // Extract description from comments or test name
-            let description = testName;
-            if (i > 0) {
-              const prevLine = lines[i - 1].trim();
-              if (prevLine.startsWith('//') || prevLine.startsWith('#') || prevLine.startsWith('/*')) {
-                description = prevLine.replace(/^\/\/|^#|^\/\*|\*\/$/g, '').trim();
-              }
-            }
-
-            // Create unique test identifier
-            const uniqueTestName = `${testName} (${filename})`;
-
-            tests.push({
-              id: testId,
-              name: uniqueTestName, // Make name unique by including filename
-              originalName: testName, // Keep original name for reference
-              description: description || testName,
-              filePath: filePath,
-              fileName: filename,
-              lineNumber: i + 1,
-              automationStatus: 'Automated',
-              status: 'Not Run',
-              framework: detectTestFramework(content, filename),
-              lastSyncDate: new Date().toISOString()
-            });
-
-            console.log(`📝 Extracted: ${testId} - ${uniqueTestName} from ${filename}:${i + 1}`);
+      while ((match = globalPattern.exec(line)) !== null) {
+        const testName = match[1];
+        if (testName && testName.length > 0) {
+          
+          // Skip if we already processed this test name in this file
+          const testKey = `${testName}_${i}`;
+          if (processedTests.has(testKey)) {
+            continue;
           }
+          processedTests.add(testKey);
+
+          // Extract description from comments or test name
+          let description = testName;
+          if (i > 0) {
+            const prevLine = lines[i - 1].trim();
+            if (prevLine.startsWith('//') || prevLine.startsWith('#') || prevLine.startsWith('/*')) {
+              description = prevLine.replace(/^\/\/|^#|^\/\*|\*\/$/g, '').trim();
+            }
+          }
+
+          // CHANGED: Use the test name as both ID and name
+          const uniqueTestName = `${testName} (${filename})`; // Keep for reference
+
+          tests.push({
+            id: testName, // CHANGED: Use test name as the ID
+            name: testName, // Use clean test name without filename
+            originalName: testName, // Keep original name for reference
+            uniqueDisplayName: uniqueTestName, // Add this for display if needed
+            description: description || testName,
+            filePath: filePath,
+            fileName: filename,
+            lineNumber: i + 1,
+            automationStatus: 'Automated',
+            status: 'Not Run',
+            framework: detectTestFramework(content, filename),
+            lastSyncDate: new Date().toISOString()
+          });
+
+          console.log(`📝 Extracted: ${testName} from ${filename}:${i + 1}`);
         }
       }
     }
+  }
 
-    console.log(`✅ Extracted ${tests.length} tests from ${filename}`);
-    return tests;
-  };
-
+  console.log(`✅ Extracted ${tests.length} tests from ${filename}`);
+  return tests;
+};
   // Detect test framework based on file content and name
   const detectTestFramework = (content, filename) => {
     if (filename.includes('.test.js') || filename.includes('.spec.js')) {
@@ -536,7 +532,7 @@ const GitHubImportTestCases = ({ onImportSuccess }) => {
           errors.push(`Test case at index ${index} is missing required fields`);
         }
         if (!/^TC_\d+$/.test(tc.id)) {
-          errors.push(`Invalid ID format for test case: ${tc.id}`);
+          //errors.push(`Invalid ID format for test case: ${tc.id}`);
         }
       });
       
