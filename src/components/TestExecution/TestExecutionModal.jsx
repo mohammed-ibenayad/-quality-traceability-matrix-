@@ -166,15 +166,23 @@ const TestExecutionModal = ({
     const handleWebhookResults = (webhookData) => {
       console.log("%c🔔 WEBHOOK RECEIVED:", "background: #03A9F4; color: white; font-weight: bold; padding: 5px 10px;", webhookData);
 
-      // Check if this webhook matches our current execution
+      // ✅ FIXED: More flexible ID matching for bulk executions
       const expectedRequirementId = requirement?.id || `bulk_req_${currentRequestId?.split('_')[1]}_${currentRequestId?.split('_')[2]}`;
       const matchesRequirement = webhookData?.requirementId === expectedRequirementId;
       const matchesRequest = webhookData?.requestId === currentRequestId;
+      
+      // ✅ NEW: Also check if this is a bulk execution with matching timestamp
+      const isBulkExecution = !requirement?.id && webhookData?.requirementId?.startsWith('bulk_req_');
+      const hasMatchingTimestamp = currentRequestId && webhookData?.requestId === currentRequestId;
+      
+      // ✅ IMPROVED: Accept webhook if ANY of these conditions match
+      const shouldProcess = matchesRequirement || matchesRequest || (isBulkExecution && hasMatchingTimestamp);
 
-      if (matchesRequirement || matchesRequest) {
+      if (shouldProcess) {
         console.log("✅ Webhook matches current execution - processing results");
         console.log("Expected:", { requirementId: expectedRequirementId, requestId: currentRequestId });
         console.log("Received:", { requirementId: webhookData?.requirementId, requestId: webhookData?.requestId });
+        console.log("Match reasons:", { matchesRequirement, matchesRequest, isBulkExecution, hasMatchingTimestamp });
         processWebhookResults(webhookData);
       } else {
         console.log("❌ Webhook doesn't match current execution - ignoring");
@@ -252,23 +260,27 @@ const TestExecutionModal = ({
       return;
     }
 
-    // ✅ CHECK: Determine if this is an incremental update or final completion
-    const finalStatuses = ['Passed', 'Failed', 'Cancelled', 'Skipped', 'Not Run'];
-    const allTestsComplete = webhookData.results.every(result => 
-      finalStatuses.includes(result.status)
-    );
+    // ✅ FIXED: Better status detection - treat "Not Started" as initial state, not final
+    const finalStatuses = ['Passed', 'Failed', 'Cancelled', 'Skipped'];
+    const initialStatuses = ['Not Started', 'Queued', 'Pending'];
+    const runningStatuses = ['Running', 'In Progress'];
     
-    const hasRunningTests = webhookData.results.some(result => 
-      result.status === 'Running'
-    );
+    const completedTests = webhookData.results.filter(result => finalStatuses.includes(result.status));
+    const runningTests = webhookData.results.filter(result => runningStatuses.includes(result.status));
+    const initialTests = webhookData.results.filter(result => initialStatuses.includes(result.status));
     
-    const isIncrementalUpdate = hasRunningTests || !allTestsComplete;
+    const allTestsComplete = completedTests.length === webhookData.results.length;
+    const hasRunningTests = runningTests.length > 0;
+    const hasInitialTests = initialTests.length > 0;
 
     console.log(`📊 Webhook Analysis:`, {
       totalResults: webhookData.results.length,
+      completedTests: completedTests.length,
+      runningTests: runningTests.length,
+      initialTests: initialTests.length,
       allTestsComplete,
       hasRunningTests,
-      isIncrementalUpdate,
+      hasInitialTests,
       statusCounts: webhookData.results.reduce((acc, r) => {
         acc[r.status] = (acc[r.status] || 0) + 1;
         return acc;
@@ -285,7 +297,7 @@ const TestExecutionModal = ({
           return {
             id: existingResult.id,
             name: existingResult.name,
-            status: newResult.status || 'Not Run',
+            status: newResult.status || 'Not Started',
             duration: newResult.duration || existingResult.duration || 0,
             logs: newResult.logs || existingResult.logs || '',
             startTime: existingResult.startTime,
@@ -298,15 +310,15 @@ const TestExecutionModal = ({
         }
       });
       
-      console.log("📊 Test results after incremental merge:", updatedResults.map(r => `${r.id}: ${r.status} (${r.duration}ms)`));
+      console.log("📊 Test results after merge:", updatedResults.map(r => `${r.id}: ${r.status} (${r.duration}ms)`));
       return updatedResults;
     });
 
     // ✅ ALWAYS update the results state (for compatibility with existing code)
     setResults(webhookData.results);
 
-    // ✅ ONLY stop listening if ALL tests are truly complete
-    if (allTestsComplete && !hasRunningTests) {
+    // ✅ FIXED: Only stop listening when truly complete (no "Not Started" considered complete)
+    if (allTestsComplete && !hasRunningTests && !hasInitialTests) {
       console.log("🏁 ALL TESTS COMPLETED - Stopping webhook listener");
       setWaitingForWebhook(false);
       waitingForWebhookRef.current = false;
@@ -324,10 +336,15 @@ const TestExecutionModal = ({
         setPollInterval(null);
         console.log("%c🧹 Cleared pollInterval upon final completion", "color: gray;");
       }
+
+      // Call completion callback
+      if (onTestComplete) {
+        console.log("🎯 All tests completed - firing onTestComplete callback");
+        onTestComplete(webhookData.results);
+      }
     } else {
       console.log("📈 INCREMENTAL UPDATE - Continuing to wait for more results");
-      setProcessingStatus('running');
-      // DO NOT clear webhookTimeout or pollInterval yet - keep listening!
+      setProcessingStatus(hasInitialTests ? 'waiting' : hasRunningTests ? 'running' : 'processing');
     }
 
     // ✅ UPDATE DataStore incrementally
@@ -347,15 +364,17 @@ const TestExecutionModal = ({
 
     console.log("✅ Incremental results processed and DataStore updated");
 
-    // ✅ ONLY call onTestComplete when everything is truly done
-    if (allTestsComplete && !hasRunningTests && onTestComplete) {
-      console.log("🎯 All tests completed - firing onTestComplete callback with updated results");
-      onTestComplete(webhookData.results);
+    // ✅ FIXED: Safe quality gates refresh with error handling
+    try {
+      if (typeof refreshQualityGates === 'function') {
+        refreshQualityGates();
+        console.log("Quality gates refreshed after incremental processing.");
+      } else {
+        console.log("Quality gates refresh function not available, skipping.");
+      }
+    } catch (error) {
+      console.warn("Quality gates refresh failed:", error.message);
     }
-
-    // Always refresh quality gates for live updates
-    refreshQualityGates();
-    console.log("Quality gates refreshed after incremental processing.");
 
     // ✅ CRITICAL: Force UI refresh after processing
     setTimeout(() => {
@@ -685,6 +704,41 @@ const TestExecutionModal = ({
     const { name, value } = e.target;
     setConfig(prev => ({ ...prev, [name]: value }));
   };
+
+  // ✅ ADD: Debug function for manual webhook testing
+  useEffect(() => {
+    // Add debug function to window for manual testing
+    window.testWebhookUpdate = (status = 'Running') => {
+      const mockWebhookData = {
+        requirementId: "bulk_req_test",
+        requestId: currentRequestId || "req_test",
+        timestamp: new Date().toISOString(),
+        results: testCases.map(tc => ({
+          id: tc.id,
+          name: tc.name, 
+          status: status,
+          duration: status === 'Running' ? 0 : Math.floor(Math.random() * 1000) + 100,
+          logs: `Test ${status.toLowerCase()}`
+        }))
+      };
+      
+      console.log("🧪 Testing webhook with status:", status);
+      if (window.onTestWebhookReceived) {
+        window.onTestWebhookReceived(mockWebhookData);
+      } else {
+        console.log("❌ No webhook listener found");
+      }
+    };
+
+    console.log("🧪 Debug function available:");
+    console.log("- window.testWebhookUpdate('Running')");
+    console.log("- window.testWebhookUpdate('Passed')"); 
+    console.log("- window.testWebhookUpdate('Failed')");
+
+    return () => {
+      delete window.testWebhookUpdate;
+    };
+  }, [testCases, currentRequestId]);
 
   if (!isOpen) return null;
 
