@@ -152,63 +152,83 @@ const TestExecutionModal = ({
     }
   };
 
-  // Set up webhook listeners - FIXED VERSION
-  // Initialize test results when modal opens - FIXED VERSION
+  // Check backend availability when modal opens
 useEffect(() => {
-  if (isOpen && testCases.length > 0) {
-    const initialResults = testCases.map(testCase => ({
-      id: testCase.id,
-      name: testCase.name,
-      status: 'Not Started',
-      duration: 0,
-      startTime: null,
-      endTime: null
-    }));
-    
-    // FIXED: Only reset states if not currently executing
-    if (!isRunning && !waitingForWebhook && !currentRequestId) {
-      console.log('🔄 Initializing modal states (not currently executing)');
-      setTestResults(initialResults);
-      setExecuting(false);
-      setCancelled(false);
-      setCurrentTestIndex(-1);
-      setExecutionStarted(false);
-      setCompletedTests(0);
-      setIsRunning(false);
-      setWaitingForWebhook(false);
-      waitingForWebhookRef.current = false;
-      setResults(null);
-      setError(null);
-      setProcessingStatus(null);
-      setIsProcessing(false);
-      setCurrentRequestId(null);
+  if (isOpen) {
+    checkBackend();
+  }
+}, [isOpen]);
 
-      // Clear intervals and timeouts only if not executing
-      if (pollInterval) {
-        clearInterval(pollInterval);
-        setPollInterval(null);
-        console.log("%c🧹 Cleared existing poll interval on modal open", "color: gray;");
+// Set up webhook listeners - FIXED VERSION  
+useEffect(() => {
+  if (!isOpen || !currentRequestId) return;
+
+  const handleWebhookResults = (webhookData) => {
+    console.log("%c🔔 WEBHOOK RECEIVED:", "background: #03A9F4; color: white; font-weight: bold; padding: 5px 10px;", webhookData);
+
+    // Check if this webhook matches our current execution
+    const expectedRequirementId = requirement?.id || `bulk_req_${currentRequestId?.split('_')[1]}_${currentRequestId?.split('_')[2]}`;
+    const matchesRequirement = webhookData?.requirementId === expectedRequirementId;
+    const matchesRequest = webhookData?.requestId === currentRequestId;
+
+    if (matchesRequirement || matchesRequest) {
+      console.log("✅ Webhook matches current execution - processing results");
+      console.log("Expected:", { requirementId: expectedRequirementId, requestId: currentRequestId });
+      console.log("Received:", { requirementId: webhookData?.requirementId, requestId: webhookData?.requestId });
+      processWebhookResults(webhookData);
+    } else {
+      console.log("❌ Webhook doesn't match current execution - ignoring");
+      console.log("Expected:", { requirementId: expectedRequirementId, requestId: currentRequestId });
+      console.log("Received:", { requirementId: webhookData?.requirementId, requestId: webhookData?.requestId });
+    }
+  };
+
+  // Set up webhook listener based on backend support
+  if (hasBackendSupport && webhookService) {
+    console.log(`🎯 Setting up webhook listener for request: ${currentRequestId}`);
+
+    // Subscribe to this specific request ID for precise targeting
+    webhookService.subscribeToRequest(currentRequestId, handleWebhookResults);
+
+    // Also subscribe to the general requirement (backup)
+    if (requirement?.id) {
+      webhookService.subscribeToRequirement(requirement.id, handleWebhookResults);
+    }
+  } else {
+    // Fallback to window-based listener
+    console.log(`🎯 Setting up fallback webhook listener (window.onTestWebhookReceived)`);
+    window.onTestWebhookReceived = handleWebhookResults;
+  }
+
+  // FIXED: Only cleanup when modal closes, not when dependencies change
+  return () => {
+    if (!isOpen) {
+      // Only cleanup when modal is actually closing
+      if (hasBackendSupport && webhookService) {
+        console.log(`🧹 Cleaning up webhook listeners for request: ${currentRequestId}`);
+        webhookService.unsubscribeFromRequest(currentRequestId);
+        if (requirement?.id) {
+          webhookService.unsubscribeFromRequirement(requirement.id);
+        }
+      } else {
+        console.log(`🧹 Cleaning up fallback webhook listener`);
+        window.onTestWebhookReceived = null;
       }
+
+      // Clear timeouts and intervals to prevent memory leaks/unwanted behavior
       if (webhookTimeout) {
+        console.log("%c🧹 Clearing webhookTimeout on effect cleanup", "color: gray;");
         clearTimeout(webhookTimeout);
         setWebhookTimeout(null);
-        console.log("%c🧹 Cleared existing webhook timeout on modal open", "color: gray;");
       }
-    } else {
-      console.log('⚠️ Modal reopened but execution in progress - preserving states');
-      // Only update test results structure, don't reset execution states
-      setTestResults(prevResults => {
-        if (prevResults.length === 0) {
-          return initialResults;
-        }
-        return prevResults; // Keep existing results if already populated
-      });
+      if (pollInterval) {
+        console.log("%c🧹 Clearing pollInterval on effect cleanup", "color: gray;");
+        clearInterval(pollInterval);
+        setPollInterval(null);
+      }
     }
-
-    console.log('Test execution modal opened for:', requirement ? requirement.id : 'bulk execution');
-    console.log('Test cases to run:', testCases);
-  }
-}, [isOpen, testCases.length]); // Removed requirement from dependencies
+  };
+}, [isOpen, currentRequestId]); // Removed hasBackendSupport from dependencies
 
 
 
