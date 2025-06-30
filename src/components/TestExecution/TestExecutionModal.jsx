@@ -237,7 +237,7 @@ useEffect(() => {
     console.log("🔍 WEBHOOK DATA STRUCTURE:", JSON.stringify(webhookData, null, 2));
     console.log("🔍 CURRENT TEST RESULTS STATE:", testResults?.map(r => `${r.id}: ${r.status}`));
     console.log("🔍 WAITING FOR WEBHOOK STATE:", waitingForWebhook);
-    console.log("🔍 MODAL STATE CHECK:", { isOpen, isRunning, waitingForWebhook, currentRequestId });
+    console.log("🔍 MODAL STATE CHECK:", { isOpen, isRunning, waitingForWebhook, currentRequestId }); 
   
     if (!webhookData?.results || !Array.isArray(webhookData.results)) {
       console.warn("⚠️ Invalid webhook data received");
