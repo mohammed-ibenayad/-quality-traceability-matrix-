@@ -1,4 +1,4 @@
-// src/components/TestExecution/TestExecutionModal.jsx - Fixed Version with Incremental Updates
+// src/components/TestExecution/TestExecutionModal.jsx - Fixed Version with Webhook Updates
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Play,
@@ -153,69 +153,67 @@ const TestExecutionModal = ({
   };
 
   // Check backend availability when modal opens
-useEffect(() => {
-  if (isOpen) {
-    checkBackend();
-  }
-}, [isOpen]);
+  useEffect(() => {
+    if (isOpen) {
+      checkBackend();
+    }
+  }, [isOpen]);
 
-// Set up webhook listeners - FIXED VERSION  
-useEffect(() => {
-  if (!isOpen || !currentRequestId) return;
+  // ✅ FIXED: Set up webhook listeners with proper dependencies
+  useEffect(() => {
+    if (!isOpen || !currentRequestId) return;
 
-  const handleWebhookResults = (webhookData) => {
-    console.log("%c🔔 WEBHOOK RECEIVED:", "background: #03A9F4; color: white; font-weight: bold; padding: 5px 10px;", webhookData);
+    const handleWebhookResults = (webhookData) => {
+      console.log("%c🔔 WEBHOOK RECEIVED:", "background: #03A9F4; color: white; font-weight: bold; padding: 5px 10px;", webhookData);
 
-    // Check if this webhook matches our current execution
-    const expectedRequirementId = requirement?.id || `bulk_req_${currentRequestId?.split('_')[1]}_${currentRequestId?.split('_')[2]}`;
-    const matchesRequirement = webhookData?.requirementId === expectedRequirementId;
-    const matchesRequest = webhookData?.requestId === currentRequestId;
+      // Check if this webhook matches our current execution
+      const expectedRequirementId = requirement?.id || `bulk_req_${currentRequestId?.split('_')[1]}_${currentRequestId?.split('_')[2]}`;
+      const matchesRequirement = webhookData?.requirementId === expectedRequirementId;
+      const matchesRequest = webhookData?.requestId === currentRequestId;
 
-    if (matchesRequirement || matchesRequest) {
-      console.log("✅ Webhook matches current execution - processing results");
-      console.log("Expected:", { requirementId: expectedRequirementId, requestId: currentRequestId });
-      console.log("Received:", { requirementId: webhookData?.requirementId, requestId: webhookData?.requestId });
-      processWebhookResults(webhookData);
+      if (matchesRequirement || matchesRequest) {
+        console.log("✅ Webhook matches current execution - processing results");
+        console.log("Expected:", { requirementId: expectedRequirementId, requestId: currentRequestId });
+        console.log("Received:", { requirementId: webhookData?.requirementId, requestId: webhookData?.requestId });
+        processWebhookResults(webhookData);
+      } else {
+        console.log("❌ Webhook doesn't match current execution - ignoring");
+        console.log("Expected:", { requirementId: expectedRequirementId, requestId: currentRequestId });
+        console.log("Received:", { requirementId: webhookData?.requirementId, requestId: webhookData?.requestId });
+      }
+    };
+
+    // Set up webhook listener based on backend support
+    if (hasBackendSupport && webhookService) {
+      console.log(`🎯 Setting up webhook listener for request: ${currentRequestId}`);
+
+      // Subscribe to this specific request ID for precise targeting
+      webhookService.subscribeToRequest(currentRequestId, handleWebhookResults);
+
+      // Also subscribe to the general requirement (backup)
+      if (requirement?.id) {
+        webhookService.subscribeToRequirement(requirement.id, handleWebhookResults);
+      }
     } else {
-      console.log("❌ Webhook doesn't match current execution - ignoring");
-      console.log("Expected:", { requirementId: expectedRequirementId, requestId: currentRequestId });
-      console.log("Received:", { requirementId: webhookData?.requirementId, requestId: webhookData?.requestId });
+      // Fallback to window-based listener
+      console.log(`🎯 Setting up fallback webhook listener (window.onTestWebhookReceived)`);
+      window.onTestWebhookReceived = handleWebhookResults;
     }
-  };
 
-  // Set up webhook listener based on backend support
-  if (hasBackendSupport && webhookService) {
-    console.log(`🎯 Setting up webhook listener for request: ${currentRequestId}`);
-
-    // Subscribe to this specific request ID for precise targeting
-    webhookService.subscribeToRequest(currentRequestId, handleWebhookResults);
-
-    // Also subscribe to the general requirement (backup)
-    if (requirement?.id) {
-      webhookService.subscribeToRequirement(requirement.id, handleWebhookResults);
-    }
-  } else {
-    // Fallback to window-based listener
-    console.log(`🎯 Setting up fallback webhook listener (window.onTestWebhookReceived)`);
-    window.onTestWebhookReceived = handleWebhookResults;
-  }
-
-  // FIXED: Only cleanup when modal closes, not when dependencies change
-  return () => {
-    if (!isOpen) {
-      // Only cleanup when modal is actually closing
+    // ✅ FIXED: Proper cleanup that doesn't trigger prematurely
+    return () => {
+      console.log(`🧹 Cleaning up webhook listeners for request: ${currentRequestId}`);
+      
       if (hasBackendSupport && webhookService) {
-        console.log(`🧹 Cleaning up webhook listeners for request: ${currentRequestId}`);
         webhookService.unsubscribeFromRequest(currentRequestId);
         if (requirement?.id) {
           webhookService.unsubscribeFromRequirement(requirement.id);
         }
       } else {
-        console.log(`🧹 Cleaning up fallback webhook listener`);
         window.onTestWebhookReceived = null;
       }
 
-      // Clear timeouts and intervals to prevent memory leaks/unwanted behavior
+      // Clear timeouts and intervals to prevent memory leaks
       if (webhookTimeout) {
         console.log("%c🧹 Clearing webhookTimeout on effect cleanup", "color: gray;");
         clearTimeout(webhookTimeout);
@@ -226,11 +224,13 @@ useEffect(() => {
         clearInterval(pollInterval);
         setPollInterval(null);
       }
-    }
-  };
-}, [isOpen, currentRequestId]); // Removed hasBackendSupport from dependencies
+    };
+  }, [currentRequestId, hasBackendSupport, requirement?.id]); // ✅ FIXED: Stable dependencies
 
-
+  // ✅ ADD: Monitor testResults changes for debugging
+  useEffect(() => {
+    console.log("🔄 testResults state updated:", testResults.map(r => `${r.id}: ${r.status} (${r.duration}ms)`));
+  }, [testResults]);
 
   // Save configuration
   const saveConfiguration = () => {
@@ -239,7 +239,7 @@ useEffect(() => {
     console.log("⚙️ Configuration saved:", config);
   };
 
-  // ✅ FIXED: Process webhook results with incremental update support
+  // ✅ FIXED: Process webhook results with proper UI updates
   const processWebhookResults = (webhookData) => {
     console.log("%c🔧 PROCESSING WEBHOOK RESULTS:", "background: #673AB7; color: white; font-weight: bold; padding: 5px 10px;", webhookData);
     console.log("🔍 WEBHOOK DATA STRUCTURE:", JSON.stringify(webhookData, null, 2));
@@ -275,6 +275,36 @@ useEffect(() => {
       }, {})
     });
 
+    // ✅ CRITICAL FIX: Update testResults state immediately and force re-render
+    setTestResults(prevResults => {
+      const updatedResults = prevResults.map(existingResult => {
+        const newResult = webhookData.results.find(r => r.id === existingResult.id);
+        
+        if (newResult) {
+          console.log(`📝 Updating ${existingResult.id}: ${existingResult.status} → ${newResult.status} (duration: ${newResult.duration || 0})`);
+          return {
+            id: existingResult.id,
+            name: existingResult.name,
+            status: newResult.status || 'Not Run',
+            duration: newResult.duration || existingResult.duration || 0,
+            logs: newResult.logs || existingResult.logs || '',
+            startTime: existingResult.startTime,
+            endTime: existingResult.endTime
+          };
+        } else {
+          // Keep existing result if no update found
+          console.log(`📝 No update for ${existingResult.id}, keeping existing status: ${existingResult.status}`);
+          return existingResult;
+        }
+      });
+      
+      console.log("📊 Test results after incremental merge:", updatedResults.map(r => `${r.id}: ${r.status} (${r.duration}ms)`));
+      return updatedResults;
+    });
+
+    // ✅ ALWAYS update the results state (for compatibility with existing code)
+    setResults(webhookData.results);
+
     // ✅ ONLY stop listening if ALL tests are truly complete
     if (allTestsComplete && !hasRunningTests) {
       console.log("🏁 ALL TESTS COMPLETED - Stopping webhook listener");
@@ -299,36 +329,6 @@ useEffect(() => {
       setProcessingStatus('running');
       // DO NOT clear webhookTimeout or pollInterval yet - keep listening!
     }
-
-    // ✅ ALWAYS update the results (incremental or final)
-    setResults(webhookData.results);
-
-    // ✅ MERGE incremental results instead of replacing
-    setTestResults(prevResults => {
-      const updatedResults = prevResults.map(existingResult => {
-        const newResult = webhookData.results.find(r => r.id === existingResult.id);
-        
-        if (newResult) {
-          console.log(`📝 Updating ${existingResult.id}: ${existingResult.status} → ${newResult.status}`);
-          return {
-            id: existingResult.id,
-            name: existingResult.name,
-            status: newResult.status || 'Not Run',
-            duration: newResult.duration || existingResult.duration || 0,
-            logs: newResult.logs || existingResult.logs || '',
-            startTime: existingResult.startTime,
-            endTime: existingResult.endTime
-          };
-        } else {
-          // Keep existing result if no update found
-          console.log(`📝 No update for ${existingResult.id}, keeping existing status: ${existingResult.status}`);
-          return existingResult;
-        }
-      });
-      
-      console.log("📊 Test results after incremental merge:", updatedResults.map(r => `${r.id}: ${r.status}`));
-      return updatedResults;
-    });
 
     // ✅ UPDATE DataStore incrementally
     webhookData.results.forEach(result => {
@@ -356,6 +356,13 @@ useEffect(() => {
     // Always refresh quality gates for live updates
     refreshQualityGates();
     console.log("Quality gates refreshed after incremental processing.");
+
+    // ✅ CRITICAL: Force UI refresh after processing
+    setTimeout(() => {
+      console.log("🔄 Forcing UI refresh to ensure modal updates");
+      // Trigger a small state change to force re-render of the component
+      setProcessingStatus(current => current);
+    }, 50);
   };
 
   // Execute GitHub workflow
@@ -984,7 +991,7 @@ useEffect(() => {
                         </div>
                       </td>
                       <td className="px-4 py-2 text-sm text-gray-500">
-                        {result.duration > 0 ? `${result.duration}s` : 
+                        {result.duration > 0 ? `${result.duration}ms` : 
                          result.status === 'Running' ? '⏱️' : '-'}
                       </td>
                     </tr>

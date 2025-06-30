@@ -152,55 +152,58 @@ const TestExecutionModal = ({
     }
   };
 
-  useEffect(() => {
-    if (isOpen) {
-      checkBackend();
-    }
-  }, [isOpen]);
+  // Check backend availability when modal opens
+useEffect(() => {
+  if (isOpen) {
+    checkBackend();
+  }
+}, [isOpen]);
 
-  // Set up webhook listeners
-  useEffect(() => {
-    if (!isOpen || !currentRequestId) return;
+// Set up webhook listeners - FIXED VERSION  
+useEffect(() => {
+  if (!isOpen || !currentRequestId) return;
 
-    const handleWebhookResults = (webhookData) => {
-      console.log("%c🔔 WEBHOOK RECEIVED:", "background: #03A9F4; color: white; font-weight: bold; padding: 5px 10px;", webhookData);
+  const handleWebhookResults = (webhookData) => {
+    console.log("%c🔔 WEBHOOK RECEIVED:", "background: #03A9F4; color: white; font-weight: bold; padding: 5px 10px;", webhookData);
 
-      // Check if this webhook matches our current execution
-      const expectedRequirementId = requirement?.id || `bulk_req_${currentRequestId?.split('_')[1]}_${currentRequestId?.split('_')[2]}`;
-      const matchesRequirement = webhookData?.requirementId === expectedRequirementId;
-      const matchesRequest = webhookData?.requestId === currentRequestId;
+    // Check if this webhook matches our current execution
+    const expectedRequirementId = requirement?.id || `bulk_req_${currentRequestId?.split('_')[1]}_${currentRequestId?.split('_')[2]}`;
+    const matchesRequirement = webhookData?.requirementId === expectedRequirementId;
+    const matchesRequest = webhookData?.requestId === currentRequestId;
 
-      if (matchesRequirement || matchesRequest) {
-        console.log("✅ Webhook matches current execution - processing results");
-        console.log("Expected:", { requirementId: expectedRequirementId, requestId: currentRequestId });
-        console.log("Received:", { requirementId: webhookData?.requirementId, requestId: webhookData?.requestId });
-        processWebhookResults(webhookData);
-      } else {
-        console.log("❌ Webhook doesn't match current execution - ignoring");
-        console.log("Expected:", { requirementId: expectedRequirementId, requestId: currentRequestId });
-        console.log("Received:", { requirementId: webhookData?.requirementId, requestId: webhookData?.requestId });
-      }
-    };
-
-    // Set up webhook listener based on backend support
-    if (hasBackendSupport && webhookService) {
-      console.log(`🎯 Setting up webhook listener for request: ${currentRequestId}`);
-
-      // Subscribe to this specific request ID for precise targeting
-      webhookService.subscribeToRequest(currentRequestId, handleWebhookResults);
-
-      // Also subscribe to the general requirement (backup)
-      if (requirement?.id) {
-        webhookService.subscribeToRequirement(requirement.id, handleWebhookResults);
-      }
+    if (matchesRequirement || matchesRequest) {
+      console.log("✅ Webhook matches current execution - processing results");
+      console.log("Expected:", { requirementId: expectedRequirementId, requestId: currentRequestId });
+      console.log("Received:", { requirementId: webhookData?.requirementId, requestId: webhookData?.requestId });
+      processWebhookResults(webhookData);
     } else {
-      // Fallback to window-based listener
-      console.log(`🎯 Setting up fallback webhook listener (window.onTestWebhookReceived)`);
-      window.onTestWebhookReceived = handleWebhookResults;
+      console.log("❌ Webhook doesn't match current execution - ignoring");
+      console.log("Expected:", { requirementId: expectedRequirementId, requestId: currentRequestId });
+      console.log("Received:", { requirementId: webhookData?.requirementId, requestId: webhookData?.requestId });
     }
+  };
 
-    return () => {
-      // Cleanup webhook listeners
+  // Set up webhook listener based on backend support
+  if (hasBackendSupport && webhookService) {
+    console.log(`🎯 Setting up webhook listener for request: ${currentRequestId}`);
+
+    // Subscribe to this specific request ID for precise targeting
+    webhookService.subscribeToRequest(currentRequestId, handleWebhookResults);
+
+    // Also subscribe to the general requirement (backup)
+    if (requirement?.id) {
+      webhookService.subscribeToRequirement(requirement.id, handleWebhookResults);
+    }
+  } else {
+    // Fallback to window-based listener
+    console.log(`🎯 Setting up fallback webhook listener (window.onTestWebhookReceived)`);
+    window.onTestWebhookReceived = handleWebhookResults;
+  }
+
+  // FIXED: Only cleanup when modal closes, not when dependencies change
+  return () => {
+    if (!isOpen) {
+      // Only cleanup when modal is actually closing
       if (hasBackendSupport && webhookService) {
         console.log(`🧹 Cleaning up webhook listeners for request: ${currentRequestId}`);
         webhookService.unsubscribeFromRequest(currentRequestId);
@@ -223,8 +226,11 @@ const TestExecutionModal = ({
         clearInterval(pollInterval);
         setPollInterval(null);
       }
-    };
-  }, [requirement?.id, hasBackendSupport, currentRequestId]);
+    }
+  };
+}, [isOpen, currentRequestId]); // Removed hasBackendSupport from dependencies
+
+
 
   // Save configuration
   const saveConfiguration = () => {
@@ -239,6 +245,7 @@ const TestExecutionModal = ({
     console.log("🔍 WEBHOOK DATA STRUCTURE:", JSON.stringify(webhookData, null, 2));
     console.log("🔍 CURRENT TEST RESULTS STATE:", testResults?.map(r => `${r.id}: ${r.status}`));
     console.log("🔍 WAITING FOR WEBHOOK STATE:", waitingForWebhook);
+    console.log("🔍 MODAL STATE CHECK:", { isOpen, isRunning, waitingForWebhook, currentRequestId }); 
   
     if (!webhookData?.results || !Array.isArray(webhookData.results)) {
       console.warn("⚠️ Invalid webhook data received");
