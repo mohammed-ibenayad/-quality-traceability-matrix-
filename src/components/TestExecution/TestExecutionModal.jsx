@@ -310,11 +310,17 @@ useEffect(() => {
         
         if (newResult) {
           console.log(`📝 Updating ${existingResult.id}: ${existingResult.status} → ${newResult.status}`);
+          
+          // Explicitly check for a number to avoid the "falsy 0" bug.
+          const updatedDuration = typeof newResult.duration === 'number' 
+            ? newResult.duration 
+            : existingResult.duration;
+
           return {
             id: existingResult.id,
             name: existingResult.name,
-            status: newResult.status || 'Not Run',
-            duration: newResult.duration || existingResult.duration || 0,
+            status: newResult.status || existingResult.status, // Also make status update more robust
+            duration: updatedDuration,
             logs: newResult.logs || existingResult.logs || '',
             startTime: existingResult.startTime,
             endTime: existingResult.endTime
