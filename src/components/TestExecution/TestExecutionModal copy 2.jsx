@@ -77,11 +77,6 @@ const TestExecutionModal = ({
   // FIXED: Test results state - respects current test case status
   const [testResults, setTestResults] = useState([]);
 
-  // NEW: Enhanced tracking for deduplication and running indicators
-  const [webhookHistory, setWebhookHistory] = useState(new Map()); // Track processed webhooks
-  const [currentlyRunningTestId, setCurrentlyRunningTestId] = useState(null);
-  const [runningTestStartTime, setRunningTestStartTime] = useState(null);
-
   // FIXED: Initialize test results when modal opens - respect current status
   useEffect(() => {
     if (isOpen && testCases.length > 0) {
@@ -104,11 +99,6 @@ const TestExecutionModal = ({
       setProcessingStatus(null);
       setIsProcessing(false);
       setCurrentRequestId(null);
-
-      // NEW: Reset enhancement states
-      setWebhookHistory(new Map());
-      setCurrentlyRunningTestId(null);
-      setRunningTestStartTime(null);
 
       // Clear intervals and timeouts
       if (pollInterval) {
@@ -224,66 +214,15 @@ const TestExecutionModal = ({
       return;
     }
 
-    // NEW: Webhook deduplication check
-    const webhookId = webhookData.requestId || webhookData.timestamp || `${Date.now()}_${Math.random()}`;
-    const webhookTimestamp = new Date(webhookData.timestamp || Date.now()).getTime();
-
-    if (webhookHistory.has(webhookId)) {
-      console.log(`🔄 Duplicate webhook detected and ignored: ${webhookId}`);
-      return;
-    }
-
-    // Check for older webhooks
-    const lastProcessedTime = Math.max(...Array.from(webhookHistory.values()), 0);
-    if (webhookTimestamp < lastProcessedTime) {
-      console.log(`⏰ Ignoring older webhook: ${webhookTimestamp} < ${lastProcessedTime}`);
-      return;
-    }
-
-    // Record this webhook as processed
-    setWebhookHistory(prev => new Map(prev.set(webhookId, webhookTimestamp)));
-
-    // NEW: Status transition validation
-    const isValidTransition = (fromStatus, toStatus) => {
-      const validTransitions = {
-        'Not Started': ['Running', 'Passed', 'Failed', 'Cancelled', 'Skipped'],
-        'Running': ['Passed', 'Failed', 'Cancelled'],
-        'Passed': [], // Final state - no transitions allowed
-        'Failed': [], // Final state - no transitions allowed  
-        'Cancelled': [], // Final state - no transitions allowed
-        'Skipped': [] // Final state - no transitions allowed
-      };
-
-      return validTransitions[fromStatus]?.includes(toStatus) || false;
-    };
-
     // SIMPLIFIED: Just update results as they come, no complex completion logic
     setResults(webhookData.results);
 
-    // NEW: Track currently running test
-    const runningTest = webhookData.results.find(r => r.status === 'Running');
-    if (runningTest && runningTest.id !== currentlyRunningTestId) {
-      setCurrentlyRunningTestId(runningTest.id);
-      setRunningTestStartTime(Date.now());
-      console.log(`🏃 Test ${runningTest.id} is now running`);
-    } else if (!runningTest && currentlyRunningTestId) {
-      setCurrentlyRunningTestId(null);
-      setRunningTestStartTime(null);
-      console.log(`🏁 No tests currently running`);
-    }
-
-    // FIXED: Update test results one by one in UI with transition guards
+    // FIXED: Update test results one by one in UI
     setTestResults(prevResults => {
       return prevResults.map(existingResult => {
         const newResult = webhookData.results.find(r => r.id === existingResult.id);
         
         if (newResult) {
-          // NEW: Validate status transition
-          if (!isValidTransition(existingResult.status, newResult.status)) {
-            console.warn(`❌ Invalid status transition rejected for ${existingResult.id}: ${existingResult.status} → ${newResult.status}`);
-            return existingResult; // Keep existing result
-          }
-
           console.log(`📝 Updating ${existingResult.id}: ${existingResult.status} → ${newResult.status}`);
           
           return {
@@ -297,16 +236,10 @@ const TestExecutionModal = ({
       });
     });
 
-    // FIXED: Update DataStore one test case at a time with transition validation
+    // FIXED: Update DataStore one test case at a time
     webhookData.results.forEach(result => {
       const testCase = testCases.find(tc => tc.id === result.id);
       if (testCase) {
-        // Validate transition for DataStore update too
-        if (!isValidTransition(testCase.status || 'Not Started', result.status)) {
-          console.warn(`❌ DataStore update rejected for ${testCase.id}: invalid transition ${testCase.status} → ${result.status}`);
-          return;
-        }
-
         console.log(`📀 Updating DataStore for ${testCase.id}: status=${result.status}`);
         dataStore.updateTestCase(testCase.id, {
           ...testCase,
@@ -324,7 +257,7 @@ const TestExecutionModal = ({
       console.warn("Error refreshing quality gates:", refreshError);
     }
 
-    console.log("✅ Webhook results processed with deduplication and transition guards");
+    console.log("✅ Webhook results processed with individual updates");
   };
 
   // Execute GitHub workflow (removed simulation logic)
@@ -419,10 +352,6 @@ const TestExecutionModal = ({
     setWaitingForWebhook(false);
     waitingForWebhookRef.current = false;
     setProcessingStatus('cancelled');
-
-    // NEW: Reset running test indicators
-    setCurrentlyRunningTestId(null);
-    setRunningTestStartTime(null);
 
     if (webhookTimeout) {
       console.log("Clearing webhookTimeout due to cancellation.");
@@ -632,30 +561,6 @@ const TestExecutionModal = ({
             </div>
           )}
 
-          {/* NEW: Currently Running Test Indicator */}
-          {currentlyRunningTestId && (
-            <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center">
-                  <Loader2 className="animate-spin mr-2 text-yellow-600" size={16} />
-                  <span className="text-yellow-700 font-medium">
-                    Currently Running: {currentlyRunningTestId}
-                  </span>
-                </div>
-                {runningTestStartTime && (
-                  <span className="text-xs text-yellow-600">
-                    {Math.floor((Date.now() - runningTestStartTime) / 1000)}s elapsed
-                  </span>
-                )}
-              </div>
-              <div className="mt-2">
-                <div className="text-sm text-yellow-600">
-                  Progress: {testResults.filter(t => ['Passed', 'Failed', 'Cancelled'].includes(t.status)).length} of {testResults.length} tests completed
-                </div>
-              </div>
-            </div>
-          )}
-
           {/* Test Results Table */}
           <div className="border border-gray-200 rounded overflow-hidden">
             <table className="min-w-full divide-y divide-gray-200">
@@ -678,25 +583,13 @@ const TestExecutionModal = ({
               <tbody className="bg-white divide-y divide-gray-200">
                 {testResults.map((result, index) => {
                   const isRunning = result.status === 'Running';
-                  const isCurrentlyRunning = result.id === currentlyRunningTestId;
                   
                   return (
                     <tr 
                       key={result.id} 
-                      className={`
-                        ${isCurrentlyRunning ? 'bg-blue-100 border-l-4 border-blue-500' : 
-                          isRunning ? 'bg-yellow-50' : ''} 
-                        transition-all duration-300
-                      `}
+                      className={`${isRunning ? 'bg-yellow-50' : ''} transition-colors duration-200`}
                     >
-                      <td className="px-4 py-2 text-sm font-mono text-gray-600">
-                        {result.id}
-                        {isCurrentlyRunning && (
-                          <span className="ml-2 text-xs bg-blue-500 text-white px-2 py-1 rounded-full">
-                            ACTIVE
-                          </span>
-                        )}
-                      </td>
+                      <td className="px-4 py-2 text-sm font-mono text-gray-600">{result.id}</td>
                       <td className="px-4 py-2 text-sm text-gray-900">
                         {result.name}
                         {isRunning && (
@@ -709,11 +602,6 @@ const TestExecutionModal = ({
                         <div className="flex items-center">
                           {getStatusIcon(result.status)}
                           <span className="ml-2">{result.status}</span>
-                          {isCurrentlyRunning && runningTestStartTime && (
-                            <span className="ml-2 text-xs text-gray-500">
-                              ({Math.floor((Date.now() - runningTestStartTime) / 1000)}s)
-                            </span>
-                          )}
                         </div>
                       </td>
                       <td className="px-4 py-2 text-sm text-gray-500">
