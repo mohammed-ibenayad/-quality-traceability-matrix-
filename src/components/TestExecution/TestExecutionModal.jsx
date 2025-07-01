@@ -213,7 +213,7 @@ const TestExecutionModal = ({
     console.log("⚙️ Configuration saved:", config);
   };
 
-  // SIMPLIFIED: Process webhook results with status transition guards only
+  // SIMPLIFIED: Process webhook results without transition guards
   const processWebhookResults = (webhookData) => {
     console.log("%c🔧 PROCESSING WEBHOOK RESULTS:", "background: #673AB7; color: white; font-weight: bold; padding: 5px 10px;", webhookData);
     
@@ -222,24 +222,10 @@ const TestExecutionModal = ({
       return;
     }
 
-    // NEW: Status transition validation
-    const isValidTransition = (fromStatus, toStatus) => {
-      const validTransitions = {
-        'Not Started': ['Running', 'Passed', 'Failed', 'Cancelled', 'Skipped'],
-        'Running': ['Passed', 'Failed', 'Cancelled'],
-        'Passed': [], // Final state - no transitions allowed
-        'Failed': [], // Final state - no transitions allowed  
-        'Cancelled': [], // Final state - no transitions allowed
-        'Skipped': [] // Final state - no transitions allowed
-      };
-
-      return validTransitions[fromStatus]?.includes(toStatus) || false;
-    };
-
     // Update results
     setResults(webhookData.results);
 
-    // NEW: Track currently running test
+    // Track currently running test
     const runningTest = webhookData.results.find(r => r.status === 'Running');
     if (runningTest && runningTest.id !== currentlyRunningTestId) {
       setCurrentlyRunningTestId(runningTest.id);
@@ -251,18 +237,12 @@ const TestExecutionModal = ({
       console.log(`🏁 No tests currently running`);
     }
 
-    // Update test results with transition guards
+    // Update test results directly
     setTestResults(prevResults => {
       return prevResults.map(existingResult => {
         const newResult = webhookData.results.find(r => r.id === existingResult.id);
         
         if (newResult) {
-          // NEW: Validate status transition
-          if (!isValidTransition(existingResult.status, newResult.status)) {
-            console.warn(`❌ Invalid status transition rejected for ${existingResult.id}: ${existingResult.status} → ${newResult.status}`);
-            return existingResult; // Keep existing result
-          }
-
           console.log(`📝 Updating ${existingResult.id}: ${existingResult.status} → ${newResult.status}`);
           
           return {
@@ -276,16 +256,10 @@ const TestExecutionModal = ({
       });
     });
 
-    // Update DataStore one test case at a time with transition validation
+    // Update DataStore one test case at a time
     webhookData.results.forEach(result => {
       const testCase = testCases.find(tc => tc.id === result.id);
       if (testCase) {
-        // Validate transition for DataStore update too
-        if (!isValidTransition(testCase.status || 'Not Started', result.status)) {
-          console.warn(`❌ DataStore update rejected for ${testCase.id}: invalid transition ${testCase.status} → ${result.status}`);
-          return;
-        }
-
         console.log(`📀 Updating DataStore for ${testCase.id}: status=${result.status}`);
         dataStore.updateTestCase(testCase.id, {
           ...testCase,
@@ -303,7 +277,7 @@ const TestExecutionModal = ({
       console.warn("Error refreshing quality gates:", refreshError);
     }
 
-    console.log("✅ Webhook results processed with transition guards");
+    console.log("✅ Webhook results processed successfully");
   };
 
   // Execute GitHub workflow (removed simulation logic)
