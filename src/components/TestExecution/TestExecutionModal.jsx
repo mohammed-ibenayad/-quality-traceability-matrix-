@@ -77,8 +77,7 @@ const TestExecutionModal = ({
   // FIXED: Test results state - respects current test case status
   const [testResults, setTestResults] = useState([]);
 
-  // NEW: Enhanced tracking for deduplication and running indicators
-  const [webhookHistory, setWebhookHistory] = useState(new Map()); // Track processed webhooks
+  // NEW: Enhanced tracking for running indicators
   const [currentlyRunningTestId, setCurrentlyRunningTestId] = useState(null);
   const [runningTestStartTime, setRunningTestStartTime] = useState(null);
 
@@ -106,7 +105,6 @@ const TestExecutionModal = ({
       setCurrentRequestId(null);
 
       // NEW: Reset enhancement states
-      setWebhookHistory(new Map());
       setCurrentlyRunningTestId(null);
       setRunningTestStartTime(null);
 
@@ -215,7 +213,7 @@ const TestExecutionModal = ({
     console.log("⚙️ Configuration saved:", config);
   };
 
-  // SIMPLIFIED: Process webhook results with one-by-one updates only
+  // SIMPLIFIED: Process webhook results with status transition guards only
   const processWebhookResults = (webhookData) => {
     console.log("%c🔧 PROCESSING WEBHOOK RESULTS:", "background: #673AB7; color: white; font-weight: bold; padding: 5px 10px;", webhookData);
     
@@ -223,25 +221,6 @@ const TestExecutionModal = ({
       console.warn("⚠️ Invalid webhook data received");
       return;
     }
-
-    // NEW: Webhook deduplication check
-    const webhookId = webhookData.requestId || webhookData.timestamp || `${Date.now()}_${Math.random()}`;
-    const webhookTimestamp = new Date(webhookData.timestamp || Date.now()).getTime();
-
-    if (webhookHistory.has(webhookId)) {
-      console.log(`🔄 Duplicate webhook detected and ignored: ${webhookId}`);
-      return;
-    }
-
-    // Check for older webhooks
-    const lastProcessedTime = Math.max(...Array.from(webhookHistory.values()), 0);
-    if (webhookTimestamp < lastProcessedTime) {
-      console.log(`⏰ Ignoring older webhook: ${webhookTimestamp} < ${lastProcessedTime}`);
-      return;
-    }
-
-    // Record this webhook as processed
-    setWebhookHistory(prev => new Map(prev.set(webhookId, webhookTimestamp)));
 
     // NEW: Status transition validation
     const isValidTransition = (fromStatus, toStatus) => {
@@ -257,7 +236,7 @@ const TestExecutionModal = ({
       return validTransitions[fromStatus]?.includes(toStatus) || false;
     };
 
-    // SIMPLIFIED: Just update results as they come, no complex completion logic
+    // Update results
     setResults(webhookData.results);
 
     // NEW: Track currently running test
@@ -272,7 +251,7 @@ const TestExecutionModal = ({
       console.log(`🏁 No tests currently running`);
     }
 
-    // FIXED: Update test results one by one in UI with transition guards
+    // Update test results with transition guards
     setTestResults(prevResults => {
       return prevResults.map(existingResult => {
         const newResult = webhookData.results.find(r => r.id === existingResult.id);
@@ -297,7 +276,7 @@ const TestExecutionModal = ({
       });
     });
 
-    // FIXED: Update DataStore one test case at a time with transition validation
+    // Update DataStore one test case at a time with transition validation
     webhookData.results.forEach(result => {
       const testCase = testCases.find(tc => tc.id === result.id);
       if (testCase) {
@@ -324,7 +303,7 @@ const TestExecutionModal = ({
       console.warn("Error refreshing quality gates:", refreshError);
     }
 
-    console.log("✅ Webhook results processed with deduplication and transition guards");
+    console.log("✅ Webhook results processed with transition guards");
   };
 
   // Execute GitHub workflow (removed simulation logic)
@@ -652,6 +631,30 @@ const TestExecutionModal = ({
                 <div className="text-sm text-yellow-600">
                   Progress: {testResults.filter(t => ['Passed', 'Failed', 'Cancelled'].includes(t.status)).length} of {testResults.length} tests completed
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* NEW: GitHub Workflow Status */}
+          {workflowRun && isRunning && (
+            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded">
+              <div className="flex justify-between items-center">
+                <div className="flex items-center">
+                  <GitBranch className="mr-2 text-blue-600" size={16} />
+                  <span className="text-blue-700 font-medium">GitHub Actions Workflow Running</span>
+                </div>
+                <a 
+                  href={workflowRun.html_url} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center text-sm"
+                >
+                  <GitBranch className="mr-1" size={14} />
+                  View Workflow
+                </a>
+              </div>
+              <div className="mt-1 text-xs text-blue-600">
+                Workflow ID: {workflowRun.id} • Branch: {config.branch}
               </div>
             </div>
           )}
