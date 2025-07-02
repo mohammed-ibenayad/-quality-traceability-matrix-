@@ -12,18 +12,10 @@ class WebhookService {
   }
 
   detectBaseURL() {
-    if (typeof window === 'undefined') return 'http://localhost:3001';
-    
-    const hostname = window.location.hostname;
-    const protocol = window.location.protocol;
-    
-    if (hostname === 'localhost' || hostname === '127.0.0.1') {
-      return 'http://localhost:3001';
-    }
-    
-    return `${protocol}//${hostname}:3001`;
+  // Always use localhost for internal communication when both services are on same server
+  return 'http://localhost:3001';
   }
-
+  
   async connect() {
     try {
       const { io } = await import('socket.io-client');
