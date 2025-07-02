@@ -1,134 +1,197 @@
-// src/services/WebhookService.js - Fixed version with request isolation
-import { io } from 'socket.io-client';
-
+// src/services/WebhookService.js - Updated for per test case handling
 class WebhookService {
   constructor() {
+    this.baseURL = this.detectBaseURL();
     this.socket = null;
-    this.listeners = new Map(); // Key: requirementId, Value: callback
-    this.requestListeners = new Map(); // Key: requestId, Value: callback
-    this.activeRequests = new Map(); // Key: requirementId, Value: Set of requestIds
-    
-    this.baseURL = this.getServerURL();
     this.connected = false;
-    this.connectionAttempts = 0;
-    this.maxConnectionAttempts = 3;
     
-    console.log(`🌐 WebhookService configured for: ${this.baseURL}`);
+    // MODIFIED: Track test case results per request
+    this.requestListeners = new Map(); // requestId -> callback
+    this.testCaseResults = new Map(); // requestId -> Map(testCaseId -> result)
+    this.activeRequests = new Map(); // requestId -> { testCaseIds: Set, startTime, status }
   }
 
-  getServerURL() {
-    const isLocalhost = window.location.hostname === 'localhost' || 
-                       window.location.hostname === '127.0.0.1';
+  detectBaseURL() {
+    if (typeof window === 'undefined') return 'http://localhost:3001';
     
-    if (isLocalhost) {
+    const hostname = window.location.hostname;
+    const protocol = window.location.protocol;
+    
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
       return 'http://localhost:3001';
     }
     
-    return `${window.location.protocol}//${window.location.hostname}`;
+    return `${protocol}//${hostname}:3001`;
   }
 
-  connect() {
-    if (this.socket && this.connected) {
-      console.log('🔌 Already connected to webhook backend');
-      return Promise.resolve();
-    }
-
-    return new Promise((resolve, reject) => {
-      console.log(`🔌 Connecting to webhook backend at ${this.baseURL}...`);
+  async connect() {
+    try {
+      const { io } = await import('socket.io-client');
       
-      const socketOptions = {
+      this.socket = io(this.baseURL, {
         transports: ['websocket', 'polling'],
-        timeout: 15000,
-        forceNew: true,
+        timeout: 10000,
         reconnection: true,
-        reconnectionAttempts: 3,
-        reconnectionDelay: 1000,
-        upgrade: true,
-        rememberUpgrade: false,
-        path: '/socket.io/'
-      };
-
-      this.socket = io(this.baseURL, socketOptions);
-
-      this.socket.on('connect', () => {
-        console.log('✅ Connected to webhook backend');
-        console.log(`🔗 Socket ID: ${this.socket.id}`);
-        console.log(`🚀 Transport: ${this.socket.io.engine.transport.name}`);
-        
-        this.connected = true;
-        this.connectionAttempts = 0;
-        resolve();
+        reconnectionAttempts: 5,
+        reconnectionDelay: 2000,
       });
 
-      this.socket.on('disconnect', (reason) => {
-        console.log('❌ Disconnected from webhook backend:', reason);
-        this.connected = false;
-      });
+      return new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          reject(new Error('Connection timeout'));
+        }, 10000);
 
-      this.socket.on('webhook-received', (data) => {
-        console.log('🔔 Webhook broadcast received:', data);
-        this.handleWebhookData(data);
-      });
+        this.socket.on('connect', () => {
+          clearTimeout(timeout);
+          this.connected = true;
+          console.log('✅ Connected to webhook backend');
+          resolve();
+        });
 
-      this.socket.on('test-results', (data) => {
-        console.log('📋 Test results received:', data);
-        this.handleWebhookData({ 
-          data, 
-          requirementId: data.requirementId,
-          requestId: data.requestId 
+        this.socket.on('disconnect', (reason) => {
+          this.connected = false;
+          console.log('🔌 Disconnected from webhook backend:', reason);
+        });
+
+        this.socket.on('connection-info', (info) => {
+          console.log('📡 Connection info received:', info);
+        });
+
+        // MODIFIED: Handle individual test case results
+        this.socket.on('test-case-result', (data) => {
+          console.log('🧪 Individual test case result received:', data);
+          this.handleTestCaseResult(data);
+        });
+
+        // Keep backward compatibility for bulk results
+        this.socket.on('test-results', (data) => {
+          console.log('📦 Bulk test results received (legacy):', data);
+          this.handleLegacyBulkResults(data);
+        });
+
+        this.socket.on('connect_error', (error) => {
+          clearTimeout(timeout);
+          console.error('❌ Connection error:', error.message);
+          reject(error);
         });
       });
+    } catch (error) {
+      console.error('❌ Failed to connect to webhook backend:', error);
+      throw error;
+    }
+  }
 
-      this.socket.on('connect_error', (error) => {
-        console.error('❌ WebSocket connection error:', error);
-        this.connectionAttempts++;
-        
-        if (error.message.includes('websocket error')) {
-          console.warn('💡 WebSocket upgrade failed, using polling transport');
-        }
-        
-        if (this.connectionAttempts >= this.maxConnectionAttempts) {
-          console.error('🚨 Max connection attempts reached');
-          reject(new Error(`Failed to connect after ${this.maxConnectionAttempts} attempts`));
-        }
-      });
-
-      setTimeout(() => {
-        if (!this.connected) {
-          console.error('⏰ Connection timeout');
-          reject(new Error('Connection timeout'));
-        }
-      }, 20000);
+  // NEW: Handle individual test case results
+  handleTestCaseResult(data) {
+    const { requestId, testCaseId, testCase, timestamp } = data;
+    
+    if (!requestId || !testCaseId || !testCase) {
+      console.warn('⚠️ Invalid test case result data:', data);
+      return;
+    }
+    
+    // Store test case result
+    if (!this.testCaseResults.has(requestId)) {
+      this.testCaseResults.set(requestId, new Map());
+    }
+    
+    const requestResults = this.testCaseResults.get(requestId);
+    requestResults.set(testCaseId, {
+      ...testCase,
+      receivedAt: timestamp,
+      processedAt: new Date().toISOString()
     });
+    
+    // Update active request tracking
+    if (this.activeRequests.has(requestId)) {
+      const request = this.activeRequests.get(requestId);
+      request.testCaseIds.add(testCaseId);
+      request.lastUpdate = new Date().toISOString();
+    }
+    
+    console.log(`📝 Stored test case result: ${requestId}-${testCaseId} -> ${testCase.status}`);
+    
+    // Notify listeners
+    this.notifyRequestListeners(requestId, {
+      type: 'test-case-update',
+      requestId,
+      testCaseId,
+      testCase,
+      allResults: this.getAllTestCaseResults(requestId)
+    });
+  }
+
+  // NEW: Handle legacy bulk results for backward compatibility
+  handleLegacyBulkResults(data) {
+    const { requestId, results } = data;
+    
+    if (!requestId || !Array.isArray(results)) {
+      console.warn('⚠️ Invalid bulk results data:', data);
+      return;
+    }
+    
+    console.log(`📦 Processing ${results.length} bulk results for request: ${requestId}`);
+    
+    // Convert bulk results to individual test case results
+    results.forEach(testCase => {
+      if (testCase.id) {
+        this.handleTestCaseResult({
+          requestId,
+          testCaseId: testCase.id,
+          testCase,
+          timestamp: data.timestamp || new Date().toISOString()
+        });
+      }
+    });
+  }
+
+  // NEW: Get all test case results for a request
+  getAllTestCaseResults(requestId) {
+    const requestResults = this.testCaseResults.get(requestId);
+    if (!requestResults) return [];
+    
+    return Array.from(requestResults.entries()).map(([testCaseId, result]) => ({
+      id: testCaseId,
+      ...result
+    }));
+  }
+
+  // NEW: Get specific test case result
+  getTestCaseResult(requestId, testCaseId) {
+    const requestResults = this.testCaseResults.get(requestId);
+    return requestResults ? requestResults.get(testCaseId) : null;
+  }
+
+  // MODIFIED: Notify request listeners with enhanced data
+  notifyRequestListeners(requestId, eventData) {
+    const callback = this.requestListeners.get(requestId);
+    if (callback) {
+      console.log(`🎯 Notifying request listener for: ${requestId}`);
+      callback(eventData);
+    } else {
+      console.log(`📭 No listener found for request: ${requestId}`);
+    }
   }
 
   async checkBackendHealth() {
     try {
-      const healthUrl = `${this.baseURL}/api/webhook/health`;
-      console.log(`🏥 Health check: ${healthUrl}`);
-      
-      const response = await fetch(healthUrl, {
+      const response = await fetch(`${this.baseURL}/api/webhook/health`, {
         method: 'GET',
         headers: { 'Content-Type': 'application/json' },
         signal: AbortSignal.timeout(8000)
       });
       
       if (response.ok) {
-        const data = await response.json();
-        console.log('✅ Backend healthy:', {
-          status: data.status,
-          connectedClients: data.connectedClients || 0,
-          storedResults: data.storedResults || 0,
-          activeRequests: data.activeRequests || []
-        });
+        const health = await response.json();
+        console.log('✅ Backend health check passed:', health);
         return true;
       } else {
-        console.warn(`⚠️ Backend health check failed: ${response.status}`);
+        console.log('⚠️ Backend health check failed:', response.status);
         return false;
       }
     } catch (error) {
       if (error.name === 'TimeoutError') {
-        console.error('❌ Backend health timeout (8s)');
+        console.log('⏰ Backend health check timeout (8s)');
       } else {
         console.error('❌ Backend unreachable:', error.message);
       }
@@ -136,34 +199,50 @@ class WebhookService {
     }
   }
 
-  // FIXED: Subscribe to both requirement and specific request
-  subscribeToRequirement(requirementId, callback) {
-    console.log(`📝 Subscribing to requirement: ${requirementId}`);
-    this.listeners.set(requirementId, callback);
-    
-    if (this.socket && this.connected) {
-      this.socket.emit('subscribe-requirement', requirementId);
-    }
-  }
-
-  // NEW: Subscribe to specific request for precise targeting
+  // MODIFIED: Subscribe to specific request for test case updates
   subscribeToRequest(requestId, callback) {
-    console.log(`📝 Subscribing to specific request: ${requestId}`);
+    console.log(`📝 Subscribing to request for test case updates: ${requestId}`);
     this.requestListeners.set(requestId, callback);
+    
+    // Initialize request tracking
+    if (!this.activeRequests.has(requestId)) {
+      this.activeRequests.set(requestId, {
+        testCaseIds: new Set(),
+        startTime: new Date().toISOString(),
+        status: 'active',
+        lastUpdate: new Date().toISOString()
+      });
+    }
     
     if (this.socket && this.connected) {
       this.socket.emit('subscribe-request', requestId);
     }
+    
+    // Send any existing results immediately
+    const existingResults = this.getAllTestCaseResults(requestId);
+    if (existingResults.length > 0) {
+      console.log(`📤 Sending ${existingResults.length} existing test case results`);
+      callback({
+        type: 'existing-results',
+        requestId,
+        allResults: existingResults
+      });
+    }
   }
 
-  // FIXED: Register a new test execution request
-  registerTestExecution(requirementId, requestId) {
-    console.log(`📝 Registering test execution: ${requirementId} -> ${requestId}`);
+  // NEW: Register test execution with expected test cases
+  registerTestExecution(requestId, expectedTestCases = []) {
+    console.log(`📝 Registering test execution: ${requestId} with ${expectedTestCases.length} test cases`);
     
-    if (!this.activeRequests.has(requirementId)) {
-      this.activeRequests.set(requirementId, new Set());
-    }
-    this.activeRequests.get(requirementId).add(requestId);
+    const request = {
+      testCaseIds: new Set(expectedTestCases),
+      expectedCount: expectedTestCases.length,
+      startTime: new Date().toISOString(),
+      status: 'registered',
+      lastUpdate: new Date().toISOString()
+    };
+    
+    this.activeRequests.set(requestId, request);
     
     // Subscribe to this specific request
     if (this.socket && this.connected) {
@@ -171,18 +250,8 @@ class WebhookService {
     }
   }
 
-  unsubscribeFromRequirement(requirementId) {
-    console.log(`📝 Unsubscribing from requirement: ${requirementId}`);
-    this.listeners.delete(requirementId);
-    
-    if (this.socket && this.connected) {
-      this.socket.emit('unsubscribe-requirement', requirementId);
-    }
-  }
-
-  // NEW: Unsubscribe from specific request
   unsubscribeFromRequest(requestId) {
-    console.log(`📝 Unsubscribing from specific request: ${requestId}`);
+    console.log(`📝 Unsubscribing from request: ${requestId}`);
     this.requestListeners.delete(requestId);
     
     if (this.socket && this.connected) {
@@ -190,30 +259,33 @@ class WebhookService {
     }
   }
 
-  // FIXED: Handle webhook data with both requirement and request targeting
-  handleWebhookData(webhookEvent) {
-    const { requirementId, requestId, data } = webhookEvent;
-    
-    // Try request-specific callback first (more precise)
-    if (requestId) {
-      const requestCallback = this.requestListeners.get(requestId);
-      if (requestCallback) {
-        console.log(`🎯 Executing request-specific callback for: ${requestId}`);
-        requestCallback(data);
-        return;
+  // NEW: Fetch specific test case result via API
+  async fetchTestCaseResult(requestId, testCaseId) {
+    try {
+      const response = await fetch(`${this.baseURL}/api/test-results/request/${requestId}/testcase/${testCaseId}`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+        signal: AbortSignal.timeout(10000)
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log(`✅ Retrieved test case result: ${requestId}-${testCaseId}`);
+        return data;
+      } else if (response.status === 404) {
+        console.log(`📭 Test case result not found: ${requestId}-${testCaseId}`);
+        return null;
+      } else {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
-    }
-    
-    // Fall back to requirement callback
-    const requirementCallback = this.listeners.get(requirementId);
-    if (requirementCallback) {
-      console.log(`🎯 Executing requirement callback for: ${requirementId}`);
-      requirementCallback(data);
+    } catch (error) {
+      console.error(`❌ Error fetching test case result ${requestId}-${testCaseId}:`, error);
+      throw error;
     }
   }
 
-  // FIXED: Fetch results by requestId (more precise)
-  async fetchResultsByRequestId(requestId) {
+  // MODIFIED: Fetch all test case results for a request via API
+  async fetchRequestResults(requestId) {
     try {
       const response = await fetch(`${this.baseURL}/api/test-results/request/${requestId}`, {
         method: 'GET',
@@ -223,7 +295,7 @@ class WebhookService {
       
       if (response.ok) {
         const data = await response.json();
-        console.log(`✅ Retrieved results for request: ${requestId}`);
+        console.log(`✅ Retrieved ${data.testCaseCount} test case results for request: ${requestId}`);
         return data;
       } else if (response.status === 404) {
         console.log(`📭 No results found for request: ${requestId}`);
@@ -232,47 +304,31 @@ class WebhookService {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
     } catch (error) {
-      console.error(`❌ Error fetching results for request ${requestId}:`, error);
+      console.error(`❌ Error fetching request results ${requestId}:`, error);
       throw error;
     }
   }
 
-  // Fetch latest results for a requirement (might return cached results)
-  async fetchLatestResultsForRequirement(requirementId) {
-    try {
-      const response = await fetch(`${this.baseURL}/api/test-results/${requirementId}`, {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
-        signal: AbortSignal.timeout(10000)
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        console.log(`✅ Retrieved latest results for requirement: ${requirementId}`);
-        return data;
-      } else if (response.status === 404) {
-        console.log(`📭 No results found for requirement: ${requirementId}`);
-        return null;
-      } else {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-    } catch (error) {
-      console.error(`❌ Error fetching latest results for requirement ${requirementId}:`, error);
-      throw error;
-    }
-  }
-
-  // FIXED: Poll for results with requestId support
-  async pollForResults(requestId, maxAttempts = 5, intervalMs = 3000) {
-    console.log(`🔄 Polling for results: ${requestId} (max ${maxAttempts} attempts)`);
+  // NEW: Poll for complete test execution results
+  async pollForTestExecution(requestId, expectedTestCases = [], maxAttempts = 10, intervalMs = 3000) {
+    console.log(`🔄 Polling for test execution completion: ${requestId} (${expectedTestCases.length} test cases expected)`);
     
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
-        const results = await this.fetchResultsByRequestId(requestId);
+        const data = await this.fetchRequestResults(requestId);
         
-        if (results) {
-          console.log(`✅ Poll successful on attempt ${attempt}`);
-          return results;
+        if (data && data.results) {
+          const completedTests = data.results.filter(r => 
+            r.testCase.status === 'Passed' || r.testCase.status === 'Failed'
+          );
+          
+          console.log(`📊 Progress: ${completedTests.length}/${expectedTestCases.length} tests completed`);
+          
+          // Check if all expected tests are complete
+          if (completedTests.length >= expectedTestCases.length) {
+            console.log(`✅ All tests completed for request: ${requestId}`);
+            return data;
+          }
         }
         
         if (attempt < maxAttempts) {
@@ -288,28 +344,22 @@ class WebhookService {
       }
     }
     
-    console.log(`❌ Polling failed after ${maxAttempts} attempts`);
+    console.log(`❌ Polling failed after ${maxAttempts} attempts for request: ${requestId}`);
     return null;
   }
 
-  async testWebhook(requirementId = 'REQ-TEST') {
+  async testWebhook(requestId = 'REQ-TEST', testCaseId = 'TC_001') {
     try {
-      console.log(`🧪 Testing webhook for: ${requirementId}`);
+      console.log(`🧪 Testing webhook for test case: ${testCaseId} in request: ${requestId}`);
       
       const response = await fetch(`${this.baseURL}/api/test-webhook`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          requirementId,
-          results: [
-            {
-              id: 'TC_001',
-              name: 'Test Backend Webhook',
-              status: 'Passed',
-              duration: 1000,
-              logs: 'Backend webhook test completed successfully'
-            }
-          ]
+          testCaseId,
+          testCaseName: `Test ${testCaseId}`,
+          status: Math.random() > 0.5 ? 'Passed' : 'Failed',
+          logs: `Manual test execution for ${testCaseId} completed`
         }),
         signal: AbortSignal.timeout(10000)
       });
@@ -327,7 +377,7 @@ class WebhookService {
     }
   }
 
-  // FIXED: Clear results for a specific request
+  // MODIFIED: Clear all test case results for a request
   async clearResults(requestId) {
     try {
       const response = await fetch(`${this.baseURL}/api/test-results/request/${requestId}`, {
@@ -338,7 +388,12 @@ class WebhookService {
       
       if (response.ok) {
         const result = await response.json();
-        console.log(`🗑️ Cleared results for request: ${requestId}`);
+        console.log(`🗑️ Cleared ${result.clearedCount} test case results for request: ${requestId}`);
+        
+        // Clear local storage
+        this.testCaseResults.delete(requestId);
+        this.activeRequests.delete(requestId);
+        
         return result;
       } else {
         throw new Error(`Clear failed: ${response.statusText}`);
@@ -355,8 +410,8 @@ class WebhookService {
       this.socket.disconnect();
       this.socket = null;
       this.connected = false;
-      this.listeners.clear();
       this.requestListeners.clear();
+      this.testCaseResults.clear();
       this.activeRequests.clear();
     }
   }
@@ -369,9 +424,26 @@ class WebhookService {
     return this.baseURL;
   }
 
-  // FIXED: Get active request IDs for a requirement
-  getActiveRequestIds(requirementId) {
-    return this.activeRequests.get(requirementId) || new Set();
+  // NEW: Get execution status for a request
+  getExecutionStatus(requestId) {
+    const request = this.activeRequests.get(requestId);
+    if (!request) return null;
+    
+    const results = this.getAllTestCaseResults(requestId);
+    const completed = results.filter(r => r.status === 'Passed' || r.status === 'Failed').length;
+    const running = results.filter(r => r.status === 'Running').length;
+    
+    return {
+      requestId,
+      expectedCount: request.expectedCount || request.testCaseIds.size,
+      totalReceived: results.length,
+      completed,
+      running,
+      notStarted: Math.max(0, (request.expectedCount || request.testCaseIds.size) - results.length),
+      startTime: request.startTime,
+      lastUpdate: request.lastUpdate,
+      status: request.status
+    };
   }
 }
 
@@ -391,39 +463,14 @@ if (typeof window !== 'undefined') {
     })
     .then(() => {
       if (webhookService.isConnected()) {
-        console.log('🎉 Real-time webhook system ready!');
+        console.log('🎉 Real-time test case tracking system ready!');
       } else {
-        console.log('📡 App running in polling mode (no real-time updates)');
+        console.log('📡 Using fallback mode - limited real-time features');
       }
     })
     .catch(error => {
-      console.warn('🔄 Webhook system unavailable:', error.message);
-      console.log('💡 App will work normally but without real-time updates');
+      console.error('❌ Failed to initialize webhook service:', error);
     });
-  
-  // Debug helpers
-  window.webhookService = webhookService;
-  window.testWebhook = (reqId) => webhookService.testWebhook(reqId);
-  
-  // Enhanced diagnostics
-  window.webhookDiagnostics = async () => {
-    console.log('🔍 Running webhook diagnostics...');
-    console.log('Base URL:', webhookService.getBaseURL());
-    console.log('Connected:', webhookService.isConnected());
-    console.log('Active Requests:', Object.fromEntries(webhookService.activeRequests));
-    
-    try {
-      const isHealthy = await webhookService.checkBackendHealth();
-      console.log('Backend healthy:', isHealthy);
-      
-      if (!webhookService.isConnected() && isHealthy) {
-        console.log('🔄 Attempting reconnection...');
-        await webhookService.connect();
-      }
-    } catch (error) {
-      console.error('Diagnostics failed:', error);
-    }
-  };
 }
 
 export default webhookService;

@@ -1,541 +1,627 @@
-// src/api/testResultsApi.js
+// src/api/testResultsApi.js - Complete Updated Version for Per Test Case Handling
 /**
- * API endpoints for handling test results from external test runners
+ * API endpoints for handling individual test case results from external test runners
  */
 import dataStore from '../services/DataStore';
+import { refreshQualityGates } from '../utils/calculateQualityGates';
 
-// Create a global store for webhook results
-// This ensures real webhook data is never overridden by simulated data
-if (typeof window !== 'undefined' && !window.webhookResults) {
-  window.webhookResults = {};
+// MODIFIED: Store individual test case results by requestId
+if (typeof window !== 'undefined' && !window.testCaseWebhookResults) {
+  window.testCaseWebhookResults = new Map(); // requestId -> Map(testCaseId -> result)
 }
 
 /**
- * Store webhook results for later retrieval
- * This helps maintain webhook data priority over simulated data
+ * Store individual test case webhook result
  * 
- * @param {Object} data - Webhook payload
- * @param {String} runId - Optional run ID to associate with the results
+ * @param {Object} data - Webhook payload for single test case
+ * @param {String} data.requestId - The request ID
+ * @param {String} data.results[0].id - The test case ID
+ * @returns {String} - Storage key for reference
  */
-export const storeWebhookResults = (data, runId = null) => {
+export const storeTestCaseWebhookResult = (data) => {
   try {
-    // Create a unique key for this webhook
-    const key = runId || `${data.requirementId}-${Date.now()}`;
-    
-    // Store the results
-    window.webhookResults[key] = data.results;
-    
-    // Add a timestamp for debugging
-    window.webhookResults[`${key}-timestamp`] = new Date().toISOString();
-    
-    console.log(`%c💾 Stored webhook results with key: ${key}`, 
-      "background: #009688; color: white; font-weight: bold; padding: 3px 6px; border-radius: 3px;");
-    
-    // Return the key for reference
-    return key;
-  } catch (error) {
-    console.error('Error storing webhook results:', error);
-    return null;
-  }
-};
-
-/**
- * Retrieve stored webhook results
- * 
- * @param {String} key - The key to retrieve results for
- * @returns {Array|null} - The stored results or null if not found
- */
-export const getStoredWebhookResults = (key) => {
-  try {
-    if (!window.webhookResults || !window.webhookResults[key]) {
+    if (!data.requestId || !data.results || data.results.length !== 1) {
+      console.warn('Invalid test case webhook data for storage:', data);
       return null;
     }
-    
-    console.log(`%c📂 Retrieved stored webhook results for key: ${key}`, 
+
+    const { requestId } = data;
+    const testCase = data.results[0];
+    const testCaseId = testCase.id;
+
+    // Initialize request storage if needed
+    if (!window.testCaseWebhookResults.has(requestId)) {
+      window.testCaseWebhookResults.set(requestId, new Map());
+    }
+
+    const requestResults = window.testCaseWebhookResults.get(requestId);
+    requestResults.set(testCaseId, {
+      ...testCase,
+      receivedAt: new Date().toISOString(),
+      requestId
+    });
+
+    const compositeKey = `${requestId}-${testCaseId}`;
+    console.log(`%c💾 Stored test case webhook result: ${compositeKey}`, 
       "background: #009688; color: white; font-weight: bold; padding: 3px 6px; border-radius: 3px;");
     
-    return window.webhookResults[key];
+    return compositeKey;
   } catch (error) {
-    console.error('Error retrieving webhook results:', error);
+    console.error('Error storing test case webhook result:', error);
     return null;
   }
 };
 
 /**
- * Process test results submitted from external test runners with improved detection
+ * Retrieve all test case results for a request
  * 
- * @param {Object} data - The request data containing test results
- * @param {String} data.requirementId - The requirement ID associated with the tests
- * @param {String} data.timestamp - ISO timestamp when the tests were run
- * @param {Array} data.results - Array of test results
- * @returns {Object} Response object
+ * @param {String} requestId - The request ID
+ * @returns {Array} - Array of test case results
  */
-export const processTestResults = async (data) => {
+export const getTestCaseResultsForRequest = (requestId) => {
   try {
-    // Check if this appears to be real webhook data with "Not Run" statuses
-    const hasNotRun = data.results && data.results.some(r => r.status === 'Not Run');
-    
-    if (hasNotRun) {
-      console.log("%c🚨 REAL WEBHOOK DATA DETECTED", "background: #FF5722; color: white; font-size: 16px; font-weight: bold; padding: 8px 12px; border-radius: 5px; margin: 5px 0;");
-    } else {
-      console.log("%c📩 WEBHOOK PAYLOAD RECEIVED", "background: #4CAF50; color: white; font-size: 14px; font-weight: bold; padding: 5px 10px; border-radius: 5px;");
+    const requestResults = window.testCaseWebhookResults.get(requestId);
+    if (!requestResults) {
+      return [];
     }
-    
-    console.log("%cTimestamp: " + new Date().toISOString(), "color: #666; font-style: italic;");
-    console.log("%cRequirement: " + data.requirementId, "color: #0066CC; font-weight: bold;");
-    console.log("%cResults Count: " + (data.results?.length || 0), "color: #0066CC; font-weight: bold;");
-    
-    // Create a special box for the "Not Run" case
-    if (hasNotRun) {
-      console.log("%c📋 TEST STATUS SUMMARY:", "font-weight: bold; color: #FF5722;");
-      const statusCounts = data.results.reduce((counts, r) => {
-        counts[r.status] = (counts[r.status] || 0) + 1;
-        return counts;
-      }, {});
-      
-      // Log status counts as a table
-      console.table(Object.entries(statusCounts).map(([status, count]) => ({
-        'Status': status,
-        'Count': count
-      })));
-      
-      console.log("%c⚠️ \"Not Run\" status detected! This is likely real webhook data, not simulated results.", 
-        "color: #FF5722; font-weight: bold; font-size: 14px;");
-    }
-    
-    console.log("%cComplete Payload:", "color: #333; font-weight: bold;");
-    console.log(data);
-    
-    const { requirementId, timestamp, results } = data;
-    
-    if (!requirementId || !timestamp || !Array.isArray(results)) {
-      console.error("Invalid test results data:", data);
-      return {
-        status: 400,
-        body: { 
-          error: 'Invalid data format. requirementId, timestamp, and results array are required.',
-          received: { 
-            hasRequirementId: !!requirementId, 
-            hasTimestamp: !!timestamp, 
-            resultsIsArray: Array.isArray(results) 
-          }
-        }
-      };
-    }
-    
-    // Store webhook results for later retrieval
-    // This ensures real webhook data is prioritized over simulated data
-    const storageKey = storeWebhookResults(data, data.runId || null);
-    console.log(`Webhook results stored with key: ${storageKey}`);
-    
-    console.log(`Received ${results.length} test results for ${requirementId} at ${timestamp}`);
-    
-    // Log all results in a nicely formatted table
-    console.log("%c📊 RECEIVED TEST RESULTS:", "background: #673AB7; color: white; font-size: 12px; padding: 3px 6px; border-radius: 3px;");
-    console.table(results.map(r => ({
-      'ID': r.id,
-      'Name': r.name || r.id,
-      'Status': r.status,
-      'Duration': r.duration || 0
-    })));
-    
-    // Update test case status in the dataStore
-    const updatedTestCases = updateTestStatusesDirectly(requirementId, results);
-    
-    // Force a DataStore notification to ensure UI is updated
-    if (typeof dataStore._notifyListeners === 'function') {
-      dataStore._notifyListeners();
-    }
-    
-    // Important: Notify any UI components waiting for the webhook callback
-    if (typeof window.onTestWebhookReceived === 'function') {
-      console.log("%c🔄 Forwarding webhook data to TestRunner component", "background: #2196F3; color: white; font-size: 12px; padding: 3px 6px; border-radius: 3px;");
-      window.onTestWebhookReceived(data);
-    } else {
-      console.log("%c⚠️ No webhook listener detected (window.onTestWebhookReceived is not a function)", "background: #FF9800; color: white; font-size: 12px; padding: 3px 6px; border-radius: 3px;");
-    }
-    
-    return {
-      status: 200,
-      body: { 
-        success: true, 
-        message: `Processed ${results.length} test results for ${requirementId}`,
-        updatedTestCases,
-        isRealWebhook: hasNotRun
-      }
-    };
-  } catch (error) {
-    console.error('Error processing test results:', error);
-    return {
-      status: 500,
-      body: { error: 'Internal server error processing test results' }
-    };
-  }
-};
 
-/**
- * Update test case statuses directly in the DataStore
- * @param {String} requirementId - The requirement ID associated with the tests
- * @param {Array} results - Array of test results
- * @returns {Array} Array of updated test cases
- */
-const updateTestStatusesDirectly = (requirementId, results) => {
-  try {
-    console.log(`Directly updating ${results.length} test statuses for requirement ${requirementId}...`);
+    const results = Array.from(requestResults.values());
+    console.log(`%c📂 Retrieved ${results.length} test case results for request: ${requestId}`, 
+      "background: #009688; color: white; font-weight: bold; padding: 3px 6px; border-radius: 3px;");
     
-    // Get current test cases from DataStore
-    const currentTestCases = dataStore.getTestCases();
-    console.log(`Found ${currentTestCases.length} test cases in DataStore`);
-    
-    // Flag to track if we found any "Not Run" status
-    let hasNotRunStatus = false;
-    
-    // Track updated test cases
-    const updatedTestCases = [];
-    
-    // Process each test result
-    results.forEach(result => {
-      // Make sure we have a valid test ID
-      if (!result.id) {
-        console.warn("Test result missing ID:", result);
-        return;
-      }
-      
-      // Check for "Not Run" status
-      if (result.status === 'Not Run') {
-        hasNotRunStatus = true;
-      }
-      
-      console.log(`Processing result for test case ${result.id} with status: ${result.status}`);
-      
-      // Find the test case to update - ENSURE EXACT MATCHING
-      const testCaseIndex = currentTestCases.findIndex(tc => tc.id === result.id);
-      
-      if (testCaseIndex === -1) {
-        console.log(`Test case ${result.id} not found in DataStore - creating new test case`);
-        
-        // Create a new test case if it doesn't exist
-        const newTestCase = {
-          id: result.id,
-          name: result.name || `Test case ${result.id}`,
-          description: `Automatically created from test results for ${requirementId}`,
-          status: result.status, // Use exactly what was reported
-          automationStatus: 'Automated',
-          lastExecuted: result.status !== 'Not Run' ? new Date().toISOString() : '',
-          executionTime: result.duration || 0,
-          requirementIds: [requirementId]
-        };
-        
-        console.log(`Created new test case: ${result.id} with status "${result.status}"`);
-        currentTestCases.push(newTestCase);
-        updatedTestCases.push(newTestCase);
-        
-        // Update mapping
-        updateRequirementMapping(requirementId, result.id);
-      } else {
-        // Update existing test case
-        const oldStatus = currentTestCases[testCaseIndex].status;
-        
-        // IMPORTANT: Make sure we preserve the exact status string from the webhook
-        currentTestCases[testCaseIndex] = {
-          ...currentTestCases[testCaseIndex],
-          status: result.status, // Use exactly what was reported, including "Not Run"
-          // Only update lastExecuted if status is not "Not Run"
-          lastExecuted: result.status !== 'Not Run' ? new Date().toISOString() : currentTestCases[testCaseIndex].lastExecuted,
-          executionTime: result.duration || 0
-        };
-        
-        console.log(`Updated test case ${result.id} status: "${oldStatus}" → "${result.status}"`);
-        updatedTestCases.push(currentTestCases[testCaseIndex]);
-        
-        // Ensure this test is mapped to the requirement
-        updateRequirementMapping(requirementId, result.id);
-      }
-    });
-    
-    // If we found any "Not Run" statuses, log a special notice
-    if (hasNotRunStatus) {
-      console.log(`%c🔔 DETECTED REAL WEBHOOK DATA WITH "NOT RUN" STATUS`, 
-        "background: #FF9800; color: white; font-size: 14px; font-weight: bold; padding: 5px 10px; border-radius: 5px;");
-      console.log(`%cThis likely means you received actual webhook data rather than simulated results.`, 
-        "color: #FF9800; font-weight: bold;");
-    }
-    
-    // Debug the final state of test cases
-    const relevantTestIds = results.map(r => r.id);
-    console.log("After processing, final status of updated test cases:");
-    currentTestCases
-      .filter(tc => relevantTestIds.includes(tc.id))
-      .forEach(tc => console.log(`- ${tc.id}: ${tc.status}`));
-    
-    // Update the DataStore with modified test cases
-    if (updatedTestCases.length > 0) {
-      console.log(`Setting ${currentTestCases.length} test cases in DataStore with ${updatedTestCases.length} updates`);
-      dataStore.setTestCases(currentTestCases);
-      
-      // Trigger a second notification after a short delay
-      // This helps ensure UI components catch the update
-      setTimeout(() => {
-        if (typeof dataStore._notifyListeners === 'function') {
-          console.log("Sending secondary notification to ensure UI updates");
-          dataStore._notifyListeners();
-        }
-      }, 100);
-    }
-    
-    return updatedTestCases;
+    return results;
   } catch (error) {
-    console.error('Error updating test statuses:', error);
+    console.error('Error retrieving test case results:', error);
     return [];
   }
 };
 
 /**
- * Make sure a test case is properly mapped to a requirement
- * @param {String} requirementId - The requirement ID
- * @param {String} testCaseId - The test case ID
+ * FIXED: Update individual test case in DataStore with proper notification
+ * This ensures the Test Cases page sees the updates immediately
+ * 
+ * @param {Object} testCase - Test case result from webhook
+ * @returns {Object} Updated test case object
  */
-const updateRequirementMapping = (requirementId, testCaseId) => {
+const updateTestCaseInDataStore = (testCase) => {
   try {
-    // Get current mapping
-    const mapping = dataStore.getMapping();
+    console.log(`📀 FIXED: Updating test case ${testCase.id} in DataStore with status: ${testCase.status}`);
     
-    // Create mapping entry if it doesn't exist
-    if (!mapping[requirementId]) {
-      mapping[requirementId] = [];
+    // Get current test cases from DataStore
+    const currentTestCases = dataStore.getTestCases();
+    console.log(`📊 Current DataStore has ${currentTestCases.length} test cases`);
+    
+    // Find the test case to update
+    const testCaseIndex = currentTestCases.findIndex(tc => tc.id === testCase.id);
+    
+    let updatedTestCase;
+    let dataChanged = false;
+    
+    if (testCaseIndex === -1) {
+      console.log(`➕ Test case ${testCase.id} not found - creating new test case`);
+      
+      // Create new test case
+      updatedTestCase = {
+        id: testCase.id,
+        name: testCase.name || `Test case ${testCase.id}`,
+        description: `Test case created from webhook result`,
+        status: testCase.status,
+        automationStatus: 'Automated',
+        priority: 'Medium',
+        lastExecuted: testCase.status !== 'Not Started' && testCase.status !== 'Not Run' ? 
+                      new Date().toISOString() : '',
+        executionTime: testCase.duration || 0,
+        logs: testCase.logs || '',
+        requirementIds: [], // Will be populated by mapping
+        version: '', // Default version
+        tags: [],
+        assignee: ''
+      };
+      
+      // Add new test case to the array
+      currentTestCases.push(updatedTestCase);
+      dataChanged = true;
+      
+      console.log(`✅ Created new test case: ${testCase.id} with status "${testCase.status}"`);
+    } else {
+      // Update existing test case
+      const existingTestCase = currentTestCases[testCaseIndex];
+      const oldStatus = existingTestCase.status;
+      
+      updatedTestCase = {
+        ...existingTestCase,
+        status: testCase.status,
+        lastExecuted: testCase.status !== 'Not Started' && testCase.status !== 'Not Run' ? 
+                      new Date().toISOString() : existingTestCase.lastExecuted,
+        executionTime: testCase.duration || existingTestCase.executionTime || 0,
+        logs: testCase.logs || existingTestCase.logs || '',
+        // Preserve existing fields like name, description, priority, etc.
+        name: existingTestCase.name, // Keep original name
+        description: existingTestCase.description,
+        priority: existingTestCase.priority,
+        automationStatus: existingTestCase.automationStatus,
+        requirementIds: existingTestCase.requirementIds,
+        version: existingTestCase.version,
+        tags: existingTestCase.tags,
+        assignee: existingTestCase.assignee
+      };
+      
+      // Only update if status actually changed
+      if (oldStatus !== testCase.status) {
+        currentTestCases[testCaseIndex] = updatedTestCase;
+        dataChanged = true;
+        console.log(`📝 Updated existing test case ${testCase.id}: "${oldStatus}" → "${testCase.status}"`);
+      } else {
+        console.log(`⏭️ Test case ${testCase.id} status unchanged: "${oldStatus}"`);
+      }
     }
     
-    // Add test case to mapping if not already present
-    if (!mapping[requirementId].includes(testCaseId)) {
-      console.log(`Adding mapping from ${requirementId} to ${testCaseId}`);
-      mapping[requirementId].push(testCaseId);
-      dataStore.updateMappings(mapping);
+    // Only update DataStore if data actually changed
+    if (dataChanged) {
+      console.log(`💾 Saving updated test cases to DataStore (${currentTestCases.length} total)`);
+      
+      // CRITICAL: Use setTestCases which triggers notifications
+      dataStore.setTestCases(currentTestCases);
+      
+      console.log(`📢 DataStore updated and listeners notified for test case ${testCase.id}`);
+      
+      // ADDITIONAL: Force a quality gates refresh if available
+      try {
+        refreshQualityGates(dataStore);
+        console.log(`🔄 Quality gates refreshed after test case update`);
+      } catch (error) {
+        console.warn('Could not refresh quality gates:', error);
+      }
+      
+      // DEBUGGING: Verify the update was successful
+      const verifyTestCases = dataStore.getTestCases();
+      const verifyTestCase = verifyTestCases.find(tc => tc.id === testCase.id);
+      if (verifyTestCase) {
+        console.log(`✅ VERIFICATION: Test case ${testCase.id} status in DataStore: "${verifyTestCase.status}"`);
+      } else {
+        console.error(`❌ VERIFICATION FAILED: Test case ${testCase.id} not found in DataStore after update`);
+      }
     }
+    
+    return updatedTestCase;
+    
   } catch (error) {
-    console.error('Error updating requirement mapping:', error);
+    console.error(`❌ Error updating test case ${testCase.id} in DataStore:`, error);
+    return null;
   }
 };
 
 /**
- * Special test function to simulate a webhook with "Not Run" status
- * This helps test the detection and handling of real webhook data
+ * ENHANCED: Notify webhook listeners with better debugging
  * 
- * @param {String} requirementId - The requirement ID to use
- * @param {Array} testIds - Optional array of test IDs to use (defaults to TC_007 and TC_008)
- * @returns {Promise} - The result of processing the webhook
+ * @param {Object} data - Individual test case webhook data
  */
-export const testNotRunWebhook = (requirementId = 'REQ-006', testIds = ['TC_007', 'TC_008']) => {
-  // Create a webhook payload with "Not Run" status
-  const webhookPayload = {
-    requirementId: requirementId,
-    timestamp: new Date().toISOString(),
-    runId: `test-not-run-${Date.now()}`,  // Unique run ID for retrieval
-    results: testIds.map(id => ({
-      id: id,
-      name: `Test ${id}`,
-      status: 'Not Run',
-      duration: 0
-    }))
-  };
-
-  console.log("%c🧪 TESTING NOT RUN WEBHOOK", "background: #673AB7; color: white; font-size: 16px; font-weight: bold; padding: 10px; border-radius: 5px; margin: 10px 0;");
-  console.log("%cThis simulates a real webhook with 'Not Run' status", "color: #673AB7; font-weight: bold;");
-  console.log("Webhook payload:", webhookPayload);
-  
-  // Process the webhook
-  return processTestResults(webhookPayload);
-};
-
-/**
- * Test function to simulate exactly the webhook data you received
- */
-const testNotRunScenario = () => {
-  const testData = {
-    "requirementId": "REQ-006",
-    "timestamp": "2025-04-18T07:51:54Z",
-    "results": [
-      {
-        "id": "TC_007",
-        "name": "Test TC_007",
-        "status": "Not Run",
-        "duration": 0
-      },
-      {
-        "id": "TC_008",
-        "name": "Test TC_008",
-        "status": "Not Run",
-        "duration": 0
-      }
-    ]
-  };
-  
-  console.log("Testing 'Not Run' status handling with data:", testData);
-  return processTestResults(testData);
-};
-
-/**
- * Endpoint to fetch test results directly when GitHub Actions workflow completes
- * This provides a way to get results without waiting for a webhook callback
- * 
- * @param {Object} params - Request parameters
- * @param {String} params.runId - The GitHub workflow run ID
- * @param {String} params.requirementId - The requirement ID
- * @returns {Object} Response with test results
- */
-export const fetchTestResults = async (params) => {
+const notifyWebhookListeners = (data) => {
   try {
-    console.log("%c🔍 FETCHING TEST RESULTS", "background: #673AB7; color: white; font-size: 14px; font-weight: bold; padding: 5px 10px; border-radius: 5px;");
-    console.log("Request params:", params);
+    console.log('%c🔄 Notifying webhook listeners', 
+      "background: #2196F3; color: white; font-size: 12px; padding: 3px 6px; border-radius: 3px;");
     
-    const { runId, requirementId } = params;
-    
-    if (!runId || !requirementId) {
-      console.error("Missing required parameters:", params);
-      return {
-        status: 400,
-        body: { error: 'Missing required parameters: runId and requirementId are required' }
-      };
+    // Check if TestRunner/TestExecutionModal listeners exist
+    if (typeof window.onTestWebhookReceived === 'function') {
+      console.log('📤 Calling window.onTestWebhookReceived with individual test case data');
+      
+      // For backward compatibility, call the listener with individual data
+      window.onTestWebhookReceived(data);
+      
+      console.log('✅ Webhook listener notified successfully');
+    } else {
+      console.log('⚠️ No webhook listener detected (window.onTestWebhookReceived is not a function)');
     }
     
-    // Check for stored webhook results first
-    const storedResults = getStoredWebhookResults(runId);
-    if (storedResults) {
-      console.log("%c✅ Found stored webhook results - using those instead of generating new ones", 
-        "background: #8BC34A; color: black; font-weight: bold; padding: 3px 6px; border-radius: 3px;");
-      
+    // ADDITIONAL: Check for any other global listeners
+    if (typeof window.receiveTestResults === 'function') {
+      console.log('📤 Calling window.receiveTestResults as fallback');
+      window.receiveTestResults(data);
+    }
+    
+  } catch (error) {
+    console.error('❌ Error notifying webhook listeners:', error);
+  }
+};
+
+/**
+ * ENHANCED: Process individual test case result with better error handling and notifications
+ * 
+ * @param {Object} data - The webhook data for a single test case
+ * @returns {Object} Response object
+ */
+export const processTestCaseResult = async (data) => {
+  try {
+    console.log('%c🧪 PROCESSING INDIVIDUAL TEST CASE RESULT', 
+      "background: #673AB7; color: white; font-size: 14px; font-weight: bold; padding: 5px 10px; border-radius: 5px;");
+    
+    // Validate individual test case payload
+    const { requestId, timestamp, results } = data;
+    
+    if (!requestId) {
+      console.error('❌ Missing requestId in test case webhook');
       return {
-        status: 200,
-        body: {
-          requirementId,
-          timestamp: new Date().toISOString(),
-          runId: runId,
-          results: storedResults,
-          source: 'stored_webhook'
+        status: 400,
+        body: { 
+          error: 'requestId is required for per-test-case processing',
+          received: data
+        }
+      };
+    }
+
+    if (!results || !Array.isArray(results) || results.length !== 1) {
+      console.error('❌ Invalid results array - expected exactly one test case');
+      return {
+        status: 400,
+        body: { 
+          error: 'Exactly one test case expected per webhook call',
+          received: { 
+            hasResults: !!results,
+            isArray: Array.isArray(results),
+            length: results?.length || 0
+          }
+        }
+      };
+    }
+
+    const testCase = results[0];
+    if (!testCase.id) {
+      console.error('❌ Test case missing ID');
+      return {
+        status: 400,
+        body: { 
+          error: 'Test case ID is required',
+          received: testCase
+        }
+      };
+    }
+
+    console.log(`📝 Processing test case: ${testCase.id} with status: ${testCase.status}`);
+    console.log(`🔗 Request ID: ${requestId}`);
+    console.log(`⏰ Timestamp: ${timestamp}`);
+
+    // Store the individual test case result (for per-test-case tracking)
+    const storageKey = storeTestCaseWebhookResult(data);
+    
+    // CRITICAL: Update test case in DataStore with proper notifications
+    const updatedTestCase = updateTestCaseInDataStore(testCase);
+    
+    if (!updatedTestCase) {
+      console.error(`❌ Failed to update test case ${testCase.id} in DataStore`);
+      return {
+        status: 500,
+        body: { 
+          error: `Failed to update test case ${testCase.id} in DataStore`
         }
       };
     }
     
-    // In a real implementation, this would fetch results from a database or storage
-    // based on the runId and requirementId
-    // For now, we'll generate simulated results
+    // Notify webhook listeners (for compatibility with existing components)
+    notifyWebhookListeners(data);
     
-    // Get test cases for this requirement from DataStore
-    const allTestCases = dataStore.getTestCases();
-    const mapping = dataStore.getMapping();
-    const testCaseIds = mapping[requirementId] || [];
-    
-    console.log(`Found ${testCaseIds.length} test cases for requirement ${requirementId}`);
-    
-    // Generate consistent results based on runId and requirementId
-    const seed = runId + requirementId;
-    const seedValue = seed.split('').reduce((sum, char) => sum + char.charCodeAt(0), 0) / 1000;
-    
-    // Generate results for each test case
-    const results = testCaseIds.map(tcId => {
-      const testCase = allTestCases.find(tc => tc.id === tcId);
-      if (!testCase) return null;
-      
-      // Use a deterministic "random" value based on test ID and seed
-      const testIdValue = tcId.split('').reduce((sum, char) => sum + char.charCodeAt(0), 0) / 1000;
-      const randomValue = Math.abs(Math.sin(seedValue + testIdValue));
-      const isPassed = randomValue > 0.3; // Make most tests pass for demonstration
-      
-      return {
-        id: tcId,
-        name: testCase.name || `Test case ${tcId}`,
-        status: isPassed ? 'Passed' : 'Failed',
-        duration: Math.floor(randomValue * 1000) + 100,
-        logs: `Executing test ${tcId}\nTest completed with ${isPassed ? 'success' : 'failure'}.`
-      };
-    }).filter(Boolean);
-    
-    console.log("%c📊 GENERATED TEST RESULTS", "background: #4CAF50; color: white; font-size: 12px; padding: 3px 6px; border-radius: 3px;");
-    console.table(results.map(r => ({
-      'ID': r.id,
-      'Status': r.status,
-      'Duration': r.duration
-    })));
-    
-    // Create a response that mimics the webhook payload format
-    const response = {
-      requirementId,
-      timestamp: new Date().toISOString(),
-      runId: runId,
-      results: results,
-      source: 'generated'
-    };
+    console.log(`✅ Test case ${testCase.id} processed successfully and DataStore updated`);
     
     return {
       status: 200,
-      body: response
+      body: { 
+        success: true, 
+        message: `Processed test case ${testCase.id} with status ${testCase.status}`,
+        requestId,
+        testCaseId: testCase.id,
+        storageKey,
+        updatedTestCase,
+        dataStoreUpdated: true
+      }
     };
+    
   } catch (error) {
-    console.error('Error fetching test results:', error);
+    console.error('❌ Error processing test case result:', error);
     return {
       status: 500,
-      body: { error: 'Internal server error fetching test results' }
+      body: { error: 'Internal server error processing test case result' }
     };
   }
 };
 
 /**
- * Example API route setup for test results
+ * BACKWARD COMPATIBILITY: Process bulk test results (legacy support)
+ * This maintains compatibility with existing bulk webhook handling
+ * 
+ * @param {Object} data - Legacy bulk webhook data
+ * @returns {Object} Response object
+ */
+export const processTestResults = async (data) => {
+  try {
+    console.log('%c📦 PROCESSING BULK TEST RESULTS (Legacy Support)', 
+      "background: #FF9800; color: white; font-size: 14px; font-weight: bold; padding: 5px 10px; border-radius: 5px;");
+    
+    const { requestId, timestamp, results } = data;
+    
+    if (!results || !Array.isArray(results)) {
+      return {
+        status: 400,
+        body: { error: 'Invalid results array' }
+      };
+    }
+    
+    console.log(`📊 Converting ${results.length} bulk results to individual test case results`);
+    
+    // Process each test case individually
+    const processedResults = [];
+    for (const testCase of results) {
+      if (testCase.id) {
+        const individualData = {
+          requestId,
+          timestamp,
+          results: [testCase]
+        };
+        
+        const result = await processTestCaseResult(individualData);
+        processedResults.push({
+          testCaseId: testCase.id,
+          status: result.status,
+          success: result.body.success
+        });
+      }
+    }
+    
+    console.log(`✅ Processed ${processedResults.length} test cases from bulk webhook`);
+    
+    return {
+      status: 200,
+      body: { 
+        success: true, 
+        message: `Converted bulk webhook to ${processedResults.length} individual test case results`,
+        processedResults
+      }
+    };
+    
+  } catch (error) {
+    console.error('❌ Error processing bulk test results:', error);
+    return {
+      status: 500,
+      body: { error: 'Internal server error processing bulk test results' }
+    };
+  }
+};
+
+/**
+ * NEW: Get execution summary for a request
+ * 
+ * @param {String} requestId - The request ID
+ * @returns {Object} Execution summary
+ */
+export const getExecutionSummary = (requestId) => {
+  try {
+    const testCaseResults = getTestCaseResultsForRequest(requestId);
+    
+    if (testCaseResults.length === 0) {
+      return {
+        requestId,
+        totalTests: 0,
+        summary: {},
+        testCases: []
+      };
+    }
+    
+    // Count statuses
+    const statusCounts = {};
+    testCaseResults.forEach(result => {
+      const status = result.status || 'Unknown';
+      statusCounts[status] = (statusCounts[status] || 0) + 1;
+    });
+    
+    return {
+      requestId,
+      totalTests: testCaseResults.length,
+      summary: statusCounts,
+      testCases: testCaseResults.map(r => ({
+        id: r.id,
+        name: r.name,
+        status: r.status,
+        duration: r.duration || 0,
+        receivedAt: r.receivedAt
+      }))
+    };
+    
+  } catch (error) {
+    console.error('❌ Error getting execution summary:', error);
+    return {
+      requestId,
+      totalTests: 0,
+      summary: {},
+      testCases: [],
+      error: error.message
+    };
+  }
+};
+
+/**
+ * NEW: Test function for individual test case webhook
+ * 
+ * @param {String} requestId - Test request ID
+ * @param {String} testCaseId - Test case ID
+ * @param {String} status - Test status
+ * @returns {Promise} Processing result
+ */
+export const testIndividualTestCaseWebhook = async (requestId = 'test-req', testCaseId = 'TC_001', status = 'Passed') => {
+  const testData = {
+    requestId: requestId,
+    timestamp: new Date().toISOString(),
+    results: [
+      {
+        id: testCaseId,
+        name: `Test ${testCaseId}`,
+        status: status,
+        duration: Math.floor(Math.random() * 5000) + 1000,
+        logs: `Test execution for ${testCaseId} completed with status: ${status}`
+      }
+    ]
+  };
+  
+  console.log('%c🧪 TESTING INDIVIDUAL TEST CASE WEBHOOK', 
+    "background: #673AB7; color: white; font-size: 16px; font-weight: bold; padding: 10px; border-radius: 5px; margin: 10px 0;");
+  console.log('Test data:', testData);
+  
+  return processTestCaseResult(testData);
+};
+
+/**
+ * NEW: Test function for multiple individual test case webhooks
+ * 
+ * @param {String} requestId - Test request ID
+ * @param {Array} testCaseIds - Array of test case IDs
+ * @returns {Promise} Processing results
+ */
+export const testMultipleIndividualWebhooks = async (requestId = 'test-req', testCaseIds = ['TC_001', 'TC_002', 'TC_003']) => {
+  console.log('%c🎭 TESTING MULTIPLE INDIVIDUAL TEST CASE WEBHOOKS', 
+    "background: #673AB7; color: white; font-size: 16px; font-weight: bold; padding: 10px; border-radius: 5px; margin: 10px 0;");
+  
+  const results = [];
+  
+  for (let i = 0; i < testCaseIds.length; i++) {
+    const testCaseId = testCaseIds[i];
+    const status = Math.random() > 0.3 ? 'Passed' : 'Failed';
+    
+    console.log(`📤 Sending webhook ${i + 1}/${testCaseIds.length} for ${testCaseId}`);
+    
+    const result = await testIndividualTestCaseWebhook(requestId, testCaseId, status);
+    results.push(result);
+    
+    // Small delay between webhooks to simulate real execution
+    await new Promise(resolve => setTimeout(resolve, 500));
+  }
+  
+  console.log(`✅ Sent ${results.length} individual test case webhooks`);
+  
+  // Show execution summary
+  const summary = getExecutionSummary(requestId);
+  console.log('📊 Execution Summary:', summary);
+  
+  return results;
+};
+
+/**
+ * MODIFIED: Setup test results endpoints for per-test-case handling
  */
 export const setupTestResultsEndpoint = () => {
-  // Create a mock endpoint for test results
+  // Create mock API endpoints
   window.mockApi = window.mockApi || {};
+  
+  // Individual test case processing (new primary method)
+  window.mockApi.processTestCase = async (data) => {
+    return processTestCaseResult(data);
+  };
+  
+  // Bulk processing (legacy support)
   window.mockApi.testResults = async (data) => {
     return processTestResults(data);
   };
   
-  // Set up the fetch results endpoint
-  window.mockApi.fetchTestResults = async (params) => {
-    return fetchTestResults(params);
+  // Direct callable functions for testing
+  window.processTestCaseResult = (data) => {
+    console.log("Manual individual test case processing:", data);
+    return processTestCaseResult(data);
   };
   
-  // Create a direct callable function for testing
-  window.updateTestResults = (data) => {
-    console.log("Manual test update called with:", data);
+  window.processTestResults = (data) => {
+    console.log("Manual bulk test results processing:", data);
     return processTestResults(data);
   };
   
-  // Add test function for the specific Not Run scenario
-  window.testNotRunScenario = testNotRunScenario;
+  // Test functions
+  window.testIndividualTestCaseWebhook = testIndividualTestCaseWebhook;
+  window.testMultipleIndividualWebhooks = testMultipleIndividualWebhooks;
+  window.getExecutionSummary = getExecutionSummary;
+  window.getTestCaseResultsForRequest = getTestCaseResultsForRequest;
   
-  // Add the new test function
-  window.testNotRunWebhook = testNotRunWebhook;
-  
-  // Add the storage functions
-  window.storeWebhookResults = storeWebhookResults;
-  window.getStoredWebhookResults = getStoredWebhookResults;
-  
-  // Create a direct callable function for fetching results
-  window.fetchTestResults = (runId, requirementId) => {
-    console.log("Manual fetch test results called with:", { runId, requirementId });
-    return fetchTestResults({ runId, requirementId });
+  // Backward compatibility functions
+  window.updateTestResults = (data) => {
+    console.log("Legacy test update called:", data);
+    return processTestResults(data);
   };
   
-  console.log('Test results API endpoints set up:');
-  console.log('- window.mockApi.testResults() - Process webhook payload');
-  console.log('- window.mockApi.fetchTestResults() - Fetch results directly');
-  console.log('- window.updateTestResults() - Manual test update');
-  console.log('- window.testNotRunScenario() - Test exact "Not Run" scenario');
-  console.log('- window.testNotRunWebhook() - Test webhook with "Not Run" status');
-  console.log('- window.storeWebhookResults() - Store webhook results');
-  console.log('- window.getStoredWebhookResults() - Retrieve stored webhook results');
-  console.log('- window.fetchTestResults() - Fetch test results directly');
+  // DEBUGGING FUNCTION: Manual test case update for testing
+  window.debugUpdateTestCase = (testCaseId, status) => {
+    console.log(`🧪 DEBUG: Manually updating test case ${testCaseId} to status ${status}`);
+    
+    const testCase = {
+      id: testCaseId,
+      name: `Test ${testCaseId}`,
+      status: status,
+      duration: 1000,
+      logs: `Debug update: ${testCaseId} -> ${status}`
+    };
+    
+    const result = updateTestCaseInDataStore(testCase);
+    console.log('DEBUG Update result:', result);
+    
+    // Verify the update
+    setTimeout(() => {
+      const testCases = dataStore.getTestCases();
+      const updated = testCases.find(tc => tc.id === testCaseId);
+      console.log(`DEBUG Verification: ${testCaseId} status is now "${updated?.status}"`);
+    }, 100);
+    
+    return result;
+  };
   
-  console.log('\nTest exact "Not Run" scenario with: window.testNotRunScenario()');
-  console.log('Test webhook with "Not Run" status: window.testNotRunWebhook("REQ-001", ["TC_001", "TC_002"])');
-  console.log('Fetch test results with: window.fetchTestResults("12345", "REQ-001")');
-  console.log('Replace "12345" with run ID and "REQ-001" with requirement ID');
+  console.log('✨ Per-Test-Case API endpoints set up:');
+  console.log('- window.mockApi.processTestCase() - Process individual test case webhook');
+  console.log('- window.mockApi.testResults() - Process bulk webhook (legacy)');
+  console.log('- window.processTestCaseResult() - Manual individual test case processing');
+  console.log('- window.processTestResults() - Manual bulk processing (legacy)');
+  console.log('- window.testIndividualTestCaseWebhook() - Test individual webhook');
+  console.log('- window.testMultipleIndividualWebhooks() - Test multiple individual webhooks');
+  console.log('- window.getExecutionSummary() - Get execution summary for request');
+  console.log('- window.getTestCaseResultsForRequest() - Get all test case results for request');
+  console.log('- window.debugUpdateTestCase() - Debug function for manual updates');
+  
+  console.log('\n🧪 Test individual test case webhook:');
+  console.log('window.testIndividualTestCaseWebhook("req-123", "TC_001", "Passed")');
+  
+  console.log('\n🎭 Test multiple individual webhooks:');
+  console.log('window.testMultipleIndividualWebhooks("req-123", ["TC_001", "TC_002", "TC_003"])');
+  
+  console.log('\n📊 Get execution summary:');
+  console.log('window.getExecutionSummary("req-123")');
+  
+  console.log('\n🐛 Debug manual update:');
+  console.log('window.debugUpdateTestCase("TC_001", "Passed")');
   
   return {
-    url: 'window.mockApi.testResults',
-    baseUrl: `${window.location.protocol}//${window.location.host}/api/test-results`,
-    test: (data) => window.mockApi.testResults(data)
+    url: 'window.mockApi.processTestCase',
+    legacyUrl: 'window.mockApi.testResults',
+    baseUrl: `${window.location.protocol}//${window.location.host}/api/webhook/test-results`,
+    testIndividual: (data) => window.mockApi.processTestCase(data),
+    testBulk: (data) => window.mockApi.testResults(data)
   };
 };
+
+/**
+ * MODIFIED: Webhook receiver function for compatibility
+ * This function can be called directly by external scripts
+ */
+window.receiveTestResults = window.receiveTestResults || ((data) => {
+  console.log("Test results received via window.receiveTestResults:", data);
+  try {
+    // Determine if this is individual or bulk data
+    if (data.results && Array.isArray(data.results)) {
+      if (data.results.length === 1) {
+        // Single test case - use individual processing
+        return processTestCaseResult(data);
+      } else {
+        // Multiple test cases - use bulk processing (legacy)
+        return processTestResults(data);
+      }
+    } else {
+      throw new Error('Invalid webhook data format');
+    }
+  } catch (error) {
+    console.error("Error processing test results:", error);
+    return { success: false, error: error.message };
+  }
+});
 
 // Initialize the API endpoint when this module is imported
 const testResultsApi = setupTestResultsEndpoint();
