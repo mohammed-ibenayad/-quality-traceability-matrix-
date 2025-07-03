@@ -75,52 +75,88 @@ const TestExecutionModal = ({
   const [showSettings, setShowSettings] = useState(false);
   const [processingStatus, setProcessingStatus] = useState(null);
 
-  // MODIFIED: Initialize per test case results when modal opens
-  useEffect(() => {
-    if (isOpen && testCases.length > 0) {
-      console.log('🎭 Initializing test execution modal for per-test-case results');
-      
-      // Initialize test case results map
-      const initialResults = new Map();
-      testCases.forEach(testCase => {
-        initialResults.set(testCase.id, {
-          id: testCase.id,
-          name: testCase.name,
-          status: 'Not Started',
-          duration: 0,
-          logs: '',
-          startTime: null,
-          endTime: null,
-          receivedAt: null
-        });
+  // Fixed TestExecutionModal.jsx - Prevent unnecessary reinitialization
+
+// Add a ref to track if modal was already initialized
+const initializedRef = useRef(false);
+
+// FIXED: Only initialize once when modal opens, not on every re-render
+useEffect(() => {
+  if (isOpen && testCases.length > 0 && !initializedRef.current) {
+    console.log('🎭 Initializing test execution modal for per-test-case results');
+    
+    // Initialize test case results map
+    const initialResults = new Map();
+    testCases.forEach(testCase => {
+      initialResults.set(testCase.id, {
+        id: testCase.id,
+        name: testCase.name,
+        status: 'Not Started',
+        duration: 0,
+        logs: '',
+        startTime: null,
+        endTime: null,
+        receivedAt: null
       });
-      
-      setTestCaseResults(initialResults);
-      setExpectedTestCases(testCases.map(tc => tc.id));
+    });
+    
+    setTestCaseResults(initialResults);
+    setExpectedTestCases(testCases.map(tc => tc.id));
 
-      // Reset all states
-      setIsRunning(false);
-      setWaitingForWebhook(false);
-      waitingForWebhookRef.current = false;
-      setError(null);
-      setProcessingStatus(null);
-      setCurrentRequestId(null);
-      setExecutionStatus(null);
+    // Reset all states - but only on first initialization
+    setIsRunning(false);
+    setWaitingForWebhook(false);
+    waitingForWebhookRef.current = false;
+    setError(null);
+    setProcessingStatus(null);
+    setCurrentRequestId(null);
+    setExecutionStatus(null);
 
-      // Clear intervals and timeouts
-      if (pollInterval) {
-        clearInterval(pollInterval);
-        setPollInterval(null);
-      }
-      if (webhookTimeout) {
-        clearTimeout(webhookTimeout);
-        setWebhookTimeout(null);
-      }
-
-      console.log('✅ Test execution modal initialized for:', requirement ? requirement.id : 'bulk execution');
-      console.log(`📊 Expected test cases: ${testCases.length}`, testCases.map(tc => tc.id));
+    // Clear intervals and timeouts
+    if (pollInterval) {
+      clearInterval(pollInterval);
+      setPollInterval(null);
     }
-  }, [isOpen, testCases, requirement]);
+    if (webhookTimeout) {
+      clearTimeout(webhookTimeout);
+      setWebhookTimeout(null);
+    }
+
+    // Mark as initialized
+    initializedRef.current = true;
+
+    console.log('✅ Test execution modal initialized for:', requirement ? requirement.name : 'bulk execution');
+    console.log('📊 Expected test cases:', expectedTestCases.length, testCases.map(tc => tc.id));
+  }
+}, [isOpen, testCases]); // Remove other dependencies that cause re-initialization
+
+// FIXED: Reset initialization flag when modal closes
+useEffect(() => {
+  if (!isOpen) {
+    initializedRef.current = false;
+  }
+}, [isOpen]);
+
+// FIXED: Handle test case result updates without reinitializing
+const handleTestCaseUpdate = useCallback((data) => {
+  if (!initializedRef.current) return; // Don't process if not initialized
+  
+  const { requestId, testCaseId, testCase } = data;
+  
+  // Only update if this is for the current request
+  if (currentRequestId && requestId === currentRequestId) {
+    setTestCaseResults(prevResults => {
+      const newResults = new Map(prevResults);
+      newResults.set(testCaseId, {
+        ...testCase,
+        receivedAt: new Date().toISOString()
+      });
+      return newResults;
+    });
+    
+    console.log(`📝 Updated test case ${testCaseId}: ${testCase.status}`);
+  }
+}, [currentRequestId]);
 
   // Sync ref with state
   useEffect(() => {
