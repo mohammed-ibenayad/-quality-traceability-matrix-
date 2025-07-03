@@ -20,7 +20,7 @@ class WebhookService {
   } else {
     // In production, use the same host as frontend with port 3001
     // Since nginx forwards internally, we need to use the external URL
-    return `http://${window.location.hostname}:3001`;
+    return `http://${window.location.hostname}`;
   }
 }
   async connect() {
