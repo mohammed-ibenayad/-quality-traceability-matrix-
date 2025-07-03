@@ -24,8 +24,10 @@ import { refreshQualityGates } from '../../utils/calculateQualityGates';
 import webhookService from '../../services/WebhookService';
 
 const getCallbackUrl = () => {
-  // Always use localhost for internal communication when both services are on same server
-  return 'http://localhost:3001/api/webhook/test-results';
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    return 'http://localhost:3001/api/webhook/test-results';
+  }
+  return `${window.location.protocol}//${window.location.hostname}/api/webhook/test-results`;
 };
 
 const TestExecutionModal = ({
