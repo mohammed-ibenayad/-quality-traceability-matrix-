@@ -12,9 +12,17 @@ class WebhookService {
   }
 
   detectBaseURL() {
-  // Always use localhost for internal communication when both services are on same server
-  return 'http://localhost:3001';
+  // Check if we're in production environment
+  const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+  
+  if (isDev) {
+    return 'http://localhost:3001';
+  } else {
+    // In production, use the same host as frontend with port 3001
+    // Since nginx forwards internally, we need to use the external URL
+    return `http://${window.location.hostname}:3001`;
   }
+}
   async connect() {
     try {
       const { io } = await import('socket.io-client');
