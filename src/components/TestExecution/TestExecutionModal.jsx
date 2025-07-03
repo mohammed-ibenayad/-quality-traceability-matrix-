@@ -75,52 +75,69 @@ const TestExecutionModal = ({
   const [showSettings, setShowSettings] = useState(false);
   const [processingStatus, setProcessingStatus] = useState(null);
 
-  // MODIFIED: Initialize per test case results when modal opens
+  // Track previous props to detect changes
+  const prevProps = useRef({ isOpen: false, testCases: [] });
+
+  // FIXED: Only initialize when modal first opens or test cases change significantly
   useEffect(() => {
-    if (isOpen && testCases.length > 0) {
+    const propsChanged = isOpen !== prevProps.current.isOpen || 
+                        JSON.stringify(testCases.map(tc => tc.id)) !== JSON.stringify(prevProps.current.testCases.map(tc => tc.id));
+    
+    if (isOpen && testCases.length > 0 && propsChanged) {
       console.log('🎭 Initializing test execution modal for per-test-case results');
       
-      // Initialize test case results map
-      const initialResults = new Map();
-      testCases.forEach(testCase => {
-        initialResults.set(testCase.id, {
-          id: testCase.id,
-          name: testCase.name,
-          status: 'Not Started',
-          duration: 0,
-          logs: '',
-          startTime: null,
-          endTime: null,
-          receivedAt: null
+      // Only reset state if we're not in the middle of an execution
+      if (!isRunning && !waitingForWebhook) {
+        console.log('📋 Resetting modal state - no active execution');
+        
+        // Initialize test case results map
+        const initialResults = new Map();
+        testCases.forEach(testCase => {
+          initialResults.set(testCase.id, {
+            id: testCase.id,
+            name: testCase.name,
+            status: 'Not Started',
+            duration: 0,
+            logs: '',
+            startTime: null,
+            endTime: null,
+            receivedAt: null
+          });
         });
-      });
-      
-      setTestCaseResults(initialResults);
-      setExpectedTestCases(testCases.map(tc => tc.id));
+        
+        setTestCaseResults(initialResults);
+        setExpectedTestCases(testCases.map(tc => tc.id));
 
-      // Reset all states
-      setIsRunning(false);
-      setWaitingForWebhook(false);
-      waitingForWebhookRef.current = false;
-      setError(null);
-      setProcessingStatus(null);
-      setCurrentRequestId(null);
-      setExecutionStatus(null);
+        // Reset execution states only if not running
+        setError(null);
+        setProcessingStatus(null);
+        setExecutionStatus(null);
+        
+        // Only reset currentRequestId if not waiting for webhook
+        if (!waitingForWebhook) {
+          setCurrentRequestId(null);
+        }
 
-      // Clear intervals and timeouts
-      if (pollInterval) {
-        clearInterval(pollInterval);
-        setPollInterval(null);
-      }
-      if (webhookTimeout) {
-        clearTimeout(webhookTimeout);
-        setWebhookTimeout(null);
+        // Clear intervals and timeouts
+        if (pollInterval) {
+          clearInterval(pollInterval);
+          setPollInterval(null);
+        }
+        if (webhookTimeout) {
+          clearTimeout(webhookTimeout);
+          setWebhookTimeout(null);
+        }
+      } else {
+        console.log('⚠️ Active execution detected - preserving state');
       }
 
       console.log('✅ Test execution modal initialized for:', requirement ? requirement.id : 'bulk execution');
       console.log(`📊 Expected test cases: ${testCases.length}`, testCases.map(tc => tc.id));
     }
-  }, [isOpen, testCases, requirement]);
+    
+    // Update previous props
+    prevProps.current = { isOpen, testCases };
+  }, [isOpen, testCases, requirement, isRunning, waitingForWebhook]);
 
   // Sync ref with state
   useEffect(() => {
@@ -154,13 +171,57 @@ const TestExecutionModal = ({
     }
   }, [isOpen]);
 
+  // FIXED: Fetch existing results when modal opens with a currentRequestId
+  useEffect(() => {
+    if (isOpen && currentRequestId && hasBackendSupport) {
+      console.log(`🔍 Checking for existing results for request: ${currentRequestId}`);
+      
+      webhookService.getAllTestCaseResults(currentRequestId)
+        .then(results => {
+          if (results.length > 0) {
+            console.log('📦 Found existing results:', results);
+            
+            // Update state with existing results
+            setTestCaseResults(prev => {
+              const updated = new Map(prev);
+              results.forEach(result => {
+                if (result.id) {
+                  updated.set(result.id, {
+                    id: result.id,
+                    name: result.name || `Test ${result.id}`,
+                    status: result.status,
+                    duration: result.duration || 0,
+                    logs: result.logs || '',
+                    receivedAt: result.receivedAt
+                  });
+                }
+              });
+              return updated;
+            });
+            
+            // Check if execution is already complete
+            checkExecutionCompletion();
+          } else {
+            console.log('📋 No existing results found');
+          }
+        })
+        .catch(error => {
+          console.warn('Error fetching existing results:', error);
+        });
+    }
+  }, [isOpen, currentRequestId, hasBackendSupport]);
+
   // MODIFIED: Set up per-test-case webhook listeners
   useEffect(() => {
     if (!isOpen || !currentRequestId) return;
 
+    console.log(`🎯 Setting up webhook listeners for request: ${currentRequestId}`);
+
     // MODIFIED: Handle individual test case results
     const handleTestCaseUpdate = (eventData) => {
       console.log('🧪 Individual test case update received:', eventData);
+      console.log('🔍 Current request ID:', currentRequestId);
+      console.log('🔍 Event request ID:', eventData.requestId);
       
       const { type, requestId, testCaseId, testCase, allResults } = eventData;
       
@@ -269,29 +330,16 @@ const TestExecutionModal = ({
       };
     }
 
-    // Cleanup on modal close
+    // Cleanup function
     return () => {
-      if (!isOpen) {
-        if (hasBackendSupport && webhookService) {
-          console.log(`🧹 Cleaning up per-test-case webhook listeners for request: ${currentRequestId}`);
-          webhookService.unsubscribeFromRequest(currentRequestId);
-        } else {
-          console.log(`🧹 Cleaning up fallback webhook listener`);
-          window.onTestWebhookReceived = null;
-        }
-
-        // Clear timeouts and intervals
-        if (webhookTimeout) {
-          clearTimeout(webhookTimeout);
-          setWebhookTimeout(null);
-        }
-        if (pollInterval) {
-          clearInterval(pollInterval);
-          setPollInterval(null);
-        }
+      if (hasBackendSupport && webhookService) {
+        console.log(`🧹 Cleaning up webhook listener for request: ${currentRequestId}`);
+        webhookService.unsubscribeFromRequest(currentRequestId);
+      } else {
+        window.onTestWebhookReceived = null;
       }
     };
-  }, [isOpen, currentRequestId, hasBackendSupport, expectedTestCases]);
+  }, [isOpen, currentRequestId, hasBackendSupport, expectedTestCases, testCases]);
 
   // MODIFIED: Check if execution is complete
   const checkExecutionCompletion = () => {
@@ -794,6 +842,18 @@ const TestExecutionModal = ({
                   <Save className="mr-2" size={14} />
                   Save Settings
                 </button>
+              </div>
+            </div>
+          )}
+
+          {/* Current Request ID Display */}
+          {currentRequestId && (
+            <div className="mb-4 p-3 bg-blue-50 rounded-lg">
+              <div className="flex items-center">
+                <GitBranch className="w-4 h-4 text-blue-600 mr-2" />
+                <span className="text-sm text-blue-800">
+                  Request ID: <code className="font-mono">{currentRequestId}</code>
+                </span>
               </div>
             </div>
           )}
