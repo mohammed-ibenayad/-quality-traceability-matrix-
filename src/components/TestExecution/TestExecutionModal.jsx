@@ -176,38 +176,39 @@ const TestExecutionModal = ({
     if (isOpen && currentRequestId && hasBackendSupport) {
       console.log(`🔍 Checking for existing results for request: ${currentRequestId}`);
       
-      webhookService.getAllTestCaseResults(currentRequestId)
-        .then(results => {
-          if (results.length > 0) {
-            console.log('📦 Found existing results:', results);
-            
-            // Update state with existing results
-            setTestCaseResults(prev => {
-              const updated = new Map(prev);
-              results.forEach(result => {
-                if (result.id) {
-                  updated.set(result.id, {
-                    id: result.id,
-                    name: result.name || `Test ${result.id}`,
-                    status: result.status,
-                    duration: result.duration || 0,
-                    logs: result.logs || '',
-                    receivedAt: result.receivedAt
-                  });
-                }
-              });
-              return updated;
+      try {
+        // getAllTestCaseResults is synchronous, not async
+        const results = webhookService.getAllTestCaseResults(currentRequestId);
+        
+        if (results.length > 0) {
+          console.log('📦 Found existing results:', results);
+          
+          // Update state with existing results
+          setTestCaseResults(prev => {
+            const updated = new Map(prev);
+            results.forEach(result => {
+              if (result.id) {
+                updated.set(result.id, {
+                  id: result.id,
+                  name: result.name || `Test ${result.id}`,
+                  status: result.status,
+                  duration: result.duration || 0,
+                  logs: result.logs || '',
+                  receivedAt: result.receivedAt
+                });
+              }
             });
-            
-            // Check if execution is already complete
-            checkExecutionCompletion();
-          } else {
-            console.log('📋 No existing results found');
-          }
-        })
-        .catch(error => {
-          console.warn('Error fetching existing results:', error);
-        });
+            return updated;
+          });
+          
+          // Check if execution is already complete
+          checkExecutionCompletion();
+        } else {
+          console.log('📋 No existing results found');
+        }
+      } catch (error) {
+        console.warn('Error fetching existing results:', error);
+      }
     }
   }, [isOpen, currentRequestId, hasBackendSupport]);
 
