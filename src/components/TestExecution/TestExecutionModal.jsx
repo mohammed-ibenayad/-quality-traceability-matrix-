@@ -1,4 +1,4 @@
-// src/components/TestExecution/TestExecutionModal.jsx - Updated for per test case handling
+// src/components/TestExecution/TestExecutionModal.jsx - Complete cleaned up version
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Play,
@@ -43,7 +43,7 @@ const TestExecutionModal = ({
     const defaultConfig = {
       repoUrl: '',
       branch: 'main',
-      workflowId: 'quality-tracker-tests-ind.yml', // UPDATED: Use per-test-case workflow
+      workflowId: 'quality-tracker-tests-ind.yml',
       ghToken: '',
       callbackUrl: getCallbackUrl()
     };
@@ -54,10 +54,10 @@ const TestExecutionModal = ({
   const [hasBackendSupport, setHasBackendSupport] = useState(false);
   const [backendStatus, setBackendStatus] = useState('checking');
 
-  // MODIFIED: Per test case execution state
+  // Per test case execution state
   const [currentRequestId, setCurrentRequestId] = useState(null);
-  const [testCaseResults, setTestCaseResults] = useState(new Map()); // testCaseId -> result
-  const [executionStatus, setExecutionStatus] = useState(null); // Overall execution status
+  const [testCaseResults, setTestCaseResults] = useState(new Map());
+  const [executionStatus, setExecutionStatus] = useState(null);
   const [expectedTestCases, setExpectedTestCases] = useState([]);
 
   // GitHub execution state
@@ -78,13 +78,13 @@ const TestExecutionModal = ({
   // Track previous props to detect changes
   const prevProps = useRef({ isOpen: false, testCases: [] });
 
-  // FIXED: Only initialize when modal first opens or test cases change significantly
+  // Initialize when modal first opens or test cases change significantly
   useEffect(() => {
     const propsChanged = isOpen !== prevProps.current.isOpen || 
                         JSON.stringify(testCases.map(tc => tc.id)) !== JSON.stringify(prevProps.current.testCases.map(tc => tc.id));
     
     if (isOpen && testCases.length > 0 && propsChanged) {
-      console.log('🎭 Initializing test execution modal for per-test-case results');
+      console.log('🎭 Initializing test execution modal');
       
       // Only reset state if we're not in the middle of an execution
       if (!isRunning && !waitingForWebhook) {
@@ -153,7 +153,7 @@ const TestExecutionModal = ({
       setBackendStatus(isHealthy ? 'available' : 'unavailable');
 
       if (isHealthy) {
-        console.log('✅ Backend webhook service available for per-test-case results');
+        console.log('✅ Backend webhook service available');
       } else {
         console.log('📡 Backend unavailable, using fallback mode');
       }
@@ -171,13 +171,12 @@ const TestExecutionModal = ({
     }
   }, [isOpen]);
 
-  // FIXED: Fetch existing results when modal opens with a currentRequestId
+  // Fetch existing results when modal opens with a currentRequestId
   useEffect(() => {
     if (isOpen && currentRequestId && hasBackendSupport) {
       console.log(`🔍 Checking for existing results for request: ${currentRequestId}`);
       
       try {
-        // getAllTestCaseResults is synchronous, not async
         const results = webhookService.getAllTestCaseResults(currentRequestId);
         
         if (results.length > 0) {
@@ -212,13 +211,13 @@ const TestExecutionModal = ({
     }
   }, [isOpen, currentRequestId, hasBackendSupport]);
 
-  // MODIFIED: Set up per-test-case webhook listeners
+  // Set up webhook listeners
   useEffect(() => {
     if (!isOpen || !currentRequestId) return;
 
     console.log(`🎯 Setting up webhook listeners for request: ${currentRequestId}`);
 
-    // MODIFIED: Handle individual test case results
+    // Handle individual test case results
     const handleTestCaseUpdate = (eventData) => {
       console.log('🧪 Individual test case update received:', eventData);
       console.log('🔍 Current request ID:', currentRequestId);
@@ -302,7 +301,7 @@ const TestExecutionModal = ({
 
     // Set up webhook listener based on backend support
     if (hasBackendSupport && webhookService) {
-      console.log(`🎯 Setting up per-test-case webhook listener for request: ${currentRequestId}`);
+      console.log(`🎯 Setting up webhook listener for request: ${currentRequestId}`);
       
       // Register execution with expected test cases
       webhookService.registerTestExecution(currentRequestId, expectedTestCases);
@@ -342,7 +341,7 @@ const TestExecutionModal = ({
     };
   }, [isOpen, currentRequestId, hasBackendSupport, expectedTestCases, testCases]);
 
-  // MODIFIED: Check if execution is complete
+  // Check if execution is complete
   const checkExecutionCompletion = () => {
     const results = Array.from(testCaseResults.values());
     const completedStatuses = ['Passed', 'Failed', 'Cancelled', 'Skipped', 'Not Run'];
@@ -388,9 +387,9 @@ const TestExecutionModal = ({
     console.log("⚙️ Configuration saved:", config);
   };
 
-  // MODIFIED: Execute tests with per-test-case workflow
+  // Execute tests
   const executeTests = async () => {
-    console.log("🐙 Starting per-test-case GitHub execution");
+    console.log("🐙 Starting GitHub execution");
     
     try {
       setIsRunning(true);
@@ -413,7 +412,7 @@ const TestExecutionModal = ({
         requestId: requestId
       };
 
-      console.log('📋 Payload for per-test-case workflow:', payload);
+      console.log('📋 Payload for workflow:', payload);
 
       // Check for simulated results
       const useSimulatedResults = !config.repoUrl || 
@@ -421,31 +420,17 @@ const TestExecutionModal = ({
                                 (!hasBackendSupport && config.callbackUrl.includes('webhook.site'));
 
       if (useSimulatedResults) {
-        console.log('🎭 Using simulated per-test-case results');
+        console.log('🎭 Using simulated results');
         setWaitingForWebhook(true);
         waitingForWebhookRef.current = true;
 
         // Simulate individual test case updates
         const timeout = setTimeout(() => {
-          console.log('⏰ Starting simulated per-test-case execution');
+          console.log('⏰ Starting simulated execution');
           
           testCases.forEach((tc, index) => {
             setTimeout(() => {
               // Simulate "Running" status
-              const runningEventData = {
-                type: 'test-case-update',
-                requestId: requestId,
-                testCaseId: tc.id,
-                testCase: {
-                  id: tc.id,
-                  name: tc.name,
-                  status: 'Running',
-                  duration: 0,
-                  logs: `Test ${tc.id} is running...`
-                }
-              };
-
-              // Handle the update
               setTestCaseResults(prev => {
                 const updated = new Map(prev);
                 updated.set(tc.id, {
@@ -462,19 +447,7 @@ const TestExecutionModal = ({
               // After 2 seconds, send final result
               setTimeout(() => {
                 const finalStatus = Math.random() > 0.2 ? 'Passed' : 'Failed';
-                const finalEventData = {
-                  type: 'test-case-update',
-                  requestId: requestId,
-                  testCaseId: tc.id,
-                  testCase: {
-                    id: tc.id,
-                    name: tc.name,
-                    status: finalStatus,
-                    duration: Math.floor(Math.random() * 5000) + 1000,
-                    logs: `Test ${tc.id} completed with status: ${finalStatus}`
-                  }
-                };
-
+                
                 setTestCaseResults(prev => {
                   const updated = new Map(prev);
                   updated.set(tc.id, {
@@ -508,14 +481,14 @@ const TestExecutionModal = ({
       );
 
       setWorkflowRun(run);
-      console.log(`✅ Per-test-case workflow triggered: ${run.id}`);
-      console.log(`⏳ Waiting for individual test case webhooks at: ${config.callbackUrl}`);
+      console.log(`✅ Workflow triggered: ${run.id}`);
+      console.log(`⏳ Waiting for webhooks at: ${config.callbackUrl}`);
 
       // Set webhook timeout with enhanced GitHub API polling fallback
-      const webhookTimeoutDuration = hasBackendSupport ? 180000 : 60000; // 3 min vs 1 min (longer for per-test-case)
+      const webhookTimeoutDuration = hasBackendSupport ? 180000 : 60000; // 3 min vs 1 min
 
       const timeout = setTimeout(async () => {
-        console.log('🚨 Per-test-case webhook timeout reached');
+        console.log('🚨 Webhook timeout reached');
         
         if (!waitingForWebhookRef.current) {
           console.log('⚠️ No longer waiting for webhooks');
@@ -525,7 +498,7 @@ const TestExecutionModal = ({
         // Try backend polling first
         if (hasBackendSupport && webhookService) {
           try {
-            console.log('🔄 Polling backend for per-test-case results');
+            console.log('🔄 Polling backend for results');
             const polledResults = await webhookService.fetchRequestResults(requestId);
             
             if (polledResults && polledResults.results) {
@@ -558,7 +531,7 @@ const TestExecutionModal = ({
         }
 
         // GitHub API polling fallback
-        console.log('🔄 Starting GitHub API polling for per-test-case workflow');
+        console.log('🔄 Starting GitHub API polling for workflow');
         setProcessingStatus('polling');
 
         let pollCount = 0;
@@ -566,13 +539,13 @@ const TestExecutionModal = ({
 
         const interval = setInterval(async () => {
           pollCount++;
-          console.log(`🔄 GitHub API Poll #${pollCount}/${maxPolls} for per-test-case workflow ${run.id}`);
+          console.log(`🔄 GitHub API Poll #${pollCount}/${maxPolls} for workflow ${run.id}`);
 
           try {
             const status = await GitHubService.getWorkflowStatus(owner, repo, run.id, config.ghToken);
             
             if (status.status === 'completed') {
-              console.log('✅ Per-test-case workflow completed');
+              console.log('✅ Workflow completed');
               
               clearInterval(interval);
               setPollInterval(null);
@@ -605,7 +578,7 @@ const TestExecutionModal = ({
                 checkExecutionCompletion();
                 
               } catch (resultsError) {
-                console.error('❌ Error getting per-test-case workflow results:', resultsError);
+                console.error('❌ Error getting workflow results:', resultsError);
                 setError(`Tests completed but results could not be retrieved: ${resultsError.message}`);
                 setIsRunning(false);
                 setWaitingForWebhook(false);
@@ -616,7 +589,7 @@ const TestExecutionModal = ({
             } else if (pollCount >= maxPolls) {
               clearInterval(interval);
               setPollInterval(null);
-              setError(`Per-test-case workflow timeout after ${(maxPolls * 2) / 60} minutes`);
+              setError(`Workflow timeout after ${(maxPolls * 2) / 60} minutes`);
               setIsRunning(false);
               setWaitingForWebhook(false);
               waitingForWebhookRef.current = false;
@@ -645,7 +618,7 @@ const TestExecutionModal = ({
       setWebhookTimeout(timeout);
 
     } catch (error) {
-      console.error("❌ Per-test-case GitHub execution failed:", error);
+      console.error("❌ GitHub execution failed:", error);
       setError(`Failed to execute tests: ${error.message}`);
       setIsRunning(false);
       setWaitingForWebhook(false);
@@ -656,7 +629,7 @@ const TestExecutionModal = ({
 
   // Cancel execution
   const handleCancel = () => {
-    console.log('🛑 Cancelling per-test-case execution');
+    console.log('🛑 Cancelling execution');
     setIsRunning(false);
     setWaitingForWebhook(false);
     waitingForWebhookRef.current = false;
@@ -712,382 +685,354 @@ const TestExecutionModal = ({
 
   return (
     <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-      <div className="relative top-20 mx-auto p-5 border w-11/12 max-w-4xl shadow-lg rounded-md bg-white">
-        <div className="mt-3">
-          {/* Header */}
-          <div className="flex justify-between items-center mb-4">
-            <div>
-              <h3 className="text-lg font-medium text-gray-900">
-                Per-Test-Case Execution: {requirement?.title || 'Bulk Test Execution'}
-              </h3>
-              <p className="text-sm text-gray-600 mt-1">
-                {testCases.length} test case{testCases.length !== 1 ? 's' : ''} selected
-                {requirement && ` for requirement ${requirement.id}`}
-              </p>
-              <p className="text-xs text-blue-600 mt-1">
-                ✨ Individual webhook delivery per test case
-              </p>
-            </div>
-            <div className="flex items-center space-x-2">
-              <button
-                onClick={() => setShowSettings(!showSettings)}
-                className="px-3 py-1 border border-gray-300 rounded text-gray-700 hover:bg-gray-50 flex items-center text-sm"
-              >
-                <Settings className="mr-1" size={14} />
-                {showSettings ? 'Hide' : 'Settings'}
-              </button>
-            </div>
-          </div>
-
-          {/* Backend Status */}
-          <div className="mb-4 p-3 bg-gray-50 border border-gray-200 rounded">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                {backendStatus === 'checking' ? (
-                  <Loader2 className="text-gray-500 animate-spin mr-2" size={16} />
-                ) : hasBackendSupport ? (
-                  <Wifi className="text-green-600 mr-2" size={16} />
-                ) : (
-                  <WifiOff className="text-orange-500 mr-2" size={16} />
-                )}
-                <span className="text-sm font-medium">
-                  Backend Status: {backendStatus === 'checking' ? 'Checking...' : hasBackendSupport ? 'Available' : 'Unavailable'}
-                </span>
+      <div className="relative top-20 mx-auto border w-11/12 max-w-4xl shadow-lg rounded-md bg-white flex flex-col" style={{ height: 'calc(100vh - 160px)' }}>
+        {/* Scrollable Content */}
+        <div className="flex-1 overflow-y-auto p-5">
+          <div className="mt-3">
+            {/* Header */}
+            <div className="flex justify-between items-center mb-4">
+              <div>
+                <h3 className="text-lg font-medium text-gray-900">
+                  Run Tests
+                </h3>
+                <p className="text-sm text-gray-600 mt-1">
+                  {testCases.length} test case{testCases.length !== 1 ? 's' : ''} selected
+                  {requirement && ` for requirement ${requirement.id}`}
+                </p>
               </div>
-              <div className="text-xs text-gray-500">
-                {hasBackendSupport ? 'Per-test-case webhook support' : 'Fallback mode (bulk conversion)'}
-              </div>
-            </div>
-          </div>
-
-          {/* Settings Panel */}
-          {showSettings && (
-            <div className="mb-4 p-4 bg-gray-50 border border-gray-200 rounded">
-              <h4 className="font-medium text-gray-900 mb-3">Configuration</h4>
-
-              <div className="space-y-3">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Repository URL
-                  </label>
-                  <input
-                    type="text"
-                    name="repoUrl"
-                    value={config.repoUrl}
-                    onChange={handleInputChange}
-                    placeholder="https://github.com/owner/repo"
-                    className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Branch
-                    </label>
-                    <input
-                      type="text"
-                      name="branch"
-                      value={config.branch}
-                      onChange={handleInputChange}
-                      placeholder="main"
-                      className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Workflow ID
-                    </label>
-                    <input
-                      type="text"
-                      name="workflowId"
-                      value={config.workflowId}
-                      onChange={handleInputChange}
-                      placeholder="quality-tracker-tests-ind.yml"
-                      className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    GitHub Token
-                  </label>
-                  <input
-                    type="password"
-                    name="ghToken"
-                    value={config.ghToken}
-                    onChange={handleInputChange}
-                    placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
-                    className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Webhook URL
-                  </label>
-                  <input
-                    type="text"
-                    name="callbackUrl"
-                    value={config.callbackUrl}
-                    onChange={handleInputChange}
-                    placeholder="http://localhost:3001/api/webhook/test-results"
-                    className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
-                  />
-                </div>
-              </div>
-
-              <div className="flex justify-end mt-4">
+              <div className="flex items-center space-x-2">
                 <button
-                  onClick={saveConfiguration}
-                  className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center text-sm"
+                  onClick={() => setShowSettings(!showSettings)}
+                  className="px-3 py-1 border border-gray-300 rounded text-gray-700 hover:bg-gray-50 flex items-center text-sm"
                 >
-                  <Save className="mr-2" size={14} />
-                  Save Settings
+                  <Settings className="mr-1" size={14} />
+                  {showSettings ? 'Hide' : 'Settings'}
                 </button>
               </div>
             </div>
-          )}
 
-          {/* Current Request ID Display */}
-          {currentRequestId && (
-            <div className="mb-4 p-3 bg-blue-50 rounded-lg">
-              <div className="flex items-center">
-                <GitBranch className="w-4 h-4 text-blue-600 mr-2" />
-                <span className="text-sm text-blue-800">
-                  Request ID: <code className="font-mono">{currentRequestId}</code>
-                </span>
-              </div>
-            </div>
-          )}
-
-          {/* GitHub Workflow Status */}
-          {workflowRun && (
-            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded">
+            {/* Backend Status */}
+            <div className="mb-4 p-3 bg-gray-50 border border-gray-200 rounded">
               <div className="flex items-center justify-between">
                 <div className="flex items-center">
-                  <GitBranch className="text-blue-600 mr-2" size={16} />
-                  <div>
-                    <p className="text-blue-800 font-medium">Per-Test-Case GitHub Workflow Triggered</p>
-                    <p className="text-blue-600 text-sm">Run ID: {workflowRun.id}</p>
-                    {currentRequestId && (
-                      <p className="text-blue-500 text-xs">Request ID: {currentRequestId}</p>
-                    )}
-                  </div>
-                </div>
-                <a
-                  href={workflowRun.html_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm flex items-center"
-                >
-                  <GitBranch className="mr-1" size={14} />
-                  View on GitHub
-                </a>
-              </div>
-              {isWaiting && (
-                <div className="mt-2 text-blue-600 text-sm">
-                  ⏳ {hasBackendSupport ?
-                      'Waiting for individual test case webhooks (up to 3 min timeout)...' :
-                      'Waiting for individual test case webhooks (up to 1 min timeout)...'}
-                </div>
-              )}
-              {runningTests > 0 && (
-                <div className="mt-2 text-green-600 text-sm">
-                  🏃 {runningTests} test{runningTests !== 1 ? 's' : ''} currently running
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Execution Controls */}
-          {!isRunning && !isWaiting && (
-            <div className="mb-4 flex justify-center">
-              <button
-                onClick={executeTests}
-                disabled={!config.repoUrl || !config.ghToken}
-                className="px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700 focus:ring-2 focus:ring-green-500 flex items-center disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <Play className="mr-2" size={16} />
-                Start Per-Test-Case Execution
-              </button>
-            </div>
-          )}
-
-          {/* Progress bar */}
-          {(isWaiting || isRunning || runningTests > 0) && (
-            <div className="mb-4">
-              <div className="flex justify-between text-sm text-gray-600 mb-1">
-                <span>
-                  {isWaiting && runningTests === 0 ?
-                    (hasBackendSupport ?
-                      'Waiting for test case webhooks (up to 3 minutes)...' :
-                      'Waiting for test case webhooks (up to 1 minute)...') :
-                    (runningTests > 0 ? 
-                      `${runningTests} test${runningTests !== 1 ? 's' : ''} running...` :
-                      `Progress: ${completedTests}/${expectedTestCases.length} completed`)
-                  }
-                </span>
-                <span>
-                  {isWaiting && runningTests === 0 ? 'GitHub Actions' :
-                   runningTests > 0 ? 'Individual Tests' :
-                   `${Math.round((completedTests / expectedTestCases.length) * 100)}%`}
-                </span>
-              </div>
-              <div className="w-full bg-gray-200 rounded-full h-2">
-                <div
-                  className={`h-2 rounded-full transition-all duration-300 ${
-                    isWaiting && runningTests === 0 ? 'bg-blue-600 animate-pulse' :
-                    runningTests > 0 ? 'bg-yellow-500 animate-pulse' : 'bg-green-600'
-                  }`}
-                  style={{
-                    width: isWaiting && runningTests === 0 ? '100%' : 
-                           `${Math.max(10, (completedTests / expectedTestCases.length) * 100)}%`
-                  }}
-                ></div>
-              </div>
-            </div>
-          )}
-
-          {/* Error Display */}
-          {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded">
-              <div className="flex items-center">
-                <AlertTriangle className="text-red-600 mr-2" size={16} />
-                <span className="text-red-800 text-sm font-medium">Error</span>
-              </div>
-              <p className="text-red-700 text-sm mt-1">{error}</p>
-            </div>
-          )}
-
-          {/* Processing Status */}
-          {processingStatus && (
-            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded">
-              <div className="flex items-center">
-                {processingStatus === 'completed' ? (
-                  <Check className="text-green-600 mr-2" size={16} />
-                ) : processingStatus === 'cancelled' ? (
-                  <X className="text-orange-500 mr-2" size={16} />
-                ) : (
-                  <Loader2 className="text-blue-600 mr-2 animate-spin" size={16} />
-                )}
-                <span className="text-blue-800 text-sm font-medium">
-                  {processingStatus === 'starting' ? 'Starting per-test-case execution...' :
-                   processingStatus === 'waiting' ? 'Waiting for individual test results...' :
-                   processingStatus === 'polling' ? 'Polling GitHub API for workflow completion...' :
-                   processingStatus === 'running' ? 'Individual test cases in progress...' :
-                   processingStatus === 'completed' ? 'All test cases completed' :
-                   processingStatus === 'cancelled' ? 'Execution cancelled' :
-                   'Processing...'}
-                </span>
-              </div>
-            </div>
-          )}
-
-          {/* Execution Summary */}
-          {testResultsArray.length > 0 && (
-            <div className="mb-4 p-3 bg-gray-50 border border-gray-200 rounded">
-              <div className="text-sm text-gray-700">
-                <div className="flex justify-between items-center">
-                  <span className="font-medium">Execution Summary:</span>
-                  <span className="text-xs text-gray-500">
-                    {new Date().toLocaleTimeString()}
+                  {backendStatus === 'checking' ? (
+                    <Loader2 className="text-gray-500 animate-spin mr-2" size={16} />
+                  ) : hasBackendSupport ? (
+                    <Wifi className="text-green-600 mr-2" size={16} />
+                  ) : (
+                    <WifiOff className="text-orange-500 mr-2" size={16} />
+                  )}
+                  <span className="text-sm font-medium">
+                    Backend Status: {backendStatus === 'checking' ? 'Checking...' : hasBackendSupport ? 'Available' : 'Unavailable'}
                   </span>
                 </div>
-                <div className="mt-2 grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
-                  <div className="flex items-center">
-                    <Clock className="text-gray-400 mr-1" size={12} />
-                    <span>Not Started: {testResultsArray.filter(r => r.status === 'Not Started').length}</span>
-                  </div>
-                  <div className="flex items-center">
-                    <Loader2 className="text-blue-500 mr-1" size={12} />
-                    <span>Running: {runningTests}</span>
-                  </div>
-                  <div className="flex items-center">
-                    <CheckCircle className="text-green-500 mr-1" size={12} />
-                    <span>Passed: {testResultsArray.filter(r => r.status === 'Passed').length}</span>
-                  </div>
-                  <div className="flex items-center">
-                    <XCircle className="text-red-500 mr-1" size={12} />
-                    <span>Failed: {testResultsArray.filter(r => r.status === 'Failed').length}</span>
-                  </div>
+                <div className="text-xs text-gray-500">
+                  {hasBackendSupport ? 'Webhook support enabled' : 'Fallback mode'}
                 </div>
               </div>
             </div>
-          )}
 
-          {/* Test Results Table */}
-          <div className="border border-gray-200 rounded overflow-hidden">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Test ID
-                  </th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Test Name
-                  </th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Status
-                  </th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Duration
-                  </th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Last Update
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {testResultsArray.map((result) => {
-                  const isRunning = result.status === 'Running';
-                  
-                  return (
-                    <tr 
-                      key={result.id} 
-                      className={`
-                        ${isRunning ? 'bg-yellow-50' : ''}
-                        transition-colors duration-200
-                      `}
-                    >
-                      <td className="px-4 py-2 text-sm font-mono text-gray-600">{result.id}</td>
-                      <td className="px-4 py-2 text-sm text-gray-900">
-                        {result.name}
-                        {isRunning && (
-                          <span className="ml-2 text-xs text-blue-600 animate-pulse">
-                            ⚡ Running...
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-4 py-2 text-sm">
-                        <div className="flex items-center">
-                          {getStatusIcon(result.status)}
-                          <span className="ml-2">{result.status}</span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-2 text-sm text-gray-500">
-                        {result.duration > 0 ? `${Math.round(result.duration / 1000)}s` : 
-                         result.status === 'Running' ? '⏱️' : '-'}
-                      </td>
-                      <td className="px-4 py-2 text-sm text-gray-500">
-                        {result.receivedAt ? 
-                          new Date(result.receivedAt).toLocaleTimeString() : 
-                          '-'}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+            {/* Settings Panel */}
+            {showSettings && (
+              <div className="mb-4 p-4 bg-gray-50 border border-gray-200 rounded">
+                <h4 className="font-medium text-gray-900 mb-3">Configuration</h4>
+
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Repository URL
+                    </label>
+                    <input
+                      type="text"
+                      name="repoUrl"
+                      value={config.repoUrl}
+                      onChange={handleInputChange}
+                      placeholder="https://github.com/owner/repo"
+                      className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Branch
+                      </label>
+                      <input
+                        type="text"
+                        name="branch"
+                        value={config.branch}
+                        onChange={handleInputChange}
+                        placeholder="main"
+                        className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Workflow ID
+                      </label>
+                      <input
+                        type="text"
+                        name="workflowId"
+                        value={config.workflowId}
+                        onChange={handleInputChange}
+                        placeholder="quality-tracker-tests-ind.yml"
+                        className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      GitHub Token
+                    </label>
+                    <input
+                      type="password"
+                      name="ghToken"
+                      value={config.ghToken}
+                      onChange={handleInputChange}
+                      placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
+                      className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Webhook URL
+                    </label>
+                    <input
+                      type="text"
+                      name="callbackUrl"
+                      value={config.callbackUrl}
+                      onChange={handleInputChange}
+                      placeholder="http://localhost:3001/api/webhook/test-results"
+                      className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end mt-4">
+                  <button
+                    onClick={saveConfiguration}
+                    className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center text-sm"
+                  >
+                    <Save className="mr-2" size={14} />
+                    Save Settings
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* GitHub Workflow Status */}
+            {workflowRun && (
+              <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center">
+                    <GitBranch className="text-blue-600 mr-2" size={16} />
+                    <div>
+                      <p className="text-blue-800 font-medium">GitHub Workflow Triggered</p>
+                      <p className="text-blue-600 text-sm">Run ID: {workflowRun.id}</p>
+                    </div>
+                  </div>
+                  <a
+                    href={workflowRun.html_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm flex items-center"
+                  >
+                    <GitBranch className="mr-1" size={14} />
+                    View on GitHub
+                  </a>
+                </div>
+                {runningTests > 0 && (
+                  <div className="mt-2 text-green-600 text-sm">
+                    🏃 {runningTests} test{runningTests !== 1 ? 's' : ''} currently running
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Execution Controls */}
+            {!isRunning && !isWaiting && (
+              <div className="mb-4 flex justify-center">
+                <button
+                  onClick={executeTests}
+                  disabled={!config.repoUrl || !config.ghToken}
+                  className="inline-flex items-center px-6 py-2 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Play className="mr-2" size={16} />
+                  Run Tests
+                </button>
+              </div>
+            )}
+
+            {/* Progress bar */}
+            {(isWaiting || isRunning || runningTests > 0) && (
+              <div className="mb-4">
+                <div className="flex justify-between text-sm text-gray-600 mb-1">
+                  <span>
+                    {isWaiting && runningTests === 0 ?
+                      (hasBackendSupport ?
+                        'Waiting for test results (up to 3 minutes)...' :
+                        'Waiting for test results (up to 1 minute)...') :
+                      (runningTests > 0 ? 
+                        `${runningTests} test${runningTests !== 1 ? 's' : ''} running...` :
+                        `Progress: ${completedTests}/${expectedTestCases.length} completed`)
+                    }
+                  </span>
+                  <span>
+                    {isWaiting && runningTests === 0 ? 'GitHub Actions' :
+                     runningTests > 0 ? 'Running Tests' :
+                     `${Math.round((completedTests / expectedTestCases.length) * 100)}%`}
+                  </span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div
+                    className={`h-2 rounded-full transition-all duration-300 ${
+                      isWaiting && runningTests === 0 ? 'bg-blue-600 animate-pulse' :
+                      runningTests > 0 ? 'bg-yellow-500 animate-pulse' : 'bg-green-600'
+                    }`}
+                    style={{
+                      width: isWaiting && runningTests === 0 ? '100%' : 
+                             `${Math.max(10, (completedTests / expectedTestCases.length) * 100)}%`
+                    }}
+                  ></div>
+                </div>
+              </div>
+            )}
+
+            {/* Error Display */}
+            {error && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded">
+                <div className="flex items-center">
+                  <AlertTriangle className="text-red-600 mr-2" size={16} />
+                  <span className="text-red-800 text-sm font-medium">Error</span>
+                </div>
+                <p className="text-red-700 text-sm mt-1">{error}</p>
+              </div>
+            )}
+
+            {/* Processing Status */}
+            {processingStatus && (
+              <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded">
+                <div className="flex items-center">
+                  {processingStatus === 'completed' ? (
+                    <Check className="text-green-600 mr-2" size={16} />
+                  ) : processingStatus === 'cancelled' ? (
+                    <X className="text-orange-500 mr-2" size={16} />
+                  ) : (
+                    <Loader2 className="text-blue-600 mr-2 animate-spin" size={16} />
+                  )}
+                  <span className="text-blue-800 text-sm font-medium">
+                    {processingStatus === 'starting' ? 'Starting test execution...' :
+                     processingStatus === 'waiting' ? 'Waiting for test results...' :
+                     processingStatus === 'polling' ? 'Polling GitHub API for workflow completion...' :
+                     processingStatus === 'running' ? 'Test cases in progress...' :
+                     processingStatus === 'completed' ? 'All test cases completed' :
+                     processingStatus === 'cancelled' ? 'Execution cancelled' :
+                     'Processing...'}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* Execution Summary */}
+            {testResultsArray.length > 0 && (
+              <div className="mb-4 p-3 bg-gray-50 border border-gray-200 rounded">
+                <div className="text-sm text-gray-700">
+                  <div className="flex justify-between items-center">
+                    <span className="font-medium">Execution Summary:</span>
+                    <span className="text-xs text-gray-500">
+                      {new Date().toLocaleTimeString()}
+                    </span>
+                  </div>
+                  <div className="mt-2 grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
+                    <div className="flex items-center">
+                      <Clock className="text-gray-400 mr-1" size={12} />
+                      <span>Not Started: {testResultsArray.filter(r => r.status === 'Not Started').length}</span>
+                    </div>
+                    <div className="flex items-center">
+                      <Loader2 className="text-blue-500 mr-1" size={12} />
+                      <span>Running: {runningTests}</span>
+                    </div>
+                    <div className="flex items-center">
+                      <CheckCircle className="text-green-500 mr-1" size={12} />
+                      <span>Passed: {testResultsArray.filter(r => r.status === 'Passed').length}</span>
+                    </div>
+                    <div className="flex items-center">
+                      <XCircle className="text-red-500 mr-1" size={12} />
+                      <span>Failed: {testResultsArray.filter(r => r.status === 'Failed').length}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Test Results Table */}
+            <div className="border border-gray-200 rounded overflow-hidden">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Test ID
+                    </th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Test Name
+                    </th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Status
+                    </th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Duration
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {testResultsArray.map((result) => {
+                    const isRunning = result.status === 'Running';
+                    
+                    return (
+                      <tr 
+                        key={result.id} 
+                        className={`
+                          ${isRunning ? 'bg-yellow-50' : ''}
+                          transition-colors duration-200
+                        `}
+                      >
+                        <td className="px-4 py-2 text-sm font-mono text-gray-600">{result.id}</td>
+                        <td className="px-4 py-2 text-sm text-gray-900">
+                          {result.name}
+                          {isRunning && (
+                            <span className="ml-2 text-xs text-blue-600 animate-pulse">
+                              ⚡ Running...
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-4 py-2 text-sm">
+                          <div className="flex items-center">
+                            {getStatusIcon(result.status)}
+                            <span className="ml-2">{result.status}</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-2 text-sm text-gray-500">
+                          {result.duration > 0 ? `${Math.round(result.duration / 1000)}s` : 
+                           result.status === 'Running' ? '⏱️' : '-'}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
+        </div>
 
-          {/* Footer */}
-          <div className="flex justify-between items-center mt-4 pt-4 border-t">
+        {/* Fixed Footer Buttons */}
+        <div className="border-t bg-white p-4">
+          <div className="flex justify-between items-center">
             <div className="text-sm text-gray-600">
-              {isExecuting ? 'Per-test-case execution in progress...' :
-               isWaiting ? 'Waiting for individual test case results...' :
+              {isExecuting ? 'Test execution in progress...' :
+               isWaiting ? 'Waiting for test results...' :
                completedTests === expectedTestCases.length ? 'All test cases completed' : 
                'Ready to execute'}
             </div>
-            <div className="flex space-x-2">
+            <div className="flex space-x-3">
               {isExecuting && (
                 <button
                   onClick={handleCancel}

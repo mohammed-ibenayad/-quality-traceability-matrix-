@@ -1,4 +1,4 @@
-// src/pages/TestCases.jsx - Complete Enhanced Version with Version Filtering and ID Column
+// src/pages/TestCases.jsx - Enhanced Version with Clear Selection, Execute Button, and Last Execution Info
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Play, 
@@ -34,7 +34,7 @@ const TestCases = () => {
   const [testCases, setTestCases] = useState([]);
   const [requirements, setRequirements] = useState([]);
   const [mapping, setMapping] = useState({});
-  const [hasTestCases, setHasTestCases] = useState(false); // FIXED: Check specifically for test cases
+  const [hasTestCases, setHasTestCases] = useState(false);
 
   // UI State
   const [searchQuery, setSearchQuery] = useState('');
@@ -42,7 +42,7 @@ const TestCases = () => {
   const [automationFilter, setAutomationFilter] = useState('All');
   const [priorityFilter, setPriorityFilter] = useState('All');
   const [versionFilter, setVersionFilter] = useState('All');
-  const [traceabilityMode, setTraceabilityMode] = useState('standalone'); // 'linked', 'unlinked', 'standalone'
+  const [traceabilityMode, setTraceabilityMode] = useState('standalone');
   const [selectedTestCases, setSelectedTestCases] = useState(new Set());
   const [expandedRows, setExpandedRows] = useState(new Set());
   const [showEditModal, setShowEditModal] = useState(false);
@@ -67,12 +67,12 @@ const TestCases = () => {
     return () => unsubscribe();
   }, []);
 
-  // NEW: Filter test cases by selected version (similar to Requirements page)
+  // Filter test cases by selected version
   const versionFilteredTestCases = selectedVersion === 'unassigned'
-    ? testCases // Show all test cases for "unassigned"
+    ? testCases
     : testCases.filter(tc => !tc.version || tc.version === selectedVersion || tc.version === '');
 
-  // Filter test cases based on various criteria (ORIGINAL BEHAVIOR PRESERVED)
+  // Filter test cases based on various criteria
   const filteredTestCases = useMemo(() => {
     return versionFilteredTestCases.filter(testCase => {
       // Search filter
@@ -96,7 +96,7 @@ const TestCases = () => {
         return false;
       }
 
-      // ORIGINAL: Version filter (keeping original logic for compatibility)
+      // Version filter (keeping original logic for compatibility)
       if (selectedVersion !== 'unassigned' && testCase.version !== selectedVersion) {
         return false;
       }
@@ -113,7 +113,7 @@ const TestCases = () => {
     });
   }, [versionFilteredTestCases, searchQuery, statusFilter, automationFilter, priorityFilter, selectedVersion, traceabilityMode]);
 
-  // Calculate summary statistics (ORIGINAL BEHAVIOR PRESERVED)
+  // Calculate summary statistics
   const summaryStats = useMemo(() => {
     const total = filteredTestCases.length;
     const passed = filteredTestCases.filter(tc => tc.status === 'Passed').length;
@@ -137,7 +137,7 @@ const TestCases = () => {
     };
   }, [filteredTestCases]);
 
-  // Handle test case selection (ORIGINAL FUNCTION PRESERVED)
+  // Handle test case selection
   const handleTestCaseSelection = (testCaseId, checked) => {
     const newSelection = new Set(selectedTestCases);
     if (checked) {
@@ -148,7 +148,6 @@ const TestCases = () => {
     setSelectedTestCases(newSelection);
   };
 
-  // ORIGINAL FUNCTION PRESERVED
   const handleSelectAll = (checked) => {
     if (checked) {
       setSelectedTestCases(new Set(filteredTestCases.map(tc => tc.id)));
@@ -157,13 +156,18 @@ const TestCases = () => {
     }
   };
 
-  // Execute selected test cases (ORIGINAL FUNCTION PRESERVED)
+  // NEW: Clear selection function like in Requirements
+  const handleClearSelection = () => {
+    setSelectedTestCases(new Set());
+  };
+
+  // Execute selected test cases
   const executeSelectedTests = () => {
     if (selectedTestCases.size === 0) return;
     setShowExecutionModal(true);
   };
 
-  // Toggle row expansion (ORIGINAL FUNCTION PRESERVED)
+  // Toggle row expansion
   const toggleRowExpansion = (testCaseId) => {
     const newExpanded = new Set(expandedRows);
     if (newExpanded.has(testCaseId)) {
@@ -174,7 +178,7 @@ const TestCases = () => {
     setExpandedRows(newExpanded);
   };
 
-  // Handle new test case creation (ORIGINAL FUNCTION PRESERVED)
+  // Handle new test case creation
   const handleNewTestCase = () => {
     setEditingTestCase({
       id: '',
@@ -191,13 +195,13 @@ const TestCases = () => {
     setShowEditModal(true);
   };
 
-  // Handle test case editing (ORIGINAL FUNCTION PRESERVED)
+  // Handle test case editing
   const handleEditTestCase = (testCase) => {
     setEditingTestCase({...testCase});
     setShowEditModal(true);
   };
 
-  // Save test case (create or update) (ORIGINAL FUNCTION PRESERVED)
+  // Save test case (create or update)
   const handleSaveTestCase = (testCaseData) => {
     try {
       if (testCaseData.id && testCases.find(tc => tc.id === testCaseData.id)) {
@@ -215,7 +219,7 @@ const TestCases = () => {
     }
   };
 
-  // Delete test case (ORIGINAL FUNCTION PRESERVED)
+  // Delete test case
   const handleDeleteTestCase = (testCaseId) => {
     if (window.confirm('Are you sure you want to delete this test case?')) {
       try {
@@ -232,13 +236,13 @@ const TestCases = () => {
     }
   };
 
-  // Execute single test case (ORIGINAL FUNCTION PRESERVED)
+  // Execute single test case
   const handleExecuteTestCase = (testCase) => {
     setSelectedTestCases(new Set([testCase.id]));
     setShowExecutionModal(true);
   };
 
-  // Handle bulk delete (ORIGINAL FUNCTION PRESERVED)
+  // Handle bulk delete
   const handleBulkDelete = () => {
     if (selectedTestCases.size === 0) return;
     
@@ -255,7 +259,13 @@ const TestCases = () => {
     }
   };
 
-  // ORIGINAL EMPTY STATE CHECK PRESERVED
+  // Format last execution date
+  const formatLastExecution = (lastExecuted) => {
+    if (!lastExecuted) return 'Never';
+    const date = new Date(lastExecuted);
+    return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
   if (!hasTestCases) {
     return (
       <MainLayout title="Test Cases" hasData={false}>
@@ -273,7 +283,7 @@ const TestCases = () => {
   return (
     <MainLayout title="Test Cases" hasData={hasTestCases}>
       <div className="space-y-6">
-        {/* NEW: Version indicator for unassigned view */}
+        {/* Version indicator for unassigned view */}
         {selectedVersion === 'unassigned' && (
           <div className="bg-blue-100 p-4 rounded-lg mb-6 text-blue-800">
             <div className="font-medium">Showing All Items (Unassigned View)</div>
@@ -283,7 +293,7 @@ const TestCases = () => {
           </div>
         )}
 
-        {/* Header (ORIGINAL STRUCTURE PRESERVED) */}
+        {/* Header */}
         <div className="flex justify-between items-center">
           <h1 className="text-2xl font-bold text-gray-900">Test Cases</h1>
           <div className="flex items-center space-x-3">
@@ -297,7 +307,7 @@ const TestCases = () => {
           </div>
         </div>
 
-        {/* Summary Cards (ORIGINAL STRUCTURE PRESERVED) */}
+        {/* Summary Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
           <div className="bg-white p-4 rounded-lg shadow">
             <div className="text-2xl font-bold text-gray-900">{summaryStats.total}</div>
@@ -329,7 +339,7 @@ const TestCases = () => {
           </div>
         </div>
 
-        {/* Filters Section (ORIGINAL STRUCTURE PRESERVED) */}
+        {/* Filters Section */}
         <div className="bg-white p-4 rounded-lg shadow">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4 items-end">
             {/* Search */}
@@ -397,67 +407,80 @@ const TestCases = () => {
           </div>
         </div>
 
-        {/* Bulk Actions (ORIGINAL STRUCTURE PRESERVED) */}
+        {/* Bulk Actions - Updated with Clear Selection like Requirements */}
         {selectedTestCases.size > 0 && (
-          <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
             <div className="flex items-center justify-between">
-              <span className="text-blue-800">
+              <span className="text-blue-700">
                 {selectedTestCases.size} test case(s) selected
               </span>
-              <div className="flex space-x-2">
+              <div className="flex gap-2">
+                {/* UPDATED: Execute button styled like traceability matrix */}
                 <button
                   onClick={executeSelectedTests}
-                  className="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 flex items-center"
+                  className="inline-flex items-center px-3 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 text-sm"
+                  disabled={selectedTestCases.size === 0}
+                  title="Execute selected test cases"
                 >
                   <Play className="mr-1" size={14} />
-                  Execute
+                  Run Tests
                 </button>
                 <button
                   onClick={handleBulkDelete}
                   className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 flex items-center"
                 >
-                  <Trash2 className="mr-1" size={14} />
-                  Delete
+                  <Trash2 size={14} className="mr-1" />
+                  Delete Selected
+                </button>
+                {/* NEW: Clear Selection button like Requirements */}
+                <button
+                  onClick={handleClearSelection}
+                  className="px-3 py-1 bg-gray-600 text-white rounded hover:bg-gray-700"
+                >
+                  Clear Selection
                 </button>
               </div>
             </div>
           </div>
         )}
 
-        {/* Test Cases Table (UPDATED WITH ID COLUMN) */}
+        {/* Test Cases Table - FIXED: Better sizing and added Last Execution */}
         <div className="bg-white shadow overflow-hidden sm:rounded-md">
           <div className="overflow-x-auto">
-            <table className="min-w-full table-fixed divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+            <table className="w-full table-fixed divide-y divide-gray-200">
+              <thead className="bg-gray-50 sticky top-0 z-10">
                 <tr>
-                  <th scope="col" className="w-10 px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-2 py-3 text-left w-12">
                     <input
                       type="checkbox"
                       checked={filteredTestCases.length > 0 && selectedTestCases.size === filteredTestCases.length}
                       onChange={(e) => handleSelectAll(e.target.checked)}
-                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                     />
                   </th>
-                  {/* NEW: ID column */}
-                  <th scope="col" className="w-32 px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-24">
                     ID
                   </th>
-                  <th scope="col" className="w-80 px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-80">
                     TEST CASE
                   </th>
-                  <th scope="col" className="w-20 px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20">
                     STATUS
                   </th>
-                  <th scope="col" className="w-20 px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20">
                     PRIORITY
                   </th>
-                  <th scope="col" className="w-24 px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    AUTOMATION
+                  <th className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20">
+                    AUTO
                   </th>
-                  <th scope="col" className="w-24 px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    REQUIREMENTS
+                  <th className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20">
+                    REQS
                   </th>
-                  <th scope="col" className="w-20 px-2 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  {/* NEW: Last Execution column */}
+                  <th className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-28">
+                    LAST RUN
+                  </th>
+                  <th className="px-2 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-20">
                     ACTIONS
                   </th>
                 </tr>
@@ -470,50 +493,49 @@ const TestCases = () => {
                   return (
                     <React.Fragment key={testCase.id}>
                       <tr className={`hover:bg-gray-50 ${isSelected ? 'bg-blue-50' : ''}`}>
-                        <td className="w-10 px-2 py-3 whitespace-nowrap">
+                        <td className="px-2 py-3 whitespace-nowrap">
                           <input
                             type="checkbox"
                             checked={isSelected}
                             onChange={(e) => handleTestCaseSelection(testCase.id, e.target.checked)}
-                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                           />
                         </td>
-                        {/* NEW: ID column with expand/collapse button */}
-                        <td className="w-32 px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
+                        <td className="px-3 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
                           <div className="flex items-center">
                             <button
                               onClick={() => toggleRowExpansion(testCase.id)}
-                              className="mr-2 p-1 hover:bg-gray-200 rounded"
+                              className="mr-1 p-1 hover:bg-gray-200 rounded"
                             >
-                              {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                              {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                             </button>
-                            {testCase.id}
+                            <span className="truncate">{testCase.id}</span>
                           </div>
                         </td>
-                        <td className="w-80 px-3 py-3">
+                        <td className="px-3 py-3">
                           <div className="flex items-start">
                             <div className="min-w-0 flex-1">
                               <div className="text-sm font-medium text-gray-900 truncate" title={testCase.name}>
                                 {testCase.name}
                               </div>
-                              <div className="text-xs text-gray-500">
-                                {testCase.description && testCase.description.substring(0, 100)}
-                                {testCase.description && testCase.description.length > 100 && '...'}
+                              <div className="text-xs text-gray-500 truncate">
+                                {testCase.description && testCase.description.substring(0, 60)}
+                                {testCase.description && testCase.description.length > 60 && '...'}
                               </div>
                             </div>
                           </div>
                         </td>
-                        <td className="w-20 px-2 py-3 whitespace-nowrap">
+                        <td className="px-2 py-3 whitespace-nowrap">
                           <span className={`inline-flex px-1.5 py-0.5 text-xs font-medium rounded ${
                             testCase.status === 'Passed' ? 'bg-green-100 text-green-800' :
                             testCase.status === 'Failed' ? 'bg-red-100 text-red-800' :
                             testCase.status === 'Blocked' ? 'bg-yellow-100 text-yellow-800' :
                             'bg-gray-100 text-gray-800'
                           }`}>
-                            {testCase.status}
+                            {testCase.status === 'Not Run' ? 'Not Run' : testCase.status}
                           </span>
                         </td>
-                        <td className="w-20 px-2 py-3 whitespace-nowrap">
+                        <td className="px-2 py-3 whitespace-nowrap">
                           <span className={`inline-flex px-1.5 py-0.5 text-xs font-medium rounded ${
                             testCase.priority === 'High' ? 'bg-red-100 text-red-800' :
                             testCase.priority === 'Medium' ? 'bg-yellow-100 text-yellow-800' :
@@ -522,7 +544,7 @@ const TestCases = () => {
                             {testCase.priority}
                           </span>
                         </td>
-                        <td className="w-24 px-2 py-3 whitespace-nowrap">
+                        <td className="px-2 py-3 whitespace-nowrap">
                           <span className={`inline-flex px-1.5 py-0.5 text-xs font-medium rounded ${
                             testCase.automationStatus === 'Automated' ? 'bg-blue-100 text-blue-800' :
                             testCase.automationStatus === 'Semi-Automated' ? 'bg-purple-100 text-purple-800' :
@@ -532,55 +554,73 @@ const TestCases = () => {
                              testCase.automationStatus === 'Semi-Automated' ? 'Semi' : 'Manual'}
                           </span>
                         </td>
-                        <td className="w-24 px-2 py-3 whitespace-nowrap">
+                        <td className="px-2 py-3 whitespace-nowrap">
                           <div className="text-xs text-gray-500">
                             {testCase.requirementIds && testCase.requirementIds.length > 0 ? (
                               <div className="flex flex-wrap gap-1">
-                                {testCase.requirementIds.slice(0, 2).map(reqId => (
-                                  <span key={reqId} className="px-1 py-0.5 bg-blue-100 text-blue-800 rounded text-xs">
+                                {testCase.requirementIds.slice(0, 1).map(reqId => (
+                                  <span key={reqId} className="px-1 py-0.5 bg-blue-100 text-blue-800 rounded text-xs truncate">
                                     {reqId}
                                   </span>
                                 ))}
-                                {testCase.requirementIds.length > 2 && (
-                                  <span className="text-gray-400">+{testCase.requirementIds.length - 2}</span>
+                                {testCase.requirementIds.length > 1 && (
+                                  <span className="text-gray-400">+{testCase.requirementIds.length - 1}</span>
                                 )}
                               </div>
                             ) : (
-                              <span className="text-gray-400">No links</span>
+                              <span className="text-gray-400">None</span>
                             )}
                           </div>
                         </td>
-                        <td className="w-20 px-2 py-3 whitespace-nowrap text-right text-sm font-medium">
+                        {/* NEW: Last Execution column */}
+                        <td className="px-2 py-3 whitespace-nowrap">
+                          <div className="text-xs text-gray-500 truncate">
+                            {testCase.lastExecuted ? (
+                              <>
+                                <div>{new Date(testCase.lastExecuted).toLocaleDateString()}</div>
+                                {testCase.lastExecutedBy && (
+                                  <div className="text-xs text-gray-400 truncate">
+                                    {testCase.lastExecutedBy}
+                                  </div>
+                                )}
+                              </>
+                            ) : (
+                              'Never'
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-2 py-3 whitespace-nowrap text-right text-sm font-medium">
                           <div className="flex items-center justify-end space-x-1">
+                            {/* UPDATED: Execute button styled like traceability matrix */}
                             <button
                               onClick={() => handleExecuteTestCase(testCase)}
-                              className="text-green-600 hover:text-green-900 p-1"
+                              className="inline-flex items-center px-1.5 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 text-xs"
                               title="Execute Test"
                             >
-                              <Play size={14} />
+                              <Play size={12} />
                             </button>
                             <button
                               onClick={() => handleEditTestCase(testCase)}
                               className="text-blue-600 hover:text-blue-900 p-1"
                               title="Edit Test Case"
                             >
-                              <Edit size={14} />
+                              <Edit size={12} />
                             </button>
                             <button
                               onClick={() => handleDeleteTestCase(testCase.id)}
                               className="text-red-600 hover:text-red-900 p-1"
                               title="Delete Test Case"
                             >
-                              <Trash2 size={14} />
+                              <Trash2 size={12} />
                             </button>
                           </div>
                         </td>
                       </tr>
 
-                      {/* Expanded Row Content (UPDATED COLSPAN) */}
+                      {/* Expanded Row Content */}
                       {isExpanded && (
                         <tr>
-                          <td colSpan="8" className="px-4 py-4 bg-gray-50">
+                          <td colSpan="9" className="px-4 py-4 bg-gray-50">
                             <div className="space-y-4">
                               <div>
                                 <h4 className="font-medium text-gray-900">Description</h4>
@@ -634,8 +674,7 @@ const TestCases = () => {
                                 <div>
                                   <span className="font-medium text-gray-900">Last Executed:</span>
                                   <span className="ml-1 text-gray-600">
-                                    {testCase.lastExecuted ? 
-                                      new Date(testCase.lastExecuted).toLocaleDateString() : 'Never'}
+                                    {formatLastExecution(testCase.lastExecuted)}
                                   </span>
                                 </div>
                               </div>
@@ -651,7 +690,7 @@ const TestCases = () => {
           </div>
         </div>
 
-        {/* NEW: Results Info - Similar to Requirements page */}
+        {/* Results Info */}
         <div className="text-sm text-gray-500 text-center">
           Showing {filteredTestCases.length} of {versionFilteredTestCases.length} test cases
           {selectedVersion !== 'unassigned' && (
@@ -659,7 +698,7 @@ const TestCases = () => {
           )}
         </div>
 
-        {/* Traceability Mode Info (ORIGINAL STRUCTURE PRESERVED) */}
+        {/* Traceability Mode Info */}
         {traceabilityMode !== 'standalone' && (
           <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
             {traceabilityMode === 'linked' && (
@@ -695,7 +734,7 @@ const TestCases = () => {
           />
         )}
 
-        {/* Edit Test Case Modal (ORIGINAL PRESERVED) */}
+        {/* Edit Test Case Modal */}
         {showEditModal && (
           <EditTestCaseModal
             testCase={editingTestCase}
@@ -711,7 +750,7 @@ const TestCases = () => {
   );
 };
 
-// Edit Test Case Modal Component (ORIGINAL PRESERVED)
+// Edit Test Case Modal Component
 const EditTestCaseModal = ({ testCase, onSave, onCancel }) => {
   const [formData, setFormData] = useState({
     id: testCase?.id || '',
