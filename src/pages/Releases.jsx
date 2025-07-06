@@ -2,12 +2,14 @@ import React, { useState, useEffect } from 'react';
 import MainLayout from '../components/Layout/MainLayout';
 import ReleaseVersionGrid from '../components/Releases/ReleaseVersionGrid';
 import EmptyState from '../components/Common/EmptyState';
+import NewReleaseModal from '../components/Releases/NewReleaseModal';
 import { useVersionContext } from '../context/VersionContext';
 import dataStore from '../services/DataStore';
 
 const Releases = () => {
   const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'table'
   const [hasData, setHasData] = useState(false);
+  const [isNewReleaseModalOpen, setIsNewReleaseModalOpen] = useState(false);
   
   // Use the version context
   const { selectedVersion, setSelectedVersion, versions } = useVersionContext();
@@ -26,7 +28,20 @@ const Releases = () => {
     return () => unsubscribe();
   }, []);
 
-  // No longer needed since we removed the new release button
+  // Handler for adding a new version (used by both header and empty state)
+  const handleAddVersion = (newVersion) => {
+    try {
+      // Use DataStore method if available
+      if (dataStore.addVersion) {
+        dataStore.addVersion(newVersion);
+      }
+      console.log('New version added:', newVersion);
+      // The version context will automatically update when DataStore changes
+    } catch (error) {
+      console.error("Error adding version:", error);
+      // In a real app, show a notification
+    }
+  };
   
   // Handler for updating a version
   const handleUpdateVersion = (versionId, updateData) => {
@@ -61,6 +76,11 @@ const Releases = () => {
     }
   };
 
+  // Handler for opening the new release modal (used by EmptyState)
+  const handleCreateRelease = () => {
+    setIsNewReleaseModalOpen(true);
+  };
+
   // Get status color class (for table view)
   const getStatusColor = (status) => {
     switch (status) {
@@ -76,6 +96,7 @@ const Releases = () => {
     <MainLayout 
       title="Release Management" 
       hasData={hasData}
+      onAddVersion={handleAddVersion} // This enables the header button
     >
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold">Release Versions</h2>
@@ -111,7 +132,7 @@ const Releases = () => {
           title="No Releases Found"
           message="Create your first release version to start tracking your quality metrics."
           actionText="Create Release"
-          actionPath="#"
+          onAction={handleCreateRelease} // Use onClick handler instead of actionPath
           icon="metrics"
           className="mt-8"
         />
@@ -148,7 +169,8 @@ const Releases = () => {
                 <tr 
                   key={version.id} 
                   className={`${
-                    version.id === selectedVersion ? 'bg-blue-50' : 'hover:bg-gray-50'
+                    version.id === selectedVersion ?
+                      'bg-blue-50' : 'hover:bg-gray-50'
                   } cursor-pointer`}
                   onClick={() => setSelectedVersion(version.id)}
                 >
@@ -195,6 +217,17 @@ const Releases = () => {
           </table>
         </div>
       )}
+
+      {/* New Release Modal - now controlled by local state */}
+      <NewReleaseModal
+        isOpen={isNewReleaseModalOpen}
+        onClose={() => setIsNewReleaseModalOpen(false)}
+        onSave={(newVersion) => {
+          handleAddVersion(newVersion);
+          setIsNewReleaseModalOpen(false);
+        }}
+        existingVersions={versions || []}
+      />
     </MainLayout>
   );
 };

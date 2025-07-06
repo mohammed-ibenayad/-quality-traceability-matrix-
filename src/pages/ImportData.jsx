@@ -11,7 +11,7 @@ import dataStore from '../services/DataStore';
  */
 const ImportData = () => {
   const [importStatus, setImportStatus] = useState(null);
-  const [activeTab, setActiveTab] = useState('requirements'); // 'requirements' or 'testcases'
+  const [activeTab, setActiveTab] = useState('testcases'); // 'requirements' or 'testcases'
   const [hasData, setHasData] = useState(false);
   const navigate = useNavigate();
 
@@ -47,6 +47,28 @@ const ImportData = () => {
       delete window.loadSampleData;
     };
   }, [navigate]);
+
+  // NEW: Set the tab based on URL hash
+  useEffect(() => {
+    const handleHashChange = () => {
+      if (window.location.hash === '#testcases-tab') {
+        setActiveTab('testcases');
+      } else if (window.location.hash === '#requirements-tab') {
+        setActiveTab('requirements');
+      }
+    };
+
+    // Check hash on component mount
+    handleHashChange();
+
+    // Listen for hash changes
+    window.addEventListener('hashchange', handleHashChange);
+
+    // Cleanup event listener
+    return () => {
+      window.removeEventListener('hashchange', handleHashChange);
+    };
+  }, []);
 
   const handleImportSuccess = (importedData) => {
     // In a real application, this would save to a database or API

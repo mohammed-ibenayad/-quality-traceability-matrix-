@@ -204,7 +204,8 @@ const Requirements = () => {
     });
   };
 
-  if (!hasData) {
+  // CHANGED: Check for requirements.length === 0 instead of !hasData
+  if (requirements.length === 0) {
     return (
       <MainLayout title="Requirements" hasData={hasData}>
         <EmptyState 

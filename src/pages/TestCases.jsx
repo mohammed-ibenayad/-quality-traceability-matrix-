@@ -263,7 +263,7 @@ const TestCases = () => {
           title="No Test Cases Found" 
           message="Import test cases to start managing your test suite. You can import from GitHub repositories or upload JSON files."
           actionText="Import Test Cases"
-          actionPath="/import"
+          actionPath="/import#testcases-tab"
           icon="testcases"
         />
       </MainLayout>
