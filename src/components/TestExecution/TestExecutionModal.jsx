@@ -187,9 +187,10 @@ const TestExecutionModal = ({
             const updated = new Map(prev);
             results.forEach(result => {
               if (result.id) {
+                const existingResult = prev.get(result.id);
                 updated.set(result.id, {
                   id: result.id,
-                  name: result.name || `Test ${result.id}`,
+                  name: existingResult?.name || result.name || `Test ${result.id}`, // Preserve existing name first
                   status: result.status,
                   duration: result.duration || 0,
                   logs: result.logs || '',
@@ -235,9 +236,10 @@ const TestExecutionModal = ({
         // Update specific test case
         setTestCaseResults(prev => {
           const updated = new Map(prev);
+          const existingResult = prev.get(testCaseId);
           updated.set(testCaseId, {
             id: testCaseId,
-            name: testCase.name || `Test ${testCaseId}`,
+            name: existingResult?.name || testCase.name || `Test ${testCaseId}`, // Preserve existing name first
             status: testCase.status,
             duration: testCase.duration || 0,
             logs: testCase.logs || '',
@@ -275,9 +277,10 @@ const TestExecutionModal = ({
           const updated = new Map(prev);
           allResults.forEach(result => {
             if (result.id) {
+              const existingResult = prev.get(result.id);
               updated.set(result.id, {
                 id: result.id,
-                name: result.name || `Test ${result.id}`,
+                name: existingResult?.name || result.name || `Test ${result.id}`, // Preserve existing name first
                 status: result.status,
                 duration: result.duration || 0,
                 logs: result.logs || '',
@@ -435,7 +438,7 @@ const TestExecutionModal = ({
                 const updated = new Map(prev);
                 updated.set(tc.id, {
                   id: tc.id,
-                  name: tc.name,
+                  name: tc.name, // Keep original test case name
                   status: 'Running',
                   duration: 0,
                   logs: `Test ${tc.id} is running...`,
@@ -452,7 +455,7 @@ const TestExecutionModal = ({
                   const updated = new Map(prev);
                   updated.set(tc.id, {
                     id: tc.id,
-                    name: tc.name,
+                    name: tc.name, // Keep original test case name
                     status: finalStatus,
                     duration: Math.floor(Math.random() * 5000) + 1000,
                     logs: `Test ${tc.id} completed with status: ${finalStatus}`,
@@ -511,7 +514,7 @@ const TestExecutionModal = ({
                     const updated = new Map(prev);
                     updated.set(result.testCaseId, {
                       id: result.testCaseId,
-                      name: result.testCase.name,
+                      name: prev.get(result.testCaseId)?.name || result.testCase.name || `Test ${result.testCaseId}`, // Preserve existing name first
                       status: result.testCase.status,
                       duration: result.testCase.duration || 0,
                       logs: result.testCase.logs || '',
@@ -562,9 +565,10 @@ const TestExecutionModal = ({
                   if (result.id) {
                     setTestCaseResults(prev => {
                       const updated = new Map(prev);
+                      const existingResult = prev.get(result.id);
                       updated.set(result.id, {
                         id: result.id,
-                        name: result.name || `Test ${result.id}`,
+                        name: existingResult?.name || result.name || `Test ${result.id}`, // Preserve existing name first
                         status: result.status,
                         duration: result.duration || 0,
                         logs: result.logs || '',
@@ -979,6 +983,12 @@ const TestExecutionModal = ({
                       Status
                     </th>
                     <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Last Run
+                    </th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Priority
+                    </th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Duration
                     </th>
                   </tr>
@@ -986,6 +996,8 @@ const TestExecutionModal = ({
                 <tbody className="bg-white divide-y divide-gray-200">
                   {testResultsArray.map((result) => {
                     const isRunning = result.status === 'Running';
+                    // Find the original test case for lastExecuted info
+                    const originalTestCase = testCases.find(tc => tc.id === result.id);
                     
                     return (
                       <tr 
@@ -998,17 +1010,28 @@ const TestExecutionModal = ({
                         <td className="px-4 py-2 text-sm font-mono text-gray-600">{result.id}</td>
                         <td className="px-4 py-2 text-sm text-gray-900">
                           {result.name}
-                          {isRunning && (
-                            <span className="ml-2 text-xs text-blue-600 animate-pulse">
-                              ⚡ Running...
-                            </span>
-                          )}
                         </td>
                         <td className="px-4 py-2 text-sm">
                           <div className="flex items-center">
                             {getStatusIcon(result.status)}
                             <span className="ml-2">{result.status}</span>
                           </div>
+                        </td>
+                        <td className="px-4 py-2 text-sm text-gray-500">
+                          {result.receivedAt ? 
+                            new Date(result.receivedAt).toLocaleDateString() :
+                            (originalTestCase?.lastExecuted ? 
+                              new Date(originalTestCase.lastExecuted).toLocaleDateString() : 
+                              'Never')}
+                        </td>
+                        <td className="px-4 py-2 text-sm">
+                          <span className={`text-xs px-1.5 py-0.5 rounded ${
+                            (originalTestCase?.priority || 'Medium') === 'High' ? 'bg-red-50 text-red-600' :
+                            (originalTestCase?.priority || 'Medium') === 'Medium' ? 'bg-yellow-50 text-yellow-600' :
+                            'bg-green-50 text-green-600'
+                          }`}>
+                            {originalTestCase?.priority || 'Medium'}
+                          </span>
                         </td>
                         <td className="px-4 py-2 text-sm text-gray-500">
                           {result.duration > 0 ? `${Math.round(result.duration / 1000)}s` : 
