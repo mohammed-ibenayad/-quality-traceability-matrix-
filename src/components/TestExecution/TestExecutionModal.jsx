@@ -16,6 +16,7 @@ import {
   Loader2,
   Check,
   AlertTriangle,
+  AlertCircle,  // ADD THIS LINE
   X
 } from 'lucide-react';
 import GitHubService from '../../services/GitHubService';
@@ -264,7 +265,7 @@ const TestExecutionModal = ({
         }
 
         // Check if execution is complete
-        const completedStatuses = ['Passed', 'Failed', 'Cancelled', 'Skipped', 'Not Run'];
+        const completedStatuses = ['Passed', 'Failed', 'Cancelled', 'Skipped', 'Not Run', 'Not Found']
         if (completedStatuses.includes(testCase.status)) {
           checkExecutionCompletion();
         }
@@ -346,55 +347,41 @@ const TestExecutionModal = ({
 
   // Check if execution is complete
   const checkExecutionCompletion = () => {
-    const results = Array.from(testCaseResults.values());
-    const completedStatuses = ['Passed', 'Failed', 'Cancelled', 'Skipped', 'Not Run'];
-    const completedTests = results.filter(r => completedStatuses.includes(r.status));
+  const results = Array.from(testCaseResults.values());
+  const completedStatuses = ['Passed', 'Failed', 'Cancelled', 'Skipped', 'Not Run', 'Not Found']; // ADDED "Not Found"
+  const completedTests = results.filter(r => completedStatuses.includes(r.status));
+  
+  console.log(`📊 Execution progress: ${completedTests.length}/${expectedTestCases.length} tests completed`);
+  console.log('🔍 All test results:', results.map(r => `${r.id}: ${r.status}`));
+  console.log('🔍 Completed test statuses:', completedTests.map(t => `${t.id}: ${t.status}`));
+  console.log('🔍 Expected test cases:', expectedTestCases);
+  console.log('🔍 Completion criteria:', { completedCount: completedTests.length, expectedCount: expectedTestCases.length });
+  
+  if (completedTests.length >= expectedTestCases.length && expectedTestCases.length > 0) {
+    console.log('🏁 All test cases completed!');
     
-    console.log(`📊 Execution progress: ${completedTests.length}/${expectedTestCases.length} tests completed`);
-    console.log('🔍 All test results:', results.map(r => `${r.id}: ${r.status}`));
-    console.log('🔍 Completed test statuses:', completedTests.map(t => `${t.id}: ${t.status}`));
-    console.log('🔍 Expected test cases:', expectedTestCases);
-    console.log('🔍 Completion criteria:', { completedCount: completedTests.length, expectedCount: expectedTestCases.length });
+    setIsRunning(false);
+    setWaitingForWebhook(false);
+    setExecutionStatus('completed');
     
-    if (completedTests.length >= expectedTestCases.length && expectedTestCases.length > 0) {
-      console.log('🏁 All test cases completed! Closing modal...');
-      setWaitingForWebhook(false);
-      waitingForWebhookRef.current = false;
-      setIsRunning(false);
-      setProcessingStatus('completed');
-      
-      // Clear timeouts
-      if (webhookTimeout) {
-        clearTimeout(webhookTimeout);
-        setWebhookTimeout(null);
-      }
-      if (pollInterval) {
-        clearInterval(pollInterval);
-        setPollInterval(null);
-      }
-      
-      // Notify completion with all results
-      if (onTestComplete) {
-        const allResults = results.map(r => ({
-          id: r.id,
-          name: r.name,
-          status: r.status,
-          duration: r.duration,
-          logs: r.logs
-        }));
-        console.log('📤 Calling onTestComplete with results:', allResults);
-        onTestComplete(allResults);
-      }
-      
-      // FIXED: Auto-close modal after completion
-      setTimeout(() => {
-        console.log('🚪 Auto-closing modal after test completion');
-        onClose();
-      }, 2000); // 2 second delay to show completion status
-    } else {
-      console.log(`⏳ Execution not complete yet: ${completedTests.length}/${expectedTestCases.length} tests finished`);
+    // Clear any polling
+    if (pollInterval) {
+      clearInterval(pollInterval);
+      setPollInterval(null);
     }
-  };
+    if (webhookTimeout) {
+      clearTimeout(webhookTimeout);
+      setWebhookTimeout(null);
+    }
+
+    // Notify parent
+    if (onTestComplete) {
+      onTestComplete(completedTests);
+    }
+  } else {
+    console.log(`⏳ Execution not complete yet: ${completedTests.length}/${expectedTestCases.length} tests finished`);
+  }
+};
 
   // Save configuration
   const saveConfiguration = () => {
@@ -676,24 +663,27 @@ const TestExecutionModal = ({
   };
 
   // Helper function to get status icon
-  const getStatusIcon = (status) => {
-    const iconProps = { size: 16, className: "inline" };
+  // Add "Not Found" case to getStatusIcon function
+const getStatusIcon = (status) => {
+  const iconProps = { size: 16, className: "inline" };
 
-    switch (status) {
-      case 'Passed':
-        return <CheckCircle {...iconProps} className="text-green-500" />;
-      case 'Failed':
-        return <XCircle {...iconProps} className="text-red-500" />;
-      case 'Running':
-        return <Loader2 {...iconProps} className="text-blue-500 animate-spin" />;
-      case 'Not Started':
-        return <Clock {...iconProps} className="text-gray-400" />;
-      case 'Cancelled':
-        return <XCircle {...iconProps} className="text-orange-500" />;
-      default:
-        return <Clock {...iconProps} className="text-gray-400" />;
-    }
-  };
+  switch (status) {
+    case 'Passed':
+      return <CheckCircle {...iconProps} className="text-green-500" />;
+    case 'Failed':
+      return <XCircle {...iconProps} className="text-red-500" />;
+    case 'Not Found':  // NEW
+      return <AlertCircle {...iconProps} className="text-orange-500" />;
+    case 'Running':
+      return <Loader2 {...iconProps} className="text-blue-500 animate-spin" />;
+    case 'Not Started':
+      return <Clock {...iconProps} className="text-gray-400" />;
+    case 'Cancelled':
+      return <XCircle {...iconProps} className="text-orange-500" />;
+    default:
+      return <Clock {...iconProps} className="text-gray-400" />;
+  }
+};
 
   // Helper function for input changes
   const handleInputChange = (e) => {

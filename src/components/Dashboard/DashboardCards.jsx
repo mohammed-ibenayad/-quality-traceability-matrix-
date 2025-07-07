@@ -1,4 +1,4 @@
-// src/components/Dashboard/DashboardCards.jsx - Updated version
+// src/components/Dashboard/DashboardCards.jsx - Updated version with "Not Found" status support
 import React from 'react';
 import TDFInfoTooltip from '../Common/TDFInfoTooltip';
 
@@ -15,21 +15,24 @@ const DashboardCards = ({ metrics }) => {
   const totalManualTests = metrics.totalManualTests || 0;
   const totalExecutableTests = totalAutomatedTests + totalManualTests;
   
-  // Calculate test execution counts using the updated values from direct metrics
+  // Calculate test execution counts using the updated values from direct metrics - UPDATED
   const passedTests = metrics.summary?.passed || 0;
   const failedTests = metrics.summary?.failed || 0;
+  const notFoundTests = metrics.summary?.notFound || 0;  // NEW: Missing test implementations
   const notExecutedTests = metrics.summary?.notExecuted || 0;
   const totalExecutedTests = passedTests + failedTests;
   const totalTests = totalActualTestCases;
+  const implementedTests = totalTests - notFoundTests;  // Tests that actually exist
   
   // Calculate manual test rate
   const manualTestRate = totalActualTestCases > 0 
     ? Math.round((totalManualTests / totalActualTestCases) * 100)
     : 0;
 
-  // Use the pass rate already calculated in the Dashboard component
-  // This ensures it's always up to date
-  const actualPassRate = metrics.passRate || 0;
+  // UPDATED: Calculate pass rate excluding "Not Found" tests (missing implementations)
+  const actualPassRate = implementedTests > 0 
+    ? Math.round((passedTests / implementedTests) * 100)
+    : metrics.passRate || 0;
 
   return (
     <div className="mb-6">
@@ -88,9 +91,9 @@ const DashboardCards = ({ metrics }) => {
         </div>
       </div>
       
-      {/* Test case-focused metrics */}
+      {/* Test case-focused metrics - UPDATED to include 3 cards */}
       <h3 className="text-sm font-medium text-gray-700 mb-2">Test Execution Status</h3>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
         <div className="bg-white p-4 rounded shadow">
           <div className="text-sm text-gray-600 mb-1">Test Pass Rate</div>
           <div className="flex flex-col">
@@ -99,13 +102,17 @@ const DashboardCards = ({ metrics }) => {
               <div className="flex items-center gap-2">
                 <span className="text-xs px-2 py-1 bg-green-100 text-green-800 rounded-full">{passedTests} Passed</span>
                 <span className="text-xs px-2 py-1 bg-red-100 text-red-800 rounded-full">{failedTests} Failed</span>
+                {notFoundTests > 0 && (
+                  <span className="text-xs px-2 py-1 bg-orange-100 text-orange-800 rounded-full">{notFoundTests} Not Found</span>
+                )}
                 {notExecutedTests > 0 && (
                   <span className="text-xs px-2 py-1 bg-gray-100 text-gray-800 rounded-full">{notExecutedTests} Not Run</span>
                 )}
               </div>
             </div>
             <div className="text-xs text-gray-500 mt-1">
-              {totalExecutedTests} executed of {totalTests} total tests
+              {totalExecutedTests} executed of {implementedTests} implemented tests
+              {notFoundTests > 0 && ` (${notFoundTests} missing implementation)`}
             </div>
             <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
               <div 
@@ -136,6 +143,34 @@ const DashboardCards = ({ metrics }) => {
               <div 
                 className="h-2 rounded-full bg-blue-500"
                 style={{width: `${metrics.automationRate}%`}}
+              ></div>
+            </div>
+          </div>
+        </div>
+
+        {/* NEW: Implementation Status Card */}
+        <div className="bg-white p-4 rounded shadow">
+          <div className="text-sm text-gray-600 mb-1">Implementation Status</div>
+          <div className="flex flex-col">
+            <div className="flex justify-between items-end">
+              <div className="text-2xl font-bold">{implementedTests} / {totalTests}</div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs px-2 py-1 bg-blue-100 text-blue-800 rounded-full">{implementedTests} Implemented</span>
+                {notFoundTests > 0 && (
+                  <span className="text-xs px-2 py-1 bg-orange-100 text-orange-800 rounded-full">{notFoundTests} Missing</span>
+                )}
+              </div>
+            </div>
+            <div className="text-xs text-gray-500 mt-1">
+              {totalTests > 0 ? Math.round((implementedTests / totalTests) * 100) : 100}% tests have implementations
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
+              <div 
+                className={`h-2 rounded-full ${
+                  implementedTests === totalTests ? 'bg-green-500' :
+                  (implementedTests / totalTests) >= 0.8 ? 'bg-blue-500' : 'bg-orange-500'
+                }`}
+                style={{width: `${totalTests > 0 ? (implementedTests / totalTests) * 100 : 100}%`}}
               ></div>
             </div>
           </div>

@@ -711,10 +711,10 @@ deleteRequirement(requirementId) {
    * @returns {Array} Updated test cases
    */
   updateTestCaseStatuses(testCaseIds, status) {
-    const validStatuses = ['Passed', 'Failed', 'Not Run', 'Blocked'];
-    if (!validStatuses.includes(status)) {
-      throw new Error(`Invalid status. Must be one of: ${validStatuses.join(', ')}`);
-    }
+    const validStatuses = ['Passed', 'Failed', 'Not Run', 'Blocked', 'Not Found'];
+if (!validStatuses.includes(status)) {
+  throw new Error(`Invalid status. Valid statuses are: ${validStatuses.join(', ')}`);
+}
 
     const updatedTestCases = [];
 

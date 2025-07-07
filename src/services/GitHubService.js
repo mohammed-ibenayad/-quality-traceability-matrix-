@@ -1101,6 +1101,9 @@ transformTestResults(rawResults, clientPayload) {
   return transformedResults;
 }
 
+// Fix for src/services/GitHubService.js
+// Update the normalizeTestStatus method to handle "Not Found" status
+
 /**
  * Normalize different test status formats
  */
@@ -1109,6 +1112,12 @@ normalizeTestStatus(testResult) {
   
   if (typeof state === 'string') {
     const lowerState = state.toLowerCase();
+    
+    // Handle "Not Found" status from GitHub workflow
+    if (lowerState.includes('not found') || lowerState === 'not found') {
+      return 'Not Found';
+    }
+    
     if (lowerState.includes('pass') || lowerState === 'passed' || lowerState === 'ok') {
       return 'Passed';
     }
@@ -1118,6 +1127,18 @@ normalizeTestStatus(testResult) {
     if (lowerState.includes('skip') || lowerState === 'skipped' || lowerState === 'pending') {
       return 'Skipped';
     }
+    if (lowerState.includes('not started') || lowerState === 'not started') {
+      return 'Not Started';
+    }
+    if (lowerState.includes('running') || lowerState === 'running') {
+      return 'Running';
+    }
+    if (lowerState.includes('blocked') || lowerState === 'blocked') {
+      return 'Blocked';
+    }
+    if (lowerState.includes('cancelled') || lowerState === 'cancelled') {
+      return 'Cancelled';
+    }
   }
   
   // Check for failure indicators
@@ -1125,7 +1146,12 @@ normalizeTestStatus(testResult) {
     return 'Failed';
   }
   
-  // Default to passed if no failure indicators
+  // If we have a valid status from the GitHub workflow, preserve it
+  if (state === 'Not Found') {
+    return 'Not Found';
+  }
+  
+  // Default to passed if no failure indicators and no explicit status
   return 'Passed';
 }
   /**

@@ -137,7 +137,7 @@ const ImportTestCases = ({ onImportSuccess }) => {
     }
 
     const requiredFields = ['id', 'name'];
-    const validStatuses = ['Passed', 'Failed', 'Not Run', 'Blocked'];
+    const validStatuses = ['Passed', 'Failed', 'Not Run', 'Blocked', 'Not Found'];
     const validAutomationStatuses = ['Automated', 'Manual', 'Planned'];
     const ids = new Set();
     
