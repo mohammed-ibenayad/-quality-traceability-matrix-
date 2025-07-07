@@ -1002,9 +1002,6 @@ const TestExecutionModal = ({
                       Test ID
                     </th>
                     <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Test Name
-                    </th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Status
                     </th>
                     <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -1032,10 +1029,7 @@ const TestExecutionModal = ({
                           transition-colors duration-200
                         `}
                       >
-                        <td className="px-4 py-2 text-sm font-mono text-gray-600">{result.id}</td>
-                        <td className="px-4 py-2 text-sm text-gray-900">
-                          {result.name}
-                        </td>
+                        <td className="px-4 py-2 text-sm font-mono text-gray-900 font-medium">{result.id}</td>
                         <td className="px-4 py-2 text-sm">
                           <div className="flex items-center">
                             {getStatusIcon(result.status)}
