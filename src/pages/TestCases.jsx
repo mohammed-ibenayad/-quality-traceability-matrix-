@@ -537,12 +537,12 @@ const TestCases = () => {
                         </td>
                         <td className="px-2 py-3 whitespace-nowrap">
                           <span className={`inline-flex px-1.5 py-0.5 text-xs font-medium rounded ${
-                            testCase.priority === 'High' ? 'bg-red-100 text-red-800' :
-                            testCase.priority === 'Medium' ? 'bg-yellow-100 text-yellow-800' :
-                            'bg-green-100 text-green-800'
-                          }`}>
-                            {testCase.priority}
-                          </span>
+  testCase.priority === 'High' ? 'bg-red-50 text-red-600' :
+  testCase.priority === 'Medium' ? 'bg-yellow-50 text-yellow-600' :
+  'bg-gray-50 text-gray-600'
+}`}>
+  {testCase.priority}
+</span>
                         </td>
                         <td className="px-2 py-3 whitespace-nowrap">
                           <span className={`inline-flex px-1.5 py-0.5 text-xs font-medium rounded ${

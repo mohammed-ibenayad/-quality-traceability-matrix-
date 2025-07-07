@@ -1045,12 +1045,12 @@ const TestExecutionModal = ({
                         </td>
                         <td className="px-4 py-2 text-sm">
                           <span className={`text-xs px-1.5 py-0.5 rounded ${
-                            (originalTestCase?.priority || 'Medium') === 'High' ? 'bg-red-50 text-red-600' :
-                            (originalTestCase?.priority || 'Medium') === 'Medium' ? 'bg-yellow-50 text-yellow-600' :
-                            'bg-green-50 text-green-600'
-                          }`}>
-                            {originalTestCase?.priority || 'Medium'}
-                          </span>
+  (originalTestCase?.priority || 'Medium') === 'High' ? 'bg-red-50 text-red-600' :
+  (originalTestCase?.priority || 'Medium') === 'Medium' ? 'bg-yellow-50 text-yellow-600' :
+  'bg-gray-50 text-gray-600'
+}`}>
+  {originalTestCase?.priority || 'Medium'}
+</span>
                         </td>
                         <td className="px-4 py-2 text-sm text-gray-500">
                           {result.duration > 0 ? (
