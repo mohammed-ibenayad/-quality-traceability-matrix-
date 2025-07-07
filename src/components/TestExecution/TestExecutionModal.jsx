@@ -351,9 +351,13 @@ const TestExecutionModal = ({
     const completedTests = results.filter(r => completedStatuses.includes(r.status));
     
     console.log(`📊 Execution progress: ${completedTests.length}/${expectedTestCases.length} tests completed`);
+    console.log('🔍 All test results:', results.map(r => `${r.id}: ${r.status}`));
+    console.log('🔍 Completed test statuses:', completedTests.map(t => `${t.id}: ${t.status}`));
+    console.log('🔍 Expected test cases:', expectedTestCases);
+    console.log('🔍 Completion criteria:', { completedCount: completedTests.length, expectedCount: expectedTestCases.length });
     
-    if (completedTests.length >= expectedTestCases.length) {
-      console.log('🏁 All test cases completed!');
+    if (completedTests.length >= expectedTestCases.length && expectedTestCases.length > 0) {
+      console.log('🏁 All test cases completed! Closing modal...');
       setWaitingForWebhook(false);
       waitingForWebhookRef.current = false;
       setIsRunning(false);
@@ -378,8 +382,17 @@ const TestExecutionModal = ({
           duration: r.duration,
           logs: r.logs
         }));
+        console.log('📤 Calling onTestComplete with results:', allResults);
         onTestComplete(allResults);
       }
+      
+      // FIXED: Auto-close modal after completion
+      setTimeout(() => {
+        console.log('🚪 Auto-closing modal after test completion');
+        onClose();
+      }, 2000); // 2 second delay to show completion status
+    } else {
+      console.log(`⏳ Execution not complete yet: ${completedTests.length}/${expectedTestCases.length} tests finished`);
     }
   };
 
@@ -525,7 +538,10 @@ const TestExecutionModal = ({
                 }
               });
               
-              checkExecutionCompletion();
+              // FIXED: Force completion check after processing backend results
+              setTimeout(() => {
+                checkExecutionCompletion();
+              }, 500);
               return;
             }
           } catch (pollError) {
@@ -560,26 +576,35 @@ const TestExecutionModal = ({
                 
                 console.log(`📥 Retrieved ${actionResults.length} test results from artifacts`);
                 
-                // Process results as individual test cases
+                // FIXED: Process results with proper state update batching
+                const processedResults = new Map(testCaseResults);
+                
                 actionResults.forEach(result => {
                   if (result.id) {
-                    setTestCaseResults(prev => {
-                      const updated = new Map(prev);
-                      const existingResult = prev.get(result.id);
-                      updated.set(result.id, {
-                        id: result.id,
-                        name: existingResult?.name || result.name || `Test ${result.id}`, // Preserve existing name first
-                        status: result.status,
-                        duration: result.duration || 0,
-                        logs: result.logs || '',
-                        receivedAt: new Date().toISOString()
-                      });
-                      return updated;
-                    });
+                    const existingResult = processedResults.get(result.id);
+                    const updatedResult = {
+                      id: result.id,
+                      name: existingResult?.name || result.name || `Test ${result.id}`,
+                      status: result.status,
+                      duration: result.duration || 0,
+                      logs: result.logs || '',
+                      receivedAt: new Date().toISOString()
+                    };
+                    
+                    processedResults.set(result.id, updatedResult);
+                    console.log(`🔄 Processing GitHub result: ${result.id} → ${result.status}`);
                   }
                 });
                 
-                checkExecutionCompletion();
+                // FIXED: Single state update with all results
+                console.log('💾 Updating testCaseResults state with GitHub artifacts...');
+                setTestCaseResults(processedResults);
+                
+                // FIXED: Longer timeout to ensure state update completes
+                setTimeout(() => {
+                  console.log('🔄 Checking completion after GitHub artifacts processing...');
+                  checkExecutionCompletion();
+                }, 1000); // Increased from 500ms to 1000ms
                 
               } catch (resultsError) {
                 console.error('❌ Error getting workflow results:', resultsError);
@@ -1034,8 +1059,11 @@ const TestExecutionModal = ({
                           </span>
                         </td>
                         <td className="px-4 py-2 text-sm text-gray-500">
-                          {result.duration > 0 ? `${Math.round(result.duration / 1000)}s` : 
-                           result.status === 'Running' ? '⏱️' : '-'}
+                          {result.duration > 0 ? (
+                            result.duration > 1000 ? 
+                              `${Math.round(result.duration / 1000)}s` : 
+                              `${result.duration}ms`
+                          ) : result.status === 'Running' ? '⏱️' : '-'}
                         </td>
                       </tr>
                     );
