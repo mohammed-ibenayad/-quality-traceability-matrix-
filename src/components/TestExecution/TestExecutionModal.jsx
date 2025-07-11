@@ -1,5 +1,5 @@
-// src/components/TestExecution/TestExecutionModal.jsx - Complete cleaned up version
-import React, { useState, useEffect, useRef } from 'react';
+// src/components/TestExecution/TestExecutionModal.jsx - Complete fixed version with all features
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Play,
   Pause,
@@ -16,7 +16,7 @@ import {
   Loader2,
   Check,
   AlertTriangle,
-  AlertCircle,  // ADD THIS LINE
+  AlertCircle,
   X
 } from 'lucide-react';
 import GitHubService from '../../services/GitHubService';
@@ -78,6 +78,92 @@ const TestExecutionModal = ({
 
   // Track previous props to detect changes
   const prevProps = useRef({ isOpen: false, testCases: [] });
+  
+  // CRITICAL FIX: Track subscription state to prevent duplicates
+  const subscriptionRef = useRef(null);
+
+  // FIXED: Create stable handleTestCaseUpdate with useCallback and empty dependencies
+  const handleTestCaseUpdate = useCallback((eventData) => {
+    console.log('🧪 Individual test case update received:', eventData);
+    
+    const { type, requestId, testCaseId, testCase, allResults } = eventData;
+    
+    // CRITICAL: Check current request ID from ref, not closure
+    const currentReqId = subscriptionRef.current;
+    if (requestId !== currentReqId) {
+      console.log(`❌ Event for ${requestId}, but current is ${currentReqId} - ignoring`);
+      return;
+    }
+
+    if (type === 'test-case-update' && testCaseId && testCase) {
+      // Update specific test case
+      setTestCaseResults(prev => {
+        const updated = new Map(prev);
+        const existingResult = prev.get(testCaseId);
+        updated.set(testCaseId, {
+          id: testCaseId,
+          name: existingResult?.name || testCase.name || `Test ${testCaseId}`,
+          status: testCase.status,
+          duration: testCase.duration || 0,
+          logs: testCase.logs || '',
+          receivedAt: new Date().toISOString()
+        });
+        
+        console.log(`📝 Updated test case ${testCaseId}: ${testCase.status}`);
+        return updated;
+      });
+
+      // Update DataStore with current testCases from DataStore
+      const currentTestCases = dataStore.getTestCases();
+      const testCaseObj = currentTestCases.find(tc => tc.id === testCaseId);
+      if (testCaseObj) {
+        dataStore.updateTestCase(testCaseId, {
+          ...testCaseObj,
+          status: testCase.status,
+          lastRun: new Date().toISOString(),
+          lastExecuted: testCase.status !== 'Not Started' ? new Date().toISOString() : testCaseObj.lastExecuted,
+          executionTime: testCase.duration || 0
+        });
+        console.log(`📀 DataStore updated for ${testCaseId}`);
+      }
+
+      // Check if execution is complete with debouncing
+      const completedStatuses = ['Passed', 'Failed', 'Cancelled', 'Skipped', 'Not Run', 'Not Found'];
+      if (completedStatuses.includes(testCase.status)) {
+        setTimeout(() => checkExecutionCompletion(), 100);
+      }
+
+    } else if (type === 'existing-results' && allResults) {
+      console.log(`📦 Processing ${allResults.length} existing test case results`);
+      
+      setTestCaseResults(prev => {
+        const updated = new Map(prev);
+        allResults.forEach(result => {
+          if (result.id) {
+            const existingResult = prev.get(result.id);
+            updated.set(result.id, {
+              id: result.id,
+              name: existingResult?.name || result.name || `Test ${result.id}`,
+              status: result.status,
+              duration: result.duration || 0,
+              logs: result.logs || '',
+              receivedAt: result.receivedAt
+            });
+          }
+        });
+        return updated;
+      });
+      
+      setTimeout(() => checkExecutionCompletion(), 100);
+    }
+
+    // Refresh quality gates
+    try {
+      refreshQualityGates(dataStore);
+    } catch (error) {
+      console.warn('Error refreshing quality gates:', error);
+    }
+  }, []); // EMPTY DEPENDENCIES to prevent recreation
 
   // Initialize when modal first opens or test cases change significantly
   useEffect(() => {
@@ -86,6 +172,9 @@ const TestExecutionModal = ({
     
     if (isOpen && testCases.length > 0 && propsChanged) {
       console.log('🎭 Initializing test execution modal');
+      
+      // Reset subscription ref on initialization
+      subscriptionRef.current = null;
       
       // Only reset state if we're not in the middle of an execution
       if (!isRunning && !waitingForWebhook) {
@@ -191,7 +280,7 @@ const TestExecutionModal = ({
                 const existingResult = prev.get(result.id);
                 updated.set(result.id, {
                   id: result.id,
-                  name: existingResult?.name || result.name || `Test ${result.id}`, // Preserve existing name first
+                  name: existingResult?.name || result.name || `Test ${result.id}`,
                   status: result.status,
                   duration: result.duration || 0,
                   logs: result.logs || '',
@@ -213,175 +302,122 @@ const TestExecutionModal = ({
     }
   }, [isOpen, currentRequestId, hasBackendSupport]);
 
-  // Set up webhook listeners
+  // FIXED: Separate useEffect for backend webhook subscription with duplicate prevention
   useEffect(() => {
-    if (!isOpen || !currentRequestId) return;
-
-    console.log(`🎯 Setting up webhook listeners for request: ${currentRequestId}`);
-
-    // Handle individual test case results
-    const handleTestCaseUpdate = (eventData) => {
-      console.log('🧪 Individual test case update received:', eventData);
-      console.log('🔍 Current request ID:', currentRequestId);
-      console.log('🔍 Event request ID:', eventData.requestId);
-      
-      const { type, requestId, testCaseId, testCase, allResults } = eventData;
-      
-      // Verify this is for our current execution
-      if (requestId !== currentRequestId) {
-        console.log('❌ Test case update not for current execution - ignoring');
-        return;
-      }
-
-      if (type === 'test-case-update' && testCaseId && testCase) {
-        // Update specific test case
-        setTestCaseResults(prev => {
-          const updated = new Map(prev);
-          const existingResult = prev.get(testCaseId);
-          updated.set(testCaseId, {
-            id: testCaseId,
-            name: existingResult?.name || testCase.name || `Test ${testCaseId}`, // Preserve existing name first
-            status: testCase.status,
-            duration: testCase.duration || 0,
-            logs: testCase.logs || '',
-            receivedAt: new Date().toISOString()
-          });
-          
-          console.log(`📝 Updated test case ${testCaseId}: ${testCase.status}`);
-          return updated;
-        });
-
-        // Update DataStore
-        const testCaseObj = testCases.find(tc => tc.id === testCaseId);
-        if (testCaseObj) {
-          dataStore.updateTestCase(testCaseId, {
-            ...testCaseObj,
-            status: testCase.status,
-            lastRun: new Date().toISOString(),
-            lastExecuted: testCase.status !== 'Not Started' ? new Date().toISOString() : testCaseObj.lastExecuted,
-            executionTime: testCase.duration || 0
-          });
-          console.log(`📀 DataStore updated for ${testCaseId}`);
-        }
-
-        // Check if execution is complete
-        const completedStatuses = ['Passed', 'Failed', 'Cancelled', 'Skipped', 'Not Run', 'Not Found']
-        if (completedStatuses.includes(testCase.status)) {
-          checkExecutionCompletion();
-        }
-
-      } else if (type === 'existing-results' && allResults) {
-        // Handle existing results on subscription
-        console.log(`📦 Processing ${allResults.length} existing test case results`);
-        
-        setTestCaseResults(prev => {
-          const updated = new Map(prev);
-          allResults.forEach(result => {
-            if (result.id) {
-              const existingResult = prev.get(result.id);
-              updated.set(result.id, {
-                id: result.id,
-                name: existingResult?.name || result.name || `Test ${result.id}`, // Preserve existing name first
-                status: result.status,
-                duration: result.duration || 0,
-                logs: result.logs || '',
-                receivedAt: result.receivedAt
-              });
-            }
-          });
-          return updated;
-        });
-        
-        checkExecutionCompletion();
-      }
-
-      // Refresh quality gates
-      try {
-        refreshQualityGates(dataStore);
-      } catch (error) {
-        console.warn('Error refreshing quality gates:', error);
-      }
-    };
-
-    // Set up webhook listener based on backend support
-    if (hasBackendSupport && webhookService) {
-      console.log(`🎯 Setting up webhook listener for request: ${currentRequestId}`);
-      
-      // Register execution with expected test cases
-      webhookService.registerTestExecution(currentRequestId, expectedTestCases);
-      
-      // Subscribe to test case updates
-      webhookService.subscribeToRequest(currentRequestId, handleTestCaseUpdate);
-    } else {
-      // Fallback to window-based listener (convert bulk to individual)
-      console.log(`🎯 Setting up fallback webhook listener`);
-      window.onTestWebhookReceived = (webhookData) => {
-        console.log('🔔 Fallback webhook received:', webhookData);
-        
-        // Convert bulk webhook to individual test case updates
-        if (webhookData?.results && Array.isArray(webhookData.results)) {
-          webhookData.results.forEach(testCase => {
-            if (testCase.id) {
-              handleTestCaseUpdate({
-                type: 'test-case-update',
-                requestId: webhookData.requestId,
-                testCaseId: testCase.id,
-                testCase: testCase
-              });
-            }
-          });
-        }
-      };
+    // Early exit conditions
+    if (!isOpen || !currentRequestId || !hasBackendSupport || !webhookService) {
+      return;
     }
+
+    // CRITICAL FIX: Prevent duplicate subscriptions
+    if (subscriptionRef.current === currentRequestId) {
+      console.log(`⚠️ Already subscribed to ${currentRequestId}, skipping duplicate subscription`);
+      return;
+    }
+
+    console.log(`🎯 Setting up webhook listener for request: ${currentRequestId}`);
+    
+    // Mark this subscription as active
+    subscriptionRef.current = currentRequestId;
+    
+    // Register execution with expected test cases
+    webhookService.registerTestExecution(currentRequestId, expectedTestCases);
+    
+    // Subscribe to test case updates
+    webhookService.subscribeToRequest(currentRequestId, handleTestCaseUpdate);
 
     // Cleanup function
     return () => {
-      if (hasBackendSupport && webhookService) {
-        console.log(`🧹 Cleaning up webhook listener for request: ${currentRequestId}`);
-        webhookService.unsubscribeFromRequest(currentRequestId);
-      } else {
-        window.onTestWebhookReceived = null;
+      console.log(`🧹 Cleaning up webhook listener for request: ${currentRequestId}`);
+      webhookService.unsubscribeFromRequest(currentRequestId);
+      
+      // Clear the subscription ref if it matches this request
+      if (subscriptionRef.current === currentRequestId) {
+        subscriptionRef.current = null;
       }
     };
-  }, [isOpen, currentRequestId, hasBackendSupport, expectedTestCases, testCases]);
+  }, [isOpen, currentRequestId, hasBackendSupport]); // MINIMAL DEPENDENCIES
+
+  // FIXED: Separate useEffect for fallback mode
+  useEffect(() => {
+    if (!isOpen || hasBackendSupport) {
+      return;
+    }
+
+    console.log(`🎯 Setting up fallback webhook listener`);
+    
+    window.onTestWebhookReceived = (webhookData) => {
+      console.log('🔔 Fallback webhook received:', webhookData);
+      
+      // Convert bulk webhook to individual test case updates
+      if (webhookData?.results && Array.isArray(webhookData.results)) {
+        webhookData.results.forEach(testCase => {
+          if (testCase.id) {
+            handleTestCaseUpdate({
+              type: 'test-case-update',
+              requestId: webhookData.requestId,
+              testCaseId: testCase.id,
+              testCase: testCase
+            });
+          }
+        });
+      }
+    };
+
+    // Cleanup function
+    return () => {
+      window.onTestWebhookReceived = null;
+    };
+  }, [isOpen, hasBackendSupport, handleTestCaseUpdate]);
+
+  // ADDED: Cleanup subscription on modal close
+  useEffect(() => {
+    if (!isOpen && subscriptionRef.current) {
+      console.log('🧹 Modal closed, cleaning up any remaining subscription');
+      if (webhookService) {
+        webhookService.unsubscribeFromRequest(subscriptionRef.current);
+      }
+      subscriptionRef.current = null;
+    }
+  }, [isOpen]);
 
   // Check if execution is complete
   const checkExecutionCompletion = () => {
-  const results = Array.from(testCaseResults.values());
-  const completedStatuses = ['Passed', 'Failed', 'Cancelled', 'Skipped', 'Not Run', 'Not Found']; // ADDED "Not Found"
-  const completedTests = results.filter(r => completedStatuses.includes(r.status));
-  
-  console.log(`📊 Execution progress: ${completedTests.length}/${expectedTestCases.length} tests completed`);
-  console.log('🔍 All test results:', results.map(r => `${r.id}: ${r.status}`));
-  console.log('🔍 Completed test statuses:', completedTests.map(t => `${t.id}: ${t.status}`));
-  console.log('🔍 Expected test cases:', expectedTestCases);
-  console.log('🔍 Completion criteria:', { completedCount: completedTests.length, expectedCount: expectedTestCases.length });
-  
-  if (completedTests.length >= expectedTestCases.length && expectedTestCases.length > 0) {
-    console.log('🏁 All test cases completed!');
+    const results = Array.from(testCaseResults.values());
+    const completedStatuses = ['Passed', 'Failed', 'Cancelled', 'Skipped', 'Not Run', 'Not Found'];
+    const completedTests = results.filter(r => completedStatuses.includes(r.status));
     
-    setIsRunning(false);
-    setWaitingForWebhook(false);
-    setExecutionStatus('completed');
+    console.log(`📊 Execution progress: ${completedTests.length}/${expectedTestCases.length} tests completed`);
+    console.log('🔍 All test results:', results.map(r => `${r.id}: ${r.status}`));
+    console.log('🔍 Completed test statuses:', completedTests.map(t => `${t.id}: ${t.status}`));
+    console.log('🔍 Expected test cases:', expectedTestCases);
+    console.log('🔍 Completion criteria:', { completedCount: completedTests.length, expectedCount: expectedTestCases.length });
     
-    // Clear any polling
-    if (pollInterval) {
-      clearInterval(pollInterval);
-      setPollInterval(null);
-    }
-    if (webhookTimeout) {
-      clearTimeout(webhookTimeout);
-      setWebhookTimeout(null);
-    }
+    if (completedTests.length >= expectedTestCases.length && expectedTestCases.length > 0) {
+      console.log('🏁 All test cases completed!');
+      
+      setIsRunning(false);
+      setWaitingForWebhook(false);
+      setExecutionStatus('completed');
+      
+      // Clear any polling
+      if (pollInterval) {
+        clearInterval(pollInterval);
+        setPollInterval(null);
+      }
+      if (webhookTimeout) {
+        clearTimeout(webhookTimeout);
+        setWebhookTimeout(null);
+      }
 
-    // Notify parent
-    if (onTestComplete) {
-      onTestComplete(completedTests);
+      // Notify parent
+      if (onTestComplete) {
+        onTestComplete(completedTests);
+      }
+    } else {
+      console.log(`⏳ Execution not complete yet: ${completedTests.length}/${expectedTestCases.length} tests finished`);
     }
-  } else {
-    console.log(`⏳ Execution not complete yet: ${completedTests.length}/${expectedTestCases.length} tests finished`);
-  }
-};
+  };
 
   // Save configuration
   const saveConfiguration = () => {
@@ -438,7 +474,7 @@ const TestExecutionModal = ({
                 const updated = new Map(prev);
                 updated.set(tc.id, {
                   id: tc.id,
-                  name: tc.name, // Keep original test case name
+                  name: tc.name,
                   status: 'Running',
                   duration: 0,
                   logs: `Test ${tc.id} is running...`,
@@ -455,7 +491,7 @@ const TestExecutionModal = ({
                   const updated = new Map(prev);
                   updated.set(tc.id, {
                     id: tc.id,
-                    name: tc.name, // Keep original test case name
+                    name: tc.name,
                     status: finalStatus,
                     duration: Math.floor(Math.random() * 5000) + 1000,
                     logs: `Test ${tc.id} completed with status: ${finalStatus}`,
@@ -514,7 +550,7 @@ const TestExecutionModal = ({
                     const updated = new Map(prev);
                     updated.set(result.testCaseId, {
                       id: result.testCaseId,
-                      name: prev.get(result.testCaseId)?.name || result.testCase.name || `Test ${result.testCaseId}`, // Preserve existing name first
+                      name: prev.get(result.testCaseId)?.name || result.testCase.name || `Test ${result.testCaseId}`,
                       status: result.testCase.status,
                       duration: result.testCase.duration || 0,
                       logs: result.testCase.logs || '',
@@ -525,7 +561,7 @@ const TestExecutionModal = ({
                 }
               });
               
-              // FIXED: Force completion check after processing backend results
+              // Force completion check after processing backend results
               setTimeout(() => {
                 checkExecutionCompletion();
               }, 500);
@@ -563,7 +599,7 @@ const TestExecutionModal = ({
                 
                 console.log(`📥 Retrieved ${actionResults.length} test results from artifacts`);
                 
-                // FIXED: Process results with proper state update batching
+                // Process results with proper state update batching
                 const processedResults = new Map(testCaseResults);
                 
                 actionResults.forEach(result => {
@@ -583,15 +619,15 @@ const TestExecutionModal = ({
                   }
                 });
                 
-                // FIXED: Single state update with all results
+                // Single state update with all results
                 console.log('💾 Updating testCaseResults state with GitHub artifacts...');
                 setTestCaseResults(processedResults);
                 
-                // FIXED: Longer timeout to ensure state update completes
+                // Longer timeout to ensure state update completes
                 setTimeout(() => {
                   console.log('🔄 Checking completion after GitHub artifacts processing...');
                   checkExecutionCompletion();
-                }, 1000); // Increased from 500ms to 1000ms
+                }, 1000);
                 
               } catch (resultsError) {
                 console.error('❌ Error getting workflow results:', resultsError);
@@ -663,27 +699,26 @@ const TestExecutionModal = ({
   };
 
   // Helper function to get status icon
-  // Add "Not Found" case to getStatusIcon function
-const getStatusIcon = (status) => {
-  const iconProps = { size: 16, className: "inline" };
+  const getStatusIcon = (status) => {
+    const iconProps = { size: 16, className: "inline" };
 
-  switch (status) {
-    case 'Passed':
-      return <CheckCircle {...iconProps} className="text-green-500" />;
-    case 'Failed':
-      return <XCircle {...iconProps} className="text-red-500" />;
-    case 'Not Found':  // NEW
-      return <AlertCircle {...iconProps} className="text-orange-500" />;
-    case 'Running':
-      return <Loader2 {...iconProps} className="text-blue-500 animate-spin" />;
-    case 'Not Started':
-      return <Clock {...iconProps} className="text-gray-400" />;
-    case 'Cancelled':
-      return <XCircle {...iconProps} className="text-orange-500" />;
-    default:
-      return <Clock {...iconProps} className="text-gray-400" />;
-  }
-};
+    switch (status) {
+      case 'Passed':
+        return <CheckCircle {...iconProps} className="text-green-500" />;
+      case 'Failed':
+        return <XCircle {...iconProps} className="text-red-500" />;
+      case 'Not Found':
+        return <AlertCircle {...iconProps} className="text-orange-500" />;
+      case 'Running':
+        return <Loader2 {...iconProps} className="text-blue-500 animate-spin" />;
+      case 'Not Started':
+        return <Clock {...iconProps} className="text-gray-400" />;
+      case 'Cancelled':
+        return <XCircle {...iconProps} className="text-orange-500" />;
+      default:
+        return <Clock {...iconProps} className="text-gray-400" />;
+    }
+  };
 
   // Helper function for input changes
   const handleInputChange = (e) => {
@@ -1035,12 +1070,12 @@ const getStatusIcon = (status) => {
                         </td>
                         <td className="px-4 py-2 text-sm">
                           <span className={`text-xs px-1.5 py-0.5 rounded ${
-  (originalTestCase?.priority || 'Medium') === 'High' ? 'bg-red-50 text-red-600' :
-  (originalTestCase?.priority || 'Medium') === 'Medium' ? 'bg-yellow-50 text-yellow-600' :
-  'bg-gray-50 text-gray-600'
-}`}>
-  {originalTestCase?.priority || 'Medium'}
-</span>
+                            (originalTestCase?.priority || 'Medium') === 'High' ? 'bg-red-50 text-red-600' :
+                            (originalTestCase?.priority || 'Medium') === 'Medium' ? 'bg-yellow-50 text-yellow-600' :
+                            'bg-gray-50 text-gray-600'
+                          }`}>
+                            {originalTestCase?.priority || 'Medium'}
+                          </span>
                         </td>
                         <td className="px-4 py-2 text-sm text-gray-500">
                           {result.duration > 0 ? (
