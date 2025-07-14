@@ -730,7 +730,7 @@ const TestCases = () => {
               console.log('Test execution completed in TestCases page:', results);
               // The unified TestExecutionModal handles all DataStore updates
               // Just clean up UI state here
-              setShowExecutionModal(false);
+              // setShowExecutionModal(false);
               setSelectedTestCases(new Set());
             }}
           />

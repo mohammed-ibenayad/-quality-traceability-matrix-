@@ -82,6 +82,45 @@ const TestExecutionModal = ({
   // CRITICAL FIX: Track subscription state to prevent duplicates
   const subscriptionRef = useRef(null);
 
+  // FIXED: Add automatic completion detection useEffect
+  useEffect(() => {
+    // Only check completion if we're actually running tests and have expected test cases
+    if ((isRunning || waitingForWebhook) && expectedTestCases.length > 0) {
+      const results = Array.from(testCaseResults.values());
+      const completedStatuses = ['Passed', 'Failed', 'Cancelled', 'Skipped', 'Not Run', 'Not Found'];
+      const completedTests = results.filter(r => completedStatuses.includes(r.status));
+      
+      console.log(`📊 Auto-check execution progress: ${completedTests.length}/${expectedTestCases.length} tests completed`);
+      
+      if (completedTests.length >= expectedTestCases.length && expectedTestCases.length > 0) {
+        console.log('🏁 All test cases completed - auto-detected!');
+        
+        setIsRunning(false);
+        setWaitingForWebhook(false);
+        waitingForWebhookRef.current = false;
+        setExecutionStatus('completed');
+        setProcessingStatus('completed');
+        
+        // Clear any polling
+        if (pollInterval) {
+          clearInterval(pollInterval);
+          setPollInterval(null);
+        }
+        if (webhookTimeout) {
+          clearTimeout(webhookTimeout);
+          setWebhookTimeout(null);
+        }
+
+        // Notify parent
+        if (onTestComplete) {
+          onTestComplete(completedTests);
+        }
+
+        // REMOVED: Auto-closing - let user review results and close manually
+      }
+    }
+  }, [testCaseResults, isRunning, waitingForWebhook, expectedTestCases.length, onTestComplete, pollInterval, webhookTimeout]);
+
   // FIXED: Create stable handleTestCaseUpdate with useCallback and empty dependencies
   const handleTestCaseUpdate = useCallback((eventData) => {
     console.log('🧪 Individual test case update received:', eventData);
@@ -127,11 +166,8 @@ const TestExecutionModal = ({
         console.log(`📀 DataStore updated for ${testCaseId}`);
       }
 
-      // Check if execution is complete with debouncing
-      const completedStatuses = ['Passed', 'Failed', 'Cancelled', 'Skipped', 'Not Run', 'Not Found'];
-      if (completedStatuses.includes(testCase.status)) {
-        setTimeout(() => checkExecutionCompletion(), 100);
-      }
+      // REMOVED: No need for timeout-based completion check
+      // The useEffect hook above will automatically detect completion
 
     } else if (type === 'existing-results' && allResults) {
       console.log(`📦 Processing ${allResults.length} existing test case results`);
@@ -154,7 +190,8 @@ const TestExecutionModal = ({
         return updated;
       });
       
-      setTimeout(() => checkExecutionCompletion(), 100);
+      // REMOVED: No need for timeout-based completion check
+      // The useEffect hook above will automatically detect completion
     }
 
     // Refresh quality gates
@@ -290,9 +327,6 @@ const TestExecutionModal = ({
             });
             return updated;
           });
-          
-          // Check if execution is already complete
-          checkExecutionCompletion();
         } else {
           console.log('📋 No existing results found');
         }
@@ -381,49 +415,123 @@ const TestExecutionModal = ({
     }
   }, [isOpen]);
 
-  // Check if execution is complete
-  const checkExecutionCompletion = () => {
-    const results = Array.from(testCaseResults.values());
-    const completedStatuses = ['Passed', 'Failed', 'Cancelled', 'Skipped', 'Not Run', 'Not Found'];
-    const completedTests = results.filter(r => completedStatuses.includes(r.status));
-    
-    console.log(`📊 Execution progress: ${completedTests.length}/${expectedTestCases.length} tests completed`);
-    console.log('🔍 All test results:', results.map(r => `${r.id}: ${r.status}`));
-    console.log('🔍 Completed test statuses:', completedTests.map(t => `${t.id}: ${t.status}`));
-    console.log('🔍 Expected test cases:', expectedTestCases);
-    console.log('🔍 Completion criteria:', { completedCount: completedTests.length, expectedCount: expectedTestCases.length });
-    
-    if (completedTests.length >= expectedTestCases.length && expectedTestCases.length > 0) {
-      console.log('🏁 All test cases completed!');
-      
-      setIsRunning(false);
-      setWaitingForWebhook(false);
-      setExecutionStatus('completed');
-      
-      // Clear any polling
-      if (pollInterval) {
-        clearInterval(pollInterval);
-        setPollInterval(null);
-      }
-      if (webhookTimeout) {
-        clearTimeout(webhookTimeout);
-        setWebhookTimeout(null);
-      }
-
-      // Notify parent
-      if (onTestComplete) {
-        onTestComplete(completedTests);
-      }
-    } else {
-      console.log(`⏳ Execution not complete yet: ${completedTests.length}/${expectedTestCases.length} tests finished`);
-    }
-  };
+  // REMOVED: checkExecutionCompletion function - replaced by useEffect
 
   // Save configuration
   const saveConfiguration = () => {
     localStorage.setItem('testRunnerConfig', JSON.stringify(config));
     setShowSettings(false);
     console.log("⚙️ Configuration saved:", config);
+  };
+
+  // FIXED: Updated GitHub workflow completion check
+  const checkGitHubWorkflowCompletion = async (owner, repo, runId, workflowPayload) => {
+    console.log('🔄 Starting GitHub API polling for workflow', runId);
+    
+    const maxPolls = 90; // 3 minutes at 2-second intervals
+    let pollCount = 0;
+    
+    const interval = setInterval(async () => {
+      pollCount++;
+      console.log(`🔄 GitHub API Poll #${pollCount}/${maxPolls} for workflow ${runId}`);
+
+      try {
+        const status = await GitHubService.getWorkflowStatus(owner, repo, runId, config.ghToken);
+        
+        if (status.status === 'completed') {
+          console.log('✅ Workflow completed');
+          
+          clearInterval(interval);
+          setPollInterval(null);
+
+          try {
+            const actionResults = await GitHubService.getWorkflowResults(
+              owner, repo, runId, config.ghToken, workflowPayload
+            );
+            
+            console.log(`📥 Retrieved ${actionResults.length} test results from artifacts`);
+            
+            // Process results with proper state update batching
+            const processedResults = new Map(testCaseResults);
+            
+            actionResults.forEach(result => {
+              if (result.id) {
+                const existingResult = processedResults.get(result.id);
+                const updatedResult = {
+                  id: result.id,
+                  name: existingResult?.name || result.name || `Test ${result.id}`,
+                  status: result.status,
+                  duration: result.duration || 0,
+                  logs: result.logs || '',
+                  receivedAt: new Date().toISOString()
+                };
+                
+                processedResults.set(result.id, updatedResult);
+                console.log(`🔄 Processing GitHub result: ${result.id} → ${result.status}`);
+              }
+            });
+            
+            // Single state update with all results
+            console.log('💾 Updating testCaseResults state with GitHub artifacts...');
+            setTestCaseResults(processedResults);
+            
+            // ADDED: Update DataStore with GitHub artifact results
+            console.log('📀 Updating DataStore with GitHub artifact results...');
+            actionResults.forEach(result => {
+              if (result.id) {
+                const currentTestCases = dataStore.getTestCases();
+                const testCaseObj = currentTestCases.find(tc => tc.id === result.id);
+                if (testCaseObj) {
+                  dataStore.updateTestCase(result.id, {
+                    ...testCaseObj,
+                    status: result.status,
+                    lastRun: new Date().toISOString(),
+                    lastExecuted: result.status !== 'Not Started' ? new Date().toISOString() : testCaseObj.lastExecuted,
+                    executionTime: result.duration || 0
+                  });
+                  console.log(`📀 DataStore updated for ${result.id}: ${result.status}`);
+                }
+              }
+            });
+            
+            // REMOVED: No need for timeout-based completion check
+            // The useEffect hook above will automatically detect completion
+            
+          } catch (resultsError) {
+            console.error('❌ Error getting workflow results:', resultsError);
+            setError(`Tests completed but results could not be retrieved: ${resultsError.message}`);
+            setIsRunning(false);
+            setWaitingForWebhook(false);
+            waitingForWebhookRef.current = false;
+            setProcessingStatus('error');
+          }
+          
+        } else if (pollCount >= maxPolls) {
+          clearInterval(interval);
+          setPollInterval(null);
+          setError(`Workflow timeout after ${(maxPolls * 2) / 60} minutes`);
+          setIsRunning(false);
+          setWaitingForWebhook(false);
+          waitingForWebhookRef.current = false;
+          setProcessingStatus('error');
+        }
+
+      } catch (pollError) {
+        console.error(`❌ Poll #${pollCount} failed:`, pollError);
+        
+        if (pollCount >= maxPolls) {
+          clearInterval(interval);
+          setPollInterval(null);
+          setError(`Polling failed after ${pollCount} attempts`);
+          setIsRunning(false);
+          setWaitingForWebhook(false);
+          waitingForWebhookRef.current = false;
+          setProcessingStatus('error');
+        }
+      }
+    }, 2000);
+
+    setPollInterval(interval);
   };
 
   // Execute tests
@@ -436,6 +544,11 @@ const TestExecutionModal = ({
       waitingForWebhookRef.current = true;
       setError(null);
       setProcessingStatus('starting');
+
+      // FIXED: Set expected test cases immediately when starting execution
+      const testCaseIds = testCases.map(tc => tc.id);
+      setExpectedTestCases(testCaseIds);
+      console.log(`📊 Set expected test cases: ${testCaseIds.length}`, testCaseIds);
 
       const [owner, repo] = config.repoUrl.replace('https://github.com/', '').split('/');
 
@@ -500,8 +613,8 @@ const TestExecutionModal = ({
                   return updated;
                 });
 
-                // Check completion after each test
-                setTimeout(() => checkExecutionCompletion(), 100);
+                // REMOVED: No need for timeout-based completion check
+                // The useEffect hook above will automatically detect completion
 
               }, 2000);
 
@@ -558,13 +671,25 @@ const TestExecutionModal = ({
                     });
                     return updated;
                   });
+
+                  // ADDED: Update DataStore with backend polling results
+                  const currentTestCases = dataStore.getTestCases();
+                  const testCaseObj = currentTestCases.find(tc => tc.id === result.testCaseId);
+                  if (testCaseObj) {
+                    dataStore.updateTestCase(result.testCaseId, {
+                      ...testCaseObj,
+                      status: result.testCase.status,
+                      lastRun: new Date().toISOString(),
+                      lastExecuted: result.testCase.status !== 'Not Started' ? new Date().toISOString() : testCaseObj.lastExecuted,
+                      executionTime: result.testCase.duration || 0
+                    });
+                    console.log(`📀 DataStore updated via backend polling for ${result.testCaseId}: ${result.testCase.status}`);
+                  }
                 }
               });
               
-              // Force completion check after processing backend results
-              setTimeout(() => {
-                checkExecutionCompletion();
-              }, 500);
+              // REMOVED: No need for timeout-based completion check
+              // The useEffect hook above will automatically detect completion
               return;
             }
           } catch (pollError) {
@@ -573,97 +698,7 @@ const TestExecutionModal = ({
         }
 
         // GitHub API polling fallback
-        console.log('🔄 Starting GitHub API polling for workflow');
-        setProcessingStatus('polling');
-
-        let pollCount = 0;
-        const maxPolls = 90;
-
-        const interval = setInterval(async () => {
-          pollCount++;
-          console.log(`🔄 GitHub API Poll #${pollCount}/${maxPolls} for workflow ${run.id}`);
-
-          try {
-            const status = await GitHubService.getWorkflowStatus(owner, repo, run.id, config.ghToken);
-            
-            if (status.status === 'completed') {
-              console.log('✅ Workflow completed');
-              
-              clearInterval(interval);
-              setPollInterval(null);
-
-              try {
-                const actionResults = await GitHubService.getWorkflowResults(
-                  owner, repo, run.id, config.ghToken, payload
-                );
-                
-                console.log(`📥 Retrieved ${actionResults.length} test results from artifacts`);
-                
-                // Process results with proper state update batching
-                const processedResults = new Map(testCaseResults);
-                
-                actionResults.forEach(result => {
-                  if (result.id) {
-                    const existingResult = processedResults.get(result.id);
-                    const updatedResult = {
-                      id: result.id,
-                      name: existingResult?.name || result.name || `Test ${result.id}`,
-                      status: result.status,
-                      duration: result.duration || 0,
-                      logs: result.logs || '',
-                      receivedAt: new Date().toISOString()
-                    };
-                    
-                    processedResults.set(result.id, updatedResult);
-                    console.log(`🔄 Processing GitHub result: ${result.id} → ${result.status}`);
-                  }
-                });
-                
-                // Single state update with all results
-                console.log('💾 Updating testCaseResults state with GitHub artifacts...');
-                setTestCaseResults(processedResults);
-                
-                // Longer timeout to ensure state update completes
-                setTimeout(() => {
-                  console.log('🔄 Checking completion after GitHub artifacts processing...');
-                  checkExecutionCompletion();
-                }, 1000);
-                
-              } catch (resultsError) {
-                console.error('❌ Error getting workflow results:', resultsError);
-                setError(`Tests completed but results could not be retrieved: ${resultsError.message}`);
-                setIsRunning(false);
-                setWaitingForWebhook(false);
-                waitingForWebhookRef.current = false;
-                setProcessingStatus('error');
-              }
-              
-            } else if (pollCount >= maxPolls) {
-              clearInterval(interval);
-              setPollInterval(null);
-              setError(`Workflow timeout after ${(maxPolls * 2) / 60} minutes`);
-              setIsRunning(false);
-              setWaitingForWebhook(false);
-              waitingForWebhookRef.current = false;
-              setProcessingStatus('error');
-            }
-
-          } catch (pollError) {
-            console.error(`❌ Poll #${pollCount} failed:`, pollError);
-            
-            if (pollCount >= maxPolls) {
-              clearInterval(interval);
-              setPollInterval(null);
-              setError(`Polling failed after ${pollCount} attempts`);
-              setIsRunning(false);
-              setWaitingForWebhook(false);
-              waitingForWebhookRef.current = false;
-              setProcessingStatus('error');
-            }
-          }
-        }, 2000);
-
-        setPollInterval(interval);
+        await checkGitHubWorkflowCompletion(owner, repo, run.id, payload);
 
       }, webhookTimeoutDuration);
 
