@@ -1,4 +1,4 @@
-// src/components/TestExecution/TestExecutionModal.jsx - Complete fixed version with all features
+// src/components/TestExecution/TestExecutionModal.jsx - Enhanced with Failure Analysis
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Play,
@@ -17,12 +17,17 @@ import {
   Check,
   AlertTriangle,
   AlertCircle,
-  X
+  X,
+  Bug,
+  Eye
 } from 'lucide-react';
 import GitHubService from '../../services/GitHubService';
 import dataStore from '../../services/DataStore';
 import { refreshQualityGates } from '../../utils/calculateQualityGates';
 import webhookService from '../../services/WebhookService';
+import FailureAnalysisPanel from './FailureAnalysisPanel';
+// ADD this import after your existing imports:
+import errorParserService from '../../services/ErrorParserService';
 
 const getCallbackUrl = () => {
   if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
@@ -76,11 +81,68 @@ const TestExecutionModal = ({
   const [showSettings, setShowSettings] = useState(false);
   const [processingStatus, setProcessingStatus] = useState(null);
 
+  // Enhanced failure analysis state
+  const [selectedFailure, setSelectedFailure] = useState(null);
+  const [showFailurePanel, setShowFailurePanel] = useState(false);
+
   // Track previous props to detect changes
   const prevProps = useRef({ isOpen: false, testCases: [] });
   
   // CRITICAL FIX: Track subscription state to prevent duplicates
   const subscriptionRef = useRef(null);
+
+  // PHASE 1: Add parsing statistics tracking
+  const [parsingStats, setParsingStats] = useState({
+    attempted: 0,
+    successful: 0,
+    successRate: 0
+  });
+
+  // Enhanced failure type detection
+  const getFailureTypeIcon = (result) => {
+    if (!result.failure) return null;
+    
+    const { type } = result.failure;
+    if (type?.includes('Timeout')) return '⏱️';
+    if (type?.includes('Element')) return '🎯';
+    if (type?.includes('Assertion')) return '🔍';
+    if (type?.includes('Network') || type?.includes('API')) return '🌐';
+    return '❌';
+  };
+
+  // Enhanced failure insight generation
+  const getQuickInsight = (result) => {
+    if (!result.failure) return null;
+    
+    const { type } = result.failure;
+    
+    if (type === 'ElementNotInteractableException') {
+      return 'Element blocked by overlay';
+    }
+    if (type === 'TimeoutException') {
+      return 'Operation timed out';
+    }
+    if (type === 'AssertionError') {
+      return 'Value mismatch detected';
+    }
+    if (type === 'NoSuchElementException') {
+      return 'Element not found';
+    }
+    
+    return 'Execution failed';
+  };
+
+  // Open failure analysis panel
+  const openFailureAnalysis = (result) => {
+    setSelectedFailure(result);
+    setShowFailurePanel(true);
+  };
+
+  // Close failure analysis panel
+  const closeFailureAnalysis = () => {
+    setSelectedFailure(null);
+    setShowFailurePanel(false);
+  };
 
   // FIXED: Add automatic completion detection useEffect
   useEffect(() => {
@@ -121,7 +183,7 @@ const TestExecutionModal = ({
     }
   }, [testCaseResults, isRunning, waitingForWebhook, expectedTestCases.length, onTestComplete, pollInterval, webhookTimeout]);
 
-  // FIXED: Create stable handleTestCaseUpdate with useCallback and empty dependencies
+  // FIXED: Create stable handleTestCaseUpdate with enhanced failure data processing
   const handleTestCaseUpdate = useCallback((eventData) => {
     console.log('🧪 Individual test case update received:', eventData);
     
@@ -135,24 +197,82 @@ const TestExecutionModal = ({
     }
 
     if (type === 'test-case-update' && testCaseId && testCase) {
-      // Update specific test case
+      // PHASE 1: Add generic parsing for failed tests
+      let enhancedFailure = testCase.failure; // Keep existing failure if present
+      
+      if (testCase.status === 'Failed' && testCase.rawOutput) {
+        try {
+          console.log(`🔍 Attempting generic parsing for ${testCaseId}`);
+          const parsed = errorParserService.parseError(testCase.rawOutput, testCaseId);
+          
+          if (parsed && parsed.parsingConfidence !== 'low') {
+            enhancedFailure = {
+              ...testCase.failure, // Keep existing workflow data
+              ...parsed,           // Add generic parser results
+              source: 'generic-parser',
+              enhanced: true
+            };
+            console.log(`✅ Generic parsing successful for ${testCaseId}: ${parsed.parsingConfidence} confidence`);
+          } else {
+            console.log(`⚠️ Low confidence parsing for ${testCaseId}, keeping existing failure`);
+          }
+        } catch (parseError) {
+          console.warn(`❌ Generic parsing failed for ${testCaseId}:`, parseError.message);
+        }
+      }
+      
+      // If no existing failure and parsing failed, create simple one
+      if (!enhancedFailure && testCase.status === 'Failed') {
+        enhancedFailure = {
+          type: 'TestFailure',
+          phase: 'call',
+          file: '',
+          line: 0,
+          method: '',
+          class: '',
+          rawError: (testCase.rawOutput || testCase.logs || '').substring(0, 500),
+          source: 'fallback',
+          parsingConfidence: 'none'
+        };
+      }
+      
+      // Update specific test case with enhanced failure data
       setTestCaseResults(prev => {
         const updated = new Map(prev);
         const existingResult = prev.get(testCaseId);
-        updated.set(testCaseId, {
+        
+        const enhancedResult = {
           id: testCaseId,
           name: existingResult?.name || testCase.name || `Test ${testCaseId}`,
           status: testCase.status,
           duration: testCase.duration || 0,
           logs: testCase.logs || '',
-          receivedAt: new Date().toISOString()
-        });
+          rawOutput: testCase.rawOutput || '', // PHASE 1: Store raw output
+          receivedAt: new Date().toISOString(),
+          // Include enhanced failure data
+          failure: enhancedFailure,
+          execution: testCase.execution
+        };
         
+        updated.set(testCaseId, enhancedResult);
         console.log(`📝 Updated test case ${testCaseId}: ${testCase.status}`);
         return updated;
       });
 
-      // Update DataStore with current testCases from DataStore
+      // PHASE 1: Update parsing statistics
+      if (testCase.status === 'Failed') {
+        setParsingStats(prev => {
+          const attempted = prev.attempted + 1;
+          const successful = prev.successful + (enhancedFailure?.parsingConfidence !== 'low' && enhancedFailure?.parsingConfidence !== 'none' ? 1 : 0);
+          return {
+            attempted,
+            successful,
+            successRate: attempted > 0 ? (successful / attempted) * 100 : 0
+          };
+        });
+      }
+
+      // Update DataStore with enhanced failure data
       const currentTestCases = dataStore.getTestCases();
       const testCaseObj = currentTestCases.find(tc => tc.id === testCaseId);
       if (testCaseObj) {
@@ -161,16 +281,18 @@ const TestExecutionModal = ({
           status: testCase.status,
           lastRun: new Date().toISOString(),
           lastExecuted: testCase.status !== 'Not Started' ? new Date().toISOString() : testCaseObj.lastExecuted,
-          executionTime: testCase.duration || 0
+          executionTime: testCase.duration || 0,
+          // PHASE 1: Store enhanced failure data in DataStore
+          failure: enhancedFailure,
+          execution: testCase.execution,
+          logs: testCase.logs,
+          rawOutput: testCase.rawOutput // PHASE 1: Store raw output
         });
-        console.log(`📀 DataStore updated for ${testCaseId}`);
+        console.log(`📀 DataStore updated for ${testCaseId} with enhanced data`);
       }
 
-      // REMOVED: No need for timeout-based completion check
-      // The useEffect hook above will automatically detect completion
-
     } else if (type === 'existing-results' && allResults) {
-      console.log(`📦 Processing ${allResults.length} existing test case results`);
+      console.log(`📦 Processing ${allResults.length} existing test case results with enhanced data`);
       
       setTestCaseResults(prev => {
         const updated = new Map(prev);
@@ -183,15 +305,16 @@ const TestExecutionModal = ({
               status: result.status,
               duration: result.duration || 0,
               logs: result.logs || '',
-              receivedAt: result.receivedAt
+              rawOutput: result.rawOutput || '', // PHASE 1: Store raw output
+              receivedAt: result.receivedAt,
+              // Include enhanced failure data
+              failure: result.failure,
+              execution: result.execution
             });
           }
         });
         return updated;
       });
-      
-      // REMOVED: No need for timeout-based completion check
-      // The useEffect hook above will automatically detect completion
     }
 
     // Refresh quality gates
@@ -217,7 +340,7 @@ const TestExecutionModal = ({
       if (!isRunning && !waitingForWebhook) {
         console.log('📋 Resetting modal state - no active execution');
         
-        // Initialize test case results map
+        // Initialize test case results map with enhanced structure
         const initialResults = new Map();
         testCases.forEach(testCase => {
           initialResults.set(testCase.id, {
@@ -226,9 +349,13 @@ const TestExecutionModal = ({
             status: 'Not Started',
             duration: 0,
             logs: '',
+            rawOutput: '', // PHASE 1: Initialize raw output
             startTime: null,
             endTime: null,
-            receivedAt: null
+            receivedAt: null,
+            // Initialize enhanced failure data structure
+            failure: null,
+            execution: null
           });
         });
         
@@ -239,6 +366,8 @@ const TestExecutionModal = ({
         setError(null);
         setProcessingStatus(null);
         setExecutionStatus(null);
+        // Reset parsing stats on new execution
+        setParsingStats({ attempted: 0, successful: 0, successRate: 0 });
         
         // Only reset currentRequestId if not waiting for webhook
         if (!waitingForWebhook) {
@@ -307,9 +436,9 @@ const TestExecutionModal = ({
         const results = webhookService.getAllTestCaseResults(currentRequestId);
         
         if (results.length > 0) {
-          console.log('📦 Found existing results:', results);
+          console.log('📦 Found existing results with enhanced data:', results);
           
-          // Update state with existing results
+          // Update state with existing results including enhanced failure data
           setTestCaseResults(prev => {
             const updated = new Map(prev);
             results.forEach(result => {
@@ -321,7 +450,11 @@ const TestExecutionModal = ({
                   status: result.status,
                   duration: result.duration || 0,
                   logs: result.logs || '',
-                  receivedAt: result.receivedAt
+                  rawOutput: result.rawOutput || '', // PHASE 1: Store raw output
+                  receivedAt: result.receivedAt,
+                  // Include enhanced failure data
+                  failure: result.failure,
+                  execution: result.execution
                 });
               }
             });
@@ -372,7 +505,7 @@ const TestExecutionModal = ({
     };
   }, [isOpen, currentRequestId, hasBackendSupport]); // MINIMAL DEPENDENCIES
 
-  // FIXED: Separate useEffect for fallback mode
+  // FIXED: Separate useEffect for fallback mode with enhanced failure data processing
   useEffect(() => {
     if (!isOpen || hasBackendSupport) {
       return;
@@ -383,7 +516,7 @@ const TestExecutionModal = ({
     window.onTestWebhookReceived = (webhookData) => {
       console.log('🔔 Fallback webhook received:', webhookData);
       
-      // Convert bulk webhook to individual test case updates
+      // Convert bulk webhook to individual test case updates with enhanced failure data
       if (webhookData?.results && Array.isArray(webhookData.results)) {
         webhookData.results.forEach(testCase => {
           if (testCase.id) {
@@ -415,8 +548,6 @@ const TestExecutionModal = ({
     }
   }, [isOpen]);
 
-  // REMOVED: checkExecutionCompletion function - replaced by useEffect
-
   // Save configuration
   const saveConfiguration = () => {
     localStorage.setItem('testRunnerConfig', JSON.stringify(config));
@@ -424,7 +555,7 @@ const TestExecutionModal = ({
     console.log("⚙️ Configuration saved:", config);
   };
 
-  // FIXED: Updated GitHub workflow completion check
+  // FIXED: Updated GitHub workflow completion check with enhanced failure data processing
   const checkGitHubWorkflowCompletion = async (owner, repo, runId, workflowPayload) => {
     console.log('🔄 Starting GitHub API polling for workflow', runId);
     
@@ -451,7 +582,7 @@ const TestExecutionModal = ({
             
             console.log(`📥 Retrieved ${actionResults.length} test results from artifacts`);
             
-            // Process results with proper state update batching
+            // Process results with enhanced failure data
             const processedResults = new Map(testCaseResults);
             
             actionResults.forEach(result => {
@@ -463,7 +594,11 @@ const TestExecutionModal = ({
                   status: result.status,
                   duration: result.duration || 0,
                   logs: result.logs || '',
-                  receivedAt: new Date().toISOString()
+                  rawOutput: result.rawOutput || '', // PHASE 1: Store raw output
+                  receivedAt: new Date().toISOString(),
+                  // Include enhanced failure data from GitHub artifacts
+                  failure: result.failure,
+                  execution: result.execution
                 };
                 
                 processedResults.set(result.id, updatedResult);
@@ -475,7 +610,7 @@ const TestExecutionModal = ({
             console.log('💾 Updating testCaseResults state with GitHub artifacts...');
             setTestCaseResults(processedResults);
             
-            // ADDED: Update DataStore with GitHub artifact results
+            // ADDED: Update DataStore with GitHub artifact results including enhanced failure data
             console.log('📀 Updating DataStore with GitHub artifact results...');
             actionResults.forEach(result => {
               if (result.id) {
@@ -487,15 +622,17 @@ const TestExecutionModal = ({
                     status: result.status,
                     lastRun: new Date().toISOString(),
                     lastExecuted: result.status !== 'Not Started' ? new Date().toISOString() : testCaseObj.lastExecuted,
-                    executionTime: result.duration || 0
+                    executionTime: result.duration || 0,
+                    // Store enhanced failure data
+                    failure: result.failure,
+                    execution: result.execution,
+                    logs: result.logs,
+                    rawOutput: result.rawOutput // PHASE 1: Store raw output
                   });
                   console.log(`📀 DataStore updated for ${result.id}: ${result.status}`);
                 }
               }
             });
-            
-            // REMOVED: No need for timeout-based completion check
-            // The useEffect hook above will automatically detect completion
             
           } catch (resultsError) {
             console.error('❌ Error getting workflow results:', resultsError);
@@ -534,7 +671,7 @@ const TestExecutionModal = ({
     setPollInterval(interval);
   };
 
-  // Execute tests
+  // Execute tests with enhanced failure data simulation
   const executeTests = async () => {
     console.log("🐙 Starting GitHub execution");
     
@@ -572,11 +709,11 @@ const TestExecutionModal = ({
                                 (!hasBackendSupport && config.callbackUrl.includes('webhook.site'));
 
       if (useSimulatedResults) {
-        console.log('🎭 Using simulated results');
+        console.log('🎭 Using simulated results with enhanced failure data');
         setWaitingForWebhook(true);
         waitingForWebhookRef.current = true;
 
-        // Simulate individual test case updates
+        // Simulate individual test case updates with enhanced failure data
         const timeout = setTimeout(() => {
           console.log('⏰ Starting simulated execution');
           
@@ -591,30 +728,73 @@ const TestExecutionModal = ({
                   status: 'Running',
                   duration: 0,
                   logs: `Test ${tc.id} is running...`,
-                  receivedAt: new Date().toISOString()
+                  rawOutput: '', // PHASE 1: Store raw output
+                  receivedAt: new Date().toISOString(),
+                  failure: null,
+                  execution: null
                 });
                 return updated;
               });
 
-              // After 2 seconds, send final result
+              // After 2 seconds, send final result with enhanced failure data
               setTimeout(() => {
-                const finalStatus = Math.random() > 0.2 ? 'Passed' : 'Failed';
+                const isFailure = Math.random() > 0.7; // 30% failure rate
+                const finalStatus = isFailure ? 'Failed' : 'Passed';
+                
+                let enhancedResult = {
+                  id: tc.id,
+                  name: tc.name,
+                  status: finalStatus,
+                  duration: Math.floor(Math.random() * 5000) + 1000,
+                  logs: isFailure ? 
+                    `FAILED: ${tc.name}\nTest execution encountered an error` :
+                    `PASSED: ${tc.name}\nTest executed successfully`,
+                  rawOutput: isFailure ? generateSimulatedError(failureType) : `PASSED: ${tc.name}\nTest executed successfully`, // PHASE 1: Store raw output
+                  receivedAt: new Date().toISOString(),
+                  failure: null,
+                  execution: null
+                };
+
+                // Add enhanced failure data for failed tests
+                if (isFailure) {
+                  const failureTypes = [
+                    'ElementNotInteractableException',
+                    'TimeoutException', 
+                    'AssertionError',
+                    'NoSuchElementException'
+                  ];
+                  
+                  const failureType = failureTypes[Math.floor(Math.random() * failureTypes.length)];
+                  
+                  enhancedResult.failure = {
+                    type: failureType,
+                    phase: 'call',
+                    file: `tests/test_${tc.id.toLowerCase()}.py`,
+                    line: Math.floor(Math.random() * 100) + 20,
+                    method: `test_${tc.id.toLowerCase()}_functionality`,
+                    class: `Test${tc.id}`,
+                    rawError: generateSimulatedError(failureType),
+                    assertion: {
+                      available: false,
+                      expression: '',
+                      expected: '',
+                      actual: '',
+                      operator: ''
+                    }
+                  };
+                  
+                  enhancedResult.execution = {
+                    exitCode: 1,
+                    framework: 'pytest',
+                    pytestDuration: enhancedResult.duration
+                  };
+                }
                 
                 setTestCaseResults(prev => {
                   const updated = new Map(prev);
-                  updated.set(tc.id, {
-                    id: tc.id,
-                    name: tc.name,
-                    status: finalStatus,
-                    duration: Math.floor(Math.random() * 5000) + 1000,
-                    logs: `Test ${tc.id} completed with status: ${finalStatus}`,
-                    receivedAt: new Date().toISOString()
-                  });
+                  updated.set(tc.id, enhancedResult);
                   return updated;
                 });
-
-                // REMOVED: No need for timeout-based completion check
-                // The useEffect hook above will automatically detect completion
 
               }, 2000);
 
@@ -656,7 +836,7 @@ const TestExecutionModal = ({
             if (polledResults && polledResults.results) {
               console.log(`✅ Found ${polledResults.results.length} test case results via backend polling`);
               
-              // Process each test case result
+              // Process each test case result with enhanced failure data
               polledResults.results.forEach(result => {
                 if (result.testCase) {
                   setTestCaseResults(prev => {
@@ -667,12 +847,16 @@ const TestExecutionModal = ({
                       status: result.testCase.status,
                       duration: result.testCase.duration || 0,
                       logs: result.testCase.logs || '',
-                      receivedAt: result.receivedAt
+                      rawOutput: result.testCase.rawOutput || '', // PHASE 1: Store raw output
+                      receivedAt: result.receivedAt,
+                      // Include enhanced failure data
+                      failure: result.testCase.failure,
+                      execution: result.testCase.execution
                     });
                     return updated;
                   });
 
-                  // ADDED: Update DataStore with backend polling results
+                  // ADDED: Update DataStore with backend polling results including enhanced data
                   const currentTestCases = dataStore.getTestCases();
                   const testCaseObj = currentTestCases.find(tc => tc.id === result.testCaseId);
                   if (testCaseObj) {
@@ -681,15 +865,17 @@ const TestExecutionModal = ({
                       status: result.testCase.status,
                       lastRun: new Date().toISOString(),
                       lastExecuted: result.testCase.status !== 'Not Started' ? new Date().toISOString() : testCaseObj.lastExecuted,
-                      executionTime: result.testCase.duration || 0
+                      executionTime: result.testCase.duration || 0,
+                      failure: result.testCase.failure,
+                      execution: result.testCase.execution,
+                      logs: result.testCase.logs,
+                      rawOutput: result.testCase.rawOutput // PHASE 1: Store raw output
                     });
                     console.log(`📀 DataStore updated via backend polling for ${result.testCaseId}: ${result.testCase.status}`);
                   }
                 }
               });
               
-              // REMOVED: No need for timeout-based completion check
-              // The useEffect hook above will automatically detect completion
               return;
             }
           } catch (pollError) {
@@ -711,6 +897,22 @@ const TestExecutionModal = ({
       setWaitingForWebhook(false);
       waitingForWebhookRef.current = false;
       setProcessingStatus('error');
+    }
+  };
+
+  // Helper function to generate simulated errors
+  const generateSimulatedError = (failureType) => {
+    switch (failureType) {
+      case 'ElementNotInteractableException':
+        return 'Element <button id="submit-btn"> is not clickable at point (150, 200). Other element would receive the click: <div class="overlay">';
+      case 'TimeoutException':
+        return 'Timed out waiting for element to be clickable after 10 seconds. Element locator: #submit-button';
+      case 'AssertionError':
+        return 'Expected "Welcome, John!" but got "Welcome, Guest!" - user login may have failed';
+      case 'NoSuchElementException':
+        return 'Unable to locate element with locator: #user-profile-menu. Element may not exist or locator needs updating';
+      default:
+        return 'Test execution failed with unknown error. Check test implementation and environment.';
     }
   };
 
@@ -782,7 +984,7 @@ const TestExecutionModal = ({
             <div className="flex justify-between items-center mb-4">
               <div>
                 <h3 className="text-lg font-medium text-gray-900">
-                  Run Tests
+                  Run Tests - Enhanced Analysis
                 </h3>
                 <p className="text-sm text-gray-600 mt-1">
                   {testCases.length} test case{testCases.length !== 1 ? 's' : ''} selected
@@ -816,7 +1018,7 @@ const TestExecutionModal = ({
                   </span>
                 </div>
                 <div className="text-xs text-gray-500">
-                  {hasBackendSupport ? 'Webhook support enabled' : 'Fallback mode'}
+                  {hasBackendSupport ? 'Enhanced failure analysis enabled' : 'Fallback mode'}
                 </div>
               </div>
             </div>
@@ -1049,11 +1251,29 @@ const TestExecutionModal = ({
                       <span>Failed: {testResultsArray.filter(r => r.status === 'Failed').length}</span>
                     </div>
                   </div>
+                  {/* PHASE 1: Add parsing statistics to execution summary */}
+                  {parsingStats.attempted > 0 && (
+                    <div className="mt-2 text-xs text-gray-600 border-t pt-2">
+                      <div className="flex items-center justify-between">
+                        <span>Parsing Success Rate:</span>
+                        <span className={`font-medium ${
+                          parsingStats.successRate >= 80 ? 'text-green-600' :
+                          parsingStats.successRate >= 60 ? 'text-yellow-600' :
+                          'text-red-600'
+                        }`}>
+                          {parsingStats.successRate.toFixed(1)}%
+                        </span>
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        {parsingStats.successful}/{parsingStats.attempted} failed tests parsed successfully
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
 
-            {/* Test Results Table */}
+            {/* Enhanced Test Results Table */}
             <div className="border border-gray-200 rounded overflow-hidden">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
@@ -1073,12 +1293,14 @@ const TestExecutionModal = ({
                     <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Duration
                     </th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Actions
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {testResultsArray.map((result) => {
                     const isRunning = result.status === 'Running';
-                    // Find the original test case for lastExecuted info
                     const originalTestCase = testCases.find(tc => tc.id === result.id);
                     
                     return (
@@ -1086,15 +1308,30 @@ const TestExecutionModal = ({
                         key={result.id} 
                         className={`
                           ${isRunning ? 'bg-yellow-50' : ''}
+                          ${result.status === 'Failed' ? 'bg-red-50' : ''}
                           transition-colors duration-200
                         `}
                       >
-                        <td className="px-4 py-2 text-sm font-mono text-gray-900 font-medium">{result.id}</td>
+                        <td className="px-4 py-2 text-sm font-mono text-gray-900 font-medium">
+                          <div className="flex items-center space-x-2">
+                            <span>{result.id}</span>
+                            {result.status === 'Failed' && result.failure && (
+                              <span className="text-lg" title={result.failure.type}>
+                                {getFailureTypeIcon(result)}
+                              </span>
+                            )}
+                          </div>
+                        </td>
                         <td className="px-4 py-2 text-sm">
                           <div className="flex items-center">
                             {getStatusIcon(result.status)}
                             <span className="ml-2">{result.status}</span>
                           </div>
+                          {result.status === 'Failed' && result.failure && (
+                            <div className="text-xs text-red-600 mt-1">
+                              {getQuickInsight(result)}
+                            </div>
+                          )}
                         </td>
                         <td className="px-4 py-2 text-sm text-gray-500">
                           {result.receivedAt ? 
@@ -1118,6 +1355,26 @@ const TestExecutionModal = ({
                               `${Math.round(result.duration / 1000)}s` : 
                               `${result.duration}ms`
                           ) : result.status === 'Running' ? '⏱️' : '-'}
+                        </td>
+                        <td className="px-4 py-2 text-sm">
+                          {result.status === 'Failed' && (
+                            <button
+                              onClick={() => openFailureAnalysis(result)}
+                              className="flex items-center space-x-1 px-2 py-1 bg-red-100 text-red-700 rounded text-xs hover:bg-red-200"
+                            >
+                              <Bug size={12} />
+                              <span>Analyze</span>
+                            </button>
+                          )}
+                          {result.status === 'Passed' && (
+                            <button
+                              onClick={() => openFailureAnalysis(result)}
+                              className="flex items-center space-x-1 px-2 py-1 bg-green-100 text-green-700 rounded text-xs hover:bg-green-200"
+                            >
+                              <Eye size={12} />
+                              <span>View</span>
+                            </button>
+                          )}
                         </td>
                       </tr>
                     );
@@ -1157,6 +1414,13 @@ const TestExecutionModal = ({
           </div>
         </div>
       </div>
+
+      {/* Enhanced Failure Analysis Panel */}
+      <FailureAnalysisPanel
+        testResult={selectedFailure}
+        isOpen={showFailurePanel}
+        onClose={closeFailureAnalysis}
+      />
     </div>
   );
 };
