@@ -556,120 +556,177 @@ const TestExecutionModal = ({
   };
 
   // FIXED: Updated GitHub workflow completion check with enhanced failure data processing
-  const checkGitHubWorkflowCompletion = async (owner, repo, runId, workflowPayload) => {
-    console.log('🔄 Starting GitHub API polling for workflow', runId);
-    
-    const maxPolls = 90; // 3 minutes at 2-second intervals
-    let pollCount = 0;
-    
-    const interval = setInterval(async () => {
-      pollCount++;
-      console.log(`🔄 GitHub API Poll #${pollCount}/${maxPolls} for workflow ${runId}`);
+const checkGitHubWorkflowCompletion = async (owner, repo, runId, workflowPayload) => {
+  console.log('🔄 Starting GitHub API polling for workflow', runId);
+  
+  const maxPolls = 90; // 3 minutes at 2-second intervals
+  let pollCount = 0;
+  
+  const interval = setInterval(async () => {
+    pollCount++;
+    console.log(`🔄 GitHub API Poll #${pollCount}/${maxPolls} for workflow ${runId}`);
 
-      try {
-        const status = await GitHubService.getWorkflowStatus(owner, repo, runId, config.ghToken);
+    try {
+      const status = await GitHubService.getWorkflowStatus(owner, repo, runId, config.ghToken);
+      
+      if (status.status === 'completed') {
+        console.log('✅ Workflow completed');
         
-        if (status.status === 'completed') {
-          console.log('✅ Workflow completed');
-          
-          clearInterval(interval);
-          setPollInterval(null);
+        clearInterval(interval);
+        setPollInterval(null);
 
-          try {
-            const actionResults = await GitHubService.getWorkflowResults(
-              owner, repo, runId, config.ghToken, workflowPayload
-            );
-            
-            console.log(`📥 Retrieved ${actionResults.length} test results from artifacts`);
-            
-            // Process results with enhanced failure data
-            const processedResults = new Map(testCaseResults);
-            
-            actionResults.forEach(result => {
-              if (result.id) {
-                const existingResult = processedResults.get(result.id);
-                const updatedResult = {
-                  id: result.id,
-                  name: existingResult?.name || result.name || `Test ${result.id}`,
-                  status: result.status,
-                  duration: result.duration || 0,
-                  logs: result.logs || '',
-                  rawOutput: result.rawOutput || '', // PHASE 1: Store raw output
-                  receivedAt: new Date().toISOString(),
-                  // Include enhanced failure data from GitHub artifacts
-                  failure: result.failure,
-                  execution: result.execution
-                };
-                
-                processedResults.set(result.id, updatedResult);
-                console.log(`🔄 Processing GitHub result: ${result.id} → ${result.status}`);
-              }
-            });
-            
-            // Single state update with all results
-            console.log('💾 Updating testCaseResults state with GitHub artifacts...');
-            setTestCaseResults(processedResults);
-            
-            // ADDED: Update DataStore with GitHub artifact results including enhanced failure data
-            console.log('📀 Updating DataStore with GitHub artifact results...');
-            actionResults.forEach(result => {
-              if (result.id) {
-                const currentTestCases = dataStore.getTestCases();
-                const testCaseObj = currentTestCases.find(tc => tc.id === result.id);
-                if (testCaseObj) {
-                  dataStore.updateTestCase(result.id, {
-                    ...testCaseObj,
-                    status: result.status,
-                    lastRun: new Date().toISOString(),
-                    lastExecuted: result.status !== 'Not Started' ? new Date().toISOString() : testCaseObj.lastExecuted,
-                    executionTime: result.duration || 0,
-                    // Store enhanced failure data
-                    failure: result.failure,
-                    execution: result.execution,
-                    logs: result.logs,
-                    rawOutput: result.rawOutput // PHASE 1: Store raw output
-                  });
-                  console.log(`📀 DataStore updated for ${result.id}: ${result.status}`);
+        try {
+          const actionResults = await GitHubService.getWorkflowResults(
+            owner, repo, runId, config.ghToken, workflowPayload
+          );
+          
+          console.log(`📥 Retrieved ${actionResults.length} test results from artifacts`);
+          
+          // Process results with enhanced failure data
+          const processedResults = new Map(testCaseResults);
+          
+          actionResults.forEach(result => {
+            if (result.id) {
+              const existingResult = processedResults.get(result.id);
+              
+              // PHASE 1: Add generic parsing for failed tests from artifacts
+              let enhancedFailure = result.failure; // Keep existing failure if present
+              
+              if (result.status === 'Failed' && result.rawOutput) {
+                try {
+                  console.log(`🔍 Attempting generic parsing for ${result.id} from artifacts`);
+                  const parsed = errorParserService.parseError(result.rawOutput, result.id);
+                  
+                  if (parsed && parsed.parsingConfidence !== 'low') {
+                    enhancedFailure = {
+                      ...result.failure, // Keep existing workflow data
+                      ...parsed,         // Add generic parser results
+                      source: 'generic-parser',
+                      enhanced: true
+                    };
+                    console.log(`✅ Generic parsing successful for ${result.id}: ${parsed.parsingConfidence} confidence`);
+                  } else {
+                    console.log(`⚠️ Low confidence parsing for ${result.id}, keeping existing failure`);
+                  }
+                } catch (parseError) {
+                  console.warn(`❌ Generic parsing failed for ${result.id}:`, parseError.message);
                 }
               }
-            });
-            
-          } catch (resultsError) {
-            console.error('❌ Error getting workflow results:', resultsError);
-            setError(`Tests completed but results could not be retrieved: ${resultsError.message}`);
-            setIsRunning(false);
-            setWaitingForWebhook(false);
-            waitingForWebhookRef.current = false;
-            setProcessingStatus('error');
-          }
+              
+              // If no existing failure and parsing failed, create simple one
+              if (!enhancedFailure && result.status === 'Failed') {
+                enhancedFailure = {
+                  type: 'TestFailure',
+                  phase: 'call',
+                  file: '',
+                  line: 0,
+                  method: '',
+                  class: '',
+                  rawError: (result.rawOutput || result.logs || '').substring(0, 500),
+                  source: 'fallback',
+                  parsingConfidence: 'none'
+                };
+              }
+              
+              const updatedResult = {
+                id: result.id,
+                name: existingResult?.name || result.name || `Test ${result.id}`,
+                status: result.status,
+                duration: result.duration || 0,
+                logs: result.logs || '',
+                rawOutput: result.rawOutput || '', // PHASE 1: Store raw output
+                receivedAt: new Date().toISOString(),
+                // Include enhanced failure data from GitHub artifacts
+                failure: enhancedFailure,
+                execution: result.execution
+              };
+              
+              processedResults.set(result.id, updatedResult);
+              console.log(`🔄 Processing GitHub result: ${result.id} → ${result.status}`);
+            }
+          });
           
-        } else if (pollCount >= maxPolls) {
-          clearInterval(interval);
-          setPollInterval(null);
-          setError(`Workflow timeout after ${(maxPolls * 2) / 60} minutes`);
+          // PHASE 1: Update parsing statistics for artifact results
+          actionResults.forEach(result => {
+            if (result.status === 'Failed') {
+              setParsingStats(prev => {
+                const attempted = prev.attempted + 1;
+                const enhancedFailure = processedResults.get(result.id)?.failure;
+                const successful = prev.successful + (enhancedFailure?.parsingConfidence !== 'low' && enhancedFailure?.parsingConfidence !== 'none' ? 1 : 0);
+                return {
+                  attempted,
+                  successful,
+                  successRate: attempted > 0 ? (successful / attempted) * 100 : 0
+                };
+              });
+            }
+          });
+          
+          // Single state update with all results
+          console.log('💾 Updating testCaseResults state with GitHub artifacts...');
+          setTestCaseResults(processedResults);
+          
+          // ADDED: Update DataStore with GitHub artifact results including enhanced failure data
+          console.log('📀 Updating DataStore with GitHub artifact results...');
+          actionResults.forEach(result => {
+            if (result.id) {
+              const processedResult = processedResults.get(result.id);
+              const currentTestCases = dataStore.getTestCases();
+              const testCaseObj = currentTestCases.find(tc => tc.id === result.id);
+              if (testCaseObj) {
+                dataStore.updateTestCase(result.id, {
+                  ...testCaseObj,
+                  status: result.status,
+                  lastRun: new Date().toISOString(),
+                  lastExecuted: result.status !== 'Not Started' ? new Date().toISOString() : testCaseObj.lastExecuted,
+                  executionTime: result.duration || 0,
+                  // Store enhanced failure data
+                  failure: processedResult?.failure,
+                  execution: result.execution,
+                  logs: result.logs,
+                  rawOutput: result.rawOutput // PHASE 1: Store raw output
+                });
+                console.log(`📀 DataStore updated for ${result.id}: ${result.status}`);
+              }
+            }
+          });
+          
+        } catch (resultsError) {
+          console.error('❌ Error getting workflow results:', resultsError);
+          setError(`Tests completed but results could not be retrieved: ${resultsError.message}`);
           setIsRunning(false);
           setWaitingForWebhook(false);
           waitingForWebhookRef.current = false;
           setProcessingStatus('error');
         }
-
-      } catch (pollError) {
-        console.error(`❌ Poll #${pollCount} failed:`, pollError);
         
-        if (pollCount >= maxPolls) {
-          clearInterval(interval);
-          setPollInterval(null);
-          setError(`Polling failed after ${pollCount} attempts`);
-          setIsRunning(false);
-          setWaitingForWebhook(false);
-          waitingForWebhookRef.current = false;
-          setProcessingStatus('error');
-        }
+      } else if (pollCount >= maxPolls) {
+        clearInterval(interval);
+        setPollInterval(null);
+        setError(`Workflow timeout after ${(maxPolls * 2) / 60} minutes`);
+        setIsRunning(false);
+        setWaitingForWebhook(false);
+        waitingForWebhookRef.current = false;
+        setProcessingStatus('error');
       }
-    }, 2000);
 
-    setPollInterval(interval);
-  };
+    } catch (pollError) {
+      console.error(`❌ Poll #${pollCount} failed:`, pollError);
+      
+      if (pollCount >= maxPolls) {
+        clearInterval(interval);
+        setPollInterval(null);
+        setError(`Polling failed after ${pollCount} attempts`);
+        setIsRunning(false);
+        setWaitingForWebhook(false);
+        waitingForWebhookRef.current = false;
+        setProcessingStatus('error');
+      }
+    }
+  }, 2000);
+
+  setPollInterval(interval);
+}; 
 
   // Execute tests with enhanced failure data simulation
   const executeTests = async () => {
