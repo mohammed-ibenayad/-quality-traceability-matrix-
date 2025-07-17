@@ -25,7 +25,7 @@ import GitHubService from '../../services/GitHubService';
 import dataStore from '../../services/DataStore';
 import { refreshQualityGates } from '../../utils/calculateQualityGates';
 import webhookService from '../../services/WebhookService';
-import FailureAnalysisPanel from './FailureAnalysisPanel';
+import FailureAnalysisModal from './FailureAnalysisModal';
 // ADD this import after your existing imports:
 import errorParserService from '../../services/ErrorParserService';
 
@@ -1655,7 +1655,7 @@ const checkGitHubWorkflowCompletion = async (owner, repo, runId, workflowPayload
       </div>
 
       {/* Enhanced Failure Analysis Panel */}
-      <FailureAnalysisPanel
+      <FailureAnalysisModal
         testResult={selectedFailure}
         isOpen={showFailurePanel}
         onClose={closeFailureAnalysis}
