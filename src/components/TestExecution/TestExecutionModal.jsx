@@ -98,40 +98,103 @@ const TestExecutionModal = ({
     successRate: 0
   });
 
-  // Enhanced failure type detection
-  const getFailureTypeIcon = (result) => {
-    if (!result.failure) return null;
-    
-    const { type } = result.failure;
-    if (type?.includes('Timeout')) return '⏱️';
-    if (type?.includes('Element')) return '🎯';
-    if (type?.includes('Assertion')) return '🔍';
-    if (type?.includes('Network') || type?.includes('API')) return '🌐';
-    return '❌';
-  };
+  
+// ENHANCED: Failure helper functions - Replace around lines 107-145
+// Enhanced failure type detection with JUnit XML awareness
+const getFailureTypeIcon = (result) => {
+  if (!result.failure) return null;
+  
+  // ✅ Use enhanced category from JUnit XML or parsing
+  const category = result.failure.category || result.failure.type;
+  
+  // Priority categorization
+  if (category === 'assertion' || result.failure.assertion?.available || 
+      result.failure.type?.includes('Assertion') || result.failure.type === 'AssertionError') {
+    return '🔍'; // Assertion
+  }
+  if (category === 'timeout' || result.failure.type?.includes('Timeout')) {
+    return '⏱️'; // Timeout
+  }
+  if (category === 'element' || result.failure.type?.includes('Element')) {
+    return '🎯'; // Element
+  }
+  if (category === 'network' || result.failure.type?.includes('Network') || 
+      result.failure.type?.includes('API') || result.failure.type?.includes('Connection')) {
+    return '🌐'; // Network
+  }
+  return '❌'; // General failure
+};
 
-  // Enhanced failure insight generation
-  const getQuickInsight = (result) => {
-    if (!result.failure) return null;
-    
-    const { type } = result.failure;
-    
-    if (type === 'ElementNotInteractableException') {
-      return 'Element blocked by overlay';
+  // Enhanced failure insight generation with JUnit XML data
+const getQuickInsight = (result) => {
+  if (!result.failure) return null;
+  
+  // ✅ Priority 1: Use parsed assertion details from JUnit XML
+  if (result.failure.assertion?.available) {
+    const { actual, expected, operator } = result.failure.assertion;
+    if (actual && expected) {
+      return `Expected ${expected}, got ${actual}`;
+    } else if (result.failure.assertion.expression) {
+      return `Assertion failed: ${result.failure.assertion.expression}`;
     }
-    if (type === 'TimeoutException') {
-      return 'Operation timed out';
+  }
+  
+  // ✅ Priority 2: Use JUnit XML message directly
+  if (result.failure.message && result.failure.parsingSource === 'junit-xml') {
+    return result.failure.message;
+  }
+  
+  // ✅ Priority 3: Use categorized insights
+  const category = result.failure.category || result.failure.type;
+  
+  if (category === 'assertion' || result.failure.type === 'AssertionError') {
+    return 'Assertion failed - value mismatch detected';
+  }
+  if (category === 'timeout' || result.failure.type?.includes('Timeout')) {
+    return 'Operation timed out';
+  }
+  if (category === 'element') {
+    if (result.failure.type === 'ElementNotInteractableException') {
+      return 'Element blocked by overlay or not clickable';
     }
-    if (type === 'AssertionError') {
-      return 'Value mismatch detected';
+    if (result.failure.type === 'NoSuchElementException') {
+      return 'Element not found on page';
     }
-    if (type === 'NoSuchElementException') {
-      return 'Element not found';
-    }
-    
-    return 'Execution failed';
-  };
+    return 'Element interaction failed';
+  }
+  if (category === 'network' || result.failure.type?.includes('Network')) {
+    return 'Network or API connection failed';
+  }
+  
+  // ✅ Priority 4: Use original message or fallback
+  if (result.failure.message) {
+    return result.failure.message;
+  }
+  
+  return 'Test execution failed';
+};
 
+const getParsingConfidenceIndicator = (result) => {
+  if (!result.failure) return null;
+  
+  const confidence = result.failure.parsingConfidence || 'none';
+  const source = result.failure.source || 'unknown';
+  
+  const indicators = {
+    'high': { color: 'text-green-600', text: 'High', icon: '✅' },
+    'medium': { color: 'text-yellow-600', text: 'Medium', icon: '⚠️' },
+    'low': { color: 'text-red-600', text: 'Low', icon: '❌' },
+    'none': { color: 'text-gray-400', text: 'None', icon: '❓' }
+  };
+  
+  const indicator = indicators[confidence] || indicators['none'];
+  
+  return {
+    ...indicator,
+    source: source,
+    tooltip: `Parsing: ${confidence} confidence (${source})`
+  };
+};
   // Open failure analysis panel
   const openFailureAnalysis = (result) => {
     setSelectedFailure(result);
@@ -183,147 +246,208 @@ const TestExecutionModal = ({
     }
   }, [testCaseResults, isRunning, waitingForWebhook, expectedTestCases.length, onTestComplete, pollInterval, webhookTimeout]);
 
-  // FIXED: Create stable handleTestCaseUpdate with enhanced failure data processing
-  const handleTestCaseUpdate = useCallback((eventData) => {
-    console.log('🧪 Individual test case update received:', eventData);
-    
-    const { type, requestId, testCaseId, testCase, allResults } = eventData;
-    
-    // CRITICAL: Check current request ID from ref, not closure
-    const currentReqId = subscriptionRef.current;
-    if (requestId !== currentReqId) {
-      console.log(`❌ Event for ${requestId}, but current is ${currentReqId} - ignoring`);
-      return;
-    }
+  // ENHANCED: handleTestCaseUpdate method - Replace the existing one around line 193
+const handleTestCaseUpdate = useCallback((eventData) => {
+  console.log('🧪 Enhanced test case update received:', eventData);
+  
+  const { type, requestId, testCaseId, testCase, allResults } = eventData;
+  
+  // CRITICAL: Check current request ID from ref, not closure
+  const currentReqId = subscriptionRef.current;
+  if (requestId !== currentReqId) {
+    console.log(`❌ Event for ${requestId}, but current is ${currentReqId} - ignoring`);
+    return;
+  }
 
-    if (type === 'test-case-update' && testCaseId && testCase) {
-      // PHASE 1: Add generic parsing for failed tests
-      let enhancedFailure = testCase.failure; // Keep existing failure if present
-      
-      if (testCase.status === 'Failed' && testCase.rawOutput) {
+  if (type === 'test-case-update' && testCaseId && testCase) {
+    console.log('🔍 Processing test case update:', {
+      testCaseId,
+      status: testCase.status,
+      hasJUnitFailure: !!testCase.failure,
+      junitParsingSource: testCase.failure?.parsingSource,
+      junitParsingConfidence: testCase.failure?.parsingConfidence,
+      hasRawOutput: !!testCase.rawOutput
+    });
+
+    // ✅ ENHANCED: Prioritize JUnit XML data over raw parsing
+    let enhancedFailure = null;
+    
+    if (testCase.status === 'Failed') {
+      // Priority 1: Use JUnit XML parsed data (from enhanced workflow)
+      if (testCase.failure && testCase.failure.parsingSource === 'junit-xml') {
+        console.log(`✅ Using JUnit XML parsed data for ${testCaseId}: ${testCase.failure.parsingConfidence} confidence`);
+        enhancedFailure = {
+          ...testCase.failure,
+          source: 'junit-xml-workflow',
+          enhanced: true
+        };
+      }
+      // Priority 2: Use any other pre-parsed failure data
+      else if (testCase.failure && testCase.failure.parsingConfidence === 'high') {
+        console.log(`✅ Using pre-parsed failure data for ${testCaseId}: ${testCase.failure.parsingConfidence} confidence`);
+        enhancedFailure = {
+          ...testCase.failure,
+          source: 'pre-parsed',
+          enhanced: true
+        };
+      }
+      // Priority 3: Fallback to raw output parsing (only if no JUnit XML data)
+      else if (testCase.rawOutput) {
         try {
-          console.log(`🔍 Attempting generic parsing for ${testCaseId}`);
+          console.log(`🔍 Fallback to raw parsing for ${testCaseId} (no JUnit XML data available)`);
           const parsed = errorParserService.parseError(testCase.rawOutput, testCaseId);
           
           if (parsed && parsed.parsingConfidence !== 'low') {
             enhancedFailure = {
-              ...testCase.failure, // Keep existing workflow data
-              ...parsed,           // Add generic parser results
-              source: 'generic-parser',
+              ...testCase.failure, // Keep any existing data
+              ...parsed,           // Add raw parser results
+              source: 'raw-output-fallback',
               enhanced: true
             };
-            console.log(`✅ Generic parsing successful for ${testCaseId}: ${parsed.parsingConfidence} confidence`);
+            console.log(`✅ Raw parsing successful for ${testCaseId}: ${parsed.parsingConfidence} confidence`);
           } else {
-            console.log(`⚠️ Low confidence parsing for ${testCaseId}, keeping existing failure`);
+            console.log(`⚠️ Low confidence raw parsing for ${testCaseId}`);
+            enhancedFailure = testCase.failure; // Keep original if any
           }
         } catch (parseError) {
-          console.warn(`❌ Generic parsing failed for ${testCaseId}:`, parseError.message);
+          console.warn(`❌ Raw parsing failed for ${testCaseId}:`, parseError.message);
+          enhancedFailure = testCase.failure; // Keep original if any
         }
       }
-      
-      // If no existing failure and parsing failed, create simple one
-      if (!enhancedFailure && testCase.status === 'Failed') {
+      // Priority 4: Use original failure data if available
+      else if (testCase.failure) {
+        console.log(`📋 Using original failure data for ${testCaseId}`);
+        enhancedFailure = testCase.failure;
+      }
+      // Priority 5: Create minimal failure object
+      else {
+        console.log(`📝 Creating minimal failure object for ${testCaseId}`);
         enhancedFailure = {
           type: 'TestFailure',
-          phase: 'call',
+          message: 'Test execution failed',
           file: '',
           line: 0,
-          method: '',
-          class: '',
           rawError: (testCase.rawOutput || testCase.logs || '').substring(0, 500),
-          source: 'fallback',
-          parsingConfidence: 'none'
+          source: 'minimal-fallback',
+          parsingConfidence: 'none',
+          category: 'general'
         };
       }
+    }
+    
+    // Update specific test case with enhanced failure data
+    setTestCaseResults(prev => {
+      const updated = new Map(prev);
+      const existingResult = prev.get(testCaseId);
       
-      // Update specific test case with enhanced failure data
-      setTestCaseResults(prev => {
-        const updated = new Map(prev);
-        const existingResult = prev.get(testCaseId);
+      const enhancedResult = {
+        id: testCaseId,
+        name: existingResult?.name || testCase.name || `Test ${testCaseId}`,
+        status: testCase.status,
+        duration: testCase.duration || 0,
+        logs: testCase.logs || '',
+        rawOutput: testCase.rawOutput || '',
+        receivedAt: new Date().toISOString(),
         
-        const enhancedResult = {
-          id: testCaseId,
-          name: existingResult?.name || testCase.name || `Test ${testCaseId}`,
-          status: testCase.status,
-          duration: testCase.duration || 0,
-          logs: testCase.logs || '',
-          rawOutput: testCase.rawOutput || '', // PHASE 1: Store raw output
-          receivedAt: new Date().toISOString(),
-          // Include enhanced failure data
-          failure: enhancedFailure,
-          execution: testCase.execution
+        // ✅ Enhanced failure data with priority system
+        failure: enhancedFailure,
+        execution: testCase.execution,
+        framework: testCase.framework,
+        
+        // ✅ Add metadata about parsing
+        parsingSource: enhancedFailure?.source || 'none',
+        parsingConfidence: enhancedFailure?.parsingConfidence || 'none',
+        
+        // ✅ Add file/line info if available from JUnit XML
+        file: testCase.file || enhancedFailure?.file,
+        line: testCase.line || enhancedFailure?.line,
+        classname: testCase.classname,
+        method: testCase.method
+      };
+      
+      updated.set(testCaseId, enhancedResult);
+      console.log(`📝 Enhanced test case ${testCaseId}: ${testCase.status} (source: ${enhancedFailure?.source || 'none'})`);
+      return updated;
+    });
+
+    // ✅ ENHANCED: Update parsing statistics with JUnit XML priority
+    if (testCase.status === 'Failed') {
+      setParsingStats(prev => {
+        const attempted = prev.attempted + 1;
+        const isSuccessful = enhancedFailure?.parsingConfidence === 'high' || 
+                           enhancedFailure?.source === 'junit-xml-workflow';
+        const successful = prev.successful + (isSuccessful ? 1 : 0);
+        
+        return {
+          attempted,
+          successful,
+          successRate: attempted > 0 ? (successful / attempted) * 100 : 0
         };
-        
-        updated.set(testCaseId, enhancedResult);
-        console.log(`📝 Updated test case ${testCaseId}: ${testCase.status}`);
-        return updated;
-      });
-
-      // PHASE 1: Update parsing statistics
-      if (testCase.status === 'Failed') {
-        setParsingStats(prev => {
-          const attempted = prev.attempted + 1;
-          const successful = prev.successful + (enhancedFailure?.parsingConfidence !== 'low' && enhancedFailure?.parsingConfidence !== 'none' ? 1 : 0);
-          return {
-            attempted,
-            successful,
-            successRate: attempted > 0 ? (successful / attempted) * 100 : 0
-          };
-        });
-      }
-
-      // Update DataStore with enhanced failure data
-      const currentTestCases = dataStore.getTestCases();
-      const testCaseObj = currentTestCases.find(tc => tc.id === testCaseId);
-      if (testCaseObj) {
-        dataStore.updateTestCase(testCaseId, {
-          ...testCaseObj,
-          status: testCase.status,
-          lastRun: new Date().toISOString(),
-          lastExecuted: testCase.status !== 'Not Started' ? new Date().toISOString() : testCaseObj.lastExecuted,
-          executionTime: testCase.duration || 0,
-          // PHASE 1: Store enhanced failure data in DataStore
-          failure: enhancedFailure,
-          execution: testCase.execution,
-          logs: testCase.logs,
-          rawOutput: testCase.rawOutput // PHASE 1: Store raw output
-        });
-        console.log(`📀 DataStore updated for ${testCaseId} with enhanced data`);
-      }
-
-    } else if (type === 'existing-results' && allResults) {
-      console.log(`📦 Processing ${allResults.length} existing test case results with enhanced data`);
-      
-      setTestCaseResults(prev => {
-        const updated = new Map(prev);
-        allResults.forEach(result => {
-          if (result.id) {
-            const existingResult = prev.get(result.id);
-            updated.set(result.id, {
-              id: result.id,
-              name: existingResult?.name || result.name || `Test ${result.id}`,
-              status: result.status,
-              duration: result.duration || 0,
-              logs: result.logs || '',
-              rawOutput: result.rawOutput || '', // PHASE 1: Store raw output
-              receivedAt: result.receivedAt,
-              // Include enhanced failure data
-              failure: result.failure,
-              execution: result.execution
-            });
-          }
-        });
-        return updated;
       });
     }
 
-    // Refresh quality gates
-    try {
-      refreshQualityGates(dataStore);
-    } catch (error) {
-      console.warn('Error refreshing quality gates:', error);
+    // Update DataStore with enhanced failure data
+    const currentTestCases = dataStore.getTestCases();
+    const testCaseObj = currentTestCases.find(tc => tc.id === testCaseId);
+    if (testCaseObj) {
+      dataStore.updateTestCase(testCaseId, {
+        ...testCaseObj,
+        status: testCase.status,
+        lastRun: new Date().toISOString(),
+        lastExecuted: testCase.status !== 'Not Started' ? new Date().toISOString() : testCaseObj.lastExecuted,
+        executionTime: testCase.duration || 0,
+        
+        // ✅ Store enhanced failure data in DataStore
+        failure: enhancedFailure,
+        execution: testCase.execution,
+        framework: testCase.framework,
+        logs: testCase.logs,
+        rawOutput: testCase.rawOutput,
+        
+        // ✅ Store parsing metadata
+        parsingSource: enhancedFailure?.source,
+        parsingConfidence: enhancedFailure?.parsingConfidence
+      });
+      console.log(`📀 DataStore updated for ${testCaseId} with enhanced data (source: ${enhancedFailure?.source})`);
     }
-  }, []); // EMPTY DEPENDENCIES to prevent recreation
+
+  } else if (type === 'existing-results' && allResults) {
+    console.log(`📦 Processing ${allResults.length} existing test case results with enhanced priority system`);
+    
+    setTestCaseResults(prev => {
+      const updated = new Map(prev);
+      allResults.forEach(result => {
+        if (result.id) {
+          const existingResult = prev.get(result.id);
+          updated.set(result.id, {
+            id: result.id,
+            name: existingResult?.name || result.name || `Test ${result.id}`,
+            status: result.status,
+            duration: result.duration || 0,
+            logs: result.logs || '',
+            rawOutput: result.rawOutput || '',
+            receivedAt: result.receivedAt,
+            
+            // ✅ Include enhanced failure data with metadata
+            failure: result.failure,
+            execution: result.execution,
+            framework: result.framework,
+            parsingSource: result.failure?.source || 'none',
+            parsingConfidence: result.failure?.parsingConfidence || 'none'
+          });
+        }
+      });
+      return updated;
+    });
+  }
+
+  // Refresh quality gates
+  try {
+    refreshQualityGates(dataStore);
+  } catch (error) {
+    console.warn('Error refreshing quality gates:', error);
+  }
+}, []); // EMPTY DEPENDENCIES to prevent recreation
 
   // Initialize when modal first opens or test cases change significantly
   useEffect(() => {
@@ -1280,55 +1404,113 @@ const checkGitHubWorkflowCompletion = async (owner, repo, runId, workflowPayload
               </div>
             )}
 
-            {/* Execution Summary */}
-            {testResultsArray.length > 0 && (
-              <div className="mb-4 p-3 bg-gray-50 border border-gray-200 rounded">
-                <div className="text-sm text-gray-700">
-                  <div className="flex justify-between items-center">
-                    <span className="font-medium">Execution Summary:</span>
-                    <span className="text-xs text-gray-500">
-                      {new Date().toLocaleTimeString()}
-                    </span>
-                  </div>
-                  <div className="mt-2 grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
-                    <div className="flex items-center">
-                      <Clock className="text-gray-400 mr-1" size={12} />
-                      <span>Not Started: {testResultsArray.filter(r => r.status === 'Not Started').length}</span>
+            {/* Enhanced Execution Summary with JUnit XML statistics */}
+{testResultsArray.length > 0 && (
+  <div className="mb-4 p-3 bg-gray-50 border border-gray-200 rounded">
+    <div className="text-sm text-gray-700">
+      <div className="flex justify-between items-center">
+        <span className="font-medium">Enhanced Execution Summary:</span>
+        <span className="text-xs text-gray-500">
+          {new Date().toLocaleTimeString()}
+        </span>
+      </div>
+      <div className="mt-2 grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
+        <div className="flex items-center">
+          <Clock className="text-gray-400 mr-1" size={12} />
+          <span>Not Started: {testResultsArray.filter(r => r.status === 'Not Started').length}</span>
+        </div>
+        <div className="flex items-center">
+          <Loader2 className="text-blue-500 mr-1" size={12} />
+          <span>Running: {runningTests}</span>
+        </div>
+        <div className="flex items-center">
+          <CheckCircle className="text-green-500 mr-1" size={12} />
+          <span>Passed: {testResultsArray.filter(r => r.status === 'Passed').length}</span>
+        </div>
+        <div className="flex items-center">
+          <XCircle className="text-red-500 mr-1" size={12} />
+          <span>Failed: {testResultsArray.filter(r => r.status === 'Failed').length}</span>
+        </div>
+      </div>
+      
+      {/* ✅ ENHANCED: Parsing statistics with JUnit XML breakdown */}
+      {parsingStats.attempted > 0 && (
+        <div className="mt-2 text-xs text-gray-600 border-t pt-2">
+          <div className="flex items-center justify-between">
+            <span>Failure Analysis Success Rate:</span>
+            <span className={`font-medium ${
+              parsingStats.successRate >= 90 ? 'text-green-600' :
+              parsingStats.successRate >= 70 ? 'text-yellow-600' :
+              'text-red-600'
+            }`}>
+              {parsingStats.successRate.toFixed(1)}%
+            </span>
+          </div>
+          <div className="text-xs text-gray-500 mt-1">
+            {parsingStats.successful}/{parsingStats.attempted} failed tests analyzed successfully
+          </div>
+          
+          {/* ✅ NEW: Show parsing source breakdown */}
+          {(() => {
+            const failedResults = testResultsArray.filter(r => r.status === 'Failed' && r.failure);
+            const junitXmlCount = failedResults.filter(r => r.parsingSource?.includes('junit-xml')).length;
+            const rawParsingCount = failedResults.filter(r => r.parsingSource?.includes('raw-output')).length;
+            const preParsedCount = failedResults.filter(r => r.parsingSource === 'pre-parsed').length;
+            
+            if (failedResults.length > 0) {
+              return (
+                <div className="text-xs text-gray-500 mt-1 space-y-1">
+                  {junitXmlCount > 0 && (
+                    <div className="flex items-center justify-between">
+                      <span className="flex items-center">
+                        <span className="w-2 h-2 bg-green-500 rounded-full mr-1"></span>
+                        JUnit XML Parsing:
+                      </span>
+                      <span className="font-medium text-green-600">{junitXmlCount}</span>
                     </div>
-                    <div className="flex items-center">
-                      <Loader2 className="text-blue-500 mr-1" size={12} />
-                      <span>Running: {runningTests}</span>
+                  )}
+                  {preParsedCount > 0 && (
+                    <div className="flex items-center justify-between">
+                      <span className="flex items-center">
+                        <span className="w-2 h-2 bg-blue-500 rounded-full mr-1"></span>
+                        Pre-parsed Data:
+                      </span>
+                      <span className="font-medium text-blue-600">{preParsedCount}</span>
                     </div>
-                    <div className="flex items-center">
-                      <CheckCircle className="text-green-500 mr-1" size={12} />
-                      <span>Passed: {testResultsArray.filter(r => r.status === 'Passed').length}</span>
-                    </div>
-                    <div className="flex items-center">
-                      <XCircle className="text-red-500 mr-1" size={12} />
-                      <span>Failed: {testResultsArray.filter(r => r.status === 'Failed').length}</span>
-                    </div>
-                  </div>
-                  {/* PHASE 1: Add parsing statistics to execution summary */}
-                  {parsingStats.attempted > 0 && (
-                    <div className="mt-2 text-xs text-gray-600 border-t pt-2">
-                      <div className="flex items-center justify-between">
-                        <span>Parsing Success Rate:</span>
-                        <span className={`font-medium ${
-                          parsingStats.successRate >= 80 ? 'text-green-600' :
-                          parsingStats.successRate >= 60 ? 'text-yellow-600' :
-                          'text-red-600'
-                        }`}>
-                          {parsingStats.successRate.toFixed(1)}%
-                        </span>
-                      </div>
-                      <div className="text-xs text-gray-500">
-                        {parsingStats.successful}/{parsingStats.attempted} failed tests parsed successfully
-                      </div>
+                  )}
+                  {rawParsingCount > 0 && (
+                    <div className="flex items-center justify-between">
+                      <span className="flex items-center">
+                        <span className="w-2 h-2 bg-yellow-500 rounded-full mr-1"></span>
+                        Raw Output Parsing:
+                      </span>
+                      <span className="font-medium text-yellow-600">{rawParsingCount}</span>
                     </div>
                   )}
                 </div>
-              </div>
-            )}
+              );
+            }
+            return null;
+          })()}
+        </div>
+      )}
+      
+      {/* ✅ NEW: Show enhanced data availability */}
+      {testResultsArray.filter(r => r.status === 'Failed').length > 0 && (
+        <div className="mt-2 text-xs text-gray-500 border-t pt-2">
+          <div className="flex items-center justify-between">
+            <span>Enhanced Analysis Available:</span>
+            <span className="font-medium text-blue-600">
+              {testResultsArray.filter(r => r.status === 'Failed' && r.failure?.parsingConfidence === 'high').length}/
+              {testResultsArray.filter(r => r.status === 'Failed').length} failures
+            </span>
+          </div>
+        </div>
+      )}
+    </div>
+  </div>
+)}
+            
 
             {/* Enhanced Test Results Table */}
             <div className="border border-gray-200 rounded overflow-hidden">

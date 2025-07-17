@@ -262,7 +262,7 @@ self = <test_login.LoginTestCase testMethod=test_login_success>
                     </button>
                   </div>
                   <pre className="text-gray-100 text-sm whitespace-pre-wrap overflow-x-auto max-h-96 overflow-y-auto">
-                    {result.rawOutput || 'No raw output available'}
+                    {result.rawOutput || result.testCase?.rawOutput || 'No raw output available'}
                   </pre>
                 </div>
               </div>
