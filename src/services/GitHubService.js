@@ -795,34 +795,27 @@ async getWorkflowResults(owner, repo, runId, token, clientPayload) {
 /**
  * Download and process artifact content (updated to accept owner/repo parameters)
  */
+// FIX for GitHubService.js - Process ALL XML files, not just one
+// Replace the downloadAndProcessArtifact method around line 860-970
+
+/**
+ * Download and process workflow artifact with enhanced multi-file XML support
+ */
+// CRITICAL FIX: Replace the artifact download section in downloadAndProcessArtifact method
+// Find this section around line 640-680 in your GitHubService and replace it:
+
 async downloadAndProcessArtifact(artifact, token, requirementId, clientPayload, owner, repo) {
-  console.log("%c📥 DOWNLOAD AND PROCESS ARTIFACT STARTED", "background: #FF5722; color: white; font-size: 16px; font-weight: bold; padding: 8px 15px; border-radius: 5px;");
-  console.log("=".repeat(80));
+  console.log("%c📦 PROCESSING ZIP FILE", "background: #673AB7; color: white; font-weight: bold; padding: 5px 10px;");
   
   try {
-    console.log("%c📋 ARTIFACT DETAILS", "background: #795548; color: white; font-weight: bold; padding: 5px 10px;");
-    console.log("Artifact Name:", artifact.name);
-    console.log("Artifact ID:", artifact.id);
-    console.log("Artifact Size:", artifact.size_in_bytes, "bytes");
-    console.log("Expires At:", artifact.expires_at);
-    console.log("Owner:", owner);
-    console.log("Repo:", repo);
-    console.log("Requirement ID:", requirementId);
-    console.log("Client Payload:", clientPayload);
-    
-    // Validate that owner and repo are provided
-    if (!owner || !repo) {
-      throw new Error(`Missing repository information: owner=${owner}, repo=${repo}`);
-    }
+    // ✅ FIX: Use Octokit instead of fetch for artifact download
+    console.log("🔧 Using Octokit to download artifact...");
     
     const octokit = new Octokit({ auth: token });
     
-    // Download artifact
-    console.log("%c⬇️ DOWNLOADING ARTIFACT", "background: #2196F3; color: white; font-weight: bold; padding: 5px 10px;");
-    console.log(`Constructing URL: /repos/${owner}/${repo}/actions/artifacts/${artifact.id}/zip`);
-    
     const downloadStart = Date.now();
     
+    // ✅ CORRECT: Use Octokit request for artifact download
     const downloadResponse = await octokit.request('GET /repos/{owner}/{repo}/actions/artifacts/{artifact_id}/{archive_format}', {
       owner: owner,
       repo: repo,
@@ -830,37 +823,40 @@ async downloadAndProcessArtifact(artifact, token, requirementId, clientPayload, 
       archive_format: 'zip',
       headers: { 'X-GitHub-Api-Version': '2022-11-28' }
     });
-    
+
     const downloadTime = Date.now() - downloadStart;
     console.log("✅ Artifact downloaded successfully");
     console.log("Download time:", downloadTime + "ms");
     console.log("Response data type:", typeof downloadResponse.data);
-    console.log("Response data size:", downloadResponse.data.byteLength || downloadResponse.data.size || 'unknown', "bytes");
-    
-    // Process ZIP
-    console.log("%c📦 PROCESSING ZIP FILE", "background: #9C27B0; color: white; font-weight: bold; padding: 5px 10px;");
-    
-    // Handle JSZip import for both browser and Node.js environments
-    let JSZip;
-    try {
-      // Try dynamic import first
-      JSZip = (await import('jszip')).default;
-    } catch (importError) {
-      // Fallback for browser environments
-      if (typeof window !== 'undefined' && window.JSZip) {
-        JSZip = window.JSZip;
-      } else {
-        throw new Error('JSZip is not available. Please ensure jszip is installed or included.');
+    console.log("Response data size:", downloadResponse.data.byteLength || downloadResponse.data.length || 'unknown', "bytes");
+
+    // Load JSZip
+    const JSZip = window.JSZip;
+    if (!JSZip) {
+      const script = document.createElement('script');
+      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
+      document.head.appendChild(script);
+      
+      await new Promise((resolve, reject) => {
+        script.onload = resolve;
+        script.onerror = () => reject(new Error('Failed to load JSZip library'));
+      });
+      
+      if (!window.JSZip) {
+        throw new Error('JSZip library not available. Please ensure jszip is installed or included.');
       }
     }
     
-    // Convert response data to ArrayBuffer
+    // ✅ FIX: Handle ArrayBuffer conversion properly for Octokit response
     let arrayBuffer;
     if (downloadResponse.data instanceof ArrayBuffer) {
       arrayBuffer = downloadResponse.data;
-    } else if (downloadResponse.data.arrayBuffer) {
-      arrayBuffer = await downloadResponse.data.arrayBuffer();
+    } else if (typeof downloadResponse.data === 'string') {
+      // Convert string to ArrayBuffer
+      const encoder = new TextEncoder();
+      arrayBuffer = encoder.encode(downloadResponse.data).buffer;
     } else {
+      // For any other data type, try to convert
       arrayBuffer = await new Response(downloadResponse.data).arrayBuffer();
     }
     
@@ -874,113 +870,153 @@ async downloadAndProcessArtifact(artifact, token, requirementId, clientPayload, 
     console.log("Files in ZIP:", fileNames.length);
     console.log("ZIP contents:", fileNames);
     
-    // 🔧 UPDATED: Prioritize XML files over JSON
+    // ✅ ENHANCED: Find ALL XML files instead of just one
     console.log("%c🔍 FINDING TEST RESULTS FILE (XML PRIORITY)", "background: #FF9800; color: white; font-weight: bold; padding: 5px 10px;");
     
-    // Priority 1: Look for JUnit XML files first
+    // Find all XML and JSON files
     const xmlFiles = fileNames.filter(name => 
       name.endsWith('.xml') && 
-      (name.toLowerCase().includes('junit') || 
-       name.toLowerCase().includes('test') || 
-       name.toLowerCase().includes('result'))
+      (name.includes('junit') || name.includes('test-results') || name.includes('test'))
     );
     
-    // Priority 2: Look for JSON files as fallback
     const jsonFiles = fileNames.filter(name => 
       name.endsWith('.json') && 
-      (name.toLowerCase().includes('test') || 
-       name.toLowerCase().includes('result'))
+      (name.includes('result') || name.includes('test') || name.includes('current'))
     );
     
     console.log("XML files found:", xmlFiles);
     console.log("JSON files found:", jsonFiles);
     
-    let resultsFile = null;
-    let fileType = null;
-    
+    // ✅ PRIORITY: Process ALL XML files first (JUnit XML has priority)
     if (xmlFiles.length > 0) {
-      resultsFile = zipContents.files[xmlFiles[0]];
-      fileType = 'xml';
-      console.log("✅ Using XML file (priority):", xmlFiles[0]);
-    } else if (jsonFiles.length > 0) {
-      resultsFile = zipContents.files[jsonFiles[0]];
-      fileType = 'json';
-      console.log("⚠️ Using JSON file (fallback):", jsonFiles[0]);
-    }
-    
-    if (!resultsFile) {
-      console.warn("⚠️ No test results file found in artifact");
-      const requestedTestIds = clientPayload?.testCases || [];
-      console.log("Creating fallback results for:", requestedTestIds);
-      return requestedTestIds.map(testId => ({
-        id: testId,
-        name: `Test ${testId}`,
-        status: 'Not Run',
-        duration: 0,
-        logs: 'No test results file found in artifact'
-      }));
-    }
-    
-    // Extract and parse results
-    console.log("%c📄 EXTRACTING AND PARSING RESULTS", "background: #4CAF50; color: white; font-weight: bold; padding: 5px 10px;");
-    console.log("Processing file:", resultsFile.name, "Type:", fileType);
-    
-    const resultsContent = await resultsFile.async('text');
-    console.log("✅ File extracted successfully");
-    console.log("Content length:", resultsContent.length, "characters");
-    console.log("Content preview:", resultsContent.substring(0, 500) + (resultsContent.length > 500 ? '...' : ''));
-    
-    // 🔧 UPDATED: Parse based on file type with JUnit XML priority
-    let testResults;
-    if (fileType === 'xml') {
-      console.log("📋 Parsing as JUnit XML...");
-      try {
-        testResults = this.parseJUnitXML(resultsContent);
-        console.log("✅ JUnit XML parsed successfully");
-        console.log("Parsed test count:", testResults.tests?.length || 0);
-      } catch (parseError) {
-        console.error("❌ JUnit XML parse failed:", parseError);
-        testResults = { parseError: parseError.message, rawContent: resultsContent };
+      console.log(`✅ Using XML files (priority): Found ${xmlFiles.length} XML files`);
+      console.log("Processing all XML files...");
+      
+      // ✅ ENHANCED: Parse ALL XML files and combine results
+      const allTestResults = [];
+      
+      for (const xmlFileName of xmlFiles) {
+        console.log(`📄 Processing XML file: ${xmlFileName}`);
+        
+        const xmlFile = zipContents.files[xmlFileName];
+        const xmlContent = await xmlFile.async('text');
+        
+        console.log(`✅ File extracted successfully: ${xmlFileName}`);
+        console.log("Content length:", xmlContent.length, "characters");
+        console.log("Content preview:", xmlContent.substring(0, 500) + (xmlContent.length > 500 ? '...' : ''));
+        
+        // Parse this XML file
+        console.log("📋 Parsing as JUnit XML...");
+        const parsedXML = this.parseJUnitXML(xmlContent);
+        
+        if (parsedXML && parsedXML.tests && parsedXML.tests.length > 0) {
+          console.log(`✅ JUnit XML parsed successfully: ${parsedXML.tests.length} tests`);
+          allTestResults.push(...parsedXML.tests);
+        } else {
+          console.log(`⚠️ No tests found in XML file: ${xmlFileName}`);
+        }
       }
-    } else if (fileType === 'json') {
-      console.log("📋 Parsing as JSON (fallback)...");
+      
+      console.log(`✅ Combined XML parsing complete: ${allTestResults.length} total tests from ${xmlFiles.length} files`);
+      
+      // Create combined results object
+      const combinedResults = {
+        tests: allTestResults,
+        source: 'junit-xml',
+        filesProcessed: xmlFiles.length,
+        totalTests: allTestResults.length
+      };
+      
+      // Transform results
+      console.log("%c🔄 TRANSFORMING RESULTS", "background: #673AB7; color: white; font-weight: bold; padding: 5px 10px;");
+      const transformedResults = this.transformTestResults(combinedResults, clientPayload);
+      
+      console.log("%c✅ ARTIFACT PROCESSING COMPLETE", "background: #4CAF50; color: white; font-size: 14px; font-weight: bold; padding: 8px 15px; border-radius: 5px;");
+      console.log("Transformed results count:", transformedResults.length);
+      console.log("Final transformed results:", transformedResults);
+      
+      return transformedResults;
+    }
+    
+    // ✅ FALLBACK: Process JSON files if no XML found
+    if (jsonFiles.length > 0) {
+      console.log("✅ Using JSON files (fallback)");
+      
+      const jsonFile = zipContents.files[jsonFiles[0]];
+      const jsonContent = await jsonFile.async('text');
+      
+      console.log("✅ File extracted successfully");
+      console.log("Content length:", jsonContent.length, "characters");
+      console.log("Content preview:", jsonContent.substring(0, 500) + (jsonContent.length > 500 ? '...' : ''));
+      
+      // Parse JSON
+      let testResults;
       try {
-        testResults = JSON.parse(resultsContent);
+        testResults = JSON.parse(jsonContent);
         console.log("✅ JSON parsed successfully");
         console.log("Parsed structure keys:", Object.keys(testResults));
       } catch (parseError) {
         console.error("❌ JSON parse failed:", parseError);
-        testResults = { parseError: parseError.message, rawContent: resultsContent };
+        testResults = { parseError: parseError.message, rawContent: jsonContent };
       }
-    } else {
-      console.log("📋 Unknown format, treating as raw content...");
-      testResults = { rawContent: resultsContent };
+      
+      // Transform results
+      console.log("%c🔄 TRANSFORMING RESULTS", "background: #673AB7; color: white; font-weight: bold; padding: 5px 10px;");
+      const transformedResults = this.transformTestResults(testResults, clientPayload);
+      
+      console.log("%c✅ ARTIFACT PROCESSING COMPLETE", "background: #4CAF50; color: white; font-size: 14px; font-weight: bold; padding: 8px 15px; border-radius: 5px;");
+      console.log("Transformed results count:", transformedResults.length);
+      console.log("Final transformed results:", transformedResults);
+      
+      return transformedResults;
     }
     
-    // Transform results
-    console.log("%c🔄 TRANSFORMING RESULTS", "background: #673AB7; color: white; font-weight: bold; padding: 5px 10px;");
-    const transformedResults = this.transformTestResults(testResults, clientPayload);
-    
-    console.log("%c✅ ARTIFACT PROCESSING COMPLETE", "background: #4CAF50; color: white; font-size: 14px; font-weight: bold; padding: 8px 15px; border-radius: 5px;");
-    console.log("Transformed results count:", transformedResults.length);
-    console.log("Final transformed results:", transformedResults);
-    
-    return transformedResults;
+    // ✅ NO RESULTS: Create fallback
+    console.warn("⚠️ No test results files found in artifact");
+    const requestedTestIds = clientPayload?.testCases || [];
+    console.log("Creating fallback results for:", requestedTestIds);
+    return requestedTestIds.map(testId => ({
+      id: testId,
+      name: `Test ${testId}`,
+      status: 'Not Run',
+      duration: 0,
+      logs: 'No test results file found in artifact'
+    }));
     
   } catch (error) {
     console.error("%c💥 ARTIFACT PROCESSING ERROR", "background: #D32F2F; color: white; font-size: 14px; font-weight: bold; padding: 8px 15px; border-radius: 5px;");
     console.error("Error details:", error);
+    console.error("Error message:", error.message);
     console.error("Error stack:", error.stack);
+    console.error("Error name:", error.name);
+    
+    // Log more details about what failed
+    console.error("Artifact details:", {
+      name: artifact?.name,
+      id: artifact?.id,
+      size: artifact?.size_in_bytes
+    });
+    console.error("Client payload:", clientPayload);
+    console.error("Owner/Repo:", owner, repo);
     
     // Return fallback results
     const requestedTestIds = clientPayload?.testCases || [];
     console.log("Creating error fallback results for:", requestedTestIds);
+    console.log("Error fallback - original error was:", error.message);
+    
     return requestedTestIds.map(testId => ({
       id: testId,
       name: `Test ${testId}`,
       status: 'Failed',
       duration: 0,
-      logs: `Error processing artifact: ${error.message}`
+      logs: `Error processing artifact: ${error.message}`,
+      rawOutput: `Error: ${error.message}\nStack: ${error.stack}`,
+      failure: {
+        type: 'ArtifactProcessingError',
+        message: error.message,
+        source: 'downloadAndProcessArtifact',
+        parsingConfidence: 'high'
+      }
     }));
   }
 }
@@ -1127,6 +1163,9 @@ extractAssertionFromStackTrace(stackTrace) {
 /**
  * 🔧 UPDATED: Transform test results with XML priority
  */
+/**
+ * Transform raw test results to application format with enhanced JUnit XML support
+ */
 transformTestResults(rawResults, clientPayload) {
   console.log("%c🔄 TRANSFORM TEST RESULTS", "background: #9C27B0; color: white; font-size: 16px; font-weight: bold; padding: 8px 15px; border-radius: 5px;");
   console.log("=".repeat(80));
@@ -1142,65 +1181,77 @@ transformTestResults(rawResults, clientPayload) {
   const transformedResults = requestedTestIds.map(testId => {
     console.log(`🔍 Processing test ID: ${testId}`);
     
+    // Try different result structures with enhanced JUnit XML support
     let testResult = null;
     
-    // 🔧 UPDATED: Priority 1 - Check .tests array (XML format)
-    if (rawResults.tests && Array.isArray(rawResults.tests)) {
-      testResult = rawResults.tests.find(r => r.id === testId);
+    // ✅ ENHANCED: JUnit XML structure (highest priority)
+    if (rawResults?.tests && Array.isArray(rawResults.tests)) {
+      console.log(`  🔍 Searching in JUnit XML tests array (${rawResults.tests.length} tests)`);
+      
+      // Try exact match first
+      testResult = rawResults.tests.find(t => t.name === testId);
       if (testResult) {
-        console.log(`  ✅ Found in .tests array (XML): ${testResult.name || testId}`);
+        console.log(`  ✅ Found exact name match in JUnit XML: ${testResult.name}`);
       }
-    }
-    
-    // Priority 2: Check .results array (JSON format)
-    if (!testResult && rawResults.results && Array.isArray(rawResults.results)) {
-      testResult = rawResults.results.find(r => r.id === testId);
-      if (testResult) {
-        console.log(`  ✅ Found in .results array (JSON): ${testResult.name || testId}`);
-      }
-    }
-    
-    // Priority 3: Direct array of tests
-    if (!testResult && Array.isArray(rawResults)) {
-      testResult = rawResults.find(t => 
-        t.id === testId || 
-        t.name?.includes(testId) ||
-        t.title?.includes(testId)
-      );
-      if (testResult) console.log(`  ✅ Found in direct array: ${testResult.name || testResult.title}`);
-    }
-    
-    // Priority 4: Check direct object access
-    if (!testResult && rawResults[testId]) {
-      testResult = rawResults[testId];
-      console.log(`  ✅ Found as direct property: ${testId}`);
-    }
-    
-    // Priority 5: Jest-like structure
-    if (!testResult && rawResults?.testResults) {
-      for (const testFile of rawResults.testResults) {
-        if (testFile.assertionResults) {
-          testResult = testFile.assertionResults.find(t => 
-            t.title?.includes(testId) ||
-            t.fullName?.includes(testId)
-          );
-          if (testResult) {
-            console.log(`  ✅ Found in Jest structure: ${testResult.title}`);
-            break;
-          }
+      
+      // Try fuzzy matching for JUnit XML
+      if (!testResult) {
+        testResult = rawResults.tests.find(t => {
+          const testName = t.name || '';
+          const className = t.classname || '';
+          
+          // Check if test ID is contained in test name or classname
+          return testName.includes(testId) || 
+                 className.includes(testId) ||
+                 testId.includes(testName) ||
+                 // Handle pytest-style naming where test function names don't include TC_XXX
+                 (testName.startsWith('test_') && testId.includes(testName));
+        });
+        
+        if (testResult) {
+          console.log(`  ✅ Found fuzzy match in JUnit XML: ${testResult.name} (class: ${testResult.classname})`);
         }
       }
     }
     
-    // If no specific result found, create a default one
+    // ✅ FALLBACK: Other structures if JUnit XML didn't match
+    if (!testResult) {
+      // Structure 1: Direct array of tests
+      if (Array.isArray(rawResults)) {
+        testResult = rawResults.find(t => 
+          t.id === testId || 
+          t.name?.includes(testId) ||
+          t.title?.includes(testId) ||
+          testId.includes(t.name || '') ||
+          testId.includes(t.title || '')
+        );
+        if (testResult) console.log(`  ✅ Found in direct array: ${testResult.name || testResult.title}`);
+      }
+      
+      // Structure 2: Object with results array
+      if (!testResult && rawResults?.results) {
+        testResult = rawResults.results.find(t => 
+          t.id === testId || 
+          t.name?.includes(testId) ||
+          t.title?.includes(testId) ||
+          testId.includes(t.name || '') ||
+          testId.includes(t.title || '')
+        );
+        if (testResult) console.log(`  ✅ Found in .results array: ${testResult.name || testResult.title}`);
+      }
+    }
+    
+    // If no specific result found, create a "Not Found" result
     if (!testResult) {
       console.log(`  ❌ Test result not found for: ${testId}`);
-      testResult = {
+      
+      return {
         id: testId,
         name: `Test ${testId}`,
         status: 'Not Found',
         duration: 0,
         logs: 'Test result not found in artifacts',
+        rawOutput: '',
         failure: {
           type: 'TestNotFound',
           message: 'Test result not found in the generated artifacts',
@@ -1210,35 +1261,68 @@ transformTestResults(rawResults, clientPayload) {
       };
     }
     
-    // Transform to standard format
+    // ✅ Transform JUnit XML result to standard format
     const status = this.normalizeTestStatus(testResult);
-    const duration = this.normalizeDuration(testResult);
-    const logs = testResult.logs || testResult.message || 
-      (status === 'Passed' ? 'Test completed successfully' : 'Test execution completed');
+    const duration = parseFloat(testResult.time || testResult.duration || 0) * 1000; // Convert to milliseconds
+    
+    // Enhanced logs generation for JUnit XML
+    let logs = '';
+    if (testResult.system_out) {
+      logs += `STDOUT:\n${testResult.system_out}\n`;
+    }
+    if (testResult.system_err) {
+      logs += `STDERR:\n${testResult.system_err}\n`;
+    }
+    if (testResult.failure) {
+      logs += `FAILURE:\n${testResult.failure.message || testResult.failure}\n`;
+    }
+    if (testResult.error) {
+      logs += `ERROR:\n${testResult.error.message || testResult.error}\n`;
+    }
+    if (!logs) {
+      logs = status === 'Passed' ? 'Test completed successfully' : 'Test execution completed';
+    }
+    
+    // ✅ Create enhanced failure object for JUnit XML
+    let enhancedFailure = null;
+    if (status === 'Failed' && (testResult.failure || testResult.error)) {
+      const failureData = testResult.failure || testResult.error;
+      
+      enhancedFailure = {
+        type: failureData.type || 'TestFailure',
+        message: failureData.message || failureData.text || 'Test execution failed',
+        parsingSource: rawResults.source || 'junit-xml',
+        parsingConfidence: 'high',
+        source: 'junit-xml-transform',
+        category: 'general', // Simplified
+        file: testResult.file,
+        line: testResult.line,
+        classname: testResult.classname,
+        method: testResult.name,
+        stackTrace: failureData.stackTrace || failureData.text
+      };
+    }
     
     const transformed = {
       id: testId,
-      name: testResult.title || testResult.name || `Test ${testId}`,
+      name: testResult.name || testResult.title || `Test ${testId}`,
       status: status,
-      duration: duration,
-      logs: logs,
-      rawOutput: testResult.rawOutput || testResult.stackTrace || testResult.output || '',
-      // 🔧 UPDATED: Preserve failure information from XML parsing
-      failure: testResult.failure || (status === 'Failed' ? {
-        type: 'TestFailure',
-        message: testResult.message || logs,
-        source: rawResults.source || 'unknown',
-        parsingConfidence: testResult.failure?.parsingConfidence || 'medium'
-      } : null),
-      execution: testResult.execution,
-      classname: testResult.classname,
-      file: testResult.file
+      duration: Math.round(duration),
+      logs: logs.trim(),
+      rawOutput: logs.trim(),
+      failure: enhancedFailure,
+      execution: {
+        totalTime: duration / 1000,
+        framework: 'junit-xml'
+      },
+      file: testResult.file,
+      classname: testResult.classname
     };
     
-    console.log(`  🔄 Transformed: ${testId} → ${status} (${duration}ms)`);
-    if (transformed.failure) {
-      console.log(`    🔍 Failure info: ${transformed.failure.type} - ${transformed.failure.message}`);
-      console.log(`    📊 Parsing source: ${transformed.failure.parsingSource} (${transformed.failure.parsingConfidence} confidence)`);
+    console.log(`  🔄 Transformed: ${testId} → ${status} (${Math.round(duration)}ms)`);
+    if (enhancedFailure) {
+      console.log(`    🔍 Failure info: ${enhancedFailure.type} - ${enhancedFailure.message}`);
+      console.log(`    📊 Parsing source: ${enhancedFailure.parsingSource} (${enhancedFailure.parsingConfidence} confidence)`);
     }
     
     return transformed;
