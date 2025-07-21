@@ -1,5 +1,6 @@
 // src/services/GitHubService.js - Enhanced version with test import capabilities
 import { Octokit } from "octokit";
+import JSZip from 'jszip';
 
 class GitHubService {
   constructor() {
@@ -830,7 +831,8 @@ async downloadAndProcessArtifact(artifact, token, requirementId, clientPayload, 
     console.log("Response data type:", typeof downloadResponse.data);
     console.log("Response data size:", downloadResponse.data.byteLength || downloadResponse.data.length || 'unknown', "bytes");
 
-    // Load JSZip
+    // Load JSZip    
+    /**
     const JSZip = window.JSZip;
     if (!JSZip) {
       const script = document.createElement('script');
@@ -846,7 +848,7 @@ async downloadAndProcessArtifact(artifact, token, requirementId, clientPayload, 
         throw new Error('JSZip library not available. Please ensure jszip is installed or included.');
       }
     }
-    
+    **/
     // ✅ FIX: Handle ArrayBuffer conversion properly for Octokit response
     let arrayBuffer;
     if (downloadResponse.data instanceof ArrayBuffer) {
@@ -1022,6 +1024,83 @@ async downloadAndProcessArtifact(artifact, token, requirementId, clientPayload, 
 }
 
 /**
+ * Detect actual test framework from XML content and attributes
+ */
+detectFrameworkFromXML(xmlContent, testsuite) {
+  // Priority 1: Check testsuite attributes
+  const name = testsuite.getAttribute('name')?.toLowerCase() || '';
+  const generator = testsuite.getAttribute('generator')?.toLowerCase() || '';
+  const hostname = testsuite.getAttribute('hostname')?.toLowerCase() || '';
+  
+  // Priority 2: Check XML content patterns
+  const contentLower = xmlContent.toLowerCase();
+  
+  // Framework detection patterns
+  if (generator.includes('pytest') || name.includes('pytest') || contentLower.includes('pytest')) {
+    return {
+      name: 'pytest',
+      version: this.extractVersion(generator, 'pytest') || null,
+      source: 'xml-attribute'
+    };
+  }
+  
+  if (name.includes('testng') || contentLower.includes('testng')) {
+    return {
+      name: 'TestNG',
+      version: this.extractVersion(contentLower, 'testng') || null,
+      source: 'xml-attribute'
+    };
+  }
+  
+  if (name.includes('junit') || contentLower.includes('junit')) {
+    return {
+      name: 'JUnit',
+      version: this.extractVersion(contentLower, 'junit') || null,
+      source: 'xml-attribute'
+    };
+  }
+  
+  if (name.includes('surefire') || contentLower.includes('surefire')) {
+    return {
+      name: 'Maven Surefire',
+      version: this.extractVersion(contentLower, 'surefire') || null,
+      source: 'xml-attribute'
+    };
+  }
+  
+  if (contentLower.includes('nunit')) {
+    return {
+      name: 'NUnit',
+      version: this.extractVersion(contentLower, 'nunit') || null,
+      source: 'xml-content'
+    };
+  }
+  
+  // Fallback: Unknown framework but XML format
+  return {
+    name: 'Unknown',
+    version: null,
+    source: 'xml-fallback'
+  };
+}
+
+/**
+ * Helper method to extract version numbers
+ */
+extractVersion(text, frameworkName) {
+  const patterns = [
+    new RegExp(`${frameworkName}[\\s-]*(\\d+\\.\\d+\\.\\d+)`, 'i'),
+    new RegExp(`${frameworkName}[\\s-]*(\\d+\\.\\d+)`, 'i'),
+  ];
+  
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    if (match) return match[1];
+  }
+  return null;
+}
+
+/**
  * 🔧 NEW: Parse JUnit XML format properly
  */
 parseJUnitXML(xmlContent) {
@@ -1039,8 +1118,15 @@ parseJUnitXML(xmlContent) {
   
   const testsuites = xmlDoc.querySelectorAll('testsuite');
   const tests = [];
+  let detectedFramework = null;
   
-  testsuites.forEach(testsuite => {
+  testsuites.forEach((testsuite, index) => {
+    // Detect framework from first testsuite
+    if (index === 0) {
+      detectedFramework = this.detectFrameworkFromXML(xmlContent, testsuite);
+      console.log("🔍 Detected framework:", detectedFramework);
+    }
+    
     const testcases = testsuite.querySelectorAll('testcase');
     
     testcases.forEach(testcase => {
@@ -1068,7 +1154,6 @@ parseJUnitXML(xmlContent) {
           file: classname ? classname.replace(/\./g, '/') + '.py' : '',
           method: name || '',
           classname: classname || '',
-          // 🔧 NEW: Extract assertion details from stack trace
           assertion: this.extractAssertionFromStackTrace(failure.textContent || '')
         };
       } else if (error) {
@@ -1102,13 +1187,18 @@ parseJUnitXML(xmlContent) {
         failure: failureInfo,
         execution: {
           totalTime: time
-        }
+        },
+        framework: detectedFramework  // ← ADD this line
       });
     });
   });
   
   console.log(`✅ Parsed ${tests.length} test cases from JUnit XML`);
-  return { tests, source: 'junit-xml' };
+  return { 
+    tests, 
+    source: 'junit-xml',           // ← KEEP this
+    framework: detectedFramework   // ← ADD this line
+  };
 }
 
 /**
@@ -1304,20 +1394,25 @@ transformTestResults(rawResults, clientPayload) {
     }
     
     const transformed = {
-      id: testId,
-      name: testResult.name || testResult.title || `Test ${testId}`,
-      status: status,
-      duration: Math.round(duration),
-      logs: logs.trim(),
-      rawOutput: logs.trim(),
-      failure: enhancedFailure,
-      execution: {
-        totalTime: duration / 1000,
-        framework: 'junit-xml'
-      },
-      file: testResult.file,
-      classname: testResult.classname
-    };
+  id: testId,
+  name: testResult.name || testResult.title || `Test ${testId}`,
+  status: status,
+  duration: Math.round(duration),
+  logs: logs.trim(),
+  rawOutput: logs.trim(),
+  failure: enhancedFailure,
+  execution: {
+    totalTime: duration / 1000,
+    parsingSource: rawResults.source || 'junit-xml',  // ← CHANGE this line
+    framework: testResult.framework || rawResults.framework || {  // ← ADD this section
+      name: 'Unknown',
+      version: null,
+      source: 'fallback'
+    }
+  },
+  file: testResult.file,
+  classname: testResult.classname
+};
     
     console.log(`  🔄 Transformed: ${testId} → ${status} (${Math.round(duration)}ms)`);
     if (enhancedFailure) {

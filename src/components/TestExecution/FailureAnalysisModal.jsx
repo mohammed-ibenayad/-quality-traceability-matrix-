@@ -107,32 +107,53 @@ const FailureAnalysisModal = ({ testResult, isOpen, onClose }) => {
   };
 
   // Enhanced framework info display
-  const getFrameworkInfo = (result) => {
-    if (result.framework) {
-      return (
-        <div className="flex items-center space-x-2 text-sm text-gray-600">
-          <span className="font-medium">Framework:</span>
-          <span>{result.framework.name}</span>
-          {result.framework.version && <span className="text-xs opacity-75">v{result.framework.version}</span>}
-          {result.execution?.junitSource && <span className="text-xs bg-blue-100 text-blue-700 px-1 rounded">XML</span>}
-        </div>
-      );
-    }
-    
-    // Fallback detection from execution metadata
-    if (result.execution?.framework) {
-      return (
-        <div className="flex items-center space-x-2 text-sm text-gray-600">
-          <span className="font-medium">Framework:</span>
-          <span>{result.execution.framework}</span>
-          {result.execution.junitSource && <span className="text-xs bg-blue-100 text-blue-700 px-1 rounded">XML</span>}
-        </div>
-      );
-    }
-    
-    return null;
-  };
-
+ // Enhanced framework info display
+const getFrameworkInfo = (result) => {
+  const framework = result.execution?.framework;
+  const parsingSource = result.execution?.parsingSource;
+  
+  if (framework && parsingSource) {
+    return (
+      <div className="flex items-center space-x-2 text-sm text-gray-600">
+        <span className="font-medium">Framework:</span>
+        <span>{framework.name}</span>
+        {framework.version && (
+          <span className="text-xs opacity-75">v{framework.version}</span>
+        )}
+        <span className="text-xs bg-blue-100 text-blue-700 px-1 rounded">
+          {parsingSource}
+        </span>
+      </div>
+    );
+  }
+  
+  // Fallback: Show just parsing source if no framework detected
+  if (parsingSource) {
+    return (
+      <div className="flex items-center space-x-2 text-sm text-gray-600">
+        <span className="font-medium">Framework:</span>
+        <span>Unknown</span>
+        <span className="text-xs bg-blue-100 text-blue-700 px-1 rounded">
+          {parsingSource}
+        </span>
+      </div>
+    );
+  }
+  
+  // Legacy fallback
+  if (result.framework) {
+    return (
+      <div className="flex items-center space-x-2 text-sm text-gray-600">
+        <span className="font-medium">Framework:</span>
+        <span>{result.framework.name}</span>
+        {result.framework.version && <span className="text-xs opacity-75">v{result.framework.version}</span>}
+        {result.execution?.junitSource && <span className="text-xs bg-blue-100 text-blue-700 px-1 rounded">XML</span>}
+      </div>
+    );
+  }
+  
+  return null;
+};
   return (
     <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
       <div className="relative top-20 mx-auto border w-11/12 max-w-4xl shadow-lg rounded-md bg-white" style={{ maxHeight: 'calc(100vh - 160px)' }}>
