@@ -1,4 +1,4 @@
-// src/pages/TestCases.jsx - Enhanced Version with Clear Selection, Execute Button, and Last Execution Info
+// src/pages/TestCases.jsx - Enhanced Version with Clear Selection, Execute Button, Last Execution Info, and Failure Details
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Play, 
@@ -18,13 +18,17 @@ import {
   Eye,
   Settings,
   ChevronDown,
-  ChevronRight
+  ChevronRight,
+  ChevronUp,
+  AlertTriangle
 } from 'lucide-react';
 import MainLayout from '../components/Layout/MainLayout';
 import EmptyState from '../components/Common/EmptyState';
 import TestExecutionModal from '../components/TestExecution/TestExecutionModal';
+import FailureDetailsPanel from '../components/TestExecution/FailureDetailsPanel';
 import { useVersionContext } from '../context/VersionContext';
 import dataStore from '../services/DataStore';
+
 
 const TestCases = () => {
   // Get version context
@@ -49,6 +53,10 @@ const TestCases = () => {
   const [showExecutionModal, setShowExecutionModal] = useState(false);
   const [editingTestCase, setEditingTestCase] = useState(null);
 
+  // Add new state variables for failure expansion
+  const [expandedTests, setExpandedTests] = useState(new Set());
+  const [allExpanded, setAllExpanded] = useState(false);
+
   // Load data from DataStore
   useEffect(() => {
     const updateData = () => {
@@ -66,6 +74,35 @@ const TestCases = () => {
     // Clean up subscription
     return () => unsubscribe();
   }, []);
+
+  // Toggle individual test expansion for failures
+  const toggleTestExpansion = (testId) => {
+    setExpandedTests(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(testId)) {
+        newSet.delete(testId);
+      } else {
+        newSet.add(testId);
+      }
+      return newSet;
+    });
+  };
+
+  // Expand/Collapse All failures
+  const toggleExpandAll = () => {
+    if (allExpanded) {
+      // Collapse all
+      setExpandedTests(new Set());
+      setAllExpanded(false);
+    } else {
+      // Expand all failed/error tests
+      const failedTests = filteredTestCases
+        .filter(tc => tc.status === 'Failed' || tc.status === 'Not Found')
+        .map(tc => tc.id);
+      setExpandedTests(new Set(failedTests));
+      setAllExpanded(true);
+    }
+  };
 
   // Filter test cases by selected version
   const versionFilteredTestCases = selectedVersion === 'unassigned'
@@ -120,6 +157,7 @@ const TestCases = () => {
     const failed = filteredTestCases.filter(tc => tc.status === 'Failed').length;
     const notRun = filteredTestCases.filter(tc => tc.status === 'Not Run').length;
     const blocked = filteredTestCases.filter(tc => tc.status === 'Blocked').length;
+    const notFound = filteredTestCases.filter(tc => tc.status === 'Not Found').length;
     const automated = filteredTestCases.filter(tc => tc.automationStatus === 'Automated').length;
     const linked = filteredTestCases.filter(tc => tc.requirementIds && tc.requirementIds.length > 0).length;
 
@@ -129,6 +167,7 @@ const TestCases = () => {
       failed,
       notRun,
       blocked,
+      notFound,
       automated,
       linked,
       passRate: total > 0 ? Math.round((passed / total) * 100) : 0,
@@ -408,6 +447,78 @@ const TestCases = () => {
           </div>
         </div>
 
+        {/* Enhanced Filters Section with Expand/Collapse */}
+        <div className="flex justify-between items-center mb-4">
+          <div className="flex space-x-2">
+            {/* Status Filter Buttons */}
+            <button 
+              onClick={() => setStatusFilter('Failed')}
+              className={`px-3 py-1 rounded-full text-sm transition-colors ${
+                statusFilter === 'Failed' 
+                  ? 'bg-red-200 text-red-800' 
+                  : 'bg-red-100 text-red-700 hover:bg-red-200'
+              }`}
+            >
+              🔴 Failed ({summaryStats.failed})
+            </button>
+            
+            {summaryStats.notFound > 0 && (
+              <button 
+                onClick={() => setStatusFilter('Not Found')}
+                className={`px-3 py-1 rounded-full text-sm transition-colors ${
+                  statusFilter === 'Not Found' 
+                    ? 'bg-orange-200 text-orange-800' 
+                    : 'bg-orange-100 text-orange-700 hover:bg-orange-200'
+                }`}
+              >
+                ⚠️ Issues ({summaryStats.notFound})
+              </button>
+            )}
+            
+            <button 
+              onClick={() => setStatusFilter('Passed')}
+              className={`px-3 py-1 rounded-full text-sm transition-colors ${
+                statusFilter === 'Passed' 
+                  ? 'bg-green-200 text-green-800' 
+                  : 'bg-green-100 text-green-700 hover:bg-green-200'
+              }`}
+            >
+              ✅ Passed ({summaryStats.passed})
+            </button>
+            
+            <button 
+              onClick={() => setStatusFilter('All')}
+              className={`px-3 py-1 rounded-full text-sm transition-colors ${
+                statusFilter === 'All' 
+                  ? 'bg-blue-200 text-blue-800' 
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              📊 All ({summaryStats.total})
+            </button>
+          </div>
+          
+          {/* Expand/Collapse All Button */}
+          {(summaryStats.failed > 0 || summaryStats.notFound > 0) && (
+            <button
+              onClick={toggleExpandAll}
+              className="flex items-center space-x-2 px-3 py-1 bg-gray-100 text-gray-700 rounded-md text-sm hover:bg-gray-200 transition-colors"
+            >
+              {allExpanded ? (
+                <>
+                  <ChevronUp size={16} />
+                  <span>Collapse All</span>
+                </>
+              ) : (
+                <>
+                  <ChevronDown size={16} />
+                  <span>Expand All Failures</span>
+                </>
+              )}
+            </button>
+          )}
+        </div>
+
         {/* Bulk Actions - Updated with Clear Selection like Requirements */}
         {selectedTestCases.size > 0 && (
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
@@ -527,15 +638,42 @@ const TestCases = () => {
                           </div>
                         </td>
                         <td className="px-2 py-3 whitespace-nowrap">
-                          <span className={`inline-flex px-1.5 py-0.5 text-xs font-medium rounded ${
-                            testCase.status === 'Passed' ? 'bg-green-100 text-green-800' :
-                            testCase.status === 'Failed' ? 'bg-red-100 text-red-800' :
-                            testCase.status === 'Blocked' ? 'bg-yellow-100 text-yellow-800' :
-                            testCase.status === 'Not Found' ? 'bg-orange-100 text-orange-800' :
-                            'bg-gray-100 text-gray-800'
-                          }`}>
-                            {testCase.status === 'Not Run' ? 'Not Run' : testCase.status}
-                          </span>
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center space-x-2">
+                              <span className={`inline-flex px-1.5 py-0.5 text-xs font-medium rounded ${
+                                testCase.status === 'Passed' ? 'bg-green-100 text-green-800' :
+                                testCase.status === 'Failed' ? 'bg-red-100 text-red-800' :
+                                testCase.status === 'Blocked' ? 'bg-yellow-100 text-yellow-800' :
+                                testCase.status === 'Not Found' ? 'bg-orange-100 text-orange-800' :
+                                'bg-gray-100 text-gray-800'
+                              }`}>
+                                {testCase.status === 'Not Run' ? 'Not Run' : testCase.status}
+                              </span>
+                              
+                              {/* Execution Info */}
+                              {(testCase.status === 'Failed' || testCase.status === 'Passed') && testCase.duration && (
+                                <div className="flex items-center space-x-1 text-xs text-gray-500">
+                                  <Clock size={12} />
+                                  <span>{testCase.duration}ms</span>
+                                </div>
+                              )}
+                            </div>
+                            
+                            {/* Expand/Collapse Button - only for failed/error tests */}
+                            {(testCase.status === 'Failed' || testCase.status === 'Not Found') && (
+                              <button
+                                onClick={() => toggleTestExpansion(testCase.id)}
+                                className="p-1 hover:bg-gray-200 rounded transition-colors"
+                                title={expandedTests.has(testCase.id) ? 'Collapse details' : 'Expand details'}
+                              >
+                                {expandedTests.has(testCase.id) ? (
+                                  <ChevronUp size={16} className="text-gray-600" />
+                                ) : (
+                                  <ChevronDown size={16} className="text-gray-600" />
+                                )}
+                              </button>
+                            )}
+                          </div>
                         </td>
                         <td className="px-2 py-3 whitespace-nowrap">
                           <span className={`inline-flex px-1.5 py-0.5 text-xs font-medium rounded ${
@@ -618,6 +756,15 @@ const TestCases = () => {
                           </div>
                         </td>
                       </tr>
+
+                      {/* Expanded Failure Details Row */}
+                      {expandedTests.has(testCase.id) && (testCase.status === 'Failed' || testCase.status === 'Not Found') && (
+                        <tr className={`${testCase.status === 'Failed' ? 'bg-red-50 border-l-4 border-red-400' : 'bg-orange-50 border-l-4 border-orange-400'}`}>
+                          <td colSpan="9" className="p-4">
+                            <FailureDetailsPanel testCase={testCase} />
+                          </td>
+                        </tr>
+                      )}
 
                       {/* Expanded Row Content */}
                       {isExpanded && (

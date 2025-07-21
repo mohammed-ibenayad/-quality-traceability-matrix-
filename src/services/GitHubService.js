@@ -1101,6 +1101,81 @@ extractVersion(text, frameworkName) {
 }
 
 /**
+ * Extract error location and type from stack trace
+ */
+extractErrorDetails(stackTrace, errorType) {
+  if (!stackTrace) {
+    return { location: null, assertionType: null };
+  }
+
+  const details = {
+    location: null,
+    assertionType: errorType || null
+  };
+
+  // Pattern 1: Python style "file.py:line:"
+  const pythonLocationMatch = stackTrace.match(/([^/\s]+\.py):(\d+):/);
+  if (pythonLocationMatch) {
+    details.location = {
+      file: pythonLocationMatch[1],
+      line: parseInt(pythonLocationMatch[2]),
+      display: `${pythonLocationMatch[1]}:${pythonLocationMatch[2]}`
+    };
+  }
+
+  // Pattern 2: JavaScript style "at file.js:line:col"
+  if (!details.location) {
+    const jsLocationMatch = stackTrace.match(/at [^(]*\(([^)]+\.(?:js|ts)):(\d+):(\d+)\)/);
+    if (jsLocationMatch) {
+      details.location = {
+        file: jsLocationMatch[1],
+        line: parseInt(jsLocationMatch[2]),
+        display: `${jsLocationMatch[1]}:${jsLocationMatch[2]}`
+      };
+    }
+  }
+
+  // Pattern 3: Java style "at Class.method(File.java:line)"
+  if (!details.location) {
+    const javaLocationMatch = stackTrace.match(/at [^(]+\(([^)]+\.java):(\d+)\)/);
+    if (javaLocationMatch) {
+      details.location = {
+        file: javaLocationMatch[1],
+        line: parseInt(javaLocationMatch[2]),
+        display: `${javaLocationMatch[1]}:${javaLocationMatch[2]}`
+      };
+    }
+  }
+
+  // Enhanced assertion type detection from stack trace content
+  if (!details.assertionType && stackTrace) {
+    const assertionTypes = [
+      'SessionNotCreatedException',
+      'AssertionError',
+      'TimeoutException',
+      'NoSuchElementException',
+      'ElementNotInteractableException',
+      'StaleElementReferenceException',
+      'WebDriverException',
+      'ValueError',
+      'TypeError',
+      'AttributeError',
+      'KeyError',
+      'IndexError'
+    ];
+
+    for (const type of assertionTypes) {
+      if (stackTrace.includes(type)) {
+        details.assertionType = type;
+        break;
+      }
+    }
+  }
+
+  return details;
+}
+
+/**
  * 🔧 NEW: Parse JUnit XML format properly
  */
 parseJUnitXML(xmlContent) {
@@ -1143,34 +1218,40 @@ parseJUnitXML(xmlContent) {
       let failureInfo = null;
       
       if (failure) {
-        status = 'Failed';
-        failureInfo = {
-          type: failure.getAttribute('type') || 'TestFailure',
-          message: failure.getAttribute('message') || failure.textContent || 'Test failed',
-          stackTrace: failure.textContent || '',
-          source: 'junit-xml',
-          parsingSource: 'junit-xml',
-          parsingConfidence: 'high',
-          file: classname ? classname.replace(/\./g, '/') + '.py' : '',
-          method: name || '',
-          classname: classname || '',
-          assertion: this.extractAssertionFromStackTrace(failure.textContent || '')
-        };
+  status = 'Failed';
+  const errorDetails = this.extractErrorDetails(failure.textContent, failure.getAttribute('type'));
+  
+  failureInfo = {
+    type: failure.getAttribute('type') || 'TestFailure',
+    message: failure.getAttribute('message') || failure.textContent || 'Test failed',
+    stackTrace: failure.textContent || '',
+    source: 'junit-xml',
+    parsingSource: 'junit-xml',
+    parsingConfidence: 'high',
+    location: errorDetails.location,        // ← Real location from stack trace
+    assertionType: errorDetails.assertionType, // ← Real assertion type
+    method: name || '',
+    classname: classname || '',
+    assertion: this.extractAssertionFromStackTrace(failure.textContent || '')
+  };
       } else if (error) {
-        status = 'Failed';
-        failureInfo = {
-          type: error.getAttribute('type') || 'TestError',
-          message: error.getAttribute('message') || error.textContent || 'Test error',
-          stackTrace: error.textContent || '',
-          source: 'junit-xml',
-          parsingSource: 'junit-xml',
-          parsingConfidence: 'high',
-          file: classname ? classname.replace(/\./g, '/') + '.py' : '',
-          method: name || '',
-          classname: classname || '',
-          assertion: this.extractAssertionFromStackTrace(error.textContent || '')
-        };
-      } else if (skipped) {
+  status = 'Failed';
+  const errorDetails = this.extractErrorDetails(error.textContent, error.getAttribute('type'));
+  
+  failureInfo = {
+    type: error.getAttribute('type') || 'TestError',
+    message: error.getAttribute('message') || error.textContent || 'Test error',
+    stackTrace: error.textContent || '',
+    source: 'junit-xml',
+    parsingSource: 'junit-xml',
+    parsingConfidence: 'high',
+    location: errorDetails.location,        // ← Real location from stack trace
+    assertionType: errorDetails.assertionType, // ← Real assertion type
+    method: name || '',
+    classname: classname || '',
+    assertion: this.extractAssertionFromStackTrace(error.textContent || '')
+  };
+} else if (skipped) {
         status = 'Skipped';
       }
       
@@ -1385,6 +1466,8 @@ transformTestResults(rawResults, clientPayload) {
         parsingConfidence: 'high',
         source: 'junit-xml-transform',
         category: 'general', // Simplified
+        location: failureData.location || null,              
+        assertionType: failureData.assertionType || null,
         file: testResult.file,
         line: testResult.line,
         classname: testResult.classname,
