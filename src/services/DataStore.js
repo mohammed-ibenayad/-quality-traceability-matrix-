@@ -819,6 +819,134 @@ if (!validStatuses.includes(status)) {
     return this._versions;
   }
 
+/**
+ * Add a new version
+ * @param {Object} versionData - Version data to add
+ * @returns {Object} Added version
+ */
+addVersion(versionData) {
+  // Validate required fields
+  if (!versionData.id || !versionData.name) {
+    throw new Error('Version ID and name are required');
+  }
+
+  // Check if version ID already exists
+  if (this._versions.find(v => v.id === versionData.id)) {
+    throw new Error(`Version with ID ${versionData.id} already exists`);
+  }
+
+  // Create the new version with defaults
+  const newVersion = {
+    id: versionData.id,
+    name: versionData.name,
+    releaseDate: versionData.releaseDate,
+    status: versionData.status || 'Planned',
+    qualityGates: versionData.qualityGates || [],
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    ...versionData
+  };
+
+  // Add to versions array
+  this._versions.push(newVersion);
+
+  // Save to localStorage
+  this._saveToLocalStorage('versions', this._versions);
+
+  // Notify listeners of data change
+  this._notifyListeners();
+
+  return newVersion;
+}
+
+/**
+ * Update an existing version
+ * @param {string} versionId - ID of the version to update
+ * @param {Object} updateData - Data to update
+ * @returns {Object} Updated version
+ */
+updateVersion(versionId, updateData) {
+  const index = this._versions.findIndex(v => v.id === versionId);
+  
+  if (index === -1) {
+    throw new Error(`Version with ID ${versionId} not found`);
+  }
+
+  // Don't allow changing the ID
+  if (updateData.id && updateData.id !== versionId) {
+    throw new Error('Cannot change version ID');
+  }
+
+  // Update the version
+  const updatedVersion = {
+    ...this._versions[index],
+    ...updateData,
+    updatedAt: new Date().toISOString()
+  };
+
+  this._versions[index] = updatedVersion;
+
+  // Save to localStorage
+  this._saveToLocalStorage('versions', this._versions);
+
+  // Notify listeners of data change
+  this._notifyListeners();
+
+  return updatedVersion;
+}
+
+/**
+ * Delete a version
+ * @param {string} versionId - ID of the version to delete
+ * @returns {boolean} True if successful
+ */
+deleteVersion(versionId) {
+  const index = this._versions.findIndex(v => v.id === versionId);
+  
+  if (index === -1) {
+    throw new Error(`Version with ID ${versionId} not found`);
+  }
+
+  const version = this._versions[index];
+
+  // Remove from versions array
+  this._versions.splice(index, 1);
+
+  // Clean up any references to this version in requirements
+  this._requirements.forEach(req => {
+    if (req.versions && Array.isArray(req.versions)) {
+      req.versions = req.versions.filter(v => v !== versionId);
+    }
+  });
+
+  // Clean up any references to this version in test cases
+  this._testCases.forEach(tc => {
+    if (tc.version === versionId) {
+      // Reset to unassigned instead of deleting the test case
+      tc.version = '';
+    }
+  });
+
+  // Save to localStorage
+  this._saveToLocalStorage('versions', this._versions);
+  this._saveToLocalStorage('requirements', this._requirements);
+  this._saveToLocalStorage('testCases', this._testCases);
+
+  // Notify listeners of data change
+  this._notifyListeners();
+
+  return true;
+}
+
+/**
+ * Get a specific version by ID
+ * @param {string} versionId - ID of the version to get
+ * @returns {Object|null} Version object or null if not found
+ */
+getVersion(versionId) {
+  return this._versions.find(v => v.id === versionId) || null;
+}
+
   // ===== UTILITY METHODS =====
 
   /**

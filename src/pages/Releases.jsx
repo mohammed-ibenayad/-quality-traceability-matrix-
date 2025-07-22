@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import { Edit, Trash2 } from 'lucide-react';
 import MainLayout from '../components/Layout/MainLayout';
 import ReleaseVersionGrid from '../components/Releases/ReleaseVersionGrid';
 import EmptyState from '../components/Common/EmptyState';
 import NewReleaseModal from '../components/Releases/NewReleaseModal';
+import EditVersionModal from '../components/Releases/EditVersionModal';
 import { useVersionContext } from '../context/VersionContext';
 import dataStore from '../services/DataStore';
 
@@ -10,73 +12,119 @@ const Releases = () => {
   const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'table'
   const [hasData, setHasData] = useState(false);
   const [isNewReleaseModalOpen, setIsNewReleaseModalOpen] = useState(false);
+  const [isEditVersionModalOpen, setIsEditVersionModalOpen] = useState(false);
+  const [editingVersion, setEditingVersion] = useState(null);
+  const [notification, setNotification] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
   
-  // Use the version context
-  const { selectedVersion, setSelectedVersion, versions } = useVersionContext();
+  // Use the version context with loading state
+  const { selectedVersion, setSelectedVersion, versions, isLoading: versionsLoading } = useVersionContext();
   
   // Load data from DataStore
   useEffect(() => {
-    // Check if we have any data
-    setHasData(dataStore.hasData());
+    const updateData = () => {
+      try {
+        setHasData(dataStore.hasData());
+        console.log('Releases: Updated hasData to', dataStore.hasData());
+      } catch (error) {
+        console.error('Releases: Error checking hasData:', error);
+        setHasData(false);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    // Initial load
+    updateData();
     
     // Subscribe to DataStore changes
     const unsubscribe = dataStore.subscribe(() => {
-      setHasData(dataStore.hasData());
+      console.log('Releases: DataStore change detected');
+      updateData();
     });
     
     // Clean up subscription
     return () => unsubscribe();
   }, []);
 
-  // Handler for adding a new version (used by both header and empty state)
+  // Debug logging for versions
+  useEffect(() => {
+    console.log('Releases: Versions updated:', {
+      versionsLoading,
+      versionsCount: versions.length,
+      versions: versions.map(v => ({ id: v?.id, name: v?.name, status: v?.status }))
+    });
+  }, [versions, versionsLoading]);
+
+  // Show notification and auto-hide after 3 seconds
+  const showNotification = (message, type = 'success') => {
+    setNotification({ message, type });
+    setTimeout(() => setNotification(null), 3000);
+  };
+
+  // Handler for adding a new version
   const handleAddVersion = (newVersion) => {
     try {
-      // Use DataStore method if available
-      if (dataStore.addVersion) {
-        dataStore.addVersion(newVersion);
-      }
-      console.log('New version added:', newVersion);
-      // The version context will automatically update when DataStore changes
+      console.log('Releases: Adding version:', newVersion);
+      dataStore.addVersion(newVersion);
+      showNotification(`Version "${newVersion.name}" created successfully!`);
     } catch (error) {
       console.error("Error adding version:", error);
-      // In a real app, show a notification
+      showNotification(error.message, 'error');
     }
   };
   
   // Handler for updating a version
   const handleUpdateVersion = (versionId, updateData) => {
     try {
-      // Use DataStore method if available
-      if (dataStore.updateVersion) {
-        dataStore.updateVersion(versionId, updateData);
-      }
+      console.log('Releases: Updating version:', versionId, updateData);
+      dataStore.updateVersion(versionId, updateData);
+      showNotification('Version updated successfully!');
     } catch (error) {
       console.error("Error updating version:", error);
-      // In a real app, show a notification
+      showNotification(error.message, 'error');
     }
+  };
+
+  // Handler for opening edit modal
+  const handleEditVersion = (version) => {
+    setEditingVersion(version);
+    setIsEditVersionModalOpen(true);
+  };
+
+  // Handler for saving edited version
+  const handleSaveEditedVersion = (updatedVersion) => {
+    handleUpdateVersion(updatedVersion.id, updatedVersion);
+    setIsEditVersionModalOpen(false);
+    setEditingVersion(null);
   };
   
   // Handler for deleting a version
   const handleDeleteVersion = (versionId) => {
     if (window.confirm("Are you sure you want to delete this version? This action cannot be undone.")) {
       try {
-        // Use DataStore method if available
-        if (dataStore.deleteVersion) {
-          dataStore.deleteVersion(versionId);
-        }
+        console.log('Releases: Deleting version:', versionId);
+        
+        // Get version name for notification
+        const versionToDelete = versions.find(v => v && v.id === versionId);
+        const versionName = versionToDelete ? versionToDelete.name : versionId;
+        
+        dataStore.deleteVersion(versionId);
         
         // If the deleted version was selected, switch to unassigned view
         if (selectedVersion === versionId) {
           setSelectedVersion('unassigned');
         }
+        
+        showNotification(`Version "${versionName}" deleted successfully!`);
       } catch (error) {
         console.error("Error deleting version:", error);
-        // In a real app, show a notification
+        showNotification(error.message, 'error');
       }
     }
   };
 
-  // Handler for opening the new release modal (used by EmptyState)
+  // Handler for opening the new release modal
   const handleCreateRelease = () => {
     setIsNewReleaseModalOpen(true);
   };
@@ -92,12 +140,59 @@ const Releases = () => {
     }
   };
 
+  // Show loading state
+  if (isLoading || versionsLoading) {
+    return (
+      <MainLayout title="Release Management" hasData={hasData}>
+        <div className="flex justify-center items-center py-12">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+            <div className="mt-2 text-gray-600">Loading releases...</div>
+          </div>
+        </div>
+      </MainLayout>
+    );
+  }
+
   return (
     <MainLayout 
       title="Release Management" 
       hasData={hasData}
-      onAddVersion={handleAddVersion} // This enables the header button
+      onAddVersion={handleAddVersion}
     >
+      {/* Debug information (remove in production) */}
+      {process.env.NODE_ENV === 'development' && (
+        <div className="mb-4 p-2 bg-gray-100 rounded text-xs text-gray-600">
+          Debug: {versions.length} versions loaded, hasData: {hasData.toString()}
+        </div>
+      )}
+
+      {/* Notification Toast */}
+      {notification && (
+        <div className={`fixed top-4 right-4 z-50 p-4 rounded-md shadow-lg ${
+          notification.type === 'success' ? 'bg-green-100 text-green-800 border border-green-200' : 'bg-red-100 text-red-800 border border-red-200'
+        }`}>
+          <div className="flex">
+            <div className="ml-3">
+              <p className="text-sm font-medium">{notification.message}</p>
+            </div>
+            <div className="ml-auto pl-3">
+              <button
+                onClick={() => setNotification(null)}
+                className={`inline-flex rounded-md p-1.5 ${
+                  notification.type === 'success' ? 'text-green-500 hover:bg-green-200' : 'text-red-500 hover:bg-red-200'
+                } focus:outline-none`}
+              >
+                <span className="sr-only">Dismiss</span>
+                <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold">Release Versions</h2>
         <div className="flex items-center gap-4">
@@ -127,12 +222,12 @@ const Releases = () => {
         </div>
       </div>
 
-      {versions.length === 0 ? (
+      {!Array.isArray(versions) || versions.length === 0 ? (
         <EmptyState
           title="No Releases Found"
           message="Create your first release version to start tracking your quality metrics."
           actionText="Create Release"
-          onAction={handleCreateRelease} // Use onClick handler instead of actionPath
+          onAction={handleCreateRelease}
           icon="metrics"
           className="mt-8"
         />
@@ -141,6 +236,8 @@ const Releases = () => {
           versions={versions}
           selectedVersion={selectedVersion}
           onSelectVersion={setSelectedVersion}
+          onDeleteVersion={handleDeleteVersion}
+          onEditVersion={handleEditVersion}
         />
       ) : (
         <div className="bg-white rounded shadow overflow-hidden">
@@ -165,36 +262,35 @@ const Releases = () => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {versions.map((version) => (
+              {versions.filter(version => version && typeof version === 'object').map((version) => (
                 <tr 
-                  key={version.id} 
+                  key={version.id || Math.random()} 
                   className={`${
-                    version.id === selectedVersion ?
-                      'bg-blue-50' : 'hover:bg-gray-50'
+                    version.id === selectedVersion ? 'bg-blue-50' : 'hover:bg-gray-50'
                   } cursor-pointer`}
                   onClick={() => setSelectedVersion(version.id)}
                 >
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900">{version.name}</div>
-                    <div className="text-sm text-gray-500">{version.id}</div>
+                    <div className="text-sm font-medium text-gray-900">{version.name || 'Unnamed'}</div>
+                    <div className="text-sm text-gray-500">{version.id || 'No ID'}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(version.status)}`}>
-                      {version.status}
+                    <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(version.status || 'Planned')}`}>
+                      {version.status || 'Planned'}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {new Date(version.releaseDate).toLocaleDateString()}
-                    {version.status === 'In Progress' && (
+                    {version.releaseDate ? new Date(version.releaseDate).toLocaleDateString() : 'Not set'}
+                    {version.status === 'In Progress' && version.releaseDate && (
                       <div className="text-xs text-blue-600">
                         {Math.ceil((new Date(version.releaseDate) - new Date()) / (1000 * 60 * 60 * 24))} days left
                       </div>
                     )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    {version.qualityGates ? (
+                    {version.qualityGates && Array.isArray(version.qualityGates) && version.qualityGates.length > 0 ? (
                       <div className="text-sm text-gray-900">
-                        {version.qualityGates.filter(gate => gate.status === 'passed').length} / {version.qualityGates.length} passed
+                        {version.qualityGates.filter(gate => gate && gate.status === 'passed').length} / {version.qualityGates.length} passed
                       </div>
                     ) : (
                       <div className="text-sm text-gray-500">No quality gates defined</div>
@@ -204,11 +300,22 @@ const Releases = () => {
                     <button 
                       onClick={(e) => {
                         e.stopPropagation();
+                        handleEditVersion(version);
+                      }}
+                      className="text-blue-600 hover:text-blue-900 p-1"
+                      title="Edit version"
+                    >
+                      <Edit size={16} />
+                    </button>
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
                         handleDeleteVersion(version.id);
                       }}
-                      className="text-red-600 hover:text-red-900"
+                      className="text-red-600 hover:text-red-900 p-1"
+                      title="Delete version"
                     >
-                      Delete
+                      <Trash2 size={16} />
                     </button>
                   </td>
                 </tr>
@@ -218,7 +325,19 @@ const Releases = () => {
         </div>
       )}
 
-      {/* New Release Modal - now controlled by local state */}
+      {/* Edit Version Modal */}
+      <EditVersionModal
+        version={editingVersion}
+        isOpen={isEditVersionModalOpen}
+        onClose={() => {
+          setIsEditVersionModalOpen(false);
+          setEditingVersion(null);
+        }}
+        onSave={handleSaveEditedVersion}
+        existingVersions={versions || []}
+      />
+
+      {/* New Release Modal */}
       <NewReleaseModal
         isOpen={isNewReleaseModalOpen}
         onClose={() => setIsNewReleaseModalOpen(false)}

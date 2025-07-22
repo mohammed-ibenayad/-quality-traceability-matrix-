@@ -35,20 +35,7 @@ export const PREDEFINED_QUALITY_GATES = [
       const reqsWithSufficientCoverage = coverage.filter(c => c.meetsMinimum);
       return Math.round((reqsWithSufficientCoverage.length / requirements.length) * 100);
     }
-  },
-  {
-    id: 'feature_coverage',
-    name: 'Feature Coverage Completeness',
-    description: 'Percentage of new features with complete test coverage',
-    category: 'Coverage',
-    defaultTarget: 95,
-    calculateActual: (requirements, testCases, mapping, coverage) => {
-      // Assuming new features could be marked with a tag or a special property
-      // For now, let's consider all requirements as features
-      return coverage.filter(c => c.meetsMinimum).length / coverage.length * 100 || 0;
-    }
-  },
-  
+  },  
   // Test Execution Gates
   {
     id: 'test_pass_rate',
@@ -62,56 +49,7 @@ export const PREDEFINED_QUALITY_GATES = [
       const passingTests = testCases.filter(tc => tc.status === 'Passed');
       return Math.round((passingTests.length / testCases.length) * 100);
     }
-  },
-  {
-    id: 'critical_path_pass_rate',
-    name: 'Critical Path Test Pass Rate',
-    description: 'Pass rate for tests covering critical user journeys',
-    category: 'Execution',
-    defaultTarget: 100,
-    calculateActual: (requirements, testCases, mapping, coverage) => {
-      // Critical path tests could be identified by a tag or a special property
-      // For now, let's focus on tests linked to high-priority requirements
-      const highPriorityReqIds = requirements
-        .filter(req => req.priority === 'High')
-        .map(req => req.id);
-      
-      let criticalPathTests = [];
-      highPriorityReqIds.forEach(reqId => {
-        const testIds = mapping[reqId] || [];
-        criticalPathTests = [...criticalPathTests, ...testIds];
-      });
-      
-      // Remove duplicates
-      criticalPathTests = [...new Set(criticalPathTests)];
-      
-      if (criticalPathTests.length === 0) return 0;
-      
-      const passingCriticalTests = criticalPathTests.filter(tcId => {
-        const tc = testCases.find(t => t.id === tcId);
-        return tc && tc.status === 'Passed';
-      });
-      
-      return Math.round((passingCriticalTests.length / criticalPathTests.length) * 100);
-    }
-  },
-  {
-    id: 'regression_pass_rate',
-    name: 'Regression Test Pass Rate',
-    description: 'Pass rate for regression test suites',
-    category: 'Execution',
-    defaultTarget: 98,
-    calculateActual: (requirements, testCases, mapping, coverage) => {
-      // Assuming regression tests could be identified by a tag or type
-      // For this example, let's consider automated tests as regression tests
-      const regressionTests = testCases.filter(tc => tc.automationStatus === 'Automated');
-      
-      if (regressionTests.length === 0) return 0;
-      
-      const passingRegressionTests = regressionTests.filter(tc => tc.status === 'Passed');
-      return Math.round((passingRegressionTests.length / regressionTests.length) * 100);
-    }
-  },
+  },   
   
   // Automation Gates
   {
@@ -177,37 +115,7 @@ export const PREDEFINED_QUALITY_GATES = [
       
       return Math.round((highImpactWithCoverage.length / highImpactReqs.length) * 100);
     }
-  },
-  {
-    id: 'security_req_verification',
-    name: 'Security Requirements Verification',
-    description: 'Percentage of security requirements passing tests',
-    category: 'Risk',
-    defaultTarget: 100,
-    calculateActual: (requirements, testCases, mapping, coverage) => {
-      // Security requirements might be identified by a tag, type or regulatory factor
-      const securityReqs = requirements.filter(req => 
-        req.type === 'Security' || req.regulatoryFactor >= 4
-      );
-      
-      if (securityReqs.length === 0) return 0;
-      
-      const securityReqIds = securityReqs.map(req => req.id);
-      
-      const passedSecurityReqs = securityReqIds.filter(reqId => {
-        const testIds = mapping[reqId] || [];
-        if (testIds.length === 0) return false;
-        
-        // A security requirement passes if all its tests pass
-        return testIds.every(tcId => {
-          const tc = testCases.find(t => t.id === tcId);
-          return tc && tc.status === 'Passed';
-        });
-      });
-      
-      return Math.round((passedSecurityReqs.length / securityReqIds.length) * 100);
-    }
-  },
+  },  
   {
     id: 'risk_area_mitigation',
     name: 'Risk Area Mitigation',
@@ -258,35 +166,7 @@ export const PREDEFINED_QUALITY_GATES = [
       
       return Math.round((compliantReqs.length / requirements.length) * 100);
     }
-  },
-  {
-    id: 'defect_density',
-    name: 'Defect Density',
-    description: 'Number of defects per requirement (should be below threshold)',
-    category: 'Technical',
-    defaultTarget: 0.5, // Less than 0.5 defects per requirement on average
-    calculateActual: (requirements, testCases, mapping, coverage) => {
-      if (requirements.length === 0) return 0;
-      
-      // Count failing tests as defects
-      let totalDefects = 0;
-      
-      Object.keys(mapping).forEach(reqId => {
-        const testIds = mapping[reqId];
-        const failingTests = testIds.filter(tcId => {
-          const tc = testCases.find(t => t.id === tcId);
-          return tc && tc.status === 'Failed';
-        });
-        
-        totalDefects += failingTests.length;
-      });
-      
-      // Return the defect density (average defects per requirement)
-      // Note: For this metric, lower is better, so the UI should handle this differently
-      return parseFloat((totalDefects / requirements.length).toFixed(2));
-    },
-    isInverted: true // Indicates that lower values are better for this metric
-  }
+  },  
 ];
 
 /**

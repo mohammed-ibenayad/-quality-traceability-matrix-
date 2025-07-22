@@ -1,10 +1,11 @@
 import React from 'react';
+import { X } from 'lucide-react';
 import NewReleaseForm from './NewReleaseForm';
 import dataStore from '../../services/DataStore';
 import { calculateCoverage } from '../../utils/coverage';
 
 /**
- * Modal component for the new release form
+ * Modal component for the new release form - Updated to exactly match EditVersionModal size
  */
 const NewReleaseModal = ({ isOpen, onClose, onSave, existingVersions }) => {
   if (!isOpen) return null;
@@ -18,25 +19,24 @@ const NewReleaseModal = ({ isOpen, onClose, onSave, existingVersions }) => {
   const coverage = calculateCoverage(requirements, mapping, testCases);
 
   return (
-    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
-      <div className="relative bg-white rounded-lg shadow-lg max-w-2xl w-full max-h-screen overflow-y-auto">
-        <div className="absolute top-0 right-0 pt-4 pr-4">
+    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+      <div className="relative top-10 mx-auto p-0 border w-11/12 max-w-4xl shadow-lg rounded-lg bg-white">
+        {/* Modal Header */}
+        <div className="flex justify-between items-center p-6 border-b">
+          <h2 className="text-xl font-semibold">Create New Release</h2>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-500 focus:outline-none"
-            aria-label="Close"
+            className="text-gray-400 hover:text-gray-600"
           >
-            <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-            </svg>
+            <X size={24} />
           </button>
         </div>
-        
+
+        {/* Modal Content */}
         <div className="p-6">
           <NewReleaseForm 
             onSave={(formData) => {
               onSave(formData);
-              onClose();
             }}
             onCancel={onClose}
             existingVersions={existingVersions}
