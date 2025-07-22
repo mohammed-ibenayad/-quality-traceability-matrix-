@@ -225,7 +225,7 @@ const notifyWebhookListeners = (data) => {
 };
 
 /**
- * ENHANCED: Process individual test case result with better error handling and notifications
+ * ENHANCED: Process individual test case result with JUnit XML parsing
  * 
  * @param {Object} data - The webhook data for a single test case
  * @returns {Object} Response object
@@ -257,70 +257,266 @@ export const processTestCaseResult = async (data) => {
           error: 'Exactly one test case expected per webhook call',
           received: { 
             hasResults: !!results,
-            isArray: Array.isArray(results),
-            length: results?.length || 0
+            resultsLength: results?.length || 0
           }
         }
       };
     }
 
     const testCase = results[0];
-    if (!testCase.id) {
-      console.error('❌ Test case missing ID');
-      return {
-        status: 400,
-        body: { 
-          error: 'Test case ID is required',
-          received: testCase
+    const testCaseId = testCase.id;
+    console.log(`📝 Processing test case: ${testCaseId} (${testCase.status})`);
+
+    // 🆕 NEW: Process JUnit XML content if available
+    let enhancedTestCase = { ...testCase };
+    
+    if (testCase.junitXml && testCase.junitXml.available && testCase.junitXml.content) {
+      console.log(`🔍 JUnit XML available for ${testCaseId}, parsing...`);
+      
+      try {
+        const parsedFailure = parseJunitXmlForTestCase(testCase.junitXml.content, testCaseId);
+        
+        if (parsedFailure) {
+          console.log(`✅ JUnit XML parsed successfully for ${testCaseId}`);
+          enhancedTestCase.failure = parsedFailure;
+          enhancedTestCase.parsingSource = 'junit-xml';
+          enhancedTestCase.parsingConfidence = 'high';
+        } else {
+          console.log(`ℹ️ No failure found in JUnit XML for ${testCaseId}`);
         }
-      };
+      } catch (parseError) {
+        console.error(`❌ JUnit XML parsing failed for ${testCaseId}:`, parseError);
+        enhancedTestCase.parsingSource = 'junit-xml-error';
+        enhancedTestCase.parsingConfidence = 'none';
+      }
     }
 
-    console.log(`📝 Processing test case: ${testCase.id} with status: ${testCase.status}`);
-    console.log(`🔗 Request ID: ${requestId}`);
-    console.log(`⏰ Timestamp: ${timestamp}`);
-
-    // Store the individual test case result (for per-test-case tracking)
-    const storageKey = storeTestCaseWebhookResult(data);
+    // Store enhanced test case result
+    const storageKey = storeTestCaseWebhookResult({
+      ...data,
+      results: [enhancedTestCase]
+    });
     
-    // CRITICAL: Update test case in DataStore with proper notifications
-    const updatedTestCase = updateTestCaseInDataStore(testCase);
-    
-    if (!updatedTestCase) {
-      console.error(`❌ Failed to update test case ${testCase.id} in DataStore`);
-      return {
-        status: 500,
-        body: { 
-          error: `Failed to update test case ${testCase.id} in DataStore`
-        }
-      };
+    if (storageKey) {
+      console.log(`📋 Enhanced test case stored: ${storageKey}`);
     }
+
+    // Update test case in DataStore with enhanced data  
+    const updatedTestCase = updateTestCaseInDataStore(enhancedTestCase);
     
-    // Notify webhook listeners (for compatibility with existing components)
-    notifyWebhookListeners(data);
-    
-    console.log(`✅ Test case ${testCase.id} processed successfully and DataStore updated`);
-    
+    if (updatedTestCase) {
+      console.log(`🎯 DataStore updated successfully for ${testCaseId}`);
+    }
+
+    // Notify listeners
+    notifyWebhookListeners({
+      ...data,
+      results: [enhancedTestCase]
+    });
+
     return {
       status: 200,
       body: { 
         success: true, 
-        message: `Processed test case ${testCase.id} with status ${testCase.status}`,
-        requestId,
-        testCaseId: testCase.id,
+        message: `Individual test case webhook processed successfully`,
+        testCaseId,
+        status: enhancedTestCase.status,
         storageKey,
-        updatedTestCase,
-        dataStoreUpdated: true
+        enhanced: !!enhancedTestCase.failure,
+        parsingSource: enhancedTestCase.parsingSource || 'none'
       }
     };
     
   } catch (error) {
-    console.error('❌ Error processing test case result:', error);
+    console.error('❌ Error processing individual test case result:', error);
     return {
       status: 500,
-      body: { error: 'Internal server error processing test case result' }
+      body: { error: 'Internal server error processing individual test case result' }
     };
   }
+};
+
+/**
+ * 🆕 NEW: Parse JUnit XML content for a specific test case
+ * This uses the same logic as GitHubService polling approach
+ * 
+ * @param {String} xmlContent - Raw JUnit XML content
+ * @param {String} testCaseId - Test case ID to look for
+ * @returns {Object|null} Parsed failure object or null
+ */
+const parseJunitXmlForTestCase = (xmlContent, testCaseId) => {
+  try {
+    console.log(`🔍 Parsing JUnit XML for test case: ${testCaseId}`);
+    
+    // Create DOM parser
+    const parser = new DOMParser();
+    const xmlDoc = parser.parseFromString(xmlContent, "text/xml");
+    
+    // Check for parsing errors
+    const parseError = xmlDoc.querySelector("parsererror");
+    if (parseError) {
+      throw new Error(`XML parsing failed: ${parseError.textContent}`);
+    }
+    
+    // Find all test cases in the XML
+    const testCases = xmlDoc.querySelectorAll('testcase');
+    let targetTestCase = null;
+    
+    // Look for the specific test case
+    for (let testCase of testCases) {
+      const name = testCase.getAttribute('name');
+      const classname = testCase.getAttribute('classname');
+      
+      // Match by test ID in name or classname
+      if (name && (name.includes(testCaseId) || name.endsWith(testCaseId))) {
+        targetTestCase = testCase;
+        console.log(`✅ Found test case in XML: ${name}`);
+        break;
+      }
+    }
+    
+    if (!targetTestCase) {
+      console.log(`⚠️ Test case ${testCaseId} not found in JUnit XML`);
+      return null;
+    }
+    
+    // Check for failure or error elements
+    const failureElement = targetTestCase.querySelector('failure');
+    const errorElement = targetTestCase.querySelector('error');
+    
+    if (!failureElement && !errorElement) {
+      console.log(`ℹ️ No failure/error element found for ${testCaseId}`);
+      return null;
+    }
+    
+    const element = failureElement || errorElement;
+    const failureType = element.getAttribute('type') || 'TestFailure';
+    const failureMessage = element.getAttribute('message') || '';
+    const stackTrace = element.textContent || '';
+    
+    console.log(`🚨 Failure detected: ${failureType} - ${failureMessage}`);
+    
+    // Build enhanced failure object
+    const failure = {
+      type: failureType,
+      message: failureMessage,
+      stackTrace: stackTrace,
+      parsingSource: 'junit-xml',
+      parsingConfidence: 'high'
+    };
+    
+    // Extract file and line info if available
+    const classname = targetTestCase.getAttribute('classname') || '';
+    const file = targetTestCase.getAttribute('file') || '';
+    const line = targetTestCase.getAttribute('line') || '0';
+    
+    if (file) {
+      failure.file = file.split('/').pop(); // Get filename only
+    }
+    if (line && line !== '0') {
+      failure.line = parseInt(line);
+    }
+    failure.classname = classname;
+    failure.method = targetTestCase.getAttribute('name') || '';
+    
+    // Parse assertion details for assertion errors
+    if (failureType === 'AssertionError' || failureMessage.toLowerCase().includes('assert')) {
+      console.log(`🔍 Parsing assertion details for ${testCaseId}`);
+      
+      const assertion = parseAssertionFromMessage(failureMessage, stackTrace);
+      if (assertion) {
+        failure.assertion = assertion;
+        failure.category = 'assertion';
+        console.log(`✅ Assertion parsed: ${assertion.actual} ${assertion.operator} ${assertion.expected}`);
+      }
+    } else {
+      // Categorize other failure types
+      failure.category = categorizeFailure(failureType, failureMessage);
+    }
+    
+    console.log(`✅ Enhanced failure object created for ${testCaseId}`);
+    return failure;
+    
+  } catch (error) {
+    console.error(`❌ Error parsing JUnit XML for ${testCaseId}:`, error);
+    throw error;
+  }
+};
+
+/**
+ * 🆕 NEW: Parse assertion details from failure message and stack trace
+ * 
+ * @param {String} message - Failure message
+ * @param {String} stackTrace - Stack trace content
+ * @returns {Object|null} Assertion object or null
+ */
+const parseAssertionFromMessage = (message, stackTrace) => {
+  try {
+    // Pattern 1: Simple assert like "assert 1 == 2"
+    const assertMatch = message.match(/assert\s+(.+?)\s*(==|!=|<|>|<=|>=)\s*(.+?)(?:\s|$)/);
+    
+    if (assertMatch) {
+      return {
+        available: true,
+        expression: message,
+        actual: assertMatch[1].strip(),
+        expected: assertMatch[3].strip(),
+        operator: assertMatch[2]
+      };
+    }
+    
+    // Pattern 2: Look in stack trace for assertion details  
+    if (stackTrace) {
+      const stackAssertMatch = stackTrace.match(/assert\s+(.+?)\s*(==|!=|<|>|<=|>=)\s*(.+?)(?:\n|$)/);
+      if (stackAssertMatch) {
+        return {
+          available: true,
+          expression: message,
+          actual: stackAssertMatch[1].strip(),
+          expected: stackAssertMatch[3].strip(),
+          operator: stackAssertMatch[2]
+        };
+      }
+    }
+    
+    // Basic assertion without clear expected/actual
+    return {
+      available: true,
+      expression: message,
+      actual: '',
+      expected: '',
+      operator: ''
+    };
+    
+  } catch (error) {
+    console.error('Error parsing assertion:', error);
+    return null;
+  }
+};
+
+/**
+ * 🆕 NEW: Categorize failure types
+ * 
+ * @param {String} failureType - Failure type from XML
+ * @param {String} message - Failure message
+ * @returns {String} Category name
+ */
+const categorizeFailure = (failureType, message) => {
+  const lowerType = failureType.toLowerCase();
+  const lowerMessage = message.toLowerCase();
+  
+  if (lowerType.includes('timeout') || lowerMessage.includes('timeout')) {
+    return 'timeout';
+  }
+  if (lowerType.includes('element') || lowerMessage.includes('element')) {
+    return 'element';
+  }
+  if (lowerType.includes('network') || lowerType.includes('connection') || 
+      lowerMessage.includes('network') || lowerMessage.includes('connection')) {
+    return 'network';
+  }
+  
+  return 'general';
 };
 
 /**
