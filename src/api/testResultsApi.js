@@ -390,11 +390,12 @@ const parseJunitXmlForTestCase = (xmlContent, testCaseId) => {
     }
     
     const element = failureElement || errorElement;
-    const failureType = element.getAttribute('type') || 'TestFailure';
+    const isError = !!errorElement;
+    const failureType = element.getAttribute('type') || (isError ? 'ExecutionError' : 'TestFailure');
     const failureMessage = element.getAttribute('message') || '';
     const stackTrace = element.textContent || '';
     
-    console.log(`🚨 Failure detected: ${failureType} - ${failureMessage}`);
+    console.log(`🚨 ${isError ? 'Execution error' : 'Test failure'} detected: ${failureType} - ${failureMessage}`);
     
     // Build enhanced failure object
     const failure = {
@@ -419,7 +420,7 @@ const parseJunitXmlForTestCase = (xmlContent, testCaseId) => {
     failure.classname = classname;
     failure.method = targetTestCase.getAttribute('name') || '';
     
-    // Parse assertion details for assertion errors
+    // Parse assertion details for assertion errors OR extract error info for execution errors
     if (failureType === 'AssertionError' || failureMessage.toLowerCase().includes('assert')) {
       console.log(`🔍 Parsing assertion details for ${testCaseId}`);
       
@@ -430,8 +431,17 @@ const parseJunitXmlForTestCase = (xmlContent, testCaseId) => {
         console.log(`✅ Assertion parsed: ${assertion.actual} ${assertion.operator} ${assertion.expected}`);
       }
     } else {
-      // Categorize other failure types
+      // Categorize execution errors and other failure types
       failure.category = categorizeFailure(failureType, failureMessage);
+      
+      // For execution errors, try to extract meaningful info from stack trace
+      if (isError && stackTrace) {
+        const errorInfo = extractExecutionErrorInfo(stackTrace, failureMessage);
+        if (errorInfo) {
+          failure.executionError = errorInfo;
+          console.log(`✅ Execution error info extracted: ${errorInfo.errorType}`);
+        }
+      }
     }
     
     console.log(`✅ Enhanced failure object created for ${testCaseId}`);
@@ -495,7 +505,72 @@ const parseAssertionFromMessage = (message, stackTrace) => {
 };
 
 /**
- * 🆕 NEW: Categorize failure types
+ * 🆕 NEW: Extract execution error information from stack trace
+ * 
+ * @param {String} stackTrace - Full stack trace content
+ * @param {String} message - Error message
+ * @returns {Object|null} Execution error info or null
+ */
+const extractExecutionErrorInfo = (stackTrace, message) => {
+  try {
+    const errorInfo = {
+      errorType: 'ExecutionError',
+      rootCause: '',
+      location: '',
+      suggestion: ''
+    };
+    
+    // Selenium WebDriver errors
+    if (stackTrace.includes('SessionNotCreatedException')) {
+      errorInfo.errorType = 'SessionNotCreatedException';
+      errorInfo.rootCause = 'Chrome driver session creation failed';
+      
+      if (stackTrace.includes('user data directory')) {
+        errorInfo.suggestion = 'Chrome user data directory conflict - ensure unique data directories';
+      } else {
+        errorInfo.suggestion = 'Check Chrome driver installation and browser compatibility';
+      }
+    }
+    // WebDriver setup errors
+    else if (stackTrace.includes('WebDriverException')) {
+      errorInfo.errorType = 'WebDriverException';
+      errorInfo.rootCause = 'WebDriver setup or communication issue';
+      errorInfo.suggestion = 'Verify WebDriver configuration and browser availability';
+    }
+    // Python import/module errors
+    else if (stackTrace.includes('ModuleNotFoundError') || stackTrace.includes('ImportError')) {
+      errorInfo.errorType = 'ModuleNotFoundError';
+      errorInfo.rootCause = 'Missing Python module or import failure';
+      errorInfo.suggestion = 'Install missing dependencies or check Python environment';
+    }
+    // Connection/network errors
+    else if (stackTrace.includes('ConnectionError') || stackTrace.includes('TimeoutException')) {
+      errorInfo.errorType = 'ConnectionError';
+      errorInfo.rootCause = 'Network or connection timeout';
+      errorInfo.suggestion = 'Check network connectivity and service availability';
+    }
+    // General execution errors
+    else {
+      errorInfo.rootCause = 'Test execution environment issue';
+      errorInfo.suggestion = 'Check test setup and environment configuration';
+    }
+    
+    // Extract file location from stack trace if available
+    const locationMatch = stackTrace.match(/tests\/([^:]+):(\d+)/);
+    if (locationMatch) {
+      errorInfo.location = `${locationMatch[1]}:${locationMatch[2]}`;
+    }
+    
+    return errorInfo;
+    
+  } catch (error) {
+    console.error('Error extracting execution error info:', error);
+    return null;
+  }
+};
+
+/**
+ * 🆕 NEW: Categorize failure types (enhanced for execution errors)
  * 
  * @param {String} failureType - Failure type from XML
  * @param {String} message - Failure message
@@ -505,15 +580,27 @@ const categorizeFailure = (failureType, message) => {
   const lowerType = failureType.toLowerCase();
   const lowerMessage = message.toLowerCase();
   
+  // Selenium/WebDriver errors
+  if (lowerType.includes('sessionnotcreated') || lowerType.includes('webdriver')) {
+    return 'webdriver';
+  }
+  // Timeout errors
   if (lowerType.includes('timeout') || lowerMessage.includes('timeout')) {
     return 'timeout';
   }
+  // Element interaction errors
   if (lowerType.includes('element') || lowerMessage.includes('element')) {
     return 'element';
   }
+  // Network/connection errors
   if (lowerType.includes('network') || lowerType.includes('connection') || 
       lowerMessage.includes('network') || lowerMessage.includes('connection')) {
     return 'network';
+  }
+  // Environment/setup errors
+  if (lowerType.includes('import') || lowerType.includes('module') || 
+      lowerMessage.includes('import') || lowerMessage.includes('module')) {
+    return 'environment';
   }
   
   return 'general';
