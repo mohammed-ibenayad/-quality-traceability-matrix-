@@ -215,142 +215,281 @@ const TestExecutionModal = ({
     }
   }, [testCaseResults, isRunning, waitingForWebhook, expectedTestCases.length, onTestComplete, pollInterval, webhookTimeout]);
 
-  // ENHANCED: handleTestCaseUpdate method - Simplified for XML-only parsing
-  const handleTestCaseUpdate = useCallback((eventData) => {
-    console.log('🧪 Enhanced test case update received:', eventData);
+ // Fix for TestExecutionModal.jsx - Add JUnit XML parsing to webhook flow
+// Replace the handleTestCaseUpdate function with this enhanced version:
+
+const handleTestCaseUpdate = useCallback((eventData) => {
+  console.log('🧪 Enhanced test case update received:', eventData);
+  
+  const { type, requestId, testCaseId, testCase, allResults } = eventData;
+  
+  // CRITICAL: Check current request ID from ref, not closure
+  const currentReqId = subscriptionRef.current;
+  if (requestId !== currentReqId) {
+    console.log(`❌ Event for ${requestId}, but current is ${currentReqId} - ignoring`);
+    return;
+  }
+
+  if (type === 'test-case-update' && testCaseId && testCase) {
+    console.log('🔍 Processing test case update:', {
+      testCaseId,
+      status: testCase.status,
+      hasFailure: !!testCase.failure,
+      hasJunitXml: !!(testCase.junitXml && testCase.junitXml.available),
+      hasRawOutput: !!testCase.rawOutput
+    });
+
+    // 🆕 NEW: Parse JUnit XML if available (same as polling mechanism)
+    let enhancedTestCase = { ...testCase };
     
-    const { type, requestId, testCaseId, testCase, allResults } = eventData;
-    
-    // CRITICAL: Check current request ID from ref, not closure
-    const currentReqId = subscriptionRef.current;
-    if (requestId !== currentReqId) {
-      console.log(`❌ Event for ${requestId}, but current is ${currentReqId} - ignoring`);
-      return;
+    if (testCase.junitXml && testCase.junitXml.available && testCase.junitXml.content) {
+      console.log(`🔍 JUnit XML available for ${testCaseId}, parsing using frontend parser...`);
+      
+      try {
+        // Use the same parsing logic as GitHubService.parseJUnitXML
+        const parsedFailure = parseJunitXmlForTestCaseFrontend(testCase.junitXml.content, testCaseId);
+        
+        if (parsedFailure) {
+          console.log(`✅ JUnit XML parsed successfully for ${testCaseId}`, {
+            type: parsedFailure.type,
+            hasMessage: !!parsedFailure.message,
+            hasStackTrace: !!parsedFailure.stackTrace,
+            category: parsedFailure.category
+          });
+          
+          enhancedTestCase.failure = parsedFailure;
+        } else {
+          console.log(`ℹ️ No failure found in JUnit XML for ${testCaseId}`);
+        }
+      } catch (parseError) {
+        console.error(`❌ JUnit XML parsing failed for ${testCaseId}:`, parseError);
+      }
     }
 
-    if (type === 'test-case-update' && testCaseId && testCase) {
-      console.log('🔍 Processing test case update:', {
-        testCaseId,
-        status: testCase.status,
-        hasFailure: !!testCase.failure,
-        parsingSource: testCase.failure?.parsingSource,
-        parsingConfidence: testCase.failure?.parsingConfidence,
-        hasRawOutput: !!testCase.rawOutput
-      });
-
-      // ✅ SIMPLIFIED: Use failure data as-is from XML parsing
-      let enhancedFailure = null;
-      
-      if (testCase.status === 'Failed') {
-        // Priority 1: Use JUnit XML parsed data (from enhanced workflow)
-        if (testCase.failure && testCase.failure.parsingSource === 'junit-xml') {
-          console.log(`✅ Using JUnit XML parsed data for ${testCaseId}: ${testCase.failure.parsingConfidence} confidence`);
-          enhancedFailure = testCase.failure;
-        }
-        // Priority 2: Use any existing failure data
-        else if (testCase.failure) {
-          console.log(`✅ Using existing failure data for ${testCaseId}`);
-          enhancedFailure = testCase.failure;
-        }
-        // Priority 3: Create minimal failure object
-        else {
-          console.log(`📝 Creating minimal failure object for ${testCaseId}`);
-          enhancedFailure = {
-            type: 'TestFailure',
-            message: 'Test execution failed',
-            source: 'minimal-fallback',
-            parsingConfidence: 'low'
-          };
-        }
+    // Create enhanced failure object for failed tests
+    let enhancedFailure = null;
+    
+    if (enhancedTestCase.status === 'Failed') {
+      // Priority 1: Use JUnit XML parsed data
+      if (enhancedTestCase.failure) {
+        console.log(`✅ Using JUnit XML parsed data for ${testCaseId}`);
+        enhancedFailure = enhancedTestCase.failure;
       }
-      
-      // Update specific test case with enhanced failure data
-      setTestCaseResults(prev => {
-        const updated = new Map(prev);
-        const existingResult = prev.get(testCaseId);
-        
-        const enhancedResult = {
-          id: testCaseId,
-          name: existingResult?.name || testCase.name || `Test ${testCaseId}`,
-          status: testCase.status,
-          duration: testCase.duration || 0,
-          logs: testCase.logs || '',
-          rawOutput: testCase.rawOutput || '',
-          receivedAt: new Date().toISOString(),
-          
-          // ✅ Enhanced failure data from XML parsing
-          failure: enhancedFailure,
-          execution: testCase.execution,
-          framework: testCase.framework,
-          
-          // ✅ Add file/line info if available from JUnit XML
-          file: testCase.file || enhancedFailure?.file,
-          line: testCase.line || enhancedFailure?.line,
-          classname: testCase.classname,
-          method: testCase.method
+      // Priority 2: Create minimal failure object
+      else {
+        console.log(`📝 Creating minimal failure object for ${testCaseId}`);
+        enhancedFailure = {
+          type: 'TestFailure',
+          message: 'Test execution failed',
+          source: 'minimal-fallback',
+          parsingConfidence: 'low'
         };
-        
-        updated.set(testCaseId, enhancedResult);
-        console.log(`📝 Enhanced test case ${testCaseId}: ${testCase.status} (source: ${enhancedFailure?.parsingSource || 'none'})`);
-        return updated;
-      });
-
-      // Update DataStore with enhanced failure data
-      const currentTestCases = dataStore.getTestCases();
-      const testCaseObj = currentTestCases.find(tc => tc.id === testCaseId);
-      if (testCaseObj) {
-        dataStore.updateTestCase(testCaseId, {
-          ...testCaseObj,
-          status: testCase.status,
-          lastRun: new Date().toISOString(),
-          lastExecuted: testCase.status !== 'Not Started' ? new Date().toISOString() : testCaseObj.lastExecuted,
-          executionTime: testCase.duration || 0,
-          
-          // ✅ Store enhanced failure data in DataStore
-          failure: enhancedFailure,
-          execution: testCase.execution,
-          framework: testCase.framework,
-          logs: testCase.logs,
-          rawOutput: testCase.rawOutput
-        });
-        console.log(`📀 DataStore updated for ${testCaseId} with enhanced data`);
       }
-
-    } else if (type === 'existing-results' && allResults) {
-      console.log(`📦 Processing ${allResults.length} existing test case results`);
+    }
+    
+    // Update specific test case with enhanced failure data
+    setTestCaseResults(prev => {
+      const updated = new Map(prev);
+      const existingResult = prev.get(testCaseId);
       
-      setTestCaseResults(prev => {
-        const updated = new Map(prev);
-        allResults.forEach(result => {
-          if (result.id) {
-            const existingResult = prev.get(result.id);
-            updated.set(result.id, {
-              id: result.id,
-              name: existingResult?.name || result.name || `Test ${result.id}`,
-              status: result.status,
-              duration: result.duration || 0,
-              logs: result.logs || '',
-              rawOutput: result.rawOutput || '',
-              receivedAt: result.receivedAt,
-              
-              // ✅ Include enhanced failure data
-              failure: result.failure,
-              execution: result.execution,
-              framework: result.framework
-            });
-          }
-        });
-        return updated;
+      const enhancedResult = {
+        id: testCaseId,
+        name: existingResult?.name || enhancedTestCase.name || `Test ${testCaseId}`,
+        status: enhancedTestCase.status,
+        duration: enhancedTestCase.duration || 0,
+        logs: enhancedTestCase.logs || '',
+        rawOutput: enhancedTestCase.rawOutput || '',
+        receivedAt: new Date().toISOString(),
+        
+        // ✅ Enhanced failure data from XML parsing
+        failure: enhancedFailure,
+        execution: enhancedTestCase.execution,
+        framework: enhancedTestCase.framework,
+        
+        // ✅ Add file/line info if available from JUnit XML
+        file: enhancedTestCase.file || enhancedFailure?.file,
+        line: enhancedTestCase.line || enhancedFailure?.line,
+        classname: enhancedTestCase.classname,
+        method: enhancedTestCase.method
+      };
+      
+      updated.set(testCaseId, enhancedResult);
+      console.log(`📝 Enhanced test case ${testCaseId}: ${enhancedTestCase.status} (source: ${enhancedFailure?.parsingSource || 'none'})`);
+      return updated;
+    });
+
+    // Update DataStore with enhanced failure data
+    const currentTestCases = dataStore.getTestCases();
+    const testCaseObj = currentTestCases.find(tc => tc.id === testCaseId);
+    if (testCaseObj) {
+      dataStore.updateTestCase(testCaseId, {
+        ...testCaseObj,
+        status: enhancedTestCase.status,
+        lastRun: new Date().toISOString(),
+        lastExecuted: enhancedTestCase.status !== 'Not Started' ? new Date().toISOString() : null,
+        failure: enhancedFailure // Add failure data to DataStore
       });
     }
+  }
+}, [subscriptionRef]);
 
-    // Refresh quality gates
-    try {
-      refreshQualityGates(dataStore);
-    } catch (error) {
-      console.warn('Error refreshing quality gates:', error);
+// 🆕 NEW: Add JUnit XML parsing function for frontend (same logic as GitHubService)
+const parseJunitXmlForTestCaseFrontend = (xmlContent, testCaseId) => {
+  try {
+    console.log(`🔍 Frontend parsing JUnit XML for test case: ${testCaseId}`);
+    
+    // Create DOM parser
+    const parser = new DOMParser();
+    const xmlDoc = parser.parseFromString(xmlContent, "text/xml");
+    
+    // Check for parsing errors
+    const parseError = xmlDoc.querySelector("parsererror");
+    if (parseError) {
+      throw new Error(`XML parsing failed: ${parseError.textContent}`);
     }
-  }, []); // EMPTY DEPENDENCIES to prevent recreation
+    
+    // Find all test cases in the XML
+    const testCases = xmlDoc.querySelectorAll('testcase');
+    let targetTestCase = null;
+    
+    // Look for the specific test case
+    for (let testCase of testCases) {
+      const name = testCase.getAttribute('name');
+      const classname = testCase.getAttribute('classname');
+      
+      // Match by test ID in name or classname
+      if (name && (name.includes(testCaseId) || name.endsWith(testCaseId))) {
+        targetTestCase = testCase;
+        console.log(`✅ Found test case in XML: ${name}`);
+        break;
+      }
+    }
+    
+    if (!targetTestCase) {
+      console.log(`⚠️ Test case ${testCaseId} not found in JUnit XML`);
+      return null;
+    }
+    
+    // Check for failure or error elements
+    const failureElement = targetTestCase.querySelector('failure');
+    const errorElement = targetTestCase.querySelector('error');
+    
+    if (!failureElement && !errorElement) {
+      console.log(`ℹ️ No failure/error element found for ${testCaseId}`);
+      return null;
+    }
+    
+    const element = failureElement || errorElement;
+    const isError = !!errorElement;
+    const failureType = element.getAttribute('type') || (isError ? 'ExecutionError' : 'TestFailure');
+    const failureMessage = element.getAttribute('message') || '';
+    const stackTrace = element.textContent || '';
+    
+    console.log(`🚨 ${isError ? 'Execution error' : 'Test failure'} detected: ${failureType}`);
+    
+    // Build enhanced failure object (same as GitHubService)
+    const failure = {
+      type: failureType,
+      message: failureMessage,
+      stackTrace: stackTrace,
+      parsingSource: 'junit-xml',
+      parsingConfidence: 'high',
+      category: categorizeFailureType(failureType, failureMessage)
+    };
+    
+    // Extract file and line info if available
+    const classname = targetTestCase.getAttribute('classname') || '';
+    const file = targetTestCase.getAttribute('file') || '';
+    const line = targetTestCase.getAttribute('line') || '0';
+    
+    if (file) {
+      failure.file = file.split('/').pop(); // Get filename only
+    }
+    if (line && line !== '0') {
+      failure.line = parseInt(line);
+    }
+    failure.classname = classname;
+    failure.method = targetTestCase.getAttribute('name') || '';
+    
+    // Parse assertion details for assertion errors
+    if (failureType === 'AssertionError' || failureMessage.toLowerCase().includes('assert')) {
+      const assertion = parseAssertionFromJUnit(failureMessage, stackTrace);
+      if (assertion) {
+        failure.assertion = assertion;
+        failure.category = 'assertion';
+      }
+    }
+    
+    console.log(`✅ Enhanced failure object created for ${testCaseId}`, {
+      type: failure.type,
+      category: failure.category,
+      hasFile: !!failure.file,
+      hasLine: !!failure.line,
+      hasAssertion: !!failure.assertion
+    });
+    
+    return failure;
+    
+  } catch (error) {
+    console.error(`❌ Error parsing JUnit XML for ${testCaseId}:`, error);
+    throw error;
+  }
+};
+
+// Helper function to categorize failure types
+const categorizeFailureType = (failureType, failureMessage) => {
+  const type = (failureType || '').toLowerCase();
+  const message = (failureMessage || '').toLowerCase();
+  
+  if (type.includes('assertion') || message.includes('assert')) {
+    return 'assertion';
+  }
+  if (type.includes('timeout') || message.includes('timeout')) {
+    return 'timeout';
+  }
+  if (type.includes('element') || message.includes('element')) {
+    return 'element';
+  }
+  if (type.includes('network') || type.includes('connection') || message.includes('network')) {
+    return 'network';
+  }
+  
+  return 'general';
+};
+
+// Helper function to parse assertion details
+const parseAssertionFromJUnit = (message, stackTrace) => {
+  try {
+    // Look for common assertion patterns
+    const assertMatch = message.match(/assert\s+(.+?)\s*(==|!=|<|>|<=|>=)\s*(.+?)(?:\s|$)/i);
+    if (assertMatch) {
+      return {
+        available: true,
+        actual: assertMatch[1].trim(),
+        operator: assertMatch[2],
+        expected: assertMatch[3].trim(),
+        expression: message
+      };
+    }
+    
+    // Look for "Expected X but was Y" patterns
+    const expectedMatch = message.match(/expected\s+(.+?)\s+but\s+(?:was|got)\s+(.+?)(?:\s|$)/i);
+    if (expectedMatch) {
+      return {
+        available: true,
+        expected: expectedMatch[1].trim(),
+        actual: expectedMatch[2].trim(),
+        operator: 'equals',
+        expression: message
+      };
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('Error parsing assertion:', error);
+    return null;
+  }
+};
 
   // Initialize when modal first opens or test cases change significantly
   useEffect(() => {
