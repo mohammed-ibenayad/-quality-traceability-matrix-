@@ -215,8 +215,7 @@ const TestExecutionModal = ({
     }
   }, [testCaseResults, isRunning, waitingForWebhook, expectedTestCases.length, onTestComplete, pollInterval, webhookTimeout]);
 
- // Fix for TestExecutionModal.jsx - Add JUnit XML parsing to webhook flow
-// Replace the handleTestCaseUpdate function with this enhanced version:
+  // Add this to TestExecutionModal.jsx - Replace your handleTestCaseUpdate function
 
 const handleTestCaseUpdate = useCallback((eventData) => {
   console.log('🧪 Enhanced test case update received:', eventData);
@@ -239,7 +238,7 @@ const handleTestCaseUpdate = useCallback((eventData) => {
       hasRawOutput: !!testCase.rawOutput
     });
 
-    // 🆕 NEW: Parse JUnit XML if available (same as polling mechanism)
+    // 🆕 CRITICAL FIX: Parse JUnit XML if available (same as polling mechanism)
     let enhancedTestCase = { ...testCase };
     
     if (testCase.junitXml && testCase.junitXml.available && testCase.junitXml.content) {
@@ -333,7 +332,7 @@ const handleTestCaseUpdate = useCallback((eventData) => {
   }
 }, [subscriptionRef]);
 
-// 🆕 NEW: Add JUnit XML parsing function for frontend (same logic as GitHubService)
+// 🆕 CRITICAL: Add JUnit XML parsing function for frontend (same logic as GitHubService)
 const parseJunitXmlForTestCaseFrontend = (xmlContent, testCaseId) => {
   try {
     console.log(`🔍 Frontend parsing JUnit XML for test case: ${testCaseId}`);
