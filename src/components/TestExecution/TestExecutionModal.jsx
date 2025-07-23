@@ -215,8 +215,6 @@ const TestExecutionModal = ({
     }
   }, [testCaseResults, isRunning, waitingForWebhook, expectedTestCases.length, onTestComplete, pollInterval, webhookTimeout]);
 
-// Replace your handleTestCaseUpdate function in TestExecutionModal.jsx with this:
-
 const handleTestCaseUpdate = useCallback((eventData) => {
   console.log('🧪 Enhanced test case update received:', eventData);
   
@@ -235,55 +233,53 @@ const handleTestCaseUpdate = useCallback((eventData) => {
       status: testCase.status,
       hasFailure: !!testCase.failure,
       hasJunitXml: !!(testCase.junitXml && testCase.junitXml.available),
-      junitXmlSize: testCase.junitXml?.size || 0,
       hasRawOutput: !!testCase.rawOutput
     });
 
-    // 🆕 CRITICAL FIX: Parse JUnit XML if available
+    // 🆕 CRITICAL FIX: If JUnit XML is available, parse it like polling does
     let enhancedTestCase = { ...testCase };
     
     if (testCase.junitXml && testCase.junitXml.available && testCase.junitXml.content) {
-      console.log(`🔍 JUnit XML available for ${testCaseId} (${testCase.junitXml.size} chars), parsing...`);
+      console.log(`🔍 JUnit XML available for ${testCaseId}, parsing like polling mechanism...`);
       
       try {
-        // Parse the JUnit XML content
-        const parsedData = parseJunitXmlLikePolling(testCase.junitXml.content, testCaseId);
+        // Use the SAME parsing logic as GitHubService.parseJUnitXML + transformTestResults
+        const parsedTestData = parseJunitXmlLikePolling(testCase.junitXml.content, testCaseId);
         
-        if (parsedData) {
+        if (parsedTestData) {
           console.log(`✅ JUnit XML parsed successfully for ${testCaseId}`, {
-            status: parsedData.status,
-            hasFailure: !!parsedData.failure,
-            duration: parsedData.duration,
-            failureType: parsedData.failure?.type
+            status: parsedTestData.status,
+            hasFailure: !!parsedTestData.failure,
+            duration: parsedTestData.duration
           });
           
-          // Override with XML data (like polling does)
+          // Override webhook data with XML data (like polling does)
           enhancedTestCase = {
             ...testCase,
-            status: parsedData.status, // Use XML status
-            duration: parsedData.duration,
-            logs: parsedData.logs,
-            failure: parsedData.failure,
-            classname: parsedData.classname,
-            framework: parsedData.framework,
-            time: parsedData.time,
-            system_out: parsedData.system_out,
-            system_err: parsedData.system_err
+            status: parsedTestData.status, // Use XML status, not webhook status
+            duration: parsedTestData.duration,
+            logs: parsedTestData.logs,
+            failure: parsedTestData.failure,
+            classname: parsedTestData.classname,
+            framework: parsedTestData.framework,
+            time: parsedTestData.time,
+            system_out: parsedTestData.system_out,
+            system_err: parsedTestData.system_err
           };
         } else {
-          console.log(`⚠️ Could not parse JUnit XML for ${testCaseId} - no matching test case found`);
+          console.log(`ℹ️ Could not parse JUnit XML for ${testCaseId}`);
         }
       } catch (parseError) {
         console.error(`❌ JUnit XML parsing failed for ${testCaseId}:`, parseError);
       }
     }
 
-    // Create enhanced failure object
+    // Use enhanced test case data (prioritizing XML over webhook)
     let enhancedFailure = null;
     
     if (enhancedTestCase.status === 'Failed') {
       if (enhancedTestCase.failure) {
-        console.log(`✅ Using parsed XML failure data for ${testCaseId}: ${enhancedTestCase.failure.type}`);
+        console.log(`✅ Using parsed XML failure data for ${testCaseId}`);
         enhancedFailure = enhancedTestCase.failure;
       } else {
         console.log(`📝 Creating minimal failure object for ${testCaseId}`);
@@ -304,7 +300,7 @@ const handleTestCaseUpdate = useCallback((eventData) => {
       const enhancedResult = {
         id: testCaseId,
         name: existingResult?.name || enhancedTestCase.name || `Test ${testCaseId}`,
-        status: enhancedTestCase.status,
+        status: enhancedTestCase.status, // Use XML status
         duration: enhancedTestCase.duration || 0,
         logs: enhancedTestCase.logs || '',
         rawOutput: enhancedTestCase.rawOutput || '',
@@ -332,7 +328,7 @@ const handleTestCaseUpdate = useCallback((eventData) => {
     if (testCaseObj) {
       dataStore.updateTestCase(testCaseId, {
         ...testCaseObj,
-        status: enhancedTestCase.status,
+        status: enhancedTestCase.status, // Use XML status
         lastRun: new Date().toISOString(),
         lastExecuted: enhancedTestCase.status !== 'Not Started' ? new Date().toISOString() : null,
         failure: enhancedFailure
@@ -341,12 +337,11 @@ const handleTestCaseUpdate = useCallback((eventData) => {
   }
 }, [subscriptionRef]);
 
-// Add this parsing function to TestExecutionModal.jsx:
 const parseJunitXmlLikePolling = (xmlContent, testCaseId) => {
   try {
     console.log(`🔍 Parsing JUnit XML like polling for: ${testCaseId}`);
     
-    // Parse XML
+    // Step 1: Parse XML (same as GitHubService.parseJUnitXML)
     const parser = new DOMParser();
     const xmlDoc = parser.parseFromString(xmlContent, "text/xml");
     
@@ -366,7 +361,7 @@ const parseJunitXmlLikePolling = (xmlContent, testCaseId) => {
         const classname = testcase.getAttribute('classname');
         const time = parseFloat(testcase.getAttribute('time') || '0');
         
-        // Check for failure or error
+        // Check for failure or error (same as GitHubService)
         const failure = testcase.querySelector('failure');
         const error = testcase.querySelector('error');
         const skipped = testcase.querySelector('skipped');
@@ -396,7 +391,7 @@ const parseJunitXmlLikePolling = (xmlContent, testCaseId) => {
           status = 'Skipped';
         }
         
-        // Extract system-out and system-err
+        // Extract system-out and system-err (like GitHubService)
         const systemOut = testcase.querySelector('system-out')?.textContent || '';
         const systemErr = testcase.querySelector('system-err')?.textContent || '';
         
@@ -412,10 +407,13 @@ const parseJunitXmlLikePolling = (xmlContent, testCaseId) => {
       });
     });
     
-    // Find matching test
+    // Step 2: Transform like GitHubService.transformTestResults
     console.log(`🔍 Found ${tests.length} tests in XML, looking for ${testCaseId}`);
     
-    let testResult = tests.find(t => t.name === testCaseId);
+    let testResult = null;
+    
+    // Find the matching test (same logic as GitHubService.transformTestResults)
+    testResult = tests.find(t => t.name === testCaseId);
     if (testResult) {
       console.log(`✅ Found exact name match: ${testResult.name}`);
     }
@@ -444,10 +442,10 @@ const parseJunitXmlLikePolling = (xmlContent, testCaseId) => {
       return null;
     }
     
-    // Transform to standard format
+    // Step 3: Transform to standard format (same as GitHubService.transformTestResults)
     const duration = parseFloat(testResult.time || 0) * 1000; // Convert to milliseconds
     
-    // Generate logs
+    // Generate logs (same as GitHubService)
     let logs = '';
     if (testResult.system_out) {
       logs += `STDOUT:\n${testResult.system_out}\n`;
@@ -468,7 +466,7 @@ const parseJunitXmlLikePolling = (xmlContent, testCaseId) => {
       status: testResult.status,
       duration: duration,
       hasFailure: !!testResult.failure,
-      failureType: testResult.failure?.type
+      hasLogs: !!logs
     });
     
     return {
@@ -489,6 +487,7 @@ const parseJunitXmlLikePolling = (xmlContent, testCaseId) => {
     throw error;
   }
 };
+
 
 
   // Initialize when modal first opens or test cases change significantly
