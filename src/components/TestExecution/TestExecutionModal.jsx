@@ -1,5 +1,6 @@
 // src/components/TestExecution/TestExecutionModal.jsx - JUnit XML-Only Enhanced
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import TestResultRow from './TestResultRow';
 import {
   Play,
   Pause,
@@ -19,13 +20,15 @@ import {
   AlertCircle,
   X,
   Bug,
-  Eye
+  Eye,
+  Copy,
 } from 'lucide-react';
 import GitHubService from '../../services/GitHubService';
 import dataStore from '../../services/DataStore';
 import { refreshQualityGates } from '../../utils/calculateQualityGates';
 import webhookService from '../../services/WebhookService';
 import FailureAnalysisModal from './FailureAnalysisModal';
+import BranchSelector from '../Common/BranchSelector';
 
 const getCallbackUrl = () => {
   if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
@@ -53,6 +56,9 @@ const TestExecutionModal = ({
     };
     return savedConfig ? { ...defaultConfig, ...JSON.parse(savedConfig) } : defaultConfig;
   });
+  
+  const [resultsViewMode, setResultsViewMode] = useState('compact');
+  const [expandedTestResults, setExpandedTestResults] = useState(new Set());
 
   // Backend support detection
   const [hasBackendSupport, setHasBackendSupport] = useState(false);
@@ -1242,19 +1248,13 @@ const parseJunitXmlLikePolling = (xmlContent, testCaseId) => {
                     />
                   </div>
                   <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Branch
-                      </label>
-                      <input
-                        type="text"
-                        name="branch"
-                        value={config.branch}
-                        onChange={handleInputChange}
-                        placeholder="main"
-                        className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:border-blue-500"
-                      />
-                    </div>
+                    <BranchSelector
+  repoUrl={config.repoUrl}
+  ghToken={config.ghToken}
+  selectedBranch={config.branch}
+  onBranchChange={(branch) => setConfig(prev => ({ ...prev, branch }))}
+  disabled={isRunning}
+/>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Workflow ID
@@ -1432,138 +1432,96 @@ const parseJunitXmlLikePolling = (xmlContent, testCaseId) => {
               </div>
             )}
 
-            {/* Simplified Execution Summary */}
-            {testResultsArray.length > 0 && (
-              <div className="mb-4 p-3 bg-gray-50 border border-gray-200 rounded">
-                <div className="text-sm text-gray-700">
-                  <div className="flex justify-between items-center">
-                    <span className="font-medium">Execution Summary:</span>
-                    <span className="text-xs text-gray-500">
-                      {new Date().toLocaleTimeString()}
-                    </span>
-                  </div>
-                  <div className="mt-2 grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
-                    <div className="flex items-center">
-                      <Clock className="text-gray-400 mr-1" size={12} />
-                      <span>Not Started: {testResultsArray.filter(r => r.status === 'Not Started').length}</span>
-                    </div>
-                    <div className="flex items-center">
-                      <Loader2 className="text-blue-500 mr-1" size={12} />
-                      <span>Running: {runningTests}</span>
-                    </div>
-                    <div className="flex items-center">
-                      <CheckCircle className="text-green-500 mr-1" size={12} />
-                      <span>Passed: {testResultsArray.filter(r => r.status === 'Passed').length}</span>
-                    </div>
-                    <div className="flex items-center">
-                      <XCircle className="text-red-500 mr-1" size={12} />
-                      <span>Failed: {testResultsArray.filter(r => r.status === 'Failed').length}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
+           {/* Enhanced Test Results Display */}
+{testResultsArray.length > 0 && (
+  <div className="mt-6">
+    <div className="flex items-center justify-between mb-4">
+      <h4 className="text-sm font-medium text-gray-700">
+        Test Results ({completedTests}/{testResultsArray.length})
+      </h4>
+      <div className="flex items-center space-x-2">
+        <button
+          onClick={() => setResultsViewMode(resultsViewMode === 'compact' ? 'detailed' : 'compact')}
+          className="px-3 py-1 text-xs bg-gray-100 text-gray-600 rounded hover:bg-gray-200"
+        >
+          {resultsViewMode === 'compact' ? 'Show Details' : 'Hide Details'}
+        </button>
+        <button
+          onClick={() => setExpandedTestResults(new Set())}
+          className="px-3 py-1 text-xs bg-gray-100 text-gray-600 rounded hover:bg-gray-200"
+        >
+          Collapse All
+        </button>
+      </div>
+    </div>
 
-            {/* Test Results Table */}
-            <div className="border border-gray-200 rounded overflow-hidden">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Test ID
-                    </th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Priority
-                    </th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Duration
-                    </th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {testResultsArray.map((result) => {
-                    const isRunning = result.status === 'Running';
-                    const isFailed = result.status === 'Failed';
-                    const originalTestCase = testCases.find(tc => tc.id === result.id);
-                    
-                    return (
-                      <tr 
-                        key={result.id} 
-                        className={`
-                          ${isRunning ? 'bg-yellow-50' : ''}
-                          ${isFailed ? 'bg-red-50' : ''}
-                          transition-colors duration-200
-                        `}
-                      >
-                        <td className="px-4 py-2 text-sm">
-                          <div className="flex items-center space-x-2">
-                            <span className="font-mono font-medium text-gray-900">{result.id}</span>
-                            {isFailed && result.failure && (
-                              <span className="text-lg" title={result.failure.type}>
-                                {getFailureTypeIcon(result)}
-                              </span>
-                            )}
-                          </div>
-                          <div className="text-xs text-gray-500 truncate max-w-xs mt-1">
-                            {result.name}
-                          </div>
-                        </td>
-                        <td className="px-4 py-2 text-sm">
-                          <div className="flex items-center">
-                            {getStatusIcon(result.status)}
-                            <span className="ml-2">{result.status}</span>
-                          </div>
-                          {/* Error message with truncation */}
-                          {isFailed && result.failure && (
-                            <div className="text-xs text-red-600 mt-1 truncate max-w-xs">
-                              {getQuickInsight(result)}
-                            </div>
-                          )}
-                        </td>
-                        <td className="px-4 py-2 text-sm">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getPriorityColor(originalTestCase?.priority)}`}>
-                            {originalTestCase?.priority || 'Medium'}
-                          </span>
-                        </td>
-                        <td className="px-4 py-2 text-sm text-gray-500">
-                          {result.duration > 0 ? (
-                            result.duration > 1000 ? 
-                              `${Math.round(result.duration / 1000)}s` : 
-                              `${result.duration}ms`
-                          ) : result.status === 'Running' ? '⏱️' : '-'}
-                        </td>
-                        <td className="px-4 py-2 text-sm">
-                          {isFailed && (
-                            <button
-                              onClick={() => openFailureAnalysis(result)}
-                              className="flex items-center space-x-1 px-2 py-1 bg-red-100 text-red-700 rounded text-xs hover:bg-red-200 focus:outline-none focus:ring-1 focus:ring-red-500"
-                            >
-                              <Bug size={12} />
-                              <span>Analyze</span>
-                            </button>
-                          )}
-                          {result.status === 'Passed' && (
-                            <button
-                              onClick={() => openFailureAnalysis(result)}
-                              className="flex items-center space-x-1 px-2 py-1 bg-green-100 text-green-700 rounded text-xs hover:bg-green-200 focus:outline-none focus:ring-1 focus:ring-green-500"
-                            >
-                              <Eye size={12} />
-                              <span>View</span>
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+    {/* Results Container */}
+    <div className="border border-gray-200 rounded-lg overflow-hidden">
+      {/* Fixed Header */}
+      <div className="bg-gray-50 border-b px-4 py-2 sticky top-0 z-10">
+        <div className="grid grid-cols-12 gap-2 text-xs font-medium text-gray-700 uppercase tracking-wider">
+          <div className="col-span-1"></div>
+          <div className="col-span-5">Test Case</div>
+          <div className="col-span-2">Status</div>
+          <div className="col-span-2">Duration</div>
+          <div className="col-span-2">Actions</div>
+        </div>
+      </div>
+
+      {/* Scrollable Results */}
+      <div className="max-h-96 overflow-y-auto">
+        {testResultsArray.map((result) => (
+          <TestResultRow
+            key={result.id}
+            result={result}
+            viewMode={resultsViewMode}
+            onToggleExpand={(testId) => {
+              const newExpanded = new Set(expandedTestResults);
+              if (newExpanded.has(testId)) {
+                newExpanded.delete(testId);
+              } else {
+                newExpanded.add(testId);
+              }
+              setExpandedTestResults(newExpanded);
+            }}
+            isExpanded={expandedTestResults.has(result.id)}
+            onRetryTest={(testId) => {
+              console.log('Retrying test:', testId);
+              // Add retry logic here
+            }}
+            onViewLogs={(testId) => {
+              console.log('Viewing logs for:', testId);
+              // Add view logs logic here
+            }}
+            openFailureAnalysis={openFailureAnalysis}
+          />
+        ))}
+      </div>
+    </div>
+
+    {/* Results Summary */}
+    <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+        <div className="flex items-center space-x-2">
+          <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+          <span>Passed: {testResultsArray.filter(r => r.status === 'Passed').length}</span>
+        </div>
+        <div className="flex items-center space-x-2">
+          <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+          <span>Failed: {testResultsArray.filter(r => r.status === 'Failed').length}</span>
+        </div>
+        <div className="flex items-center space-x-2">
+          <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
+          <span>Running: {testResultsArray.filter(r => r.status === 'Running').length}</span>
+        </div>
+        <div className="flex items-center space-x-2">
+          <div className="w-3 h-3 bg-gray-400 rounded-full"></div>
+          <span>Pending: {testResultsArray.filter(r => r.status === 'Not Started').length}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+)}            
           </div>
         </div>
 

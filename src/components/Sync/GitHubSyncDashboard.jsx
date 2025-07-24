@@ -16,6 +16,8 @@ import {
   EyeOff
 } from 'lucide-react';
 import GitHubSyncService from '../../services/GitHubSyncService';
+import BranchSelector from '../Common/BranchSelector';
+
 
 const GitHubSyncDashboard = () => {
   const [syncConfigs, setSyncConfigs] = useState([]);
@@ -355,16 +357,13 @@ const GitHubSyncDashboard = () => {
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Branch
-                </label>
-                <input
-                  type="text"
-                  value={selectedConfig.branch}
-                  onChange={(e) => setSelectedConfig(prev => ({ ...prev, branch: e.target.value }))}
-                  className="w-full p-2 border border-gray-300 rounded-md"
-                />
-              </div>
+  <BranchSelector
+    repoUrl={`https://github.com/${selectedConfig.owner}/${selectedConfig.repo}`}
+    ghToken={selectedConfig.token}
+    selectedBranch={selectedConfig.branch}
+    onBranchChange={(branch) => setSelectedConfig(prev => ({ ...prev, branch }))}
+  />
+</div>
               
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">

@@ -16,6 +16,8 @@ import TestCases from './pages/TestCases'; // NEW: Import Test Cases page
 import ImportData from './pages/ImportData';
 import Releases from './pages/Releases';
 import Roadmap from './pages/Roadmap';
+import GitHubSyncDashboard from './components/Sync/GitHubSyncDashboard';
+
 
 function App() {
   const [hasData, setHasData] = useState(false);
@@ -99,6 +101,9 @@ window.receiveTestResults({
           
           {/* Redirect any unknown paths to dashboard or import based on data presence */}
           <Route path="*" element={<Navigate to={hasData ? "/" : "/import"} />} />
+
+          <Route path="/sync" element={<GitHubSyncDashboard />} />
+
         </Routes>
       </Router>
     </VersionProvider>

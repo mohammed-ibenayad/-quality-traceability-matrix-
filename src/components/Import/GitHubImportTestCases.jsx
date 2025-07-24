@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { GitBranch, RefreshCw, AlertCircle, CheckCircle, FileText, Search, RotateCcw } from 'lucide-react';
 import dataStore from '../../services/DataStore';
+import BranchSelector from '../Common/BranchSelector';
 
 const GitHubImportTestCases = ({ onImportSuccess }) => {
   // Connection state
@@ -598,37 +599,30 @@ const extractTestCases = (content, filePath, filename) => {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Branch
-              </label>
-              <input
-                type="text"
-                value={config.branch}
-                onChange={(e) => setConfig(prev => ({ ...prev, branch: e.target.value }))}
-                placeholder="main"
-                className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                disabled={isConnecting}
-              />
-            </div>
+  <div>
+    <BranchSelector
+      repoUrl={config.repoUrl}
+      ghToken={config.ghToken}
+      selectedBranch={config.branch}
+      onBranchChange={(branch) => setConfig(prev => ({ ...prev, branch }))}
+      disabled={isConnecting}
+    />
+  </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                GitHub Personal Access Token
-              </label>
-              <input
-                type="password"
-                value={config.ghToken}
-                onChange={(e) => setConfig(prev => ({ ...prev, ghToken: e.target.value }))}
-                placeholder="ghp_xxxxxxxxxxxx"
-                className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                disabled={isConnecting}
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                Token needs 'repo' scope for private repositories
-              </p>
-            </div>
-          </div>
+  <div>
+    <label className="block text-sm font-medium text-gray-700 mb-1">
+      GitHub Token
+    </label>
+    <input
+      type="password"
+      value={config.ghToken}
+      onChange={(e) => setConfig(prev => ({ ...prev, ghToken: e.target.value }))}
+      placeholder="ghp_..."
+      className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+      disabled={isConnecting}
+    />
+  </div>
+</div>
 
           {connectionError && (
             <div className="flex items-center p-3 bg-red-50 border border-red-200 rounded-md">
