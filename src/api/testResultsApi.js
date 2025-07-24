@@ -12,8 +12,7 @@ if (typeof window !== 'undefined' && !window.testCaseWebhookResults) {
 
 /**
  * Store individual test case webhook result
- * 
- * @param {Object} data - Webhook payload for single test case
+ * * @param {Object} data - Webhook payload for single test case
  * @param {String} data.requestId - The request ID
  * @param {String} data.results[0].id - The test case ID
  * @returns {String} - Storage key for reference
@@ -54,8 +53,7 @@ export const storeTestCaseWebhookResult = (data) => {
 
 /**
  * Retrieve all test case results for a request
- * 
- * @param {String} requestId - The request ID
+ * * @param {String} requestId - The request ID
  * @returns {Array} - Array of test case results
  */
 export const getTestCaseResultsForRequest = (requestId) => {
@@ -79,8 +77,7 @@ export const getTestCaseResultsForRequest = (requestId) => {
 /**
  * FIXED: Update individual test case in DataStore with proper notification
  * This ensures the Test Cases page sees the updates immediately
- * 
- * @param {Object} testCase - Test case result from webhook
+ * * @param {Object} testCase - Test case result from webhook
  * @returns {Object} Updated test case object
  */
 const updateTestCaseInDataStore = (testCase) => {
@@ -193,8 +190,7 @@ const updateTestCaseInDataStore = (testCase) => {
 
 /**
  * ENHANCED: Notify webhook listeners with better debugging
- * 
- * @param {Object} data - Individual test case webhook data
+ * * @param {Object} data - Individual test case webhook data
  */
 const notifyWebhookListeners = (data) => {
   try {
@@ -225,9 +221,168 @@ const notifyWebhookListeners = (data) => {
 };
 
 /**
+ * 🔧 FIXED: Use the EXACT same parsing logic as GitHubService polling
+ * This function now mirrors GitHubService.parseJUnitXML() + transformTestResults()
+ * * @param {String} xmlContent - Raw JUnit XML content
+ * @param {String} testCaseId - Test case ID to look for
+ * @returns {Object|null} Parsed test result with logs, failure, etc.
+ */
+const parseJunitXmlForTestCase = (xmlContent, testCaseId) => {
+  try {
+    console.log(`🔍 Parsing JUnit XML for test case using polling logic: ${testCaseId}`);
+    
+    // Step 1: Parse XML exactly like GitHubService.parseJUnitXML()
+    const parser = new DOMParser();
+    const xmlDoc = parser.parseFromString(xmlContent, "text/xml");
+    
+    const parseError = xmlDoc.querySelector("parsererror");
+    if (parseError) {
+      throw new Error(`XML parsing failed: ${parseError.textContent}`);
+    }
+    
+    const testsuites = xmlDoc.querySelectorAll('testsuite');
+    const tests = [];
+    
+    testsuites.forEach(testsuite => {
+      const testcases = testsuite.querySelectorAll('testcase');
+      
+      testcases.forEach(testcase => {
+        const name = testcase.getAttribute('name');
+        const classname = testcase.getAttribute('classname');
+        const time = parseFloat(testcase.getAttribute('time') || '0');
+        
+        // Check for failure or error (same as GitHubService)
+        const failure = testcase.querySelector('failure');
+        const error = testcase.querySelector('error');
+        const skipped = testcase.querySelector('skipped');
+        
+        let status = 'Passed';
+        let failureInfo = null;
+        
+        if (failure) {
+          status = 'Failed';
+          failureInfo = {
+            type: failure.getAttribute('type') || 'TestFailure',
+            message: failure.getAttribute('message') || '',
+            stackTrace: failure.textContent || '',
+            parsingSource: 'junit-xml',
+            parsingConfidence: 'high'
+          };
+        } else if (error) {
+          status = 'Failed';
+          failureInfo = {
+            type: error.getAttribute('type') || 'ExecutionError',
+            message: error.getAttribute('message') || '',
+            stackTrace: error.textContent || '',
+            parsingSource: 'junit-xml',
+            parsingConfidence: 'high'
+          };
+        } else if (skipped) {
+          status = 'Skipped';
+        }
+        
+        // ✅ CRITICAL: Extract system-out and system-err (like GitHubService)
+        const systemOut = testcase.querySelector('system-out')?.textContent || '';
+        const systemErr = testcase.querySelector('system-err')?.textContent || '';
+        
+        tests.push({
+          name: name,
+          classname: classname,
+          time: time,
+          status: status,
+          failure: failureInfo,
+          system_out: systemOut,
+          system_err: systemErr
+        });
+      });
+    });
+    
+    // Step 2: Find the matching test (same logic as GitHubService.transformTestResults)
+    console.log(`🔍 Found ${tests.length} tests in XML, looking for ${testCaseId}`);
+    
+    let testResult = null;
+    
+    // Try exact match first
+    testResult = tests.find(t => t.name === testCaseId);
+    if (testResult) {
+      console.log(`✅ Found exact name match: ${testResult.name}`);
+    }
+    
+    // Try fuzzy matching
+    if (!testResult) {
+      testResult = tests.find(t => {
+        const testName = t.name || '';
+        const className = t.classname || '';
+        
+        return testName.includes(testCaseId) || 
+               className.includes(testCaseId) ||
+               testCaseId.includes(testName) ||
+               (testName.startsWith('test_') && testCaseId.includes(testName));
+      });
+      
+      if (testResult) {
+        console.log(`✅ Found fuzzy match: ${testResult.name} (class: ${testResult.classname})`);
+      }
+    }
+    
+    if (!testResult) {
+      console.log(`⚠️ Test ${testCaseId} not found in XML. Available tests:`);
+      tests.forEach((t, i) => {
+        console.log(`  ${i + 1}. name="${t.name}", classname="${t.classname}"`);
+      });
+      return null;
+    }
+    
+    // Step 3: Transform to standard format (EXACT same as GitHubService.transformTestResults)
+    const duration = parseFloat(testResult.time || 0) * 1000; // Convert to milliseconds
+    
+    // ✅ CRITICAL: Generate logs exactly like GitHubService
+    let logs = '';
+    if (testResult.system_out) {
+      logs += `STDOUT:\n${testResult.system_out}\n`;
+    }
+    if (testResult.system_err) {
+      logs += `STDERR:\n${testResult.system_err}\n`;
+    }
+    if (testResult.failure) {
+      logs += `FAILURE:\n${testResult.failure.message || testResult.failure}\n`;
+    }
+    if (!logs) {
+      logs = testResult.status === 'Passed' ? 
+        `Test ${testCaseId} executed successfully` : 
+        `Test ${testCaseId} completed with status: ${testResult.status}`;
+    }
+    
+    console.log(`✅ Transformed test data for ${testCaseId}:`, {
+      status: testResult.status,
+      duration: duration,
+      hasFailure: !!testResult.failure,
+      hasLogs: !!logs
+    });
+    
+    // ✅ Return the SAME structure as GitHubService.transformTestResults
+    return {
+      status: testResult.status,
+      duration: duration,
+      logs: logs,           // ← NOW INCLUDES FULL LOGS
+      failure: testResult.failure,
+      classname: testResult.classname,
+      framework: 'pytest',
+      time: testResult.time,
+      system_out: testResult.system_out,  // ← NOW EXTRACTED
+      system_err: testResult.system_err,  // ← NOW EXTRACTED
+      method: testResult.name
+    };
+    
+  } catch (error) {
+    console.error(`❌ Error parsing JUnit XML like polling for ${testCaseId}:`, error);
+    throw error;
+  }
+};
+
+/**
  * ENHANCED: Process individual test case result with JUnit XML parsing
- * 
- * @param {Object} data - The webhook data for a single test case
+ * * @param {Object} data - The webhook data for a single test case
  * @returns {Object} Response object
  */
 export const processTestCaseResult = async (data) => {
@@ -267,22 +422,42 @@ export const processTestCaseResult = async (data) => {
     const testCaseId = testCase.id;
     console.log(`📝 Processing test case: ${testCaseId} (${testCase.status})`);
 
-    // 🆕 NEW: Process JUnit XML content if available
+    // ✅ ENHANCED: Process JUnit XML content if available using SAME logic as polling
     let enhancedTestCase = { ...testCase };
     
     if (testCase.junitXml && testCase.junitXml.available && testCase.junitXml.content) {
-      console.log(`🔍 JUnit XML available for ${testCaseId}, parsing...`);
+      console.log(`🔍 JUnit XML available for ${testCaseId}, parsing with polling logic...`);
       
       try {
-        const parsedFailure = parseJunitXmlForTestCase(testCase.junitXml.content, testCaseId);
+        // ✅ Use the updated parseJunitXmlForTestCase that now includes logs
+        const parsedTestData = parseJunitXmlForTestCase(testCase.junitXml.content, testCaseId);
         
-        if (parsedFailure) {
-          console.log(`✅ JUnit XML parsed successfully for ${testCaseId}`);
-          enhancedTestCase.failure = parsedFailure;
-          enhancedTestCase.parsingSource = 'junit-xml';
-          enhancedTestCase.parsingConfidence = 'high';
+        if (parsedTestData) {
+          console.log(`✅ JUnit XML parsed successfully for ${testCaseId}`, {
+            status: parsedTestData.status,
+            hasFailure: !!parsedTestData.failure,
+            hasLogs: !!parsedTestData.logs,
+            logsLength: parsedTestData.logs?.length || 0
+          });
+          
+          // ✅ CRITICAL: Use ALL the parsed data from XML (just like polling)
+          enhancedTestCase = {
+            ...testCase,
+            status: parsedTestData.status,
+            duration: parsedTestData.duration,
+            logs: parsedTestData.logs,    // ← NOW HAS FULL LOGS
+            failure: parsedTestData.failure,
+            classname: parsedTestData.classname,
+            framework: parsedTestData.framework,
+            time: parsedTestData.time,
+            system_out: parsedTestData.system_out,  // ← NOW EXTRACTED
+            system_err: parsedTestData.system_err,  // ← NOW EXTRACTED
+            method: parsedTestData.method,
+            parsingSource: 'junit-xml',
+            parsingConfidence: 'high'
+          };
         } else {
-          console.log(`ℹ️ No failure found in JUnit XML for ${testCaseId}`);
+          console.log(`ℹ️ No test data found in JUnit XML for ${testCaseId}`);
         }
       } catch (parseError) {
         console.error(`❌ JUnit XML parsing failed for ${testCaseId}:`, parseError);
@@ -308,7 +483,7 @@ export const processTestCaseResult = async (data) => {
       console.log(`🎯 DataStore updated successfully for ${testCaseId}`);
     }
 
-    // Notify listeners
+    // Notify listeners with enhanced data
     notifyWebhookListeners({
       ...data,
       results: [enhancedTestCase]
@@ -318,11 +493,12 @@ export const processTestCaseResult = async (data) => {
       status: 200,
       body: { 
         success: true, 
-        message: `Individual test case webhook processed successfully`,
+        message: `Individual test case webhook processed successfully with enhanced data`,
         testCaseId,
         status: enhancedTestCase.status,
         storageKey,
-        enhanced: !!enhancedTestCase.failure,
+        enhanced: !!enhancedTestCase.logs,  // ← Now should be true
+        logsExtracted: !!(enhancedTestCase.system_out || enhancedTestCase.system_err),
         parsingSource: enhancedTestCase.parsingSource || 'none'
       }
     };
@@ -337,126 +513,8 @@ export const processTestCaseResult = async (data) => {
 };
 
 /**
- * 🆕 NEW: Parse JUnit XML content for a specific test case
- * This uses the same logic as GitHubService polling approach
- * 
- * @param {String} xmlContent - Raw JUnit XML content
- * @param {String} testCaseId - Test case ID to look for
- * @returns {Object|null} Parsed failure object or null
- */
-const parseJunitXmlForTestCase = (xmlContent, testCaseId) => {
-  try {
-    console.log(`🔍 Parsing JUnit XML for test case: ${testCaseId}`);
-    
-    // Create DOM parser
-    const parser = new DOMParser();
-    const xmlDoc = parser.parseFromString(xmlContent, "text/xml");
-    
-    // Check for parsing errors
-    const parseError = xmlDoc.querySelector("parsererror");
-    if (parseError) {
-      throw new Error(`XML parsing failed: ${parseError.textContent}`);
-    }
-    
-    // Find all test cases in the XML
-    const testCases = xmlDoc.querySelectorAll('testcase');
-    let targetTestCase = null;
-    
-    // Look for the specific test case
-    for (let testCase of testCases) {
-      const name = testCase.getAttribute('name');
-      const classname = testCase.getAttribute('classname');
-      
-      // Match by test ID in name or classname
-      if (name && (name.includes(testCaseId) || name.endsWith(testCaseId))) {
-        targetTestCase = testCase;
-        console.log(`✅ Found test case in XML: ${name}`);
-        break;
-      }
-    }
-    
-    if (!targetTestCase) {
-      console.log(`⚠️ Test case ${testCaseId} not found in JUnit XML`);
-      return null;
-    }
-    
-    // Check for failure or error elements
-    const failureElement = targetTestCase.querySelector('failure');
-    const errorElement = targetTestCase.querySelector('error');
-    
-    if (!failureElement && !errorElement) {
-      console.log(`ℹ️ No failure/error element found for ${testCaseId}`);
-      return null;
-    }
-    
-    const element = failureElement || errorElement;
-    const isError = !!errorElement;
-    const failureType = element.getAttribute('type') || (isError ? 'ExecutionError' : 'TestFailure');
-    const failureMessage = element.getAttribute('message') || '';
-    const stackTrace = element.textContent || '';
-    
-    console.log(`🚨 ${isError ? 'Execution error' : 'Test failure'} detected: ${failureType} - ${failureMessage}`);
-    
-    // Build enhanced failure object
-    const failure = {
-      type: failureType,
-      message: failureMessage,
-      stackTrace: stackTrace,
-      parsingSource: 'junit-xml',
-      parsingConfidence: 'high'
-    };
-    
-    // Extract file and line info if available
-    const classname = targetTestCase.getAttribute('classname') || '';
-    const file = targetTestCase.getAttribute('file') || '';
-    const line = targetTestCase.getAttribute('line') || '0';
-    
-    if (file) {
-      failure.file = file.split('/').pop(); // Get filename only
-    }
-    if (line && line !== '0') {
-      failure.line = parseInt(line);
-    }
-    failure.classname = classname;
-    failure.method = targetTestCase.getAttribute('name') || '';
-    
-    // Parse assertion details for assertion errors OR extract error info for execution errors
-    if (failureType === 'AssertionError' || failureMessage.toLowerCase().includes('assert')) {
-      console.log(`🔍 Parsing assertion details for ${testCaseId}`);
-      
-      const assertion = parseAssertionFromMessage(failureMessage, stackTrace);
-      if (assertion) {
-        failure.assertion = assertion;
-        failure.category = 'assertion';
-        console.log(`✅ Assertion parsed: ${assertion.actual} ${assertion.operator} ${assertion.expected}`);
-      }
-    } else {
-      // Categorize execution errors and other failure types
-      failure.category = categorizeFailure(failureType, failureMessage);
-      
-      // For execution errors, try to extract meaningful info from stack trace
-      if (isError && stackTrace) {
-        const errorInfo = extractExecutionErrorInfo(stackTrace, failureMessage);
-        if (errorInfo) {
-          failure.executionError = errorInfo;
-          console.log(`✅ Execution error info extracted: ${errorInfo.errorType}`);
-        }
-      }
-    }
-    
-    console.log(`✅ Enhanced failure object created for ${testCaseId}`);
-    return failure;
-    
-  } catch (error) {
-    console.error(`❌ Error parsing JUnit XML for ${testCaseId}:`, error);
-    throw error;
-  }
-};
-
-/**
  * 🆕 NEW: Parse assertion details from failure message and stack trace
- * 
- * @param {String} message - Failure message
+ * * @param {String} message - Failure message
  * @param {String} stackTrace - Stack trace content
  * @returns {Object|null} Assertion object or null
  */
@@ -506,8 +564,7 @@ const parseAssertionFromMessage = (message, stackTrace) => {
 
 /**
  * 🆕 NEW: Extract execution error information from stack trace
- * 
- * @param {String} stackTrace - Full stack trace content
+ * * @param {String} stackTrace - Full stack trace content
  * @param {String} message - Error message
  * @returns {Object|null} Execution error info or null
  */
@@ -571,8 +628,7 @@ const extractExecutionErrorInfo = (stackTrace, message) => {
 
 /**
  * 🆕 NEW: Categorize failure types (enhanced for execution errors)
- * 
- * @param {String} failureType - Failure type from XML
+ * * @param {String} failureType - Failure type from XML
  * @param {String} message - Failure message
  * @returns {String} Category name
  */
@@ -609,8 +665,7 @@ const categorizeFailure = (failureType, message) => {
 /**
  * BACKWARD COMPATIBILITY: Process bulk test results (legacy support)
  * This maintains compatibility with existing bulk webhook handling
- * 
- * @param {Object} data - Legacy bulk webhook data
+ * * @param {Object} data - Legacy bulk webhook data
  * @returns {Object} Response object
  */
 export const processTestResults = async (data) => {
@@ -670,8 +725,7 @@ export const processTestResults = async (data) => {
 
 /**
  * NEW: Get execution summary for a request
- * 
- * @param {String} requestId - The request ID
+ * * @param {String} requestId - The request ID
  * @returns {Object} Execution summary
  */
 export const getExecutionSummary = (requestId) => {
@@ -721,8 +775,7 @@ export const getExecutionSummary = (requestId) => {
 
 /**
  * NEW: Test function for individual test case webhook
- * 
- * @param {String} requestId - Test request ID
+ * * @param {String} requestId - Test request ID
  * @param {String} testCaseId - Test case ID
  * @param {String} status - Test status
  * @returns {Promise} Processing result
@@ -751,8 +804,7 @@ export const testIndividualTestCaseWebhook = async (requestId = 'test-req', test
 
 /**
  * NEW: Test function for multiple individual test case webhooks
- * 
- * @param {String} requestId - Test request ID
+ * * @param {String} requestId - Test request ID
  * @param {Array} testCaseIds - Array of test case IDs
  * @returns {Promise} Processing results
  */
