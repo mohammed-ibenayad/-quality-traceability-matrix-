@@ -422,6 +422,9 @@ deleteRequirement(requirementId) {
         throw new Error(`Test case at index ${index} is missing required 'name' field`);
       }
       
+      // === NEW: Validate field types ===
+      this._validateTestCaseFieldTypes(tc, index);
+
       // Log each test case being processed
       console.log(`✅ Validated test case ${index + 1}/${testCases.length}: ${tc.id} - ${tc.name}`);
       
@@ -430,12 +433,16 @@ deleteRequirement(requirementId) {
         id: tc.id,
         name: tc.name,
         description: tc.description || '',
+        // === NEW TESTAIL FIELDS ===
+        category: tc.category || '',
+        preconditions: tc.preconditions || '',
+        testData: tc.testData || '',
         status: tc.status || 'Not Run',
         automationStatus: tc.automationStatus || 'Manual',
         priority: tc.priority || 'Medium',
         requirementIds: tc.requirementIds || [],
         version: tc.version || '',
-        tags: tc.tags || [],
+        tags: Array.isArray(tc.tags) ? tc.tags : (tc.tags ? [tc.tags] : []), // Enhanced tags handling
         assignee: tc.assignee || '',
         lastExecuted: tc.lastExecuted || null,
         executionTime: tc.executionTime || null,
@@ -567,12 +574,16 @@ deleteRequirement(requirementId) {
       id: testCaseId,
       name: testCaseData.name,
       description: testCaseData.description || '',
+      // === NEW TESTAIL FIELDS ===
+      category: testCaseData.category || '',
+      preconditions: testCaseData.preconditions || '',
+      testData: testCaseData.testData || '',
       status: testCaseData.status || 'Not Run',
       automationStatus: testCaseData.automationStatus || 'Manual',
       priority: testCaseData.priority || 'Medium',
       requirementIds: testCaseData.requirementIds || [],
       version: testCaseData.version || '',
-      tags: testCaseData.tags || [],
+      tags: Array.isArray(testCaseData.tags) ? testCaseData.tags : (testCaseData.tags ? [testCaseData.tags] : []),
       assignee: testCaseData.assignee || '',
       lastExecuted: testCaseData.lastExecuted || null,
       executionTime: testCaseData.executionTime || null,
@@ -1138,6 +1149,38 @@ getVersion(versionId) {
         ? Math.round((passedTestCases / testCases.length) * 100) 
         : 0
     };
+  }
+
+  /**
+   * Validate field types for TestRail integration
+   * @private
+   * @param {Object} tc - Test case object
+   * @param {number} index - Index for error reporting
+   */
+  _validateTestCaseFieldTypes(tc, index) {
+    const errors = [];
+
+    // Validate new TestRail fields
+    if (tc.category !== undefined && typeof tc.category !== 'string') {
+      errors.push(`Category must be string for test case at index ${index} (${tc.id || 'unknown'})`);
+    }
+
+    if (tc.preconditions !== undefined && typeof tc.preconditions !== 'string') {
+      errors.push(`Preconditions must be string for test case at index ${index} (${tc.id || 'unknown'})`);
+    }
+
+    if (tc.testData !== undefined && typeof tc.testData !== 'string') {
+      errors.push(`Test data must be string for test case at index ${index} (${tc.id || 'unknown'})`);
+    }
+
+    // Validate tags is array
+    if (tc.tags !== undefined && !Array.isArray(tc.tags)) {
+      errors.push(`Tags must be array for test case at index ${index} (${tc.id || 'unknown'})`);
+    }
+
+    if (errors.length > 0) {
+      throw new Error(errors.join('; '));
+    }
   }
 }
 

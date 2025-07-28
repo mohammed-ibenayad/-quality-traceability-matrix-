@@ -29,6 +29,279 @@ import FailureDetailsPanel from '../components/TestExecution/FailureDetailsPanel
 import { useVersionContext } from '../context/VersionContext';
 import dataStore from '../services/DataStore';
 
+// Helper function to format last execution date
+const formatLastExecution = (lastExecuted) => {
+  if (!lastExecuted) return 'Never';
+  const date = new Date(lastExecuted);
+  return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+};
+
+// TestCaseRow Component (extracted for cleaner rendering)
+const TestCaseRow = ({ 
+  testCase, 
+  onSelect, 
+  onEdit, 
+  onDelete, 
+  onExecute, 
+  isSelected, 
+  isExpanded, 
+  onToggleExpand,
+  expandedTests // Prop for failure expansion
+}) => {
+  const isFailureExpanded = expandedTests.has(testCase.id);
+
+  return (
+    <React.Fragment>
+      <tr className={`hover:bg-gray-50 ${isSelected ? 'bg-blue-50' : ''}`}>
+        <td className="px-2 py-3 whitespace-nowrap w-12">
+          <input
+            type="checkbox"
+            checked={isSelected}
+            onChange={(e) => onSelect(testCase.id, e.target.checked)}
+            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+          />
+        </td>
+        <td className="px-3 py-3 whitespace-nowrap text-sm font-medium text-gray-900 w-24">
+          <div className="flex items-center">
+            <button
+              onClick={() => onToggleExpand(testCase.id)}
+              className="mr-1 p-1 hover:bg-gray-200 rounded"
+            >
+              {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+            </button>
+            <span className="truncate">{testCase.id}</span>
+          </div>
+        </td>
+        <td className="px-3 py-3 w-48"> {/* Changed from w-80 to w-48 */}
+          <div className="flex items-start">
+            <div className="min-w-0 flex-1">
+              <div className="text-sm font-medium text-gray-900 truncate" title={testCase.name}>
+                {testCase.name}
+              </div>
+              <div className="text-xs text-gray-500 truncate">
+                {testCase.description && testCase.description.substring(0, 60)}
+                {testCase.description && testCase.description.length > 60 && '...'}
+              </div>
+            </div>
+          </div>
+        </td>
+        <td className="px-2 py-3 whitespace-nowrap w-20">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <span className={`inline-flex px-1.5 py-0.5 text-xs font-medium rounded ${
+                testCase.status === 'Passed' ? 'bg-green-100 text-green-800' :
+                testCase.status === 'Failed' ? 'bg-red-100 text-red-800' :
+                testCase.status === 'Blocked' ? 'bg-yellow-100 text-yellow-800' :
+                testCase.status === 'Not Found' ? 'bg-orange-100 text-orange-800' :
+                'bg-gray-100 text-gray-800'
+              }`}>
+                {testCase.status === 'Not Run' ? 'Not Run' : testCase.status}
+              </span>
+              
+              {/* Execution Info */}
+              {(testCase.status === 'Failed' || testCase.status === 'Passed') && testCase.duration && (
+                <div className="flex items-center space-x-1 text-xs text-gray-500">
+                  <Clock size={12} />
+                  <span>{testCase.duration}ms</span>
+                </div>
+              )}
+            </div>
+            
+            {/* Expand/Collapse Button - only for failed/error tests */}
+            {(testCase.status === 'Failed' || testCase.status === 'Not Found') && (
+              <button
+                onClick={() => expandedTests.has(testCase.id) ? expandedTests.delete(testCase.id) : expandedTests.add(testCase.id)} // Direct update to set
+                className="p-1 hover:bg-gray-200 rounded transition-colors"
+                title={isFailureExpanded ? 'Collapse details' : 'Expand details'}
+              >
+                {isFailureExpanded ? (
+                  <ChevronUp size={16} className="text-gray-600" />
+                ) : (
+                  <ChevronDown size={16} className="text-gray-600" />
+                )}
+              </button>
+            )}
+          </div>
+        </td>
+        <td className="px-2 py-3 whitespace-nowrap w-20">
+          <span className={`inline-flex px-1.5 py-0.5 text-xs font-medium rounded ${
+            testCase.priority === 'High' ? 'bg-red-50 text-red-600' :
+            testCase.priority === 'Medium' ? 'bg-yellow-50 text-yellow-600' :
+            'bg-gray-50 text-gray-600'
+          }`}>
+            {testCase.priority}
+          </span>
+        </td>
+        <td className="px-2 py-3 whitespace-nowrap w-20">
+          <span className={`inline-flex px-1.5 py-0.5 text-xs font-medium rounded ${
+            testCase.automationStatus === 'Automated' ? 'bg-blue-100 text-blue-800' :
+            testCase.automationStatus === 'Semi-Automated' ? 'bg-purple-100 text-purple-800' :
+            'bg-gray-100 text-gray-800'
+          }`}>
+            {testCase.automationStatus === 'Automated' ? 'Auto' : 
+             testCase.automationStatus === 'Semi-Automated' ? 'Semi' : 'Manual'}
+          </span>
+        </td>
+        <td className="px-2 py-3 whitespace-nowrap w-20">
+          <div className="text-xs text-gray-500">
+            {testCase.requirementIds && testCase.requirementIds.length > 0 ? (
+              <div className="flex flex-wrap gap-1">
+                {testCase.requirementIds.slice(0, 1).map(reqId => (
+                  <span key={reqId} className="px-1 py-0.5 bg-blue-100 text-blue-800 rounded text-xs truncate">
+                    {reqId}
+                  </span>
+                ))}
+                {testCase.requirementIds.length > 1 && (
+                  <span className="text-gray-400">+{testCase.requirementIds.length - 1}</span>
+                )}
+              </div>
+            ) : (
+              <span className="text-gray-400">None</span>
+            )}
+          </div>
+        </td>
+        <td className="px-2 py-3 whitespace-nowrap w-28">
+          <div className="text-xs text-gray-500 truncate">
+            {testCase.lastExecuted ? (
+              <>
+                <div>{new Date(testCase.lastExecuted).toLocaleDateString()}</div>
+                {testCase.lastExecutedBy && (
+                  <div className="text-xs text-gray-400 truncate">
+                    {testCase.lastExecutedBy}
+                  </div>
+                )}
+              </>
+            ) : (
+              'Never'
+            )}
+          </div>
+        </td>
+        <td className="px-2 py-3 whitespace-nowrap text-right text-sm font-medium w-20">
+          <div className="flex items-center justify-end space-x-1">
+            <button
+              onClick={() => onExecute(testCase)}
+              className="inline-flex items-center px-1.5 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 text-xs"
+              title="Execute Test"
+            >
+              <Play size={12} />
+            </button>
+            <button
+              onClick={() => onEdit(testCase)}
+              className="text-blue-600 hover:text-blue-900 p-1"
+              title="Edit Test Case"
+            >
+              <Edit size={12} />
+            </button>
+            <button
+              onClick={() => onDelete(testCase.id)}
+              className="text-red-600 hover:text-red-900 p-1"
+              title="Delete Test Case"
+            >
+              <Trash2 size={12} />
+            </button>
+          </div>
+        </td>
+      </tr>
+
+      {/* Expanded Failure Details Row */}
+      {isFailureExpanded && (testCase.status === 'Failed' || testCase.status === 'Not Found') && (
+        <tr className={`${testCase.status === 'Failed' ? 'bg-red-50 border-l-4 border-red-400' : 'bg-orange-50 border-l-4 border-orange-400'}`}>
+          <td colSpan="9" className="p-4">
+            <FailureDetailsPanel testCase={testCase} />
+          </td>
+        </tr>
+      )}
+
+      {/* Expanded Row Content */}
+      {isExpanded && (
+        <tr>
+          <td colSpan="9" className="px-4 py-4 bg-gray-50">
+            <div className="space-y-4">
+              <div>
+                <h4 className="font-medium text-gray-900">Description</h4>
+                <p className="text-sm text-gray-600 mt-1">{testCase.description}</p>
+              </div>
+              
+              {testCase.category && (
+                <div>
+                  <h4 className="font-medium text-gray-900">Category</h4>
+                  <p className="text-sm text-gray-600 mt-1">{testCase.category}</p>
+                </div>
+              )}
+
+              {testCase.preconditions && (
+                <div>
+                  <h4 className="font-medium text-gray-900">Preconditions</h4>
+                  <p className="text-sm text-gray-600 mt-1">{testCase.preconditions}</p>
+                </div>
+              )}
+
+              {testCase.testData && (
+                <div>
+                  <h4 className="font-medium text-gray-900">Test Data</h4>
+                  <p className="text-sm text-gray-600 mt-1">{testCase.testData}</p>
+                </div>
+              )}
+              
+              {testCase.steps && (
+                <div>
+                  <h4 className="font-medium text-gray-900">Steps</h4>
+                  <ol className="list-decimal list-inside text-sm text-gray-600 mt-1 space-y-1">
+                    {testCase.steps.map((step, index) => (
+                      <li key={index}>{step}</li>
+                    ))}
+                  </ol>
+                </div>
+              )}
+              
+              {testCase.expectedResult && (
+                <div>
+                  <h4 className="font-medium text-gray-900">Expected Result</h4>
+                  <p className="text-sm text-gray-600 mt-1">{testCase.expectedResult}</p>
+                </div>
+              )}
+              
+              {testCase.tags && testCase.tags.length > 0 && (
+                <div>
+                  <h4 className="font-medium text-gray-900">Tags</h4>
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {testCase.tags.map(tag => (
+                      <span key={tag} className="px-2 py-1 bg-gray-200 text-gray-700 rounded text-xs">
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                <div>
+                  <span className="font-medium text-gray-900">Version:</span>
+                  <span className="ml-1 text-gray-600">{testCase.version || 'Unassigned'}</span>
+                </div>
+                <div>
+                  <span className="font-medium text-gray-900">Assignee:</span>
+                  <span className="ml-1 text-gray-600">{testCase.assignee || 'Unassigned'}</span>
+                </div>
+                <div>
+                  <span className="font-medium text-gray-900">Duration:</span>
+                  <span className="ml-1 text-gray-600">{testCase.estimatedDuration || 0} min</span>
+                </div>
+                <div>
+                  <span className="font-medium text-gray-900">Last Executed:</span>
+                  <span className="ml-1 text-gray-600">
+                    {formatLastExecution(testCase.lastExecuted)}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </td>
+        </tr>
+      )}
+    </React.Fragment>
+  );
+};
+
 
 const TestCases = () => {
   // Get version context
@@ -52,6 +325,11 @@ const TestCases = () => {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showExecutionModal, setShowExecutionModal] = useState(false);
   const [editingTestCase, setEditingTestCase] = useState(null);
+
+  // Add category filter state
+  const [categoryFilter, setCategoryFilter] = useState('');
+  // State for collapsed/expanded sections
+  const [collapsedSections, setCollapsedSections] = useState(new Set());
 
   // Add new state variables for failure expansion
   const [expandedTests, setExpandedTests] = useState(new Set());
@@ -109,46 +387,49 @@ const TestCases = () => {
     ? testCases
     : testCases.filter(tc => !tc.version || tc.version === selectedVersion || tc.version === '');
 
+  // Add to get unique categories
+  const categories = useMemo(() => {
+    const cats = [...new Set(testCases.map(tc => tc.category).filter(Boolean))];
+    return cats.sort();
+  }, [testCases]);
+
   // Filter test cases based on various criteria
   const filteredTestCases = useMemo(() => {
     return versionFilteredTestCases.filter(testCase => {
       // Search filter
-      if (searchQuery && !testCase.name.toLowerCase().includes(searchQuery.toLowerCase()) &&
-          !testCase.id.toLowerCase().includes(searchQuery.toLowerCase())) {
-        return false;
-      }
+      const matchesSearch = !searchQuery || 
+                            testCase.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                            testCase.id.toLowerCase().includes(searchQuery.toLowerCase());
 
       // Status filter
-      if (statusFilter !== 'All' && testCase.status !== statusFilter) {
-        return false;
-      }
+      const matchesStatus = statusFilter === 'All' || testCase.status === statusFilter;
 
       // Automation filter
-      if (automationFilter !== 'All' && testCase.automationStatus !== automationFilter) {
-        return false;
-      }
+      const matchesAutomation = automationFilter === 'All' || testCase.automationStatus === automationFilter;
 
       // Priority filter
-      if (priorityFilter !== 'All' && testCase.priority !== priorityFilter) {
-        return false;
-      }
+      const matchesPriority = priorityFilter === 'All' || testCase.priority === priorityFilter;
+
+      // Category filter
+      const matchesCategory = categoryFilter === '' || testCase.category === categoryFilter;
 
       // Version filter (keeping original logic for compatibility)
-      if (selectedVersion !== 'unassigned' && testCase.version !== selectedVersion) {
-        return false;
-      }
+      const matchesVersion = selectedVersion === 'unassigned' || testCase.version === selectedVersion;
 
       // Traceability mode filter
+      let matchesTraceability = true;
       if (traceabilityMode === 'linked' && (!testCase.requirementIds || testCase.requirementIds.length === 0)) {
-        return false;
+        matchesTraceability = false;
       }
       if (traceabilityMode === 'unlinked' && testCase.requirementIds && testCase.requirementIds.length > 0) {
-        return false;
+        matchesTraceability = false;
       }
 
-      return true;
+      return matchesSearch && matchesStatus && matchesAutomation &&
+             matchesPriority && matchesCategory && matchesVersion && matchesTraceability;
     });
-  }, [versionFilteredTestCases, searchQuery, statusFilter, automationFilter, priorityFilter, selectedVersion, traceabilityMode]);
+  }, [versionFilteredTestCases, searchQuery, statusFilter, automationFilter, priorityFilter, categoryFilter, selectedVersion, traceabilityMode]);
+
 
   // Calculate summary statistics
   const summaryStats = useMemo(() => {
@@ -178,13 +459,15 @@ const TestCases = () => {
 
   // Handle test case selection
   const handleTestCaseSelection = (testCaseId, checked) => {
-    const newSelection = new Set(selectedTestCases);
-    if (checked) {
-      newSelection.add(testCaseId);
-    } else {
-      newSelection.delete(testCaseId);
-    }
-    setSelectedTestCases(newSelection);
+    setSelectedTestCases(prev => {
+      const newSelection = new Set(prev);
+      if (checked) {
+        newSelection.add(testCaseId);
+      } else {
+        newSelection.delete(testCaseId);
+      }
+      return newSelection;
+    });
   };
 
   const handleSelectAll = (checked) => {
@@ -193,6 +476,24 @@ const TestCases = () => {
     } else {
       setSelectedTestCases(new Set());
     }
+  };
+
+  // Handle select/deselect all in a specific category
+  const handleSelectAllInCategory = (category, checked) => {
+    setSelectedTestCases(prev => {
+      const newSelection = new Set(prev);
+      const testsInCategory = groupedTestCases[category];
+      if (testsInCategory) {
+        testsInCategory.forEach(tc => {
+          if (checked) {
+            newSelection.add(tc.id);
+          } else {
+            newSelection.delete(tc.id);
+          }
+        });
+      }
+      return newSelection;
+    });
   };
 
   // NEW: Clear selection function like in Requirements
@@ -208,13 +509,15 @@ const TestCases = () => {
 
   // Toggle row expansion
   const toggleRowExpansion = (testCaseId) => {
-    const newExpanded = new Set(expandedRows);
-    if (newExpanded.has(testCaseId)) {
-      newExpanded.delete(testCaseId);
-    } else {
-      newExpanded.add(testCaseId);
-    }
-    setExpandedRows(newExpanded);
+    setExpandedRows(prev => {
+      const newExpanded = new Set(prev);
+      if (newExpanded.has(testCaseId)) {
+        newExpanded.delete(testCaseId);
+      } else {
+        newExpanded.add(testCaseId);
+      }
+      return newExpanded;
+    });
   };
 
   // Handle new test case creation
@@ -223,6 +526,9 @@ const TestCases = () => {
       id: '',
       name: '',
       description: '',
+      category: '', // New field
+      preconditions: '', // New field
+      testData: '', // New field
       status: 'Not Run',
       automationStatus: 'Manual',
       priority: 'Medium',
@@ -270,7 +576,7 @@ const TestCases = () => {
         });
       } catch (error) {
         console.error('Error deleting test case:', error);
-        alert('Error deleting test case: ' + error.message);
+        alert('Error deleting test cases: ' + error.message);
       }
     }
   };
@@ -298,12 +604,46 @@ const TestCases = () => {
     }
   };
 
-  // Format last execution date
-  const formatLastExecution = (lastExecuted) => {
-    if (!lastExecuted) return 'Never';
-    const date = new Date(lastExecuted);
-    return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  // Group test cases by category
+  const groupedTestCases = useMemo(() => {
+    const groups = {};
+    filteredTestCases.forEach(tc => {
+      const category = tc.category || 'Uncategorized';
+      if (!groups[category]) {
+        groups[category] = [];
+      }
+      groups[category].push(tc);
+    });
+    // Sort categories alphabetically
+    return Object.keys(groups).sort().reduce((sorted, key) => {
+      sorted[key] = groups[key];
+      return sorted;
+    }, {});
+  }, [filteredTestCases]);
+
+  // Toggle category section collapse
+  const toggleSection = (category) => {
+    setCollapsedSections(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(category)) {
+        newSet.delete(category);
+      } else {
+        newSet.add(category);
+      }
+      return newSet;
+    });
   };
+
+  // Generate category statistics
+  const getCategoryStats = (testCases) => {
+    const total = testCases.length;
+    const passed = testCases.filter(tc => tc.status === 'Passed').length;
+    const failed = testCases.filter(tc => tc.status === 'Failed').length;
+    const automated = testCases.filter(tc => tc.automationStatus === 'Automated').length;
+      
+    return { total, passed, failed, automated, passRate: total > 0 ? Math.round((passed / total) * 100) : 0 };
+  };
+
 
   if (!hasTestCases) {
     return (
@@ -434,6 +774,18 @@ const TestCases = () => {
               <option value="Low">Low</option>
             </select>
 
+            {/* Category Filter */}
+            <select
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value)}
+              className="p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            >
+              <option value="">All Categories</option>
+              {categories.map(category => (
+                <option key={category} value={category}>{category}</option>
+              ))}
+            </select>
+
             {/* Traceability Mode */}
             <select
               value={traceabilityMode}
@@ -556,288 +908,85 @@ const TestCases = () => {
           </div>
         )}
 
-        {/* Test Cases Table - FIXED: Better sizing and added Last Execution */}
-        <div className="bg-white shadow overflow-hidden sm:rounded-md">
-          <div className="overflow-x-auto">
-            <table className="w-full table-fixed divide-y divide-gray-200">
-              <thead className="bg-gray-50 sticky top-0 z-10">
-                <tr>
-                  <th className="px-2 py-3 text-left w-12">
-                    <input
-                      type="checkbox"
-                      checked={filteredTestCases.length > 0 && selectedTestCases.size === filteredTestCases.length}
-                      onChange={(e) => handleSelectAll(e.target.checked)}
-                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+        {/* Test Cases Table - Grouped by Category */}
+        <div className="space-y-4">
+          {Object.entries(groupedTestCases).map(([category, categoryTests]) => {
+            const isCollapsed = collapsedSections.has(category);
+            const stats = getCategoryStats(categoryTests);
+                
+            return (
+              <div key={category} className="bg-white rounded-lg shadow">
+                {/* Category Header */}
+                <div 
+                  className="flex items-center justify-between p-4 border-b cursor-pointer hover:bg-gray-50"
+                  onClick={() => toggleSection(category)}
+                >
+                  <div className="flex items-center space-x-3">
+                    <ChevronRight 
+                      className={`transform transition-transform ${isCollapsed ? '' : 'rotate-90'}`} 
+                      size={16} 
                     />
-                  </th>
-                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-24">
-                    ID
-                  </th>
-                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-80">
-                    TEST CASE
-                  </th>
-                  <th className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20">
-                    STATUS
-                  </th>
-                  <th className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20">
-                    PRIORITY
-                  </th>
-                  <th className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20">
-                    AUTO
-                  </th>
-                  <th className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20">
-                    REQS
-                  </th>
-                  {/* NEW: Last Execution column */}
-                  <th className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-28">
-                    LAST RUN
-                  </th>
-                  <th className="px-2 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-20">
-                    ACTIONS
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {filteredTestCases.map((testCase) => {
-                  const isExpanded = expandedRows.has(testCase.id);
-                  const isSelected = selectedTestCases.has(testCase.id);
-                  
-                  return (
-                    <React.Fragment key={testCase.id}>
-                      <tr className={`hover:bg-gray-50 ${isSelected ? 'bg-blue-50' : ''}`}>
-                        <td className="px-2 py-3 whitespace-nowrap">
-                          <input
-                            type="checkbox"
-                            checked={isSelected}
-                            onChange={(e) => handleTestCaseSelection(testCase.id, e.target.checked)}
-                            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                          />
-                        </td>
-                        <td className="px-3 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
-                          <div className="flex items-center">
-                            <button
-                              onClick={() => toggleRowExpansion(testCase.id)}
-                              className="mr-1 p-1 hover:bg-gray-200 rounded"
-                            >
-                              {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                            </button>
-                            <span className="truncate">{testCase.id}</span>
-                          </div>
-                        </td>
-                        <td className="px-3 py-3">
-                          <div className="flex items-start">
-                            <div className="min-w-0 flex-1">
-                              <div className="text-sm font-medium text-gray-900 truncate" title={testCase.name}>
-                                {testCase.name}
-                              </div>
-                              <div className="text-xs text-gray-500 truncate">
-                                {testCase.description && testCase.description.substring(0, 60)}
-                                {testCase.description && testCase.description.length > 60 && '...'}
-                              </div>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-2 py-3 whitespace-nowrap">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center space-x-2">
-                              <span className={`inline-flex px-1.5 py-0.5 text-xs font-medium rounded ${
-                                testCase.status === 'Passed' ? 'bg-green-100 text-green-800' :
-                                testCase.status === 'Failed' ? 'bg-red-100 text-red-800' :
-                                testCase.status === 'Blocked' ? 'bg-yellow-100 text-yellow-800' :
-                                testCase.status === 'Not Found' ? 'bg-orange-100 text-orange-800' :
-                                'bg-gray-100 text-gray-800'
-                              }`}>
-                                {testCase.status === 'Not Run' ? 'Not Run' : testCase.status}
-                              </span>
-                              
-                              {/* Execution Info */}
-                              {(testCase.status === 'Failed' || testCase.status === 'Passed') && testCase.duration && (
-                                <div className="flex items-center space-x-1 text-xs text-gray-500">
-                                  <Clock size={12} />
-                                  <span>{testCase.duration}ms</span>
-                                </div>
-                              )}
-                            </div>
+                    <h3 className="text-lg font-medium text-gray-900">{category}</h3>
+                    <span className="text-sm text-gray-500">({stats.total} tests)</span>
+                  </div>
                             
-                            {/* Expand/Collapse Button - only for failed/error tests */}
-                            {(testCase.status === 'Failed' || testCase.status === 'Not Found') && (
-                              <button
-                                onClick={() => toggleTestExpansion(testCase.id)}
-                                className="p-1 hover:bg-gray-200 rounded transition-colors"
-                                title={expandedTests.has(testCase.id) ? 'Collapse details' : 'Expand details'}
-                              >
-                                {expandedTests.has(testCase.id) ? (
-                                  <ChevronUp size={16} className="text-gray-600" />
-                                ) : (
-                                  <ChevronDown size={16} className="text-gray-600" />
-                                )}
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-2 py-3 whitespace-nowrap">
-                          <span className={`inline-flex px-1.5 py-0.5 text-xs font-medium rounded ${
-                            testCase.priority === 'High' ? 'bg-red-50 text-red-600' :
-                            testCase.priority === 'Medium' ? 'bg-yellow-50 text-yellow-600' :
-                            'bg-gray-50 text-gray-600'
-                          }`}>
-                            {testCase.priority}
-                          </span>
-                        </td>
-                        <td className="px-2 py-3 whitespace-nowrap">
-                          <span className={`inline-flex px-1.5 py-0.5 text-xs font-medium rounded ${
-                            testCase.automationStatus === 'Automated' ? 'bg-blue-100 text-blue-800' :
-                            testCase.automationStatus === 'Semi-Automated' ? 'bg-purple-100 text-purple-800' :
-                            'bg-gray-100 text-gray-800'
-                          }`}>
-                            {testCase.automationStatus === 'Automated' ? 'Auto' : 
-                             testCase.automationStatus === 'Semi-Automated' ? 'Semi' : 'Manual'}
-                          </span>
-                        </td>
-                        <td className="px-2 py-3 whitespace-nowrap">
-                          <div className="text-xs text-gray-500">
-                            {testCase.requirementIds && testCase.requirementIds.length > 0 ? (
-                              <div className="flex flex-wrap gap-1">
-                                {testCase.requirementIds.slice(0, 1).map(reqId => (
-                                  <span key={reqId} className="px-1 py-0.5 bg-blue-100 text-blue-800 rounded text-xs truncate">
-                                    {reqId}
-                                  </span>
-                                ))}
-                                {testCase.requirementIds.length > 1 && (
-                                  <span className="text-gray-400">+{testCase.requirementIds.length - 1}</span>
-                                )}
-                              </div>
-                            ) : (
-                              <span className="text-gray-400">None</span>
-                            )}
-                          </div>
-                        </td>
-                        {/* NEW: Last Execution column */}
-                        <td className="px-2 py-3 whitespace-nowrap">
-                          <div className="text-xs text-gray-500 truncate">
-                            {testCase.lastExecuted ? (
-                              <>
-                                <div>{new Date(testCase.lastExecuted).toLocaleDateString()}</div>
-                                {testCase.lastExecutedBy && (
-                                  <div className="text-xs text-gray-400 truncate">
-                                    {testCase.lastExecutedBy}
-                                  </div>
-                                )}
-                              </>
-                            ) : (
-                              'Never'
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-2 py-3 whitespace-nowrap text-right text-sm font-medium">
-                          <div className="flex items-center justify-end space-x-1">
-                            {/* UPDATED: Execute button styled like traceability matrix */}
-                            <button
-                              onClick={() => handleExecuteTestCase(testCase)}
-                              className="inline-flex items-center px-1.5 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 text-xs"
-                              title="Execute Test"
-                            >
-                              <Play size={12} />
-                            </button>
-                            <button
-                              onClick={() => handleEditTestCase(testCase)}
-                              className="text-blue-600 hover:text-blue-900 p-1"
-                              title="Edit Test Case"
-                            >
-                              <Edit size={12} />
-                            </button>
-                            <button
-                              onClick={() => handleDeleteTestCase(testCase.id)}
-                              className="text-red-600 hover:text-red-900 p-1"
-                              title="Delete Test Case"
-                            >
-                              <Trash2 size={12} />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-
-                      {/* Expanded Failure Details Row */}
-                      {expandedTests.has(testCase.id) && (testCase.status === 'Failed' || testCase.status === 'Not Found') && (
-                        <tr className={`${testCase.status === 'Failed' ? 'bg-red-50 border-l-4 border-red-400' : 'bg-orange-50 border-l-4 border-orange-400'}`}>
-                          <td colSpan="9" className="p-4">
-                            <FailureDetailsPanel testCase={testCase} />
-                          </td>
-                        </tr>
-                      )}
-
-                      {/* Expanded Row Content */}
-                      {isExpanded && (
+                  {/* Category Stats */}
+                  <div className="flex items-center space-x-4 text-sm">
+                    <span className="text-green-600">{stats.passed} passed</span>
+                    <span className="text-red-600">{stats.failed} failed</span>
+                    <span className="text-blue-600">{stats.automated} automated</span>
+                    <span className="font-medium">{stats.passRate}% pass rate</span>
+                  </div>
+                </div>
+                        
+                {/* Category Tests */}
+                {!isCollapsed && (
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200 table-fixed">
+                      <thead className="bg-gray-50">
                         <tr>
-                          <td colSpan="9" className="px-4 py-4 bg-gray-50">
-                            <div className="space-y-4">
-                              <div>
-                                <h4 className="font-medium text-gray-900">Description</h4>
-                                <p className="text-sm text-gray-600 mt-1">{testCase.description}</p>
-                              </div>
-                              
-                              {testCase.steps && (
-                                <div>
-                                  <h4 className="font-medium text-gray-900">Steps</h4>
-                                  <ol className="list-decimal list-inside text-sm text-gray-600 mt-1 space-y-1">
-                                    {testCase.steps.map((step, index) => (
-                                      <li key={index}>{step}</li>
-                                    ))}
-                                  </ol>
-                                </div>
-                              )}
-                              
-                              {testCase.expectedResult && (
-                                <div>
-                                  <h4 className="font-medium text-gray-900">Expected Result</h4>
-                                  <p className="text-sm text-gray-600 mt-1">{testCase.expectedResult}</p>
-                                </div>
-                              )}
-                              
-                              {testCase.tags && testCase.tags.length > 0 && (
-                                <div>
-                                  <h4 className="font-medium text-gray-900">Tags</h4>
-                                  <div className="flex flex-wrap gap-1 mt-1">
-                                    {testCase.tags.map(tag => (
-                                      <span key={tag} className="px-2 py-1 bg-gray-200 text-gray-700 rounded text-xs">
-                                        {tag}
-                                      </span>
-                                    ))}
-                                  </div>
-                                </div>
-                              )}
-                              
-                              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                                <div>
-                                  <span className="font-medium text-gray-900">Version:</span>
-                                  <span className="ml-1 text-gray-600">{testCase.version || 'Unassigned'}</span>
-                                </div>
-                                <div>
-                                  <span className="font-medium text-gray-900">Assignee:</span>
-                                  <span className="ml-1 text-gray-600">{testCase.assignee || 'Unassigned'}</span>
-                                </div>
-                                <div>
-                                  <span className="font-medium text-gray-900">Duration:</span>
-                                  <span className="ml-1 text-gray-600">{testCase.estimatedDuration || 0} min</span>
-                                </div>
-                                <div>
-                                  <span className="font-medium text-gray-900">Last Executed:</span>
-                                  <span className="ml-1 text-gray-600">
-                                    {formatLastExecution(testCase.lastExecuted)}
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-                          </td>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-12">
+                            <input
+                              type="checkbox"
+                              checked={categoryTests.length > 0 && categoryTests.every(tc => selectedTestCases.has(tc.id))}
+                              onChange={(e) => handleSelectAllInCategory(category, e.target.checked)}
+                              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                            />
+                          </th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase w-24">ID</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase w-48">Name</th> {/* Changed from w-80 to w-48 */}
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase w-20">Status</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase w-20">Priority</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase w-20">Automation</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase w-20">Requirements</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase w-28">Last Run</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase w-20">Actions</th>
                         </tr>
-                      )}
-                    </React.Fragment>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {categoryTests.map((testCase) => (
+                          <TestCaseRow 
+                            key={testCase.id}
+                            testCase={testCase}
+                            onSelect={handleTestCaseSelection}
+                            onEdit={handleEditTestCase} 
+                            onDelete={handleDeleteTestCase}
+                            onExecute={handleExecuteTestCase}
+                            isSelected={selectedTestCases.has(testCase.id)}
+                            isExpanded={expandedRows.has(testCase.id)}
+                            onToggleExpand={toggleRowExpansion}
+                            expandedTests={expandedTests} // Pass down the expandedTests set
+                          />
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
+
 
         {/* Results Info */}
         <div className="text-sm text-gray-500 text-center">
@@ -905,6 +1054,9 @@ const EditTestCaseModal = ({ testCase, onSave, onCancel }) => {
     id: testCase?.id || '',
     name: testCase?.name || '',
     description: testCase?.description || '',
+    category: testCase?.category || '', // New field
+    preconditions: testCase?.preconditions || '', // New field
+    testData: testCase?.testData || '', // New field
     status: testCase?.status || 'Not Run',
     automationStatus: testCase?.automationStatus || 'Manual',
     priority: testCase?.priority || 'Medium',
@@ -973,6 +1125,35 @@ const EditTestCaseModal = ({ testCase, onSave, onCancel }) => {
                 value={formData.description}
                 onChange={(e) => setFormData({...formData, description: e.target.value})}
                 rows={3}
+                className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
+
+            {/* New TestRail fields in Edit/Create Modal */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Category</label>
+              <input
+                type="text"
+                value={formData.category}
+                onChange={(e) => setFormData({...formData, category: e.target.value})}
+                className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Preconditions</label>
+              <textarea
+                value={formData.preconditions}
+                onChange={(e) => setFormData({...formData, preconditions: e.target.value})}
+                rows={2}
+                className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Test Data</label>
+              <textarea
+                value={formData.testData}
+                onChange={(e) => setFormData({...formData, testData: e.target.value})}
+                rows={2}
                 className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
               />
             </div>

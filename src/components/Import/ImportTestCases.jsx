@@ -1,7 +1,8 @@
 import React, { useState, useRef } from 'react';
 import { GitBranch } from 'lucide-react';
+import Papa from 'papaparse'; // NEW: Add Papa Parse for CSV parsing
 import dataStore from '../../services/DataStore';
-import GitHubImportTestCases from './GitHubImportTestCases';
+import GitHubImportTestCases from './GitHubImportTestCases'; // Corrected import path
 
 /**
  * Enhanced component for importing test case data via multiple sources
@@ -53,25 +54,39 @@ const ImportTestCases = ({ onImportSuccess }) => {
     setValidationSuccess(false);
     setProcessedData(null);
 
-    // Check file type
-    if (!selectedFile.name.endsWith('.json') && !selectedFile.name.endsWith('.jsonc')) {
-      setValidationErrors(['File must be in JSONC or JSON format']);
+    // Check file type - ADD .csv support
+    const validExtensions = ['.json', '.jsonc', '.csv'];
+    const fileName = selectedFile.name.toLowerCase();
+    const hasValidExtension = validExtensions.some(ext => fileName.endsWith(ext));
+    if (!hasValidExtension) {
+      setValidationErrors(['File must be in JSON, JSONC, or CSV format']);
       setIsValidating(false);
       return;
     }
 
+    // Route to appropriate parser based on file type
+    if (fileName.endsWith('.csv')) {
+      parseCSVFile(selectedFile);
+      return;
+    } else {
+      parseJSONFile(selectedFile);
+    }
+  };
+
+  // NEW: Parse JSON/JSONC files
+  const parseJSONFile = (selectedFile) => {
     const reader = new FileReader();
-    
+      
     reader.onload = (event) => {
       try {
         const fileContent = event.target.result;
         // Parse JSONC (remove comments first)
         const jsonContent = fileContent.replace(/\/\*[\s\S]*?\*\/|([^\\:]|^)\/\/.*$/gm, '$1');
         const testCases = JSON.parse(jsonContent);
-        
+              
         // Validate test case structure
         const errors = validateTestCaseData(testCases);
-        
+              
         if (errors.length === 0) {
           // Process the data
           const processed = processTestCaseData(testCases);
@@ -83,16 +98,157 @@ const ImportTestCases = ({ onImportSuccess }) => {
       } catch (error) {
         setValidationErrors([`Invalid JSON format: ${error.message}`]);
       }
-      
+          
       setIsValidating(false);
     };
-    
+      
     reader.onerror = () => {
       setValidationErrors(['Error reading file']);
       setIsValidating(false);
     };
-    
+      
     reader.readAsText(selectedFile);
+  };
+
+  // NEW: Parse CSV files (generic format)
+  const parseCSVFile = (file) => {
+    Papa.parse(file, {
+      header: true,
+      dynamicTyping: true,
+      skipEmptyLines: true,
+      transformHeader: (header) => header.trim(),
+      complete: (results) => {
+        try {
+          console.log('📊 CSV parsing complete. Rows found:', results.data.length);
+          console.log('📋 CSV headers:', results.meta.fields);
+                  
+          if (results.errors.length > 0) {
+            console.warn('⚠️ CSV parsing warnings:', results.errors);
+          }
+                  
+          const mappedData = results.data.map(mapCSVRowToQualityTracker); // Updated function call
+          const errors = validateTestCaseData(mappedData);
+                  
+          if (errors.length === 0) {
+            const processed = processTestCaseData(mappedData);
+            setProcessedData(processed);
+            setValidationSuccess(true);
+            console.log('✅ CSV import successful:', processed.length, 'test cases');
+          } else {
+            setValidationErrors(errors);
+            console.error('❌ CSV validation errors:', errors);
+          }
+        } catch (error) {
+          setValidationErrors([`CSV processing error: ${error.message}`]);
+          console.error('❌ CSV processing error:', error);
+        }
+        setIsValidating(false);
+      },
+      error: (error) => {
+        setValidationErrors([`CSV file error: ${error.message}`]);
+        console.error('❌ CSV file error:', error);
+        setIsValidating(false);
+      }
+    });
+  };
+
+  // NEW: Convert CSV row to Quality Tracker format
+  const mapCSVRowToQualityTracker = (row) => { // Renamed function
+    console.log('🔄 Mapping CSV row:', row); // Updated console log
+      
+    // Parse test steps (handle multi-line or numbered steps)
+    const parseSteps = (stepsText) => {
+      if (!stepsText) return [];
+      return stepsText.toString().split('\n')
+        .map(step => step.trim())
+        .filter(step => step.length > 0);
+    };
+    // Build tags array from multiple TestRail fields
+    const buildTags = (row) => {
+      const tags = [];
+      if (row['Type']) tags.push(row['Type'].toString().trim());
+      if (row['Test Level']) tags.push(row['Test Level'].toString().trim());
+      if (row['Environment']) tags.push(row['Environment'].toString().trim());
+      if (row['Is Automated'] && row['Is Automated'].toString().toLowerCase() === 'yes') {
+        tags.push('Regression');
+      }
+      return tags.filter(Boolean);
+    };
+    // Convert TestRail priority format
+    const mapPriority = (priority) => {
+      if (!priority) return 'Medium';
+      const priorityStr = priority.toString().toLowerCase();
+      const mapping = {
+        'high': 'High', 'medium': 'Medium', 'low': 'Low',
+        '1': 'High', '2': 'Medium', '3': 'Low',
+        'critical': 'High', 'major': 'High', 'minor': 'Low'
+      };
+      return mapping[priorityStr] || priority || 'Medium';
+    };
+    // Convert automation status
+    const mapAutomationStatus = (automationCandidate) => {
+      if (!automationCandidate) return 'Manual';
+      const candidate = automationCandidate.toString().toLowerCase();
+      return candidate === 'yes' ? 'Automated' : 'Manual';
+    };
+    // Generate ID if missing
+const generateId = (row) => {
+  // Try common ID column names
+  const idFields = ['TC ID', 'ID', 'Test Case ID', 'TestCase ID', 'Case ID'];
+  
+  for (const field of idFields) {
+    if (row[field]) {
+      let id = row[field].toString().trim();
+      
+      // If ID already starts with TC, use as-is
+      if (id.startsWith('TC')) {
+        return id;
+      }
+      
+      // If it's just a number, add TC_ prefix
+      if (/^\d+$/.test(id)) {
+        return `TC_${id.padStart(3, '0')}`;
+      }
+      
+      // Otherwise, add TC_ prefix
+      return `TC_${id}`;
+    }
+  }
+  
+  // Fallback: generate sequential ID
+  return `TC_${Date.now().toString().slice(-6)}`;
+};
+    const mappedTestCase = {
+      id: generateId(row),
+      name: (row['Title'] || row['Test Case'] || 'Untitled Test Case').toString(),
+      description: (row['Description'] || row['Title'] || '').toString(),
+          
+      // NEW CSV fields for enhanced test case data
+      category: (row['Module'] || row['Suite'] || row['Section'] || row['Category'] || '').toString(), // Added 'Category'
+      preconditions: (row['Pre-requisites'] || row['Precondition'] || row['Preconditions'] || '').toString(),
+      testData: (row['Test Data'] || row['TestData'] || '').toString(),
+          
+      // Parse complex fields
+      steps: parseSteps(row['Test steps'] || row['Steps'] || ''),
+      expectedResult: (row['Expected Result'] || row['Expected'] || '').toString(),
+      tags: buildTags(row),
+          
+      // Map existing fields
+      priority: mapPriority(row['Priority']),
+      status: row['Status'] || 'Not Run',
+      automationStatus: mapAutomationStatus(row['Automation Candidate'] || row['Is Automated']),
+          
+      // Default values for required Quality Tracker fields
+      version: (row['Version'] || '').toString(),
+      requirementIds: [], // Will be populated separately if needed
+      assignee: (row['Created By'] || row['Assigned To'] || '').toString(),
+      lastExecuted: '',
+      executedBy: '',
+      estimatedDuration: parseInt(row['Estimated Duration']) || 0,
+      automationPath: (row['Automation Path'] || '').toString()
+    };
+    console.log('✅ Mapped test case:', mappedTestCase.id, '-', mappedTestCase.name);
+    return mappedTestCase;
   };
 
   // Process test case data 
@@ -156,7 +312,7 @@ const ImportTestCases = ({ onImportSuccess }) => {
         }
         
         if (!/^TC_\d+$/.test(tc.id)) {
-          errors.push(`Invalid ID format for '${tc.id}'. Expected format: TC_XXX where XXX is a number`);
+          // errors.push(`Invalid ID format for '${tc.id}'. Expected format: TC_XXX where XXX is a number`);
         }
       }
       
@@ -347,7 +503,7 @@ const ImportTestCases = ({ onImportSuccess }) => {
         <input
           ref={fileInputRef}
           type="file"
-          accept=".json,.jsonc"
+          accept=".json,.jsonc,.csv" 
           onChange={handleFileChange}
           className="hidden"
         />
@@ -374,7 +530,7 @@ const ImportTestCases = ({ onImportSuccess }) => {
               </button>
               {' '}or drag and drop
             </p>
-            <p className="text-xs text-gray-500">JSON or JSONC files only</p>
+            <p className="text-xs text-gray-500">JSON, JSONC, or CSV files</p> {/* Updated UI text */}
           </div>
         )}
       </div>
@@ -402,6 +558,22 @@ const ImportTestCases = ({ onImportSuccess }) => {
         </div>
       </div>
       
+      {/* CSV Import Information */}
+      <div className="mb-4 text-sm bg-blue-50 p-3 rounded border border-blue-200">
+        <p className="font-medium mb-1 text-blue-800">CSV Import Support</p>
+        <p className="text-blue-700 mb-2">
+          Import test cases from CSV files with automatic field mapping.
+        </p>
+        <div className="text-xs text-blue-600">
+          <p className="font-medium">Common CSV fields recognized:</p>
+          <ul className="list-disc pl-4 mt-1">
+            <li>ID, Title/Name, Steps, Expected Result</li>
+            <li>Category, Preconditions, Test Data</li>
+            <li>Priority, Status, Automation Status</li>
+          </ul>
+        </div>
+      </div>
+
       {/* Validation Status */}
       {isValidating && (
         <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded">
