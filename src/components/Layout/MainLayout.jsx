@@ -25,9 +25,33 @@ const MainLayout = ({
             hasData={hasData}
             onAddVersion={onAddVersion}
           />
-          <main className="p-6 flex-grow">
+          {/* BALANCED APPROACH: Reasonable padding for visual comfort, more space than original */}
+          <main className="px-3 py-4 flex-grow">
             {children}
           </main>
+          
+          {/* Alternative options (commented out): */}
+          
+          {/* OPTION 2: Slightly more padding - Good balance */}
+          {/* 
+          <main className="px-4 py-4 flex-grow">
+            {children}
+          </main>
+          */}
+          
+          {/* OPTION 3: Responsive padding - Adapts to screen size */}
+          {/* 
+          <main className="px-2 sm:px-3 lg:px-4 xl:px-5 py-4 flex-grow">
+            {children}
+          </main>
+          */}
+          
+          {/* OPTION 4: Minimal but visible padding */}
+          {/* 
+          <main className="px-2 py-4 flex-grow">
+            {children}
+          </main>
+          */}
           
           {/* Footer with copyright */}
           <footer className="mt-auto bg-white shadow-md p-4 text-center text-gray-600">

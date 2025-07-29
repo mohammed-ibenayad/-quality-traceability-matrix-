@@ -440,7 +440,7 @@ const generateId = (row) => {
 
   console.log('🎨 Rendering file import interface');
 
-  // Default file import view (your existing UI)
+  // Default file import view (enhanced UI)
   return (
     <div className="bg-white p-6 rounded shadow">
       <div className="flex items-center justify-between mb-4">
@@ -492,63 +492,131 @@ const generateId = (row) => {
         </p>
       </div>
       
-      {/* File Upload Area */}
+      {/* Enhanced File Upload Area - Following ImportRequirements pattern */}
       <div 
         className={`mb-4 border-2 border-dashed rounded-lg p-6 text-center ${
-          file ? 'border-blue-300 bg-blue-50' : 'border-gray-300 hover:border-gray-400'
+          file ? 'border-blue-300 bg-blue-50' : 'border-gray-300'
         }`}
         onDrop={handleDrop}
         onDragOver={handleDragOver}
       >
+        <div className="mb-3">
+          <svg className="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true">
+            <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4h-12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          <p className="mt-1 text-sm text-gray-600">
+            Drag and drop your JSON, JSONC, or CSV file here, or
+          </p>
+        </div>
+        
         <input
-          ref={fileInputRef}
           type="file"
-          accept=".json,.jsonc,.csv" 
+          accept=".json,.jsonc,.csv"
           onChange={handleFileChange}
+          ref={fileInputRef}
           className="hidden"
+          id="file-upload"
         />
         
-        {file ? (
-          <div>
-            <svg className="mx-auto h-12 w-12 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-            <p className="mt-2 text-sm font-medium text-blue-600">{file.name}</p>
-            <p className="text-xs text-gray-500">File selected - ready for validation</p>
-          </div>
-        ) : (
-          <div>
-            <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-            <p className="mt-2 text-sm text-gray-600">
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                className="font-medium text-blue-600 hover:text-blue-500"
-              >
-                Click to upload
-              </button>
-              {' '}or drag and drop
-            </p>
-            <p className="text-xs text-gray-500">JSON, JSONC, or CSV files</p> {/* Updated UI text */}
+        <div className="flex gap-3 justify-center">
+          <label
+            htmlFor="file-upload"
+            className="cursor-pointer inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+          >
+            Select File
+          </label>
+          
+          <button
+            onClick={resetForm}
+            className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-md shadow-sm hover:bg-gray-50 focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+          >
+            Reset
+          </button>
+        </div>
+        
+        {file && (
+          <div className="mt-3 text-sm text-gray-600">
+            Selected file: <span className="font-medium">{file.name}</span> ({(file.size / 1024).toFixed(1)} KB)
           </div>
         )}
       </div>
+      
+      {/* Validation Success - Moved right after file upload area */}
+      {validationSuccess && (
+        <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded">
+          <h3 className="text-green-700 font-medium mb-2 flex items-center">
+            <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"></path>
+            </svg>
+            File Validated Successfully
+          </h3>
+          <p className="text-green-700 text-sm mb-3">
+            Your test case file has been validated and processed. Ready to import.
+          </p>
+          
+          {processedData && (
+            <div className="mb-3 text-sm text-green-700">
+              <p>Found {processedData.length} test cases</p>
+              {importOption === 'withMapping' && (
+                <p className="mt-1">
+                  {Object.keys(extractMappings(processedData)).length} requirements will be mapped
+                </p>
+              )}
+              <details className="mt-2">
+                <summary className="cursor-pointer hover:underline">View Data Summary</summary>
+                <div className="mt-2 p-2 bg-white rounded text-xs font-mono overflow-auto max-h-32">
+                  {processedData.map((tc, i) => (
+                    <div key={i} className="mb-1">
+                      {tc.id}: {tc.name} ({tc.status}, {tc.automationStatus})
+                      {tc.requirementIds && importOption === 'withMapping' && (
+                        <span> → {tc.requirementIds.join(', ')}</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </details>
+            </div>
+          )}
 
-      {/* Sample File Section */}
+          {/* Import button moved inside validation success box */}
+          <button
+            onClick={handleImport}
+            className="flex items-center px-4 py-2 bg-green-600 text-white rounded-md shadow-sm hover:bg-green-700 focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors"
+          >
+            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"></path>
+            </svg>
+            Confirm & Import Data
+          </button>
+        </div>
+      )}
+
+      {/* Enhanced Sample File Section with JSON and CSV downloads */}
       <div className="mb-4 text-sm bg-gray-50 p-3 rounded border border-gray-200">
         <p className="font-medium mb-1">Need a sample file?</p>
         <div className="flex items-center justify-between">
-          <a 
-            href="/sample-testcases.jsonc" 
-            download 
-            className="text-blue-600 hover:underline flex items-center"
-          >
-            <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-              <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd"></path>
-            </svg>
-            Download sample
-          </a>
+          <div className="flex gap-3">
+            <a 
+              href="/sample-testcases.jsonc" 
+              download 
+              className="text-blue-600 hover:underline flex items-center"
+            >
+              <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd"></path>
+              </svg>
+              JSON Sample
+            </a>
+            <a 
+              href="/sample-testcases.csv" 
+              download 
+              className="text-blue-600 hover:underline flex items-center"
+            >
+              <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd"></path>
+              </svg>
+              CSV Sample
+            </a>
+          </div>
           <button
             className="px-2 py-1 bg-gray-200 text-gray-700 rounded text-xs hover:bg-gray-300"
             onClick={() => window.loadSampleData && window.loadSampleData()}
@@ -558,22 +626,6 @@ const generateId = (row) => {
         </div>
       </div>
       
-      {/* CSV Import Information */}
-      <div className="mb-4 text-sm bg-blue-50 p-3 rounded border border-blue-200">
-        <p className="font-medium mb-1 text-blue-800">CSV Import Support</p>
-        <p className="text-blue-700 mb-2">
-          Import test cases from CSV files with automatic field mapping.
-        </p>
-        <div className="text-xs text-blue-600">
-          <p className="font-medium">Common CSV fields recognized:</p>
-          <ul className="list-disc pl-4 mt-1">
-            <li>ID, Title/Name, Steps, Expected Result</li>
-            <li>Category, Preconditions, Test Data</li>
-            <li>Priority, Status, Automation Status</li>
-          </ul>
-        </div>
-      </div>
-
       {/* Validation Status */}
       {isValidating && (
         <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded">
@@ -606,67 +658,6 @@ const generateId = (row) => {
           </p>
         </div>
       )}
-      
-      {/* Validation Success */}
-      {validationSuccess && (
-        <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded">
-          <h3 className="text-green-700 font-medium mb-2 flex items-center">
-            <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"></path>
-            </svg>
-            File Validated Successfully
-          </h3>
-          <p className="text-green-700 text-sm">
-            Your test case file has been validated and processed. Ready to import.
-          </p>
-          
-          {processedData && (
-            <div className="mt-3 text-sm text-green-700">
-              <p>Found {processedData.length} test cases</p>
-              {importOption === 'withMapping' && (
-                <p className="mt-1">
-                  {Object.keys(extractMappings(processedData)).length} requirements will be mapped
-                </p>
-              )}
-              <details className="mt-2">
-                <summary className="cursor-pointer hover:underline">View Data Summary</summary>
-                <div className="mt-2 p-2 bg-white rounded text-xs font-mono overflow-auto max-h-32">
-                  {processedData.map((tc, i) => (
-                    <div key={i} className="mb-1">
-                      {tc.id}: {tc.name} ({tc.status}, {tc.automationStatus})
-                      {tc.requirementIds && importOption === 'withMapping' && (
-                        <span> → {tc.requirementIds.join(', ')}</span>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </details>
-            </div>
-          )}
-        </div>
-      )}
-      
-      {/* Action Buttons */}
-      <div className="flex gap-3 mt-6">
-        <button
-          onClick={handleImport}
-          disabled={!validationSuccess}
-          className={`px-4 py-2 rounded-md shadow-sm ${
-            validationSuccess
-              ? 'bg-blue-600 text-white hover:bg-blue-700 focus:ring-2 focus:ring-offset-2 focus:ring-blue-500'
-              : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-          }`}
-        >
-          Import Test Cases
-        </button>
-        
-        <button
-          onClick={resetForm}
-          className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-md shadow-sm hover:bg-gray-50 focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-        >
-          Reset
-        </button>
-      </div>
     </div>
   );
 };

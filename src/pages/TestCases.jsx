@@ -1,31 +1,35 @@
 // src/pages/TestCases.jsx - Enhanced Version with Clear Selection, Execute Button, Last Execution Info, and Failure Details
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { 
-  Play, 
-  Pause, 
-  CheckCircle, 
-  XCircle, 
-  Clock, 
-  Search, 
-  Filter, 
-  Plus, 
-  Edit, 
-  Trash2, 
-  Download, 
+import {
+  Play,
+  Pause,
+  CheckCircle,
+  XCircle,
+  Clock,
+  Search,
+  Filter,
+  Plus,
+  Edit,
+  Trash2,
+  Download,
   Upload,
   Link,
   Unlink,
-  Eye,
+  Eye, // NEW: Eye icon for view action
   Settings,
   ChevronDown,
   ChevronRight,
   ChevronUp,
-  AlertTriangle
+  AlertTriangle,
+  Copy // NEW: Copy icon for duplicate action
 } from 'lucide-react';
 import MainLayout from '../components/Layout/MainLayout';
 import EmptyState from '../components/Common/EmptyState';
 import TestExecutionModal from '../components/TestExecution/TestExecutionModal';
 import FailureDetailsPanel from '../components/TestExecution/FailureDetailsPanel';
+// NEW: Import enhanced modals - UNCOMMENT when components are created
+import ViewTestCaseModal from '../components/TestCases/ViewTestCaseModal';
+import EditTestCaseModal from '../components/TestCases/EditTestCaseModal';
 import { useVersionContext } from '../context/VersionContext';
 import dataStore from '../services/DataStore';
 
@@ -36,24 +40,26 @@ const formatLastExecution = (lastExecuted) => {
   return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 };
 
-// TestCaseRow Component (extracted for cleaner rendering)
-const TestCaseRow = ({ 
-  testCase, 
-  onSelect, 
-  onEdit, 
-  onDelete, 
-  onExecute, 
-  isSelected, 
-  isExpanded, 
+// TestCaseRow Component (updated with view action and optimized layout)
+const TestCaseRow = ({
+  testCase,
+  onSelect,
+  onView, // NEW: View action
+  onEdit,
+  onDelete,
+  onExecute,
+  isSelected,
+  isExpanded,
   onToggleExpand,
-  expandedTests // Prop for failure expansion
+  expandedTests, // Prop for failure expansion
+  onToggleFailureExpand // NEW: Handler for failure expansion
 }) => {
   const isFailureExpanded = expandedTests.has(testCase.id);
 
   return (
     <React.Fragment>
-      <tr className={`hover:bg-gray-50 ${isSelected ? 'bg-blue-50' : ''}`}>
-        <td className="px-2 py-3 whitespace-nowrap w-12">
+      <tr className={`flex w-full hover:bg-gray-50 ${isSelected ? 'bg-blue-50' : ''}`}>
+        <td className="px-2 py-3 w-10 flex-shrink-0">
           <input
             type="checkbox"
             checked={isSelected}
@@ -61,113 +67,115 @@ const TestCaseRow = ({
             className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
           />
         </td>
-        <td className="px-3 py-3 whitespace-nowrap text-sm font-medium text-gray-900 w-24">
-          <div className="flex items-center">
+        {/* REPLACE WITH THIS SINGLE COMBINED COLUMN: */}
+        <td className="px-2 py-3 text-sm text-gray-900 w-80 flex-shrink-0">
+          <div className="flex items-start">
             <button
               onClick={() => onToggleExpand(testCase.id)}
-              className="mr-1 p-1 hover:bg-gray-200 rounded"
+              className="mr-2 p-1 hover:bg-gray-200 rounded flex-shrink-0 mt-0.5"
             >
               {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
             </button>
-            <span className="truncate">{testCase.id}</span>
-          </div>
-        </td>
-        <td className="px-3 py-3 w-48"> {/* Changed from w-80 to w-48 */}
-          <div className="flex items-start">
-            <div className="min-w-0 flex-1">
-              <div className="text-sm font-medium text-gray-900 truncate" title={testCase.name}>
-                {testCase.name}
-              </div>
-              <div className="text-xs text-gray-500 truncate">
-                {testCase.description && testCase.description.substring(0, 60)}
-                {testCase.description && testCase.description.length > 60 && '...'}
-              </div>
-            </div>
-          </div>
-        </td>
-        <td className="px-2 py-3 whitespace-nowrap w-20">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <span className={`inline-flex px-1.5 py-0.5 text-xs font-medium rounded ${
-                testCase.status === 'Passed' ? 'bg-green-100 text-green-800' :
-                testCase.status === 'Failed' ? 'bg-red-100 text-red-800' :
-                testCase.status === 'Blocked' ? 'bg-yellow-100 text-yellow-800' :
-                testCase.status === 'Not Found' ? 'bg-orange-100 text-orange-800' :
-                'bg-gray-100 text-gray-800'
-              }`}>
-                {testCase.status === 'Not Run' ? 'Not Run' : testCase.status}
-              </span>
-              
-              {/* Execution Info */}
-              {(testCase.status === 'Failed' || testCase.status === 'Passed') && testCase.duration && (
-                <div className="flex items-center space-x-1 text-xs text-gray-500">
-                  <Clock size={12} />
-                  <span>{testCase.duration}ms</span>
+            <div className="flex-1 min-w-0">
+              <div className="font-medium text-gray-900 mb-1 truncate">{testCase.id}</div>
+              {/* Only show name if it's different from ID */}
+              {testCase.name && testCase.name !== testCase.id && (
+                <div className="text-sm text-gray-700 truncate" title={testCase.name}>
+                  {testCase.name}
+                </div>
+              )}
+              {/* Show description only if it's different from both ID and name */}
+              {testCase.description &&
+               testCase.description !== testCase.id &&
+               testCase.description !== testCase.name && (
+                <div className="text-xs text-gray-500 truncate">
+                  {testCase.description.substring(0, 50)}
+                  {testCase.description.length > 50 && '...'}
                 </div>
               )}
             </div>
-            
+          </div>
+        </td>
+        {/* END OF REPLACEMENT */}
+        <td className="px-2 py-3 w-20 flex-shrink-0">
+          <div className="flex flex-col items-start">
+            <span className={`inline-flex px-2 py-1 text-xs font-medium rounded ${
+              testCase.status === 'Passed' ? 'bg-green-100 text-green-800' :
+              testCase.status === 'Failed' ? 'bg-red-100 text-red-800' :
+              testCase.status === 'Blocked' ? 'bg-yellow-100 text-yellow-800' :
+              testCase.status === 'Not Found' ? 'bg-orange-100 text-orange-800' :
+              'bg-gray-100 text-gray-800'
+            }`}>
+              {testCase.status === 'Not Run' ? 'Not Run' : testCase.status}
+            </span>
+
+            {/* Execution Info - moved below status */}
+            {(testCase.status === 'Failed' || testCase.status === 'Passed') && testCase.duration && (
+              <div className="flex items-center mt-1 text-xs text-gray-500">
+                <Clock size={12} />
+                <span className="ml-1">{testCase.duration}ms</span>
+              </div>
+            )}
+
             {/* Expand/Collapse Button - only for failed/error tests */}
             {(testCase.status === 'Failed' || testCase.status === 'Not Found') && (
               <button
-                onClick={() => expandedTests.has(testCase.id) ? expandedTests.delete(testCase.id) : expandedTests.add(testCase.id)} // Direct update to set
-                className="p-1 hover:bg-gray-200 rounded transition-colors"
+                onClick={() => onToggleFailureExpand(testCase.id)} // Corrected handler
+                className="mt-1 p-1 hover:bg-gray-200 rounded transition-colors"
                 title={isFailureExpanded ? 'Collapse details' : 'Expand details'}
               >
                 {isFailureExpanded ? (
-                  <ChevronUp size={16} className="text-gray-600" />
+                  <ChevronUp size={14} className="text-gray-600" />
                 ) : (
-                  <ChevronDown size={16} className="text-gray-600" />
+                  <ChevronDown size={14} className="text-gray-600" />
                 )}
               </button>
             )}
           </div>
         </td>
-        <td className="px-2 py-3 whitespace-nowrap w-20">
-          <span className={`inline-flex px-1.5 py-0.5 text-xs font-medium rounded ${
+        <td className="px-2 py-3 w-16 flex-shrink-0">
+          <span className={`inline-flex px-2 py-1 text-xs font-medium rounded ${
             testCase.priority === 'High' ? 'bg-red-50 text-red-600' :
             testCase.priority === 'Medium' ? 'bg-yellow-50 text-yellow-600' :
             'bg-gray-50 text-gray-600'
           }`}>
-            {testCase.priority}
+            {testCase.priority} {/* Show full priority name */}
           </span>
         </td>
-        <td className="px-2 py-3 whitespace-nowrap w-20">
-          <span className={`inline-flex px-1.5 py-0.5 text-xs font-medium rounded ${
+        <td className="px-2 py-3 w-20 flex-shrink-0">
+          <span className={`inline-flex px-2 py-1 text-xs font-medium rounded ${
             testCase.automationStatus === 'Automated' ? 'bg-blue-100 text-blue-800' :
             testCase.automationStatus === 'Semi-Automated' ? 'bg-purple-100 text-purple-800' :
             'bg-gray-100 text-gray-800'
           }`}>
-            {testCase.automationStatus === 'Automated' ? 'Auto' : 
+            {testCase.automationStatus === 'Automated' ? 'Auto' :
              testCase.automationStatus === 'Semi-Automated' ? 'Semi' : 'Manual'}
           </span>
         </td>
-        <td className="px-2 py-3 whitespace-nowrap w-20">
+        <td className="px-2 py-3 w-20 flex-shrink-0">
           <div className="text-xs text-gray-500">
             {testCase.requirementIds && testCase.requirementIds.length > 0 ? (
-              <div className="flex flex-wrap gap-1">
-                {testCase.requirementIds.slice(0, 1).map(reqId => (
-                  <span key={reqId} className="px-1 py-0.5 bg-blue-100 text-blue-800 rounded text-xs truncate">
-                    {reqId}
-                  </span>
-                ))}
+              <div className="flex flex-col">
+                <span className="px-1 py-0.5 bg-blue-100 text-blue-800 rounded text-xs truncate">
+                  {testCase.requirementIds[0]}
+                </span>
                 {testCase.requirementIds.length > 1 && (
-                  <span className="text-gray-400">+{testCase.requirementIds.length - 1}</span>
+                  <span className="text-gray-400 text-xs mt-0.5">+{testCase.requirementIds.length - 1}</span>
                 )}
               </div>
             ) : (
-              <span className="text-gray-400">None</span>
+              <span className="text-gray-400">-</span>
             )}
           </div>
         </td>
-        <td className="px-2 py-3 whitespace-nowrap w-28">
+        <td className="px-2 py-3 w-20 flex-shrink-0">
           <div className="text-xs text-gray-500 truncate">
             {testCase.lastExecuted ? (
               <>
-                <div>{new Date(testCase.lastExecuted).toLocaleDateString()}</div>
+                <div>{new Date(testCase.lastExecuted).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</div>
                 {testCase.lastExecutedBy && (
                   <div className="text-xs text-gray-400 truncate">
-                    {testCase.lastExecutedBy}
+                    {testCase.lastExecutedBy.substring(0, 10)}...
                   </div>
                 )}
               </>
@@ -176,28 +184,36 @@ const TestCaseRow = ({
             )}
           </div>
         </td>
-        <td className="px-2 py-3 whitespace-nowrap text-right text-sm font-medium w-20">
+        <td className="px-2 py-3 w-24 flex-shrink-0">
           <div className="flex items-center justify-end space-x-1">
+            {/* NEW: View button */}
+            <button
+              onClick={() => onView(testCase)}
+              className="text-blue-600 hover:text-blue-900 p-1 rounded hover:bg-blue-50"
+              title="View Details"
+            >
+              <Eye size={14} />
+            </button>
             <button
               onClick={() => onExecute(testCase)}
-              className="inline-flex items-center px-1.5 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 text-xs"
+              className="text-green-600 hover:text-green-900 p-1 rounded hover:bg-green-50"
               title="Execute Test"
             >
-              <Play size={12} />
+              <Play size={14} />
             </button>
             <button
               onClick={() => onEdit(testCase)}
-              className="text-blue-600 hover:text-blue-900 p-1"
+              className="text-gray-600 hover:text-gray-900 p-1 rounded hover:bg-gray-50"
               title="Edit Test Case"
             >
-              <Edit size={12} />
+              <Edit size={14} />
             </button>
             <button
               onClick={() => onDelete(testCase.id)}
-              className="text-red-600 hover:text-red-900 p-1"
+              className="text-red-600 hover:text-red-900 p-1 rounded hover:bg-red-50"
               title="Delete Test Case"
             >
-              <Trash2 size={12} />
+              <Trash2 size={14} />
             </button>
           </div>
         </td>
@@ -205,93 +221,227 @@ const TestCaseRow = ({
 
       {/* Expanded Failure Details Row */}
       {isFailureExpanded && (testCase.status === 'Failed' || testCase.status === 'Not Found') && (
-        <tr className={`${testCase.status === 'Failed' ? 'bg-red-50 border-l-4 border-red-400' : 'bg-orange-50 border-l-4 border-orange-400'}`}>
-          <td colSpan="9" className="p-4">
+        <tr className={`flex w-full ${testCase.status === 'Failed' ? 'bg-red-50 border-l-4 border-red-400' : 'bg-orange-50 border-l-4 border-orange-400'}`}>
+          <td colSpan="8" className="p-4 w-full"> {/* colSpan changed to 8 */}
             <FailureDetailsPanel testCase={testCase} />
           </td>
         </tr>
       )}
 
-      {/* Expanded Row Content */}
+      {/* Expanded Row Content - IMPROVED UI/UX */}
       {isExpanded && (
-        <tr>
-          <td colSpan="9" className="px-4 py-4 bg-gray-50">
-            <div className="space-y-4">
-              <div>
-                <h4 className="font-medium text-gray-900">Description</h4>
-                <p className="text-sm text-gray-600 mt-1">{testCase.description}</p>
-              </div>
-              
-              {testCase.category && (
-                <div>
-                  <h4 className="font-medium text-gray-900">Category</h4>
-                  <p className="text-sm text-gray-600 mt-1">{testCase.category}</p>
-                </div>
-              )}
-
-              {testCase.preconditions && (
-                <div>
-                  <h4 className="font-medium text-gray-900">Preconditions</h4>
-                  <p className="text-sm text-gray-600 mt-1">{testCase.preconditions}</p>
-                </div>
-              )}
-
-              {testCase.testData && (
-                <div>
-                  <h4 className="font-medium text-gray-900">Test Data</h4>
-                  <p className="text-sm text-gray-600 mt-1">{testCase.testData}</p>
-                </div>
-              )}
-              
-              {testCase.steps && (
-                <div>
-                  <h4 className="font-medium text-gray-900">Steps</h4>
-                  <ol className="list-decimal list-inside text-sm text-gray-600 mt-1 space-y-1">
-                    {testCase.steps.map((step, index) => (
-                      <li key={index}>{step}</li>
-                    ))}
-                  </ol>
-                </div>
-              )}
-              
-              {testCase.expectedResult && (
-                <div>
-                  <h4 className="font-medium text-gray-900">Expected Result</h4>
-                  <p className="text-sm text-gray-600 mt-1">{testCase.expectedResult}</p>
-                </div>
-              )}
-              
-              {testCase.tags && testCase.tags.length > 0 && (
-                <div>
-                  <h4 className="font-medium text-gray-900">Tags</h4>
-                  <div className="flex flex-wrap gap-1 mt-1">
-                    {testCase.tags.map(tag => (
-                      <span key={tag} className="px-2 py-1 bg-gray-200 text-gray-700 rounded text-xs">
-                        {tag}
-                      </span>
-                    ))}
+        <tr className="flex w-full">
+          <td colSpan="8" className="p-0 w-full">
+            <div className="bg-gradient-to-r from-blue-50 to-gray-50 border-l-4 border-blue-400">
+              <div className="p-6">
+                {/* Header Section */}
+                <div className="flex items-center justify-between mb-6 pb-4 border-b border-gray-200">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                    <h3 className="text-lg font-semibold text-gray-900">Test Case Details</h3>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    {/* Status Badge */}
+                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                      testCase.status === 'Passed' ? 'bg-green-100 text-green-800' :
+                      testCase.status === 'Failed' ? 'bg-red-100 text-red-800' :
+                      testCase.status === 'Blocked' ? 'bg-yellow-100 text-yellow-800' :
+                      testCase.status === 'Not Found' ? 'bg-orange-100 text-orange-800' :
+                      'bg-gray-100 text-gray-800'
+                    }`}>
+                      {testCase.status}
+                    </span>
+                    {/* Priority Badge */}
+                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                      testCase.priority === 'High' ? 'bg-red-100 text-red-800' :
+                      testCase.priority === 'Medium' ? 'bg-yellow-100 text-yellow-800' :
+                      'bg-green-100 text-green-800'
+                    }`}>
+                      {testCase.priority} Priority
+                    </span>
                   </div>
                 </div>
-              )}
-              
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                <div>
-                  <span className="font-medium text-gray-900">Version:</span>
-                  <span className="ml-1 text-gray-600">{testCase.version || 'Unassigned'}</span>
-                </div>
-                <div>
-                  <span className="font-medium text-gray-900">Assignee:</span>
-                  <span className="ml-1 text-gray-600">{testCase.assignee || 'Unassigned'}</span>
-                </div>
-                <div>
-                  <span className="font-medium text-gray-900">Duration:</span>
-                  <span className="ml-1 text-gray-600">{testCase.estimatedDuration || 0} min</span>
-                </div>
-                <div>
-                  <span className="font-medium text-gray-900">Last Executed:</span>
-                  <span className="ml-1 text-gray-600">
-                    {formatLastExecution(testCase.lastExecuted)}
-                  </span>
+
+                {/* Main Content Grid */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  {/* Left Column - Test Details */}
+                  <div className="lg:col-span-2 space-y-6">
+                    {/* Description */}
+                    {testCase.description && (
+                      <div className="bg-white rounded-lg p-4 shadow-sm border">
+                        <div className="flex items-center mb-3">
+                          <div className="w-1 h-6 bg-blue-500 rounded mr-3"></div>
+                          <h4 className="font-semibold text-gray-900">Description</h4>
+                        </div>
+                        <p className="text-gray-700 leading-relaxed">{testCase.description}</p>
+                      </div>
+                    )}
+
+                    {/* Preconditions */}
+                    {testCase.preconditions && (
+                      <div className="bg-white rounded-lg p-4 shadow-sm border">
+                        <div className="flex items-center mb-3">
+                          <div className="w-1 h-6 bg-yellow-500 rounded mr-3"></div>
+                          <h4 className="font-semibold text-gray-900">Preconditions</h4>
+                        </div>
+                        <p className="text-gray-700 leading-relaxed">{testCase.preconditions}</p>
+                      </div>
+                    )}
+
+                    {/* Test Steps */}
+                    {testCase.steps && testCase.steps.length > 0 && (
+                      <div className="bg-white rounded-lg p-4 shadow-sm border">
+                        <div className="flex items-center mb-3">
+                          <div className="w-1 h-6 bg-green-500 rounded mr-3"></div>
+                          <h4 className="font-semibold text-gray-900">Test Steps</h4>
+                        </div>
+                        <ol className="space-y-3">
+                          {testCase.steps.map((step, index) => (
+                            <li key={index} className="flex items-start">
+                              <span className="flex-shrink-0 w-6 h-6 bg-blue-100 text-blue-800 rounded-full text-xs font-medium flex items-center justify-center mr-3 mt-0.5">
+                                {index + 1}
+                              </span>
+                              <span className="text-gray-700 leading-relaxed">{step}</span>
+                            </li>
+                          ))}
+                        </ol>
+                      </div>
+                    )}
+
+                    {/* Expected Result */}
+                    {testCase.expectedResult && (
+                      <div className="bg-white rounded-lg p-4 shadow-sm border">
+                        <div className="flex items-center mb-3">
+                          <div className="w-1 h-6 bg-purple-500 rounded mr-3"></div>
+                          <h4 className="font-semibold text-gray-900">Expected Result</h4>
+                        </div>
+                        <p className="text-gray-700 leading-relaxed">{testCase.expectedResult}</p>
+                      </div>
+                    )}
+
+                    {/* Test Data */}
+                    {testCase.testData && (
+                      <div className="bg-white rounded-lg p-4 shadow-sm border">
+                        <div className="flex items-center mb-3">
+                          <div className="w-1 h-6 bg-indigo-500 rounded mr-3"></div>
+                          <h4 className="font-semibold text-gray-900">Test Data</h4>
+                        </div>
+                        <div className="bg-gray-50 rounded p-3 font-mono text-sm text-gray-800">
+                          {testCase.testData}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Right Column - Metadata */}
+                  <div className="space-y-4">
+                    {/* Quick Info Card */}
+                    <div className="bg-white rounded-lg p-4 shadow-sm border">
+                      <h4 className="font-semibold text-gray-900 mb-4">Quick Info</h4>
+                      <div className="space-y-3">
+                        <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                          <span className="text-sm text-gray-600">Category</span>
+                          <span className="text-sm font-medium text-gray-900">
+                            {testCase.category || 'Uncategorized'}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                          <span className="text-sm text-gray-600">Automation</span>
+                          <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                            testCase.automationStatus === 'Automated' ? 'bg-blue-100 text-blue-800' :
+                            testCase.automationStatus === 'Semi-Automated' ? 'bg-purple-100 text-purple-800' :
+                            'bg-gray-100 text-gray-800'
+                          }`}>
+                            {testCase.automationStatus}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                          <span className="text-sm text-gray-600">Version</span>
+                          <span className="text-sm font-medium text-gray-900">
+                            {testCase.version || 'Unassigned'}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                          <span className="text-sm text-gray-600">Assignee</span>
+                          <span className="text-sm font-medium text-gray-900">
+                            {testCase.assignee || 'Unassigned'}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center py-2">
+                          <span className="text-sm text-gray-600">Duration</span>
+                          <span className="text-sm font-medium text-gray-900">
+                            {testCase.estimatedDuration || 0} min
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Execution History */}
+                    <div className="bg-white rounded-lg p-4 shadow-sm border">
+                      <h4 className="font-semibold text-gray-900 mb-4">Execution History</h4>
+                      <div className="space-y-3">
+                        <div className="flex items-center space-x-3">
+                          <div className={`w-3 h-3 rounded-full ${
+                            testCase.status === 'Passed' ? 'bg-green-500' :
+                            testCase.status === 'Failed' ? 'bg-red-500' :
+                            'bg-gray-400'
+                          }`}></div>
+                          <div>
+                            <div className="text-sm font-medium text-gray-900">
+                              {testCase.lastExecuted ? 'Last Run' : 'Never Executed'}
+                            </div>
+                            {testCase.lastExecuted && (
+                              <div className="text-xs text-gray-500">
+                                {formatLastExecution(testCase.lastExecuted)}
+                                {testCase.lastExecutedBy && (
+                                  <span> by {testCase.lastExecutedBy}</span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        {testCase.duration && (
+                          <div className="text-xs text-gray-500 pl-6">
+                            Runtime: {testCase.duration}ms
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Tags */}
+                    {testCase.tags && testCase.tags.length > 0 && (
+                      <div className="bg-white rounded-lg p-4 shadow-sm border">
+                        <h4 className="font-semibold text-gray-900 mb-3">Tags</h4>
+                        <div className="flex flex-wrap gap-2">
+                          {testCase.tags.map(tag => (
+                            <span key={tag} className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Linked Requirements */}
+                    {testCase.requirementIds && testCase.requirementIds.length > 0 && (
+                      <div className="bg-white rounded-lg p-4 shadow-sm border">
+                        <h4 className="font-semibold text-gray-900 mb-3">Linked Requirements</h4>
+                        <div className="space-y-2">
+                          {testCase.requirementIds.slice(0, 5).map(reqId => (
+                            <div key={reqId} className="flex items-center space-x-2">
+                              <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
+                              <span className="text-sm text-gray-700 font-mono">{reqId}</span>
+                            </div>
+                          ))}
+                          {testCase.requirementIds.length > 5 && (
+                            <div className="text-xs text-gray-500 pl-4">
+                              +{testCase.requirementIds.length - 5} more requirements
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -301,7 +451,6 @@ const TestCaseRow = ({
     </React.Fragment>
   );
 };
-
 
 const TestCases = () => {
   // Get version context
@@ -316,20 +465,21 @@ const TestCases = () => {
   // UI State
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
-  const [automationFilter, setAutomationFilter] = useState('All');
   const [priorityFilter, setPriorityFilter] = useState('All');
   const [versionFilter, setVersionFilter] = useState('All');
-  const [traceabilityMode, setTraceabilityMode] = useState('standalone');
+  const [selectedTags, setSelectedTags] = useState(new Set());
   const [selectedTestCases, setSelectedTestCases] = useState(new Set());
-  const [expandedRows, setExpandedRows] = useState(new Set());
+  const [expandedRows, setExpandedRows] = useState(new Set()); // Corrected line
+
+  // Modal states - ENHANCED
+  const [showViewModal, setShowViewModal] = useState(false); // NEW: View modal state
   const [showEditModal, setShowEditModal] = useState(false);
   const [showExecutionModal, setShowExecutionModal] = useState(false);
+  const [viewingTestCase, setViewingTestCase] = useState(null); // NEW: Currently viewing test case
   const [editingTestCase, setEditingTestCase] = useState(null);
 
-  // Add category filter state
-  const [categoryFilter, setCategoryFilter] = useState('');
   // State for collapsed/expanded sections
-  const [collapsedSections, setCollapsedSections] = useState(new Set());
+  const [collapsedSections, setCollapsedSections] = useState(new Set()); // Corrected line
 
   // Add new state variables for failure expansion
   const [expandedTests, setExpandedTests] = useState(new Set());
@@ -343,15 +493,25 @@ const TestCases = () => {
       setMapping(dataStore.getMapping());
       setHasTestCases(dataStore.getTestCases().length > 0);
     };
-    
+
     updateData();
-    
+
     // Subscribe to DataStore changes
     const unsubscribe = dataStore.subscribe(updateData);
-    
+
     // Clean up subscription
     return () => unsubscribe();
   }, []);
+
+  // NEW: Get linked requirements for the currently viewing test case
+  const linkedRequirements = useMemo(() => {
+    if (!viewingTestCase || !viewingTestCase.requirementIds?.length) return [];
+
+    const requirements = dataStore.getRequirements();
+    return requirements.filter(req =>
+      viewingTestCase.requirementIds.includes(req.id)
+    );
+  }, [viewingTestCase]);
 
   // Toggle individual test expansion for failures
   const toggleTestExpansion = (testId) => {
@@ -387,49 +547,41 @@ const TestCases = () => {
     ? testCases
     : testCases.filter(tc => !tc.version || tc.version === selectedVersion || tc.version === '');
 
-  // Add to get unique categories
-  const categories = useMemo(() => {
-    const cats = [...new Set(testCases.map(tc => tc.category).filter(Boolean))];
-    return cats.sort();
+  // Get unique tags from all test cases
+  const availableTags = useMemo(() => {
+    const tags = new Set();
+    testCases.forEach(tc => {
+      if (tc.tags && Array.isArray(tc.tags)) {
+        tc.tags.forEach(tag => tags.add(tag));
+      }
+    });
+    return Array.from(tags).sort();
   }, [testCases]);
 
-  // Filter test cases based on various criteria
   const filteredTestCases = useMemo(() => {
     return versionFilteredTestCases.filter(testCase => {
       // Search filter
-      const matchesSearch = !searchQuery || 
+      const matchesSearch = !searchQuery ||
                             testCase.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                             testCase.id.toLowerCase().includes(searchQuery.toLowerCase());
 
       // Status filter
       const matchesStatus = statusFilter === 'All' || testCase.status === statusFilter;
 
-      // Automation filter
-      const matchesAutomation = automationFilter === 'All' || testCase.automationStatus === automationFilter;
-
       // Priority filter
       const matchesPriority = priorityFilter === 'All' || testCase.priority === priorityFilter;
 
-      // Category filter
-      const matchesCategory = categoryFilter === '' || testCase.category === categoryFilter;
+      // Tag filter - test case must have ALL selected tags
+      const matchesTags = selectedTags.size === 0 || 
+                          (testCase.tags && Array.isArray(testCase.tags) && 
+                           Array.from(selectedTags).some(tag => testCase.tags.includes(tag)));
 
       // Version filter (keeping original logic for compatibility)
       const matchesVersion = selectedVersion === 'unassigned' || testCase.version === selectedVersion;
 
-      // Traceability mode filter
-      let matchesTraceability = true;
-      if (traceabilityMode === 'linked' && (!testCase.requirementIds || testCase.requirementIds.length === 0)) {
-        matchesTraceability = false;
-      }
-      if (traceabilityMode === 'unlinked' && testCase.requirementIds && testCase.requirementIds.length > 0) {
-        matchesTraceability = false;
-      }
-
-      return matchesSearch && matchesStatus && matchesAutomation &&
-             matchesPriority && matchesCategory && matchesVersion && matchesTraceability;
+      return matchesSearch && matchesStatus && matchesPriority && matchesTags && matchesVersion;
     });
-  }, [versionFilteredTestCases, searchQuery, statusFilter, automationFilter, priorityFilter, categoryFilter, selectedVersion, traceabilityMode]);
-
+  }, [versionFilteredTestCases, searchQuery, statusFilter, priorityFilter, selectedTags, selectedVersion]);
 
   // Calculate summary statistics
   const summaryStats = useMemo(() => {
@@ -496,7 +648,7 @@ const TestCases = () => {
     });
   };
 
-  // NEW: Clear selection function like in Requirements
+  // Clear selection function
   const handleClearSelection = () => {
     setSelectedTestCases(new Set());
   };
@@ -520,15 +672,21 @@ const TestCases = () => {
     });
   };
 
+  // NEW: Handle view test case - ENHANCED VERSION
+  const handleViewTestCase = (testCase) => {
+    setViewingTestCase(testCase);
+    setShowViewModal(true);
+  };
+
   // Handle new test case creation
   const handleNewTestCase = () => {
     setEditingTestCase({
       id: '',
       name: '',
       description: '',
-      category: '', // New field
-      preconditions: '', // New field
-      testData: '', // New field
+      category: '',
+      preconditions: '',
+      testData: '',
       status: 'Not Run',
       automationStatus: 'Manual',
       priority: 'Medium',
@@ -540,10 +698,34 @@ const TestCases = () => {
     setShowEditModal(true);
   };
 
-  // Handle test case editing
+  // Handle test case editing (can be called from view modal)
   const handleEditTestCase = (testCase) => {
     setEditingTestCase({...testCase});
     setShowEditModal(true);
+    setShowViewModal(false); // Close view modal when editing
+  };
+
+  // Handle execute test case
+  const handleExecuteTestCase = (testCase) => {
+    setSelectedTestCases(new Set([testCase.id]));
+    setShowExecutionModal(true);
+    setShowViewModal(false); // Close view modal when executing
+  };
+
+  // Handle duplicate test case - NEW
+  const handleDuplicateTestCase = (testCase) => {
+    const duplicatedTestCase = {
+      ...testCase,
+      id: `${testCase.id}_copy_${Date.now()}`,
+      name: `${testCase.name} (Copy)`,
+      status: 'Not Run',
+      lastExecuted: '',
+      executedBy: ''
+    };
+
+    setEditingTestCase(duplicatedTestCase);
+    setShowEditModal(true);
+    setShowViewModal(false); // Close view modal when duplicating
   };
 
   // Save test case (create or update)
@@ -574,6 +756,7 @@ const TestCases = () => {
           newSet.delete(testCaseId);
           return newSet;
         });
+        setShowViewModal(false); // Close view modal if currently viewing deleted test case
       } catch (error) {
         console.error('Error deleting test case:', error);
         alert('Error deleting test cases: ' + error.message);
@@ -581,16 +764,10 @@ const TestCases = () => {
     }
   };
 
-  // Execute single test case
-  const handleExecuteTestCase = (testCase) => {
-    setSelectedTestCases(new Set([testCase.id]));
-    setShowExecutionModal(true);
-  };
-
   // Handle bulk delete
   const handleBulkDelete = () => {
     if (selectedTestCases.size === 0) return;
-    
+
     if (window.confirm(`Are you sure you want to delete ${selectedTestCases.size} test case(s)?`)) {
       try {
         Array.from(selectedTestCases).forEach(testCaseId => {
@@ -602,6 +779,24 @@ const TestCases = () => {
         alert('Error deleting test cases: ' + error.message);
       }
     }
+  };
+
+  // Handle tag selection
+  const handleTagToggle = (tag) => {
+    setSelectedTags(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(tag)) {
+        newSet.delete(tag);
+      } else {
+        newSet.add(tag);
+      }
+      return newSet;
+    });
+  };
+
+  // Clear all selected tags
+  const handleClearTags = () => {
+    setSelectedTags(new Set());
   };
 
   // Group test cases by category
@@ -640,16 +835,15 @@ const TestCases = () => {
     const passed = testCases.filter(tc => tc.status === 'Passed').length;
     const failed = testCases.filter(tc => tc.status === 'Failed').length;
     const automated = testCases.filter(tc => tc.automationStatus === 'Automated').length;
-      
+
     return { total, passed, failed, automated, passRate: total > 0 ? Math.round((passed / total) * 100) : 0 };
   };
-
 
   if (!hasTestCases) {
     return (
       <MainLayout title="Test Cases" hasData={false}>
-        <EmptyState 
-          title="No Test Cases Found" 
+        <EmptyState
+          title="No Test Cases Found"
           message="Import test cases to start managing your test suite. You can import from GitHub repositories or upload JSON files."
           actionText="Import Test Cases"
           actionPath="/import#testcases-tab"
@@ -676,7 +870,7 @@ const TestCases = () => {
         <div className="flex justify-between items-center">
           <h1 className="text-2xl font-bold text-gray-900">Test Cases</h1>
           <div className="flex items-center space-x-3">
-            <button 
+            <button
               onClick={handleNewTestCase}
               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center"
             >
@@ -720,9 +914,10 @@ const TestCases = () => {
 
         {/* Filters Section */}
         <div className="bg-white p-4 rounded-lg shadow">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4 items-end">
-            {/* Search */}
-            <div className="lg:col-span-2">
+          {/* CHANGE 1: Update the grid layout in the Filters Section */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-end">
+            {/* CHANGE 3: Update the Search section to accommodate Priority filter */}
+            <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Search</label>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
@@ -736,6 +931,7 @@ const TestCases = () => {
               </div>
             </div>
 
+            {/* CHANGE 2: Update the filters to remove Status and Priority from the main grid */}
             {/* Status Filter */}
             <select
               value={statusFilter}
@@ -750,18 +946,7 @@ const TestCases = () => {
               <option value="Not Run">Not Run</option>
             </select>
 
-            {/* Automation Filter */}
-            <select
-              value={automationFilter}
-              onChange={(e) => setAutomationFilter(e.target.value)}
-              className="p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            >
-              <option value="All">All Automation</option>
-              <option value="Automated">Automated</option>
-              <option value="Manual">Manual</option>
-              <option value="Semi-Automated">Semi-Automated</option>
-            </select>
-
+            {/* CHANGE 4: Add Priority Filter after Status Filter */}
             {/* Priority Filter */}
             <select
               value={priorityFilter}
@@ -773,83 +958,98 @@ const TestCases = () => {
               <option value="Medium">Medium</option>
               <option value="Low">Low</option>
             </select>
-
-            {/* Category Filter */}
-            <select
-              value={categoryFilter}
-              onChange={(e) => setCategoryFilter(e.target.value)}
-              className="p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            >
-              <option value="">All Categories</option>
-              {categories.map(category => (
-                <option key={category} value={category}>{category}</option>
-              ))}
-            </select>
-
-            {/* Traceability Mode */}
-            <select
-              value={traceabilityMode}
-              onChange={(e) => setTraceabilityMode(e.target.value)}
-              className="p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            >
-              <option value="standalone">All Test Cases</option>
-              <option value="linked">Linked to Requirements</option>
-              <option value="unlinked">Orphaned Test Cases</option>
-            </select>
           </div>
+          
+          {/* Tag Filter Section */}
+          {availableTags.length > 0 && (
+            <div className="mt-4">
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-sm font-medium text-gray-700">Filter by Tags</label>
+                {selectedTags.size > 0 && (
+                  <button
+                    onClick={handleClearTags}
+                    className="text-xs text-gray-500 hover:text-gray-700"
+                  >
+                    Clear all ({selectedTags.size})
+                  </button>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {availableTags.map(tag => (
+                  <button
+                    key={tag}
+                    onClick={() => handleTagToggle(tag)}
+                    className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                      selectedTags.has(tag)
+                        ? 'bg-blue-100 text-blue-800 border-2 border-blue-300'
+                        : 'bg-gray-100 text-gray-700 border border-gray-300 hover:bg-gray-200'
+                    }`}
+                  >
+                    {tag}
+                    {selectedTags.has(tag) && <span className="ml-1">✓</span>}
+                  </button>
+                ))}
+              </div>
+              {selectedTags.size > 0 && (
+                <div className="mt-2 text-xs text-gray-600">
+                  "Showing test cases with any of these tags:": {Array.from(selectedTags).join(', ')}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Enhanced Filters Section with Expand/Collapse */}
         <div className="flex justify-between items-center mb-4">
           <div className="flex space-x-2">
             {/* Status Filter Buttons */}
-            <button 
+            <button
               onClick={() => setStatusFilter('Failed')}
               className={`px-3 py-1 rounded-full text-sm transition-colors ${
-                statusFilter === 'Failed' 
-                  ? 'bg-red-200 text-red-800' 
+                statusFilter === 'Failed'
+                  ? 'bg-red-200 text-red-800'
                   : 'bg-red-100 text-red-700 hover:bg-red-200'
               }`}
             >
               🔴 Failed ({summaryStats.failed})
             </button>
-            
+
             {summaryStats.notFound > 0 && (
-              <button 
+              <button
                 onClick={() => setStatusFilter('Not Found')}
                 className={`px-3 py-1 rounded-full text-sm transition-colors ${
-                  statusFilter === 'Not Found' 
-                    ? 'bg-orange-200 text-orange-800' 
+                  statusFilter === 'Not Found'
+                    ? 'bg-orange-200 text-orange-800'
                     : 'bg-orange-100 text-orange-700 hover:bg-orange-200'
                 }`}
               >
                 ⚠️ Issues ({summaryStats.notFound})
               </button>
             )}
-            
-            <button 
+
+            <button
               onClick={() => setStatusFilter('Passed')}
               className={`px-3 py-1 rounded-full text-sm transition-colors ${
-                statusFilter === 'Passed' 
-                  ? 'bg-green-200 text-green-800' 
+                statusFilter === 'Passed'
+                  ? 'bg-green-200 text-green-800'
                   : 'bg-green-100 text-green-700 hover:bg-green-200'
               }`}
             >
               ✅ Passed ({summaryStats.passed})
             </button>
-            
-            <button 
+
+            <button
               onClick={() => setStatusFilter('All')}
               className={`px-3 py-1 rounded-full text-sm transition-colors ${
-                statusFilter === 'All' 
-                  ? 'bg-blue-200 text-blue-800' 
+                statusFilter === 'All'
+                  ? 'bg-blue-200 text-blue-800'
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
               }`}
             >
               📊 All ({summaryStats.total})
             </button>
           </div>
-          
+
           {/* Expand/Collapse All Button */}
           {(summaryStats.failed > 0 || summaryStats.notFound > 0) && (
             <button
@@ -871,7 +1071,7 @@ const TestCases = () => {
           )}
         </div>
 
-        {/* Bulk Actions - Updated with Clear Selection like Requirements */}
+        {/* Bulk Actions */}
         {selectedTestCases.size > 0 && (
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
             <div className="flex items-center justify-between">
@@ -879,7 +1079,6 @@ const TestCases = () => {
                 {selectedTestCases.size} test case(s) selected
               </span>
               <div className="flex gap-2">
-                {/* UPDATED: Execute button styled like traceability matrix */}
                 <button
                   onClick={executeSelectedTests}
                   className="inline-flex items-center px-3 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 text-sm"
@@ -896,7 +1095,6 @@ const TestCases = () => {
                   <Trash2 size={14} className="mr-1" />
                   Delete Selected
                 </button>
-                {/* NEW: Clear Selection button like Requirements */}
                 <button
                   onClick={handleClearSelection}
                   className="px-3 py-1 bg-gray-600 text-white rounded hover:bg-gray-700"
@@ -913,23 +1111,23 @@ const TestCases = () => {
           {Object.entries(groupedTestCases).map(([category, categoryTests]) => {
             const isCollapsed = collapsedSections.has(category);
             const stats = getCategoryStats(categoryTests);
-                
+
             return (
               <div key={category} className="bg-white rounded-lg shadow">
                 {/* Category Header */}
-                <div 
+                <div
                   className="flex items-center justify-between p-4 border-b cursor-pointer hover:bg-gray-50"
                   onClick={() => toggleSection(category)}
                 >
                   <div className="flex items-center space-x-3">
-                    <ChevronRight 
-                      className={`transform transition-transform ${isCollapsed ? '' : 'rotate-90'}`} 
-                      size={16} 
+                    <ChevronRight
+                      className={`transform transition-transform ${isCollapsed ? '' : 'rotate-90'}`}
+                      size={16}
                     />
                     <h3 className="text-lg font-medium text-gray-900">{category}</h3>
                     <span className="text-sm text-gray-500">({stats.total} tests)</span>
                   </div>
-                            
+
                   {/* Category Stats */}
                   <div className="flex items-center space-x-4 text-sm">
                     <span className="text-green-600">{stats.passed} passed</span>
@@ -938,14 +1136,14 @@ const TestCases = () => {
                     <span className="font-medium">{stats.passRate}% pass rate</span>
                   </div>
                 </div>
-                        
+
                 {/* Category Tests */}
                 {!isCollapsed && (
                   <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200 table-fixed">
+                    <table className="min-w-full divide-y divide-gray-200">
                       <thead className="bg-gray-50">
-                        <tr>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-12">
+                        <tr className="flex w-full">
+                          <th className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-10 flex-shrink-0">
                             <input
                               type="checkbox"
                               checked={categoryTests.length > 0 && categoryTests.every(tc => selectedTestCases.has(tc.id))}
@@ -953,29 +1151,32 @@ const TestCases = () => {
                               className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                             />
                           </th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase w-24">ID</th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase w-48">Name</th> {/* Changed from w-80 to w-48 */}
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase w-20">Status</th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase w-20">Priority</th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase w-20">Automation</th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase w-20">Requirements</th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase w-28">Last Run</th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase w-20">Actions</th>
+                          {/* REPLACE WITH THIS SINGLE COMBINED HEADER: */}
+                          <th className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase w-80 flex-shrink-0">ID / Name</th>
+                          {/* END OF REPLACEMENT */}
+                          <th className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase w-20 flex-shrink-0">Status</th>
+                          <th className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase w-16 flex-shrink-0">Priority</th>
+                          <th className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase w-20 flex-shrink-0">Auto.</th> {/* Changed from Automation */}
+                          <th className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase w-20 flex-shrink-0">Reqs.</th> {/* Changed from Requirements */}
+                          <th className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase w-20 flex-shrink-0">Last Run</th>
+                          <th className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase w-24 flex-shrink-0">Actions</th>
                         </tr>
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
                         {categoryTests.map((testCase) => (
-                          <TestCaseRow 
+                          <TestCaseRow
                             key={testCase.id}
                             testCase={testCase}
                             onSelect={handleTestCaseSelection}
-                            onEdit={handleEditTestCase} 
+                            onView={handleViewTestCase} // Pass view handler
+                            onEdit={handleEditTestCase}
                             onDelete={handleDeleteTestCase}
                             onExecute={handleExecuteTestCase}
                             isSelected={selectedTestCases.has(testCase.id)}
                             isExpanded={expandedRows.has(testCase.id)}
                             onToggleExpand={toggleRowExpansion}
-                            expandedTests={expandedTests} // Pass down the expandedTests set
+                            expandedTests={expandedTests}
+                            onToggleFailureExpand={toggleTestExpansion} // Pass the correct handler
                           />
                         ))}
                       </tbody>
@@ -987,7 +1188,6 @@ const TestCases = () => {
           })}
         </div>
 
-
         {/* Results Info */}
         <div className="text-sm text-gray-500 text-center">
           Showing {filteredTestCases.length} of {versionFilteredTestCases.length} test cases
@@ -996,26 +1196,27 @@ const TestCases = () => {
           )}
         </div>
 
-        {/* Traceability Mode Info */}
-        {traceabilityMode !== 'standalone' && (
-          <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-            {traceabilityMode === 'linked' && (
-              <p className="text-sm text-blue-800">
-                Showing only test cases that are linked to requirements. Use this mode to focus on traced test cases.
-              </p>
-            )}
-            {traceabilityMode === 'unlinked' && (
-              <p className="text-sm text-blue-800">
-                Showing only test cases that are NOT linked to any requirements. These orphaned test cases may need requirement association.
-              </p>
-            )}
-          </div>
-        )}
+        {/* MODALS */}
 
-        {/* Test Execution Modal - USE UNIFIED COMPONENT */}
+        {/* NEW: Enhanced View Test Case Modal - NOW ACTIVE */}
+        <ViewTestCaseModal
+          testCase={viewingTestCase}
+          isOpen={showViewModal}
+          linkedRequirements={linkedRequirements}
+          onClose={() => {
+            setShowViewModal(false);
+            setViewingTestCase(null);
+          }}
+          onEdit={handleEditTestCase}
+          onExecute={handleExecuteTestCase}
+          onDuplicate={handleDuplicateTestCase}
+          onDelete={handleDeleteTestCase}
+        />
+
+        {/* Test Execution Modal */}
         {showExecutionModal && (
           <TestExecutionModal
-            requirement={null} // null for bulk execution from Test Cases page
+            requirement={null}
             testCases={Array.from(selectedTestCases).map(id => filteredTestCases.find(tc => tc.id === id)).filter(Boolean)}
             isOpen={showExecutionModal}
             onClose={() => {
@@ -1024,15 +1225,12 @@ const TestCases = () => {
             }}
             onTestComplete={(results) => {
               console.log('Test execution completed in TestCases page:', results);
-              // The unified TestExecutionModal handles all DataStore updates
-              // Just clean up UI state here
-              // setShowExecutionModal(false);
               setSelectedTestCases(new Set());
             }}
           />
         )}
 
-        {/* Edit Test Case Modal */}
+        {/* Edit Test Case Modal - NOW USING SEPARATE COMPONENT */}
         {showEditModal && (
           <EditTestCaseModal
             testCase={editingTestCase}
@@ -1045,201 +1243,6 @@ const TestCases = () => {
         )}
       </div>
     </MainLayout>
-  );
-};
-
-// Edit Test Case Modal Component
-const EditTestCaseModal = ({ testCase, onSave, onCancel }) => {
-  const [formData, setFormData] = useState({
-    id: testCase?.id || '',
-    name: testCase?.name || '',
-    description: testCase?.description || '',
-    category: testCase?.category || '', // New field
-    preconditions: testCase?.preconditions || '', // New field
-    testData: testCase?.testData || '', // New field
-    status: testCase?.status || 'Not Run',
-    automationStatus: testCase?.automationStatus || 'Manual',
-    priority: testCase?.priority || 'Medium',
-    version: testCase?.version || '',
-    requirementIds: testCase?.requirementIds || [],
-    steps: testCase?.steps || [],
-    expectedResult: testCase?.expectedResult || '',
-    tags: testCase?.tags || [],
-    assignee: testCase?.assignee || '',
-    estimatedDuration: testCase?.estimatedDuration || 0
-  });
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    
-    // Validate required fields
-    if (!formData.name.trim()) {
-      alert('Test case name is required');
-      return;
-    }
-
-    // Generate ID if creating new test case
-    if (!formData.id) {
-      formData.id = `TC_${Date.now()}`;
-    }
-
-    onSave(formData);
-  };
-
-  return (
-    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-      <div className="relative top-20 mx-auto p-5 border w-11/12 max-w-2xl shadow-lg rounded-md bg-white">
-        <div className="mt-3">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">
-            {testCase?.id ? 'Edit Test Case' : 'Create New Test Case'}
-          </h3>
-          
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Name *</label>
-                <input
-                  type="text"
-                  required
-                  value={formData.name}
-                  onChange={(e) => setFormData({...formData, name: e.target.value})}
-                  className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700">ID</label>
-                <input
-                  type="text"
-                  value={formData.id}
-                  onChange={(e) => setFormData({...formData, id: e.target.value})}
-                  placeholder="Auto-generated if empty"
-                  className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Description</label>
-              <textarea
-                value={formData.description}
-                onChange={(e) => setFormData({...formData, description: e.target.value})}
-                rows={3}
-                className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
-
-            {/* New TestRail fields in Edit/Create Modal */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Category</label>
-              <input
-                type="text"
-                value={formData.category}
-                onChange={(e) => setFormData({...formData, category: e.target.value})}
-                className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Preconditions</label>
-              <textarea
-                value={formData.preconditions}
-                onChange={(e) => setFormData({...formData, preconditions: e.target.value})}
-                rows={2}
-                className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Test Data</label>
-              <textarea
-                value={formData.testData}
-                onChange={(e) => setFormData({...formData, testData: e.target.value})}
-                rows={2}
-                className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
-
-            <div className="grid grid-cols-3 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Status</label>
-                <select
-                  value={formData.status}
-                  onChange={(e) => setFormData({...formData, status: e.target.value})}
-                  className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
-                >
-                  <option value="Not Run">Not Run</option>
-                  <option value="Passed">Passed</option>
-                  <option value="Failed">Failed</option>
-                  <option value="Blocked">Blocked</option>
-                  <option value="Not Found">Not Found</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Priority</label>
-                <select
-                  value={formData.priority}
-                  onChange={(e) => setFormData({...formData, priority: e.target.value})}
-                  className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
-                >
-                  <option value="High">High</option>
-                  <option value="Medium">Medium</option>
-                  <option value="Low">Low</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Automation</label>
-                <select
-                  value={formData.automationStatus}
-                  onChange={(e) => setFormData({...formData, automationStatus: e.target.value})}
-                  className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
-                >
-                  <option value="Manual">Manual</option>
-                  <option value="Automated">Automated</option>
-                  <option value="Semi-Automated">Semi-Automated</option>
-                </select>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Version</label>
-              <input
-                type="text"
-                value={formData.version}
-                onChange={(e) => setFormData({...formData, version: e.target.value})}
-                className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Expected Result</label>
-              <textarea
-                value={formData.expectedResult}
-                onChange={(e) => setFormData({...formData, expectedResult: e.target.value})}
-                rows={2}
-                className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
-
-            <div className="flex justify-end space-x-3 pt-4">
-              <button
-                type="button"
-                onClick={onCancel}
-                className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 focus:ring-2 focus:ring-gray-500"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:ring-2 focus:ring-blue-500"
-              >
-                {testCase?.id ? 'Update' : 'Create'} Test Case
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-    </div>
   );
 };
 

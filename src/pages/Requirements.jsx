@@ -145,10 +145,44 @@ const Requirements = () => {
   // Handle saving the edited requirement
   const handleSaveRequirement = (updatedRequirement) => {
     try {
-      dataStore.updateRequirement(updatedRequirement.id, updatedRequirement);
+      console.log('Saving requirement:', updatedRequirement);
+      
+      // Get current requirements
+      const currentRequirements = dataStore.getRequirements();
+      
+      if (updatedRequirement.id) {
+        // UPDATE EXISTING: Find and replace the existing requirement
+        const index = currentRequirements.findIndex(req => req.id === updatedRequirement.id);
+        if (index !== -1) {
+          currentRequirements[index] = {
+            ...currentRequirements[index],
+            ...updatedRequirement,
+            updatedAt: new Date().toISOString()
+          };
+        } else {
+          throw new Error(`Requirement with ID ${updatedRequirement.id} not found`);
+        }
+      } else {
+        // CREATE NEW: Generate ID and add to requirements
+        const newRequirement = {
+          ...updatedRequirement,
+          id: `REQ_${Date.now()}`, // Generate unique ID
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        };
+        currentRequirements.push(newRequirement);
+      }
+      
+      // Save the updated requirements array back to DataStore
+      dataStore.setRequirements(currentRequirements);
+      
+      // Close the modal
       setEditingRequirement(null);
+      
+      console.log('✅ Requirement saved successfully');
     } catch (error) {
-      console.error("Error updating requirement:", error);
+      console.error("❌ Error saving requirement:", error);
+      alert('Error saving requirement: ' + error.message);
     }
   };
 
@@ -236,8 +270,8 @@ const Requirements = () => {
           </div>
         </div>
 
-        {/* Summary Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
+        {/* Summary Cards - Removed Avg Test Depth card */}
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
           <div className="bg-white p-4 rounded-lg shadow">
             <div className="text-2xl font-bold text-gray-900">{stats.total}</div>
             <div className="text-sm text-gray-500">Total Requirements</div>
@@ -257,10 +291,6 @@ const Requirements = () => {
           <div className="bg-white p-4 rounded-lg shadow">
             <div className="text-2xl font-bold text-purple-600">{stats.fullyAutomated}</div>
             <div className="text-sm text-gray-500">Fully Automated</div>
-          </div>
-          <div className="bg-white p-4 rounded-lg shadow">
-            <div className="text-2xl font-bold text-orange-600">{stats.avgTDF}</div>
-            <div className="text-sm text-gray-500">Avg Test Depth</div>
           </div>
           <div className="bg-white p-4 rounded-lg shadow">
             <div className="text-2xl font-bold text-indigo-600">{stats.testCoverage}%</div>
@@ -362,11 +392,8 @@ const Requirements = () => {
                       className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                     />
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32">
-                    ID
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-64">
-                    Name
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-80">
+                    ID / Name
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-28">
                     Type
@@ -379,12 +406,9 @@ const Requirements = () => {
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32">
                     <div className="flex items-center">
-                      Test Depth
+                      Coverage
                       <TDFInfoTooltip />
                     </div>
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32">
-                    Coverage
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32">
                     Versions
@@ -421,19 +445,21 @@ const Requirements = () => {
                             className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                           />
                         </td>
-                        <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                          <div className="flex items-center">
+                        <td className="px-4 py-4 text-sm text-gray-900">
+                          <div className="flex items-start">
                             <button
                               onClick={() => toggleRowExpansion(req.id)}
-                              className="mr-2 p-1 hover:bg-gray-200 rounded"
+                              className="mr-2 p-1 hover:bg-gray-200 rounded flex-shrink-0 mt-0.5"
                             >
                               {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
                             </button>
-                            {req.id}
+                            <div className="flex-1">
+                              <div className="font-medium text-gray-900 mb-1">{req.id}</div>
+                              <div className="text-sm text-gray-700 break-words" title={req.name}>
+                                {req.name}
+                              </div>
+                            </div>
                           </div>
-                        </td>
-                        <td className="px-4 py-4 text-sm text-gray-900">
-                          <div className="max-w-xs truncate" title={req.name}>{req.name}</div>
                         </td>
                         <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
                           <span className={`px-2 py-1 rounded text-xs ${
@@ -463,12 +489,6 @@ const Requirements = () => {
                           }`}>
                             {req.status}
                           </span>
-                        </td>
-                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                          <div className="flex items-center">
-                            <span className="font-medium">{req.testDepthFactor}</span>
-                            <span className="text-gray-500 ml-1">/ {req.minTestCases} tests</span>
-                          </div>
                         </td>
                         <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
                           <div className="flex items-center">
@@ -537,46 +557,260 @@ const Requirements = () => {
                       </tr>
                       
                       {/* Expanded Row Details */}
-                      {isExpanded && (
+                       {isExpanded && (
                         <tr>
-                          <td colSpan="10" className="px-6 py-4 bg-gray-50">
-                            <div className="space-y-3">
-                              <div>
-                                <h4 className="font-medium text-gray-900 mb-2">Description</h4>
-                                <p className="text-sm text-gray-600">{req.description}</p>
-                              </div>
-                              
-                              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                <div>
-                                  <span className="text-xs font-medium text-gray-500">Business Impact</span>
-                                  <div className="text-sm font-medium">{req.businessImpact}/5</div>
-                                </div>
-                                <div>
-                                  <span className="text-xs font-medium text-gray-500">Technical Complexity</span>
-                                  <div className="text-sm font-medium">{req.technicalComplexity}/5</div>
-                                </div>
-                                <div>
-                                  <span className="text-xs font-medium text-gray-500">Regulatory Factor</span>
-                                  <div className="text-sm font-medium">{req.regulatoryFactor}/5</div>
-                                </div>
-                                <div>
-                                  <span className="text-xs font-medium text-gray-500">Usage Frequency</span>
-                                  <div className="text-sm font-medium">{req.usageFrequency}/5</div>
-                                </div>
-                              </div>
-
-                              {req.tags && req.tags.length > 0 && (
-                                <div>
-                                  <span className="text-xs font-medium text-gray-500">Tags</span>
-                                  <div className="flex flex-wrap gap-1 mt-1">
-                                    {req.tags.map(tag => (
-                                      <span key={tag} className="px-2 py-1 bg-gray-200 text-gray-700 rounded text-xs">
-                                        {tag}
-                                      </span>
-                                    ))}
+                          <td colSpan="8" className="p-0">
+                            <div className="bg-gradient-to-r from-green-50 to-gray-50 border-l-4 border-green-400">
+                              <div className="p-6">
+                                {/* Header Section */}
+                                <div className="flex items-center mb-6 pb-4 border-b border-gray-200">
+                                  <div className="flex items-center space-x-3">
+                                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                                    <h3 className="text-lg font-semibold text-gray-900">Requirement Details</h3>
                                   </div>
                                 </div>
-                              )}
+
+                                {/* Main Content Grid */}
+                                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                                  {/* Left Column - Requirement Details */}
+                                  <div className="lg:col-span-2 space-y-6">
+                                    {/* Description */}
+                                    {req.description && (
+                                      <div className="bg-white rounded-lg p-4 shadow-sm border">
+                                        <div className="flex items-center mb-3">
+                                          <div className="w-1 h-6 bg-green-500 rounded mr-3"></div>
+                                          <h4 className="font-semibold text-gray-900">Description</h4>
+                                        </div>
+                                        <p className="text-gray-700 leading-relaxed">{req.description}</p>
+                                      </div>
+                                    )}
+
+                                    {/* Business Rationale (if available) */}
+                                    {req.businessRationale && (
+                                      <div className="bg-white rounded-lg p-4 shadow-sm border">
+                                        <div className="flex items-center mb-3">
+                                          <div className="w-1 h-6 bg-blue-500 rounded mr-3"></div>
+                                          <h4 className="font-semibold text-gray-900">Business Rationale</h4>
+                                        </div>
+                                        <p className="text-gray-700 leading-relaxed">{req.businessRationale}</p>
+                                      </div>
+                                    )}
+
+                                    {/* Acceptance Criteria (if available) */}
+                                    {req.acceptanceCriteria && req.acceptanceCriteria.length > 0 && (
+                                      <div className="bg-white rounded-lg p-4 shadow-sm border">
+                                        <div className="flex items-center mb-3">
+                                          <div className="w-1 h-6 bg-purple-500 rounded mr-3"></div>
+                                          <h4 className="font-semibold text-gray-900">Acceptance Criteria</h4>
+                                        </div>
+                                        <ul className="space-y-2">
+                                          {req.acceptanceCriteria.map((criteria, index) => (
+                                            <li key={index} className="flex items-start">
+                                              <span className="flex-shrink-0 w-5 h-5 bg-purple-100 text-purple-800 rounded-full text-xs font-medium flex items-center justify-center mr-3 mt-0.5">
+                                                ✓
+                                              </span>
+                                              <span className="text-gray-700 leading-relaxed">{criteria}</span>
+                                            </li>
+                                          ))}
+                                        </ul>
+                                      </div>
+                                    )}
+
+                                    {/* Risk Factors */}
+                                    <div className="bg-white rounded-lg p-4 shadow-sm border">
+                                      <div className="flex items-center mb-3">
+                                        <div className="w-1 h-6 bg-orange-500 rounded mr-3"></div>
+                                        <h4 className="font-semibold text-gray-900">Risk Assessment Factors</h4>
+                                      </div>
+                                      <div className="grid grid-cols-2 gap-4">
+                                        <div className="bg-gray-50 rounded-lg p-3">
+                                          <div className="flex items-center justify-between mb-2">
+                                            <span className="text-sm font-medium text-gray-700">Business Impact</span>
+                                            <span className="text-lg font-bold text-blue-600">{req.businessImpact}/5</span>
+                                          </div>
+                                          <div className="w-full bg-gray-200 rounded-full h-2">
+                                            <div 
+                                              className="bg-blue-500 h-2 rounded-full" 
+                                              style={{width: `${(req.businessImpact / 5) * 100}%`}}
+                                            ></div>
+                                          </div>
+                                        </div>
+                                        <div className="bg-gray-50 rounded-lg p-3">
+                                          <div className="flex items-center justify-between mb-2">
+                                            <span className="text-sm font-medium text-gray-700">Technical Complexity</span>
+                                            <span className="text-lg font-bold text-orange-600">{req.technicalComplexity}/5</span>
+                                          </div>
+                                          <div className="w-full bg-gray-200 rounded-full h-2">
+                                            <div 
+                                              className="bg-orange-500 h-2 rounded-full" 
+                                              style={{width: `${(req.technicalComplexity / 5) * 100}%`}}
+                                            ></div>
+                                          </div>
+                                        </div>
+                                        <div className="bg-gray-50 rounded-lg p-3">
+                                          <div className="flex items-center justify-between mb-2">
+                                            <span className="text-sm font-medium text-gray-700">Regulatory Factor</span>
+                                            <span className="text-lg font-bold text-red-600">{req.regulatoryFactor}/5</span>
+                                          </div>
+                                          <div className="w-full bg-gray-200 rounded-full h-2">
+                                            <div 
+                                              className="bg-red-500 h-2 rounded-full" 
+                                              style={{width: `${(req.regulatoryFactor / 5) * 100}%`}}
+                                            ></div>
+                                          </div>
+                                        </div>
+                                        <div className="bg-gray-50 rounded-lg p-3">
+                                          <div className="flex items-center justify-between mb-2">
+                                            <span className="text-sm font-medium text-gray-700">Usage Frequency</span>
+                                            <span className="text-lg font-bold text-green-600">{req.usageFrequency}/5</span>
+                                          </div>
+                                          <div className="w-full bg-gray-200 rounded-full h-2">
+                                            <div 
+                                              className="bg-green-500 h-2 rounded-full" 
+                                              style={{width: `${(req.usageFrequency / 5) * 100}%`}}
+                                            ></div>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  {/* Right Column - Metadata */}
+                                  <div className="space-y-4">
+                                    {/* Quick Info Card */}
+                                    <div className="bg-white rounded-lg p-4 shadow-sm border">
+                                      <h4 className="font-semibold text-gray-900 mb-4">Quick Info</h4>
+                                      <div className="space-y-3">
+                                        <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                                          <span className="text-sm text-gray-600">Type</span>
+                                          <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                                            req.type === 'Security' ? 'bg-red-100 text-red-800' :
+                                            req.type === 'Performance' ? 'bg-orange-100 text-orange-800' :
+                                            req.type === 'Functional' ? 'bg-blue-100 text-blue-800' :
+                                            'bg-gray-100 text-gray-800'
+                                          }`}>
+                                            {req.type}
+                                          </span>
+                                        </div>
+                                        <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                                          <span className="text-sm text-gray-600">Priority</span>
+                                          <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                                            req.priority === 'High' ? 'bg-red-100 text-red-800' :
+                                            req.priority === 'Medium' ? 'bg-yellow-100 text-yellow-800' :
+                                            'bg-green-100 text-green-800'
+                                          }`}>
+                                            {req.priority}
+                                          </span>
+                                        </div>
+                                        <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                                          <span className="text-sm text-gray-600">Status</span>
+                                          <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                                            req.status === 'Active' ? 'bg-green-100 text-green-800' :
+                                            req.status === 'Proposed' ? 'bg-yellow-100 text-yellow-800' :
+                                            req.status === 'Implemented' ? 'bg-blue-100 text-blue-800' :
+                                            'bg-gray-100 text-gray-800'
+                                          }`}>
+                                            {req.status}
+                                          </span>
+                                        </div>
+                                        <div className="flex justify-between items-center py-2">
+                                          <span className="text-sm text-gray-600">Created</span>
+                                          <span className="text-sm font-medium text-gray-900">
+                                            {req.createdDate ? new Date(req.createdDate).toLocaleDateString() : 'Unknown'}
+                                          </span>
+                                        </div>
+                                      </div>
+                                    </div>
+
+                                    {/* Test Depth Analysis */}
+                                    <div className="bg-white rounded-lg p-4 shadow-sm border">
+                                      <h4 className="font-semibold text-gray-900 mb-4">Test Depth Analysis</h4>
+                                      <div className="space-y-4">
+                                        <div className="text-center">
+                                          <div className="text-3xl font-bold text-indigo-600 mb-1">
+                                            {req.testDepthFactor}
+                                          </div>
+                                          <div className="text-sm text-gray-500">Test Depth Factor</div>
+                                        </div>
+                                        <div className="text-center pt-2 border-t border-gray-100">
+                                          <div className="text-2xl font-bold text-green-600 mb-1">
+                                            {req.minTestCases}
+                                          </div>
+                                          <div className="text-sm text-gray-500">Required Test Cases</div>
+                                        </div>
+                                        <div className="bg-blue-50 rounded-lg p-3 text-center">
+                                          <div className="text-xs text-blue-700 font-medium">
+                                            Coverage Status: {linkedTestCount} / {req.minTestCases}
+                                          </div>
+                                          <div className="w-full bg-blue-200 rounded-full h-2 mt-2">
+                                            <div 
+                                              className="bg-blue-600 h-2 rounded-full" 
+                                              style={{width: `${Math.min(100, (linkedTestCount / req.minTestCases) * 100)}%`}}
+                                            ></div>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
+
+                                    {/* Versions */}
+                                    {req.versions && req.versions.length > 0 && (
+                                      <div className="bg-white rounded-lg p-4 shadow-sm border">
+                                        <h4 className="font-semibold text-gray-900 mb-3">Associated Versions</h4>
+                                        <div className="space-y-2">
+                                          {req.versions.map(vId => {
+                                            const versionExists = versions.some(v => v.id === vId);
+                                            return (
+                                              <div key={vId} className="flex items-center space-x-2">
+                                                <div className={`w-2 h-2 rounded-full ${
+                                                  versionExists ? 'bg-blue-400' : 'bg-yellow-400'
+                                                }`}></div>
+                                                <span className="text-sm text-gray-700 font-mono">{vId}</span>
+                                                {!versionExists && (
+                                                  <span className="text-xs text-yellow-600">(Pending)</span>
+                                                )}
+                                              </div>
+                                            );
+                                          })}
+                                        </div>
+                                      </div>
+                                    )}
+
+                                    {/* Tags */}
+                                    {req.tags && req.tags.length > 0 && (
+                                      <div className="bg-white rounded-lg p-4 shadow-sm border">
+                                        <h4 className="font-semibold text-gray-900 mb-3">Tags</h4>
+                                        <div className="flex flex-wrap gap-2">
+                                          {req.tags.map(tag => (
+                                            <span key={tag} className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">
+                                              {tag}
+                                            </span>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+
+                                    {/* Linked Test Cases */}
+                                    {linkedTestCount > 0 && (
+                                      <div className="bg-white rounded-lg p-4 shadow-sm border">
+                                        <h4 className="font-semibold text-gray-900 mb-3">Linked Test Cases</h4>
+                                        <div className="space-y-2">
+                                          <div className="text-sm text-gray-600">
+                                            {linkedTestCount} test case{linkedTestCount !== 1 ? 's' : ''} linked
+                                          </div>
+                                          <div className="bg-gray-50 rounded p-2">
+                                            <div className="flex items-center justify-between text-xs">
+                                              <span>Coverage Progress</span>
+                                              <span className="font-medium">
+                                                {Math.round((linkedTestCount / req.minTestCases) * 100)}%
+                                              </span>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
                             </div>
                           </td>
                         </tr>
