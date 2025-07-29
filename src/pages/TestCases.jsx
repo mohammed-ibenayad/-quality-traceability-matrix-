@@ -471,6 +471,10 @@ const TestCases = () => {
   const [selectedTestCases, setSelectedTestCases] = useState(new Set());
   const [expandedRows, setExpandedRows] = useState(new Set()); // Corrected line
 
+  // Add new state variables for tag filter
+  const [showTagFilter, setShowTagFilter] = useState(false);
+  const [tagSearchQuery, setTagSearchQuery] = useState('');
+
   // Modal states - ENHANCED
   const [showViewModal, setShowViewModal] = useState(false); // NEW: View modal state
   const [showEditModal, setShowEditModal] = useState(false);
@@ -479,7 +483,7 @@ const TestCases = () => {
   const [editingTestCase, setEditingTestCase] = useState(null);
 
   // State for collapsed/expanded sections
-  const [collapsedSections, setCollapsedSections] = useState(new Set()); // Corrected line
+  const [collapsedSections, setCollapsedSections] = useState(new Set()); // Corrected initialization
 
   // Add new state variables for failure expansion
   const [expandedTests, setExpandedTests] = useState(new Set());
@@ -558,6 +562,15 @@ const TestCases = () => {
     return Array.from(tags).sort();
   }, [testCases]);
 
+  // Add this computed value for filtered tags
+  const filteredAvailableTags = useMemo(() => {
+      if (!tagSearchQuery) return availableTags;
+      return availableTags.filter(tag =>
+          tag.toLowerCase().includes(tagSearchQuery.toLowerCase())
+      );
+  }, [availableTags, tagSearchQuery]);
+
+
   const filteredTestCases = useMemo(() => {
     return versionFilteredTestCases.filter(testCase => {
       // Search filter
@@ -571,9 +584,9 @@ const TestCases = () => {
       // Priority filter
       const matchesPriority = priorityFilter === 'All' || testCase.priority === priorityFilter;
 
-      // Tag filter - test case must have ALL selected tags
-      const matchesTags = selectedTags.size === 0 || 
-                          (testCase.tags && Array.isArray(testCase.tags) && 
+      // Tag filter - test case must have ANY of the selected tags (changed from ALL for better UX)
+      const matchesTags = selectedTags.size === 0 ||
+                          (testCase.tags && Array.isArray(testCase.tags) &&
                            Array.from(selectedTags).some(tag => testCase.tags.includes(tag)));
 
       // Version filter (keeping original logic for compatibility)
@@ -959,40 +972,159 @@ const TestCases = () => {
               <option value="Low">Low</option>
             </select>
           </div>
-          
-          {/* Tag Filter Section */}
+
+          {/* Enhanced Tag Filter Section - Collapsible */}
           {availableTags.length > 0 && (
             <div className="mt-4">
               <div className="flex items-center justify-between mb-2">
-                <label className="text-sm font-medium text-gray-700">Filter by Tags</label>
+                <div className="flex items-center space-x-3">
+                  <button
+                    onClick={() => setShowTagFilter(!showTagFilter)}
+                    className="flex items-center space-x-2 text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors"
+                  >
+                    <Filter size={16} />
+                    <span>Filter by Tags</span>
+                    <ChevronDown
+                      className={`transform transition-transform ${showTagFilter ? 'rotate-180' : ''}`}
+                      size={16}
+                    />
+                    {selectedTags.size > 0 && (
+                      <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full ml-2">
+                        {selectedTags.size}
+                      </span>
+                    )}
+                  </button>
+
+                  {/* Show tag count and available tags indicator */}
+                  <span className="text-xs text-gray-500">
+                    ({availableTags.length} available)
+                  </span>
+                </div>
+
                 {selectedTags.size > 0 && (
                   <button
                     onClick={handleClearTags}
-                    className="text-xs text-gray-500 hover:text-gray-700"
+                    className="text-xs text-gray-500 hover:text-gray-700 px-2 py-1 rounded hover:bg-gray-100"
                   >
                     Clear all ({selectedTags.size})
                   </button>
                 )}
               </div>
-              <div className="flex flex-wrap gap-2">
-                {availableTags.map(tag => (
-                  <button
-                    key={tag}
-                    onClick={() => handleTagToggle(tag)}
-                    className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-                      selectedTags.has(tag)
-                        ? 'bg-blue-100 text-blue-800 border-2 border-blue-300'
-                        : 'bg-gray-100 text-gray-700 border border-gray-300 hover:bg-gray-200'
-                    }`}
-                  >
-                    {tag}
-                    {selectedTags.has(tag) && <span className="ml-1">✓</span>}
-                  </button>
-                ))}
-              </div>
+
+              {/* Selected Tags Preview - Always visible when there are selected tags */}
+              {selectedTags.size > 0 && (
+                <div className="mb-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                  <div className="text-xs font-medium text-blue-700 mb-2">Active Tag Filters:</div>
+                  <div className="flex flex-wrap gap-2">
+                    {Array.from(selectedTags).map(tag => (
+                      <span
+                        key={tag}
+                        className="inline-flex items-center px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-full"
+                      >
+                        {tag}
+                        <button
+                          onClick={() => handleTagToggle(tag)}
+                          className="ml-1 text-blue-600 hover:text-blue-900 font-bold"
+                          title="Remove tag"
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Collapsible Tag Selection Area */}
+              {showTagFilter && (
+                <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                  {/* Tag Search */}
+                  {availableTags.length > 10 && (
+                    <div className="mb-3">
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={14} />
+                        <input
+                          type="text"
+                          placeholder="Search tags..."
+                          value={tagSearchQuery}
+                          onChange={(e) => setTagSearchQuery(e.target.value)}
+                          className="pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-md w-full focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Tag Grid */}
+                  <div className="max-h-48 overflow-y-auto">
+                    {filteredAvailableTags.length > 0 ? (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
+                        {filteredAvailableTags.map(tag => (
+                          <button
+                            key={tag}
+                            onClick={() => handleTagToggle(tag)}
+                            className={`px-3 py-2 text-sm font-medium transition-all duration-200 rounded-md border ${
+                              selectedTags.has(tag)
+                                ? 'bg-blue-500 text-white border-blue-500 shadow-sm'
+                                : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 hover:border-gray-400'
+                            }`}
+                            title={`Toggle ${tag} filter`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="truncate">{tag}</span>
+                              {selectedTags.has(tag) && (
+                                <CheckCircle size={14} className="ml-1 flex-shrink-0" />
+                              )}
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-4 text-gray-500 text-sm">
+                        {tagSearchQuery ? `No tags found matching "${tagSearchQuery}"` : 'No tags available'}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Filter Stats */}
+                  <div className="mt-3 pt-3 border-t border-gray-300">
+                    <div className="flex items-center justify-between text-xs text-gray-600">
+                      <span>
+                        {filteredAvailableTags.length} of {availableTags.length} tags shown
+                      </span>
+                      {selectedTags.size > 0 && (
+                        <span>
+                          Filtering by {selectedTags.size} tag{selectedTags.size !== 1 ? 's' : ''}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Quick Actions */}
+                  <div className="mt-3 pt-3 border-t border-gray-300 flex justify-between">
+                    <button
+                      onClick={() => {
+                        const allFilteredTags = new Set([...selectedTags, ...filteredAvailableTags]);
+                        setSelectedTags(allFilteredTags);
+                      }}
+                      disabled={filteredAvailableTags.length === 0}
+                      className="text-xs text-blue-600 hover:text-blue-800 disabled:text-gray-400 disabled:cursor-not-allowed"
+                    >
+                      Select All Visible
+                    </button>
+                    <button
+                      onClick={() => setShowTagFilter(false)}
+                      className="text-xs text-gray-600 hover:text-gray-800"
+                    >
+                      Close Filter
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Tag Filter Summary - Always visible for context */}
               {selectedTags.size > 0 && (
                 <div className="mt-2 text-xs text-gray-600">
-                  "Showing test cases with any of these tags:": {Array.from(selectedTags).join(', ')}
+                  Showing test cases with any of these tags: {Array.from(selectedTags).join(', ')}
                 </div>
               )}
             </div>
