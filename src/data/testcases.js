@@ -16,7 +16,7 @@ const testCases = [
     "automationStatus": "Automated",
     "automationPath": "tests/TestOpenCart/test_user_login.py",
     "lastExecuted": "",
-    "version": "v1.0",
+    "applicableVersions": ["v1.0", "v1.1", "v2.0"], // Core functionality
     "executedBy": "Pytest",
     "tags": [
       "Authentication",
@@ -44,7 +44,7 @@ const testCases = [
     "automationStatus": "Automated",
     "automationPath": "tests/TestOpenCart/test_user_login_invalid.py",
     "lastExecuted": "",
-    "version": "v1.0",
+    "applicableVersions": ["v1.0", "v1.1", "v2.0"], // Core functionality
     "executedBy": "Pytest",
     "tags": [
       "Authentication",
@@ -76,7 +76,7 @@ const testCases = [
     "automationStatus": "Automated",
     "automationPath": "tests/TestOpenCart/test_login_logout_continue.py",
     "lastExecuted": "",
-    "version": "v1.0",
+    "applicableVersions": ["v1.0", "v1.1", "v2.0"], // Core functionality
     "executedBy": "Pytest",
     "tags": [
       "Authentication",
@@ -106,7 +106,7 @@ const testCases = [
     "automationStatus": "Automated",
     "automationPath": "tests/TestOpenCart/test_forgotten_password.py",
     "lastExecuted": "",
-    "version": "v1.0",
+    "applicableVersions": ["v1.0", "v1.1", "v2.0"], // Core functionality
     "executedBy": "Pytest",
     "tags": [
       "Authentication",
@@ -136,7 +136,7 @@ const testCases = [
     "automationStatus": "Automated",
     "automationPath": "tests/TestOpenCart/test_user_registration.py",
     "lastExecuted": "",
-    "version": "v1.0",
+    "applicableVersions": ["v1.0", "v1.1", "v2.0"], // Core functionality
     "executedBy": "Pytest",
     "tags": [
       "Authentication",
@@ -165,7 +165,7 @@ const testCases = [
     "automationStatus": "Automated",
     "automationPath": "tests/TestOpenCart/test_user_registration_duplicate_email.py",
     "lastExecuted": "",
-    "version": "v1.0",
+    "applicableVersions": ["v1.0", "v1.1", "v2.0"], // Core functionality
     "executedBy": "Pytest",
     "tags": [
       "Authentication",
@@ -193,7 +193,7 @@ const testCases = [
     "automationStatus": "Automated",
     "automationPath": "tests/TestOpenCart/test_privacy_policy_validation.py",
     "lastExecuted": "",
-    "version": "v1.0",
+    "applicableVersions": ["v1.0", "v1.1", "v2.0"], // Core functionality
     "executedBy": "Pytest",
     "tags": [
       "Authentication",
@@ -222,7 +222,7 @@ const testCases = [
     "automationStatus": "Automated",
     "automationPath": "tests/TestOpenCart/test_required_fields_validation.py",
     "lastExecuted": "",
-    "version": "v1.0",
+    "applicableVersions": ["v1.0", "v1.1", "v2.0"], // Core functionality
     "executedBy": "Pytest",
     "tags": [
       "Authentication",
@@ -255,7 +255,7 @@ const testCases = [
     "automationStatus": "Automated",
     "automationPath": "tests/TestOpenCart/test_dashboard_content.py",
     "lastExecuted": "",
-    "version": "v1.0",
+    "applicableVersions": ["v1.0", "v1.1", "v2.0"], // Core UI
     "executedBy": "Pytest",
     "tags": [
       "Dashboard",
@@ -286,7 +286,7 @@ const testCases = [
     "automationStatus": "Automated",
     "automationPath": "tests/TestOpenCart/test_dashboard_header.py",
     "lastExecuted": "",
-    "version": "v1.0",
+    "applicableVersions": ["v1.0", "v1.1", "v2.0"], // Core UI
     "executedBy": "Pytest",
     "tags": [
       "Dashboard",
@@ -316,7 +316,7 @@ const testCases = [
     "automationStatus": "Automated",
     "automationPath": "tests/TestOpenCart/test_navigation_layout.py",
     "lastExecuted": "",
-    "version": "v1.0",
+    "applicableVersions": ["v1.0", "v1.1", "v2.0"], // Core UI
     "executedBy": "Pytest",
     "tags": [
       "Dashboard",
@@ -347,7 +347,7 @@ const testCases = [
     "automationStatus": "Automated",
     "automationPath": "tests/TestOpenCart/test_navigation_categories.py",
     "lastExecuted": "",
-    "version": "v1.0",
+    "applicableVersions": ["v1.0", "v1.1", "v2.0"], // Core UI
     "executedBy": "Pytest",
     "tags": [
       "Dashboard",
@@ -377,7 +377,7 @@ const testCases = [
     "automationStatus": "Automated",
     "automationPath": "tests/TestOpenCart/test_product_cards.py",
     "lastExecuted": "",
-    "version": "v1.0",
+    "applicableVersions": ["v1.0", "v1.1", "v2.0"], // Core UI
     "executedBy": "Pytest",
     "tags": [
       "Dashboard",
@@ -408,7 +408,7 @@ const testCases = [
     "automationStatus": "Automated",
     "automationPath": "tests/TestOpenCart/test_product_card_elements.py",
     "lastExecuted": "",
-    "version": "v1.0",
+    "applicableVersions": ["v1.0", "v1.1", "v2.0"], // Core UI
     "executedBy": "Pytest",
     "tags": [
       "Dashboard",
@@ -438,7 +438,7 @@ const testCases = [
     "automationStatus": "Automated",
     "automationPath": "tests/TestOpenCart/test_brand_logos.py",
     "lastExecuted": "",
-    "version": "v1.0",
+    "applicableVersions": ["v1.0", "v1.1", "v2.0"], // Core UI
     "executedBy": "Pytest",
     "tags": [
       "Dashboard",
@@ -468,7 +468,7 @@ const testCases = [
     "automationStatus": "Automated",
     "automationPath": "tests/TestOpenCart/test_footer.py",
     "lastExecuted": "",
-    "version": "v1.0",
+    "applicableVersions": ["v1.0", "v1.1", "v2.0"], // Core UI
     "executedBy": "Pytest",
     "tags": [
       "Dashboard",
@@ -499,7 +499,7 @@ const testCases = [
     "automationStatus": "Automated",
     "automationPath": "tests/TestOpenCart/test_category_navigation.py",
     "lastExecuted": "",
-    "version": "v1.0",
+    "applicableVersions": ["v1.0", "v1.1", "v2.0"], // Core functionality
     "executedBy": "Pytest",
     "tags": [
       "Navigation",
@@ -530,7 +530,7 @@ const testCases = [
     "automationStatus": "Automated",
     "automationPath": "tests/TestOpenCart/test_wishlist_functionality.py",
     "lastExecuted": "",
-    "version": "v1.0",
+    "applicableVersions": ["v1.0", "v1.1", "v2.0"], // Core functionality
     "executedBy": "Pytest",
     "tags": [
       "Wishlist",
@@ -561,7 +561,7 @@ const testCases = [
     "automationStatus": "Automated",
     "automationPath": "tests/TestOpenCart/test_cart_functionality.py",
     "lastExecuted": "",
-    "version": "v1.0",
+    "applicableVersions": ["v1.0", "v1.1", "v2.0"], // Core functionality
     "executedBy": "Pytest",
     "tags": [
       "Shopping Cart",
@@ -592,7 +592,7 @@ const testCases = [
     "automationStatus": "Automated",
     "automationPath": "tests/TestOpenCart/test_cart_navigation.py",
     "lastExecuted": "",
-    "version": "v1.0",
+    "applicableVersions": ["v1.0", "v1.1", "v2.0"], // Core functionality
     "executedBy": "Pytest",
     "tags": [
       "Shopping Cart",
@@ -623,7 +623,7 @@ const testCases = [
     "automationStatus": "Automated",
     "automationPath": "tests/TestOpenCart/test_product_comparison.py",
     "lastExecuted": "",
-    "version": "v1.0",
+    "applicableVersions": ["v1.0", "v1.1", "v2.0"], // Core functionality
     "executedBy": "Pytest",
     "tags": [
       "Product Comparison",
@@ -654,7 +654,7 @@ const testCases = [
     "automationStatus": "Automated",
     "automationPath": "tests/TestOpenCart/test_scroll_functionality.py",
     "lastExecuted": "",
-    "version": "v1.0",
+    "applicableVersions": [], // Universal test
     "executedBy": "Pytest",
     "tags": [
       "Scroll",
@@ -685,7 +685,7 @@ const testCases = [
     "automationStatus": "Automated",
     "automationPath": "tests/TestOpenCart/test_currency_switcher.py",
     "lastExecuted": "",
-    "version": "v1.0",
+    "applicableVersions": ["v1.0", "v1.1", "v2.0"], // Core functionality
     "executedBy": "Pytest",
     "tags": [
       "Currency",
@@ -716,7 +716,7 @@ const testCases = [
     "automationStatus": "Automated",
     "automationPath": "tests/TestOpenCart/test_account_dropdown.py",
     "lastExecuted": "",
-    "version": "v1.0",
+    "applicableVersions": ["v1.0", "v1.1", "v2.0"], // Core functionality
     "executedBy": "Pytest",
     "tags": [
       "Account",
@@ -747,7 +747,7 @@ const testCases = [
     "automationStatus": "Automated",
     "automationPath": "tests/TestOpenCart/test_wishlist_navigation.py",
     "lastExecuted": "",
-    "version": "v1.0",
+    "applicableVersions": ["v1.0", "v1.1", "v2.0"], // Core functionality
     "executedBy": "Pytest",
     "tags": [
       "Wishlist",
@@ -778,7 +778,7 @@ const testCases = [
     "automationStatus": "Automated",
     "automationPath": "tests/TestOpenCart/test_cart_icon_navigation.py",
     "lastExecuted": "",
-    "version": "v1.0",
+    "applicableVersions": ["v1.0", "v1.1", "v2.0"], // Core functionality
     "executedBy": "Pytest",
     "tags": [
       "Shopping Cart",
@@ -809,7 +809,7 @@ const testCases = [
     "automationStatus": "Automated",
     "automationPath": "tests/TestOpenCart/test_checkout_navigation.py",
     "lastExecuted": "",
-    "version": "v1.0",
+    "applicableVersions": ["v1.0", "v1.1", "v2.0"], // Core functionality
     "executedBy": "Pytest",
     "tags": [
       "Checkout",

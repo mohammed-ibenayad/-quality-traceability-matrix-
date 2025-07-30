@@ -37,8 +37,10 @@ class DataStoreService {
         console.log(`📁 Found saved test cases data (${savedTestCases.length} characters)`);
         const parsedTestCases = JSON.parse(savedTestCases);
         if (Array.isArray(parsedTestCases)) {
-          this._testCases = parsedTestCases;
-          console.log(`✅ Successfully loaded ${this._testCases.length} test cases from localStorage`);
+          // Change 2: Update Data Loading with Migration
+          const rawTestCases = parsedTestCases;
+          this._testCases = rawTestCases.map(tc => this._migrateTestCaseVersionFormat(tc));
+          console.log(`✅ Successfully loaded and migrated ${this._testCases.length} test cases from localStorage`);
           console.log(`📋 Sample test case IDs: [${this._testCases.slice(0, 3).map(tc => tc.id).join(', ')}${this._testCases.length > 3 ? ', ...' : ''}]`);
         } else {
           console.warn(`⚠️ Saved test cases data is not an array:`, typeof parsedTestCases);
@@ -162,7 +164,8 @@ class DataStoreService {
    */
   initWithDefaultData() {
     this._requirements = [...defaultRequirements];
-    this._testCases = [...defaultTestCases];
+    // Change 3: Update Default Data Initialization
+    this._testCases = defaultTestCases.map(tc => this._migrateTestCaseVersionFormat(tc));
     this._mapping = { ...defaultMapping };
     this._versions = [...defaultVersions];
     this._hasInitializedData = true;
@@ -289,7 +292,7 @@ deleteRequirement(requirementId) {
     });
     
     // Remove the mapping entry
-    delete this._mapping[requirementId];
+    delete this._mapping[reqId]; // Corrected: use reqId here
   }
 
   // Also check for any test cases that have this requirement in their requirementIds array
@@ -369,8 +372,8 @@ deleteRequirement(requirementId) {
         if (savedTestCases) {
           const parsedTestCases = JSON.parse(savedTestCases);
           if (Array.isArray(parsedTestCases) && parsedTestCases.length > 0) {
-            this._testCases = parsedTestCases;
-            console.log(`🔄 Reloaded ${this._testCases.length} test cases from localStorage`);
+            this._testCases = parsedTestCases.map(tc => this._migrateTestCaseVersionFormat(tc)); // Apply migration here too
+            console.log(`🔄 Reloaded and migrated ${this._testCases.length} test cases from localStorage`);
           }
         }
       } catch (error) {
@@ -425,6 +428,21 @@ deleteRequirement(requirementId) {
       // === NEW: Validate field types ===
       this._validateTestCaseFieldTypes(tc, index);
 
+      // Change 4: Add Validation for New Format (for applicableVersions)
+      if (tc.applicableVersions !== undefined) {
+        if (!Array.isArray(tc.applicableVersions)) {
+          throw new Error(`applicableVersions must be an array for test case at index ${index} (${tc.id || 'unknown'})`);
+        }
+        if (!tc.applicableVersions.every(v => typeof v === 'string')) {
+          throw new Error(`All versions in applicableVersions must be strings for test case at index ${index} (${tc.id || 'unknown'})`);
+        }
+      }
+      // Existing version validation (if any)
+      if (tc.version !== undefined && typeof tc.version !== 'string') {
+        throw new Error(`Version must be a string for test case at index ${index} (${tc.id || 'unknown'})`);
+      }
+
+
       // Log each test case being processed
       console.log(`✅ Validated test case ${index + 1}/${testCases.length}: ${tc.id} - ${tc.name}`);
       
@@ -441,7 +459,8 @@ deleteRequirement(requirementId) {
         automationStatus: tc.automationStatus || 'Manual',
         priority: tc.priority || 'Medium',
         requirementIds: tc.requirementIds || [],
-        version: tc.version || '',
+        version: tc.version || '', // Keep legacy 'version' for now for backward compatibility during transition
+        applicableVersions: Array.isArray(tc.applicableVersions) ? tc.applicableVersions : [], // New field
         tags: Array.isArray(tc.tags) ? tc.tags : (tc.tags ? [tc.tags] : []), // Enhanced tags handling
         assignee: tc.assignee || '',
         lastExecuted: tc.lastExecuted || null,
@@ -553,6 +572,20 @@ deleteRequirement(requirementId) {
       throw new Error('Test case name is required');
     }
 
+    // Change 4: Add Validation for New Format (for applicableVersions)
+    if (testCaseData.applicableVersions !== undefined) {
+      if (!Array.isArray(testCaseData.applicableVersions)) {
+        throw new Error('applicableVersions must be an array');
+      }
+      if (!testCaseData.applicableVersions.every(v => typeof v === 'string')) {
+        throw new Error('All versions in applicableVersions must be strings');
+      }
+    }
+    // Existing version validation (if any)
+    if (testCaseData.version !== undefined && typeof testCaseData.version !== 'string') {
+      throw new Error('Version must be a string');
+    }
+
     // Generate ID if not provided
     let testCaseId = testCaseData.id;
     if (!testCaseId) {
@@ -582,7 +615,8 @@ deleteRequirement(requirementId) {
       automationStatus: testCaseData.automationStatus || 'Manual',
       priority: testCaseData.priority || 'Medium',
       requirementIds: testCaseData.requirementIds || [],
-      version: testCaseData.version || '',
+      version: testCaseData.version || '', // Keep legacy 'version' for now for backward compatibility during transition
+      applicableVersions: Array.isArray(testCaseData.applicableVersions) ? testCaseData.applicableVersions : [], // New field
       tags: Array.isArray(testCaseData.tags) ? testCaseData.tags : (testCaseData.tags ? [testCaseData.tags] : []),
       assignee: testCaseData.assignee || '',
       lastExecuted: testCaseData.lastExecuted || null,
@@ -633,6 +667,20 @@ deleteRequirement(requirementId) {
 
     const existingTestCase = this._testCases[index];
     const oldRequirementIds = existingTestCase.requirementIds || [];
+
+    // Change 4: Add Validation for New Format (for applicableVersions)
+    if (updateData.applicableVersions !== undefined) {
+      if (!Array.isArray(updateData.applicableVersions)) {
+        throw new Error('applicableVersions must be an array');
+      }
+      if (!updateData.applicableVersions.every(v => typeof v === 'string')) {
+        throw new Error('All versions in applicableVersions must be strings');
+      }
+    }
+    // Existing version validation (if any)
+    if (updateData.version !== undefined && typeof updateData.version !== 'string') {
+      throw new Error('Version must be a string');
+    }
 
     // Update the test case
     const updatedTestCase = {
@@ -930,10 +978,15 @@ deleteVersion(versionId) {
     }
   });
 
-  // Clean up any references to this version in test cases
+  // Change 5: Update Version Cleanup Logic
   this._testCases.forEach(tc => {
+    // Handle new format
+    if (tc.applicableVersions && Array.isArray(tc.applicableVersions)) {
+      tc.applicableVersions = tc.applicableVersions.filter(v => v !== versionId);
+    }
+    
+    // Handle legacy format during transition
     if (tc.version === versionId) {
-      // Reset to unassigned instead of deleting the test case
       tc.version = '';
     }
   });
@@ -983,7 +1036,6 @@ getVersion(versionId) {
       // Import test cases
       if (data.testCases && Array.isArray(data.testCases)) {
         this.setTestCases(data.testCases);
-        results.testCases = data.testCases.length;
         
         // Extract mappings from test cases if no explicit mapping provided
         if (!data.mappings && data.testCases.some(tc => tc.requirementIds)) {
@@ -1181,6 +1233,78 @@ getVersion(versionId) {
     if (errors.length > 0) {
       throw new Error(errors.join('; '));
     }
+  }
+
+  /**
+   * Migrate test case from legacy version format to applicableVersions format
+   * @param {Object} testCase - Test case object to migrate
+   * @returns {Object} Migrated test case object
+   */
+  _migrateTestCaseVersionFormat(testCase) {
+    // If already using new format, return as-is
+    if (testCase.applicableVersions) {
+      return testCase;
+    }
+
+    // Migrate from legacy format
+    const migrated = { ...testCase };
+    
+    if (migrated.version && migrated.version !== '') { // Use migrated.version
+      // Convert single version to array
+      migrated.applicableVersions = [migrated.version];
+    } else {
+      // Empty version means applies to all versions
+      migrated.applicableVersions = [];
+    }
+
+    // Remove the old 'version' field after migration to avoid redundancy,
+    // but only if it was successfully migrated to applicableVersions.
+    // This makes the transition cleaner over time.
+    if (migrated.hasOwnProperty('version')) {
+      delete migrated.version;
+    }
+
+    return migrated;
+  }
+
+  /**
+   * Check if a test case applies to a specific version
+   * @param {Object} testCase - Test case object
+   * @param {string} versionId - Version ID to check
+   * @returns {boolean} True if test case applies to the version
+   */
+  testCaseAppliesTo(testCase, versionId) {
+    // Handle new format
+    if (testCase.applicableVersions) {
+      // Empty array means applies to all versions
+      if (testCase.applicableVersions.length === 0) return true;
+      return testCase.applicableVersions.includes(versionId);
+    }
+    
+    // Handle legacy format
+    if (testCase.version) {
+      return testCase.version === versionId || testCase.version === '';
+    }
+    
+    // Default: applies to all versions if no versioning specified
+    return true;
+  }
+
+  /**
+   * Get test cases that apply to a specific version
+   * @param {string} versionId - Version ID to filter by
+   * @returns {Array} Test cases applicable to the version
+   */
+  getTestCasesForVersion(versionId) {
+    if (versionId === 'unassigned') {
+      // 'unassigned' should typically show all test cases, or test cases with no specific version assigned.
+      // Based on the migration, an empty applicableVersions array means "applies to all versions".
+      // If 'unassigned' specifically means test cases that have *no* applicableVersions defined (or empty),
+      // then we'd filter for that. For now, assuming 'unassigned' means show all.
+      return this._testCases; 
+    }
+    
+    return this._testCases.filter(tc => this.testCaseAppliesTo(tc, versionId));
   }
 }
 

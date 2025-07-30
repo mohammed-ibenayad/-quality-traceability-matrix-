@@ -13,6 +13,26 @@ import { refreshQualityGates } from '../utils/calculateQualityGates';
 import { calculateCoverage } from '../utils/coverage';
 import { calculateReleaseMetrics } from '../utils/metrics';
 
+/**
+ * Helper function to check if a test case applies to a version
+ * @param {Object} testCase - Test case object
+ * @param {string} selectedVersion - Currently selected version
+ * @returns {boolean} True if test case applies to the version
+ */
+const testCaseAppliesTo = (testCase, selectedVersion) => {
+  if (selectedVersion === 'unassigned') return true;
+  
+  // Handle new format
+  if (testCase.applicableVersions) {
+    // Empty array means applies to all versions
+    if (testCase.applicableVersions.length === 0) return true;
+    return testCase.applicableVersions.includes(selectedVersion);
+  }
+  
+  // Handle legacy format during transition
+  return !testCase.version || testCase.version === selectedVersion || testCase.version === '';
+};
+
 const Dashboard = () => {
   // State to hold the data from DataStore
   const [requirements, setRequirements] = useState([]);
@@ -90,7 +110,9 @@ const Dashboard = () => {
     
     // Otherwise, filter by the selected version
     console.log("Recalculating version-specific coverage for:", selectedVersion);
-    return calculateCoverage(requirements, mapping, testCases, selectedVersion);
+    // Pass filtered test cases to calculateCoverage
+    const filteredTestCasesForCoverage = testCases.filter(tc => testCaseAppliesTo(tc, selectedVersion));
+    return calculateCoverage(requirements, mapping, filteredTestCasesForCoverage);
   }, [requirements, mapping, testCases, selectedVersion, coverage, hasData, refreshCounter]);
   
   // Calculate release metrics for the selected version
@@ -119,7 +141,9 @@ const Dashboard = () => {
     }
     
     const calculateVersionCoverage = (versionId) => {
-      return calculateCoverage(requirements, mapping, testCases, versionId);
+      // Ensure this internal function also uses the new filtering logic
+      const filteredTests = testCases.filter(tc => testCaseAppliesTo(tc, versionId));
+      return calculateCoverage(requirements, mapping, filteredTests);
     };
     
     const calculatedMetrics = calculateReleaseMetrics(
@@ -163,10 +187,8 @@ const Dashboard = () => {
         req.versions && req.versions.includes(selectedVersion)
       );
       
-      // Filter test cases by selected version (empty version means applies to all)
-      versionTestCases = testCases.filter(tc => 
-        !tc.version || tc.version === selectedVersion || tc.version === ''
-      );
+      // Change 1 & 4: Update Version Test Filtering & Simplify
+      versionTestCases = testCases.filter(tc => testCaseAppliesTo(tc, selectedVersion));
     }
     
     const totalRequirements = versionRequirements.length;
@@ -175,7 +197,7 @@ const Dashboard = () => {
     const reqWithTests = versionRequirements.filter(req => 
       (mapping[req.id] || []).some(tcId => {
         const tc = testCases.find(t => t.id === tcId);
-        return tc && (selectedVersion === 'unassigned' || !tc.version || tc.version === selectedVersion || tc.version === '');
+        return tc && testCaseAppliesTo(tc, selectedVersion); // Change 5: Update Summary Metrics Version Filtering
       })
     ).length;
     
@@ -204,11 +226,10 @@ const Dashboard = () => {
     
     console.log("Computing direct metrics for dashboard display");
     
-    // Filter tests based on selected version
+    // Change 1 & 4: Update Version Test Filtering & Simplify
     const versionTests = selectedVersion === 'unassigned'
       ? testCases
-      : testCases.filter(tc => 
-          !tc.version || tc.version === selectedVersion || tc.version === '');
+      : testCases.filter(tc => testCaseAppliesTo(tc, selectedVersion));
     
     // Calculate pass rate - mirror the calculation in TraceabilityMatrix
     // Calculate based on tests that have actually been executed, not all tests
@@ -233,12 +254,12 @@ const Dashboard = () => {
       const reqTestIds = mapping[req.id] || [];
       if (reqTestIds.length === 0) return false;
       
-      // For version filtering
+      // Change 2 & 4: Update Requirements Filtering for Fully Passed Calculation & Simplify
       const filteredTestIds = selectedVersion === 'unassigned'
         ? reqTestIds
         : reqTestIds.filter(tcId => {
             const tc = testCases.find(t => t.id === tcId);
-            return tc && (!tc.version || tc.version === selectedVersion || tc.version === '');
+            return tc && testCaseAppliesTo(tc, selectedVersion);
           });
           
       if (filteredTestIds.length === 0) return false;

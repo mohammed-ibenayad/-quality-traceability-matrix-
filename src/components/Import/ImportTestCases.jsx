@@ -93,6 +93,12 @@ const ImportTestCases = ({ onImportSuccess }) => {
           setProcessedData(processed);
           setValidationSuccess(true);
         } else {
+          // Change 4: Update Validation Error Messages
+          errors.push(""); // Empty line for spacing
+          errors.push("📝 Format Notes:");
+          errors.push("• Use 'applicableVersions: []' instead of 'version' for better flexibility");
+          errors.push("• Empty applicableVersions array means the test applies to all versions");
+          errors.push("• Multiple versions can be specified: ['v1.0', 'v1.1', 'v2.0']");
           setValidationErrors(errors);
         }
       } catch (error) {
@@ -135,6 +141,12 @@ const ImportTestCases = ({ onImportSuccess }) => {
             setValidationSuccess(true);
             console.log('✅ CSV import successful:', processed.length, 'test cases');
           } else {
+            // Change 4: Update Validation Error Messages
+            errors.push(""); // Empty line for spacing
+            errors.push("📝 Format Notes:");
+            errors.push("• Use 'applicableVersions: []' instead of 'version' for better flexibility");
+            errors.push("• Empty applicableVersions array means the test applies to all versions");
+            errors.push("• Multiple versions can be specified: ['v1.0', 'v1.1', 'v2.0']");
             setValidationErrors(errors);
             console.error('❌ CSV validation errors:', errors);
           }
@@ -239,7 +251,10 @@ const generateId = (row) => {
       automationStatus: mapAutomationStatus(row['Automation Candidate'] || row['Is Automated']),
           
       // Default values for required Quality Tracker fields
-      version: (row['Version'] || '').toString(),
+      // Keep version for backward compatibility during CSV import, it will be migrated later by processTestCaseData
+      version: (row['Version'] || '').toString(), 
+      // Attempt to parse applicableVersions from CSV if present
+      applicableVersions: row['Applicable Versions'] ? row['Applicable Versions'].toString().split(',').map(v => v.trim()).filter(Boolean) : undefined,
       requirementIds: [], // Will be populated separately if needed
       assignee: (row['Created By'] || row['Assigned To'] || '').toString(),
       lastExecuted: '',
@@ -253,12 +268,32 @@ const generateId = (row) => {
 
   // Process test case data 
   const processTestCaseData = (testCases) => {
+    // Change 2: Update Data Processing Function
     return testCases.map(tc => {
+      // Migrate from legacy format to new format if needed
+      let processedTC = { ...tc };
+      
+      // If using old format (has 'version' but not 'applicableVersions'), convert to new format
+      if (processedTC.version !== undefined && !processedTC.applicableVersions) {
+        if (processedTC.version && processedTC.version !== '') {
+          processedTC.applicableVersions = [processedTC.version];
+        } else {
+          processedTC.applicableVersions = []; // Empty version means applies to all
+        }
+        // Remove the old version field
+        delete processedTC.version;
+      }
+      
+      // Ensure applicableVersions exists (default to empty array if still undefined)
+      if (!processedTC.applicableVersions) {
+        processedTC.applicableVersions = [];
+      }
+      
       return {
-        ...tc,
-        automationStatus: tc.automationStatus || 'Manual',
-        status: tc.status || 'Not Run',
-        lastExecuted: tc.lastExecuted || ''
+        ...processedTC,
+        automationStatus: processedTC.automationStatus || 'Manual',
+        status: processedTC.status || 'Not Run',
+        lastExecuted: processedTC.lastExecuted || ''
       };
     });
   };
@@ -341,6 +376,28 @@ const generateId = (row) => {
           errors.push(`Invalid date format for lastExecuted '${tc.lastExecuted}' for ${tc.id || `test case at index ${index}`}`);
         }
       }
+
+      // Change 1: Update Validation Function - Add applicableVersions validation
+      if (tc.applicableVersions !== undefined) {
+        if (!Array.isArray(tc.applicableVersions)) {
+          errors.push(`Test case at index ${index} (${tc.id || 'unknown'}): applicableVersions must be an array`);
+        } else {
+          // Validate each version in the array
+          tc.applicableVersions.forEach((version, vIndex) => {
+            if (typeof version !== 'string') {
+              errors.push(`Test case at index ${index} (${tc.id || 'unknown'}): applicableVersions[${vIndex}] must be a string`);
+            }
+            if (version.trim() === '') {
+              errors.push(`Test case at index ${index} (${tc.id || 'unknown'}): applicableVersions[${vIndex}] cannot be empty`);
+            }
+          });
+        }
+      }
+
+      // Keep backward compatibility validation for legacy version field
+      if (tc.version !== undefined && typeof tc.version !== 'string') {
+        errors.push(`Test case at index ${index} (${tc.id || 'unknown'}): version must be a string`);
+      }
     });
     
     return errors;
@@ -372,7 +429,21 @@ const generateId = (row) => {
       // Reset the form
       resetForm();
 
-      console.log("Test cases imported successfully:", updatedTestCases);
+      // Change 6: Update Import Success Message
+      const migrationCount = processedData.filter(tc => tc.hasOwnProperty('version') && !tc.applicableVersions).length;
+      const migrationMessage = migrationCount > 0 ? 
+        ` (${migrationCount} test cases migrated from legacy format)` : '';
+
+      // Assuming setImportStatus is a state setter for a message display
+      // This part of the prompt is slightly out of context for this file,
+      // as setImportStatus is not defined here.
+      // If it were, it would look like this:
+      // setImportStatus({
+      //   success: true,
+      //   message: `Successfully imported ${updatedTestCases.length} test cases${migrationMessage}`,
+      // });
+      console.log(`Successfully imported ${updatedTestCases.length} test cases${migrationMessage}`);
+
     } catch (error) {
       console.error("Error importing test cases:", error);
       setValidationErrors([`Error importing data: ${error.message}`]);
@@ -440,7 +511,48 @@ const generateId = (row) => {
 
   console.log('🎨 Rendering file import interface');
 
-  // Default file import view (enhanced UI)
+  // Sample data template
+  // Change 3: Update Sample Data Template
+  const sampleTemplate = {
+    id: "TC-001",
+    name: "Sample Test Case", 
+    description: "Description of what this test case validates",
+    steps: [
+      "Step 1: Action to perform", 
+      "Step 2: Another action", 
+      "Step 3: Final verification step"
+    ],
+    expectedResult: "Expected outcome of the test",
+    priority: "High", // High, Medium, Low
+    automationStatus: "Manual", // Automated, Manual, Semi-Automated
+    status: "Not Run", // Passed, Failed, Not Run, Blocked
+    applicableVersions: ["v1.0", "v1.1"], // Array of versions this test applies to (empty array = all versions)
+    requirementIds: ["REQ-001"], // Array of requirement IDs this test covers
+    lastExecuted: null
+  };
+
+  // Change 5: Update Field Documentation
+  const fieldDescriptions = {
+    id: "Unique identifier for the test case (e.g., 'TC-001')",
+    name: "Name or title of the test case",
+    description: "Detailed description of the test case",
+    steps: "Array of steps to execute the test case",
+    expectedResult: "The expected outcome or behavior after executing the steps",
+    priority: "Importance of the test case (High, Medium, Low)",
+    automationStatus: "Whether the test is automated (Automated, Manual, Semi-Automated)",
+    status: "Current execution status (Passed, Failed, Not Run, Blocked)",
+    applicableVersions: "Array of versions this test applies to (e.g., ['v1.0', 'v1.1']). Empty array means applies to all versions.",
+    version: "Legacy field - use 'applicableVersions' instead", // DEPRECATED
+    requirementIds: "Array of requirement IDs this test covers (e.g., ['REQ-001'])",
+    lastExecuted: "Timestamp of the last execution (ISO 8601 format or null)",
+    category: "Category or module the test belongs to (e.g., 'Authentication')",
+    preconditions: "Conditions that must be met before executing the test",
+    testData: "Any data required for the test (e.g., 'user_credentials.json')",
+    assignee: "Person responsible for the test case",
+    executionTime: "Time taken for execution in minutes",
+    automationPath: "Path to the automation script (if automated)"
+  };
+
   return (
     <div className="bg-white p-6 rounded shadow">
       <div className="flex items-center justify-between mb-4">
@@ -568,6 +680,9 @@ const generateId = (row) => {
                   {processedData.map((tc, i) => (
                     <div key={i} className="mb-1">
                       {tc.id}: {tc.name} ({tc.status}, {tc.automationStatus})
+                      {tc.applicableVersions && tc.applicableVersions.length > 0 && (
+                        <span> [Versions: {tc.applicableVersions.join(', ')}]</span>
+                      )}
                       {tc.requirementIds && importOption === 'withMapping' && (
                         <span> → {tc.requirementIds.join(', ')}</span>
                       )}

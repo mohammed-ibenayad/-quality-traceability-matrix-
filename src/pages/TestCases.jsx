@@ -40,6 +40,42 @@ const formatLastExecution = (lastExecuted) => {
   return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 };
 
+/**
+ * Helper function to get display text for test case versions
+ * @param {Object} testCase - Test case object
+ * @returns {string} Display text for versions
+ */
+const getVersionDisplayText = (testCase) => {
+  // Handle new format
+  if (testCase.applicableVersions) {
+    if (testCase.applicableVersions.length === 0) {
+      return 'All Versions';
+    }
+    return testCase.applicableVersions.join(', ');
+  }
+  
+  // Handle legacy format
+  return testCase.version || 'All Versions';
+};
+
+/**
+ * Helper function to get version tags for display
+ * @param {Object} testCase - Test case object
+ * @returns {Array} Array of version strings for tag display
+ */
+const getVersionTags = (testCase) => {
+  // Handle new format
+  if (testCase.applicableVersions) {
+    return testCase.applicableVersions.length > 0 
+      ? testCase.applicableVersions 
+      : ['All Versions'];
+  }
+  
+  // Handle legacy format
+  return testCase.version ? [testCase.version] : ['All Versions'];
+};
+
+
 // TestCaseRow Component (updated with view action and optimized layout)
 const TestCaseRow = ({
   testCase,
@@ -347,10 +383,11 @@ const TestCaseRow = ({
                             {testCase.automationStatus}
                           </span>
                         </div>
+                        {/* Change 1 & 6: Applicable Versions Display */}
                         <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                          <span className="text-sm text-gray-600">Version</span>
+                          <span className="text-sm text-gray-600">Versions</span>
                           <span className="text-sm font-medium text-gray-900">
-                            {testCase.version || 'Unassigned'}
+                            {getVersionDisplayText(testCase)}
                           </span>
                         </div>
                         <div className="flex justify-between items-center py-2 border-b border-gray-100">
@@ -458,7 +495,7 @@ const TestCases = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [priorityFilter, setPriorityFilter] = useState('All');
-  const [versionFilter, setVersionFilter] = useState('All');
+  const [versionFilter, setVersionFilter] = useState('All'); // This filter is now handled by selectedVersion from context
   const [selectedTags, setSelectedTags] = useState(new Set());
   const [selectedTestCases, setSelectedTestCases] = useState(new Set());
   const [expandedRows, setExpandedRows] = useState(new Set()); // Corrected line
@@ -538,10 +575,24 @@ const TestCases = () => {
     }
   };
 
-  // Filter test cases by selected version
-  const versionFilteredTestCases = selectedVersion === 'unassigned'
-    ? testCases
-    : testCases.filter(tc => !tc.version || tc.version === selectedVersion || tc.version === '');
+  // Filter test cases by selected version (from context)
+  const versionFilteredTestCases = useMemo(() => {
+    if (selectedVersion === 'unassigned') {
+      return testCases;
+    }
+    // Change 2: Update Test Case Filtering Logic
+    return testCases.filter(tc => {
+      // Handle new format
+      if (tc.applicableVersions) {
+        // Empty array means applies to all versions
+        if (tc.applicableVersions.length === 0) return true;
+        return tc.applicableVersions.includes(selectedVersion);
+      }
+      
+      // Handle legacy format during transition
+      return !tc.version || tc.version === selectedVersion || tc.version === '';
+    });
+  }, [testCases, selectedVersion]);
 
   // Get unique tags from all test cases
   const availableTags = useMemo(() => {
@@ -581,12 +632,10 @@ const TestCases = () => {
                           (testCase.tags && Array.isArray(testCase.tags) &&
                            Array.from(selectedTags).some(tag => testCase.tags.includes(tag)));
 
-      // Version filter (keeping original logic for compatibility)
-      const matchesVersion = selectedVersion === 'unassigned' || testCase.version === selectedVersion;
-
-      return matchesSearch && matchesStatus && matchesPriority && matchesTags && matchesVersion;
+      // Version filter is now handled by `versionFilteredTestCases`
+      return matchesSearch && matchesStatus && matchesPriority && matchesTags;
     });
-  }, [versionFilteredTestCases, searchQuery, statusFilter, priorityFilter, selectedTags, selectedVersion]);
+  }, [versionFilteredTestCases, searchQuery, statusFilter, priorityFilter, selectedTags]);
 
   // Calculate summary statistics
   const summaryStats = useMemo(() => {
@@ -696,7 +745,7 @@ const TestCases = () => {
       automationStatus: 'Manual',
       priority: 'Medium',
       requirementIds: [],
-      version: selectedVersion !== 'unassigned' ? selectedVersion : '',
+      applicableVersions: selectedVersion !== 'unassigned' ? [selectedVersion] : [], // Initialize with applicableVersions
       tags: [],
       assignee: ''
     });
@@ -843,6 +892,37 @@ const TestCases = () => {
 
     return { total, passed, failed, automated, passRate: total > 0 ? Math.round((passed / total) * 100) : 0 };
   };
+
+  // Available versions for the Edit Test Case Modal's multi-select
+  const availableVersions = useMemo(() => {
+    return versions.map(v => ({ id: v.id, name: v.name }));
+  }, [versions]);
+
+  // Handle version toggle in Edit Test Case Modal (for applicableVersions)
+  const handleVersionToggle = (testCaseId, versionId, isChecked) => {
+    setEditingTestCase(prev => {
+      if (!prev) return null;
+
+      const currentApplicableVersions = Array.isArray(prev.applicableVersions)
+        ? [...prev.applicableVersions]
+        : (prev.version ? [prev.version] : []); // Handle legacy during editing
+
+      let newApplicableVersions;
+      if (isChecked) {
+        newApplicableVersions = [...new Set([...currentApplicableVersions, versionId])];
+      } else {
+        newApplicableVersions = currentApplicableVersions.filter(v => v !== versionId);
+      }
+
+      return {
+        ...prev,
+        applicableVersions: newApplicableVersions,
+        // Ensure 'version' field is removed if 'applicableVersions' is being used
+        ...(prev.hasOwnProperty('version') && { version: undefined })
+      };
+    });
+  };
+
 
   if (!hasTestCases) {
     return (
@@ -1363,6 +1443,8 @@ const TestCases = () => {
               setShowEditModal(false);
               setEditingTestCase(null);
             }}
+            availableVersions={availableVersions} // Pass available versions to the modal
+            onVersionToggle={handleVersionToggle} // Pass the new handler
           />
         )}
       </div>

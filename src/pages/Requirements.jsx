@@ -22,6 +22,53 @@ import { useVersionContext } from '../context/VersionContext';
 import { calculateCoverage } from '../utils/coverage';
 import dataStore from '../services/DataStore';
 
+/**
+ * Helper function to check if a test case applies to a version
+ * @param {Object} testCase - Test case object
+ * @param {string} selectedVersion - Currently selected version
+ * @returns {boolean} True if test case applies to the version
+ */
+const testCaseAppliesTo = (testCase, selectedVersion) => {
+  if (selectedVersion === 'unassigned') return true;
+  
+  // Handle new format
+  if (testCase.applicableVersions) {
+    // Empty array means applies to all versions
+    if (testCase.applicableVersions.length === 0) return true;
+    return testCase.applicableVersions.includes(selectedVersion);
+  }
+  
+  // Handle legacy format during transition
+  return !testCase.version || testCase.version === selectedVersion || testCase.version === '';
+};
+
+/**
+ * Helper function to get version tags for display
+ * @param {Object} testCase - Test case object
+ * @returns {Array} Array of version strings for tag display
+ */
+const getVersionTags = (testCase) => {
+  // Handle new format
+  if (testCase.applicableVersions) {
+    return testCase.applicableVersions.length > 0 
+      ? testCase.applicableVersions 
+      : ['All Versions'];
+  }
+  
+  // Handle legacy format
+  return testCase.version ? [testCase.version] : ['All Versions'];
+};
+
+/**
+ * Helper function to get display text for test case versions
+ * @param {Object} testCase - Test case object
+ * @returns {string} Display text for versions
+ */
+const getVersionDisplayText = (testCase) => {
+  const tags = getVersionTags(testCase);
+  return tags.length > 3 ? `${tags.length} versions` : tags.join(', ');
+};
+
 const Requirements = () => {
   // State to hold the data from DataStore
   const [requirements, setRequirements] = useState([]);
@@ -64,7 +111,9 @@ const Requirements = () => {
     if (selectedVersion === 'unassigned') {
       return calculateCoverage(requirements, mapping, testCases);
     } else {
-      return calculateCoverage(requirements, mapping, testCases, selectedVersion);
+      // Pass filtered test cases to calculateCoverage
+      const filteredTests = testCases.filter(tc => testCaseAppliesTo(tc, selectedVersion));
+      return calculateCoverage(requirements, mapping, filteredTests);
     }
   }, [requirements, mapping, testCases, selectedVersion]);
 
@@ -423,14 +472,13 @@ const Requirements = () => {
                   // Find corresponding coverage data
                   const coverage = versionCoverage.find(c => c.reqId === req.id);
                   
-                  // Filter linked test cases based on selected version
-                  const allLinkedTests = mapping[req.id] || [];
-                  const linkedTestCount = selectedVersion === 'unassigned'
-                    ? allLinkedTests.length
-                    : allLinkedTests.filter(tcId => {
-                        const tc = testCases.find(t => t.id === tcId);
-                        return tc && (!tc.version || tc.version === selectedVersion || tc.version === '');
-                      }).length;
+                  // Change 2: Get linked test cases for this requirement using new format
+                  const linkedTests = (mapping[req.id] || [])
+                    .map(tcId => testCases.find(tc => tc.id === tcId))
+                    .filter(Boolean)
+                    .filter(tc => testCaseAppliesTo(tc, selectedVersion));
+
+                  const linkedTestCount = linkedTests.length;
 
                   const isExpanded = expandedRows.has(req.id);
                   
@@ -738,15 +786,25 @@ const Requirements = () => {
                                           </div>
                                           <div className="text-sm text-gray-500">Required Test Cases</div>
                                         </div>
-                                        <div className="bg-blue-50 rounded-lg p-3 text-center">
-                                          <div className="text-xs text-blue-700 font-medium">
-                                            Coverage Status: {linkedTestCount} / {req.minTestCases}
-                                          </div>
-                                          <div className="w-full bg-blue-200 rounded-full h-2 mt-2">
-                                            <div 
-                                              className="bg-blue-600 h-2 rounded-full" 
-                                              style={{width: `${Math.min(100, (linkedTestCount / req.minTestCases) * 100)}%`}}
-                                            ></div>
+                                        {/* Change 5: Enhanced Test Coverage Summary */}
+                                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                                          <h4 className="font-semibold text-blue-800 mb-2">Test Coverage</h4>
+                                          <div className="space-y-2">
+                                            <div className="text-sm text-blue-700">
+                                              This requirement has {linkedTestCount} associated test case{linkedTestCount !== 1 ? 's' : ''}
+                                              {selectedVersion !== 'unassigned' && (
+                                                <span className="font-medium"> for {selectedVersion}</span>
+                                              )}
+                                            </div>
+                                            {linkedTests.length > 0 && (
+                                              <div className="text-xs text-blue-600">
+                                                Status breakdown: {' '}
+                                                {['Passed', 'Failed', 'Not Run', 'Blocked'].map(status => {
+                                                  const count = linkedTests.filter(tc => tc.status === status).length;
+                                                  return count > 0 ? `${count} ${status}` : null;
+                                                }).filter(Boolean).join(', ')}
+                                              </div>
+                                            )}
                                           </div>
                                         </div>
                                       </div>
@@ -789,22 +847,35 @@ const Requirements = () => {
                                       </div>
                                     )}
 
-                                    {/* Linked Test Cases */}
+                                    {/* Change 1: Linked Test Cases with Enhanced Version Display */}
                                     {linkedTestCount > 0 && (
                                       <div className="bg-white rounded-lg p-4 shadow-sm border">
                                         <h4 className="font-semibold text-gray-900 mb-3">Linked Test Cases</h4>
                                         <div className="space-y-2">
-                                          <div className="text-sm text-gray-600">
-                                            {linkedTestCount} test case{linkedTestCount !== 1 ? 's' : ''} linked
-                                          </div>
-                                          <div className="bg-gray-50 rounded p-2">
-                                            <div className="flex items-center justify-between text-xs">
-                                              <span>Coverage Progress</span>
-                                              <span className="font-medium">
-                                                {Math.round((linkedTestCount / req.minTestCases) * 100)}%
-                                              </span>
+                                          {linkedTests.map(tc => (
+                                            <div key={tc.id} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                                              <div className="flex-1">
+                                                <span className="text-sm font-medium">{tc.name}</span>
+                                                <div className="flex items-center mt-1 space-x-2">
+                                                  <span className="text-xs text-gray-500">Status: {tc.status}</span>
+                                                  <div className="flex flex-wrap gap-1">
+                                                    {getVersionTags(tc).map((version, index) => (
+                                                      <span 
+                                                        key={index} 
+                                                        className={`px-2 py-0.5 rounded text-xs font-medium ${
+                                                          version === 'All Versions' 
+                                                            ? 'bg-green-100 text-green-700' 
+                                                            : 'bg-blue-100 text-blue-700'
+                                                        }`}
+                                                      >
+                                                        {version}
+                                                      </span>
+                                                    ))}
+                                                  </div>
+                                                </div>
+                                              </div>
                                             </div>
-                                          </div>
+                                          ))}
                                         </div>
                                       </div>
                                     )}

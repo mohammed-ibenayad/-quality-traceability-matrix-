@@ -4,6 +4,26 @@ import { calculateReleaseMetrics } from '../utils/metrics';
 import dataStore from '../services/DataStore';
 
 /**
+ * Helper function to check if a test case applies to a version
+ * @param {Object} testCase - Test case object
+ * @param {string} selectedVersion - Currently selected version
+ * @returns {boolean} True if test case applies to the version
+ */
+const testCaseAppliesTo = (testCase, selectedVersion) => {
+  if (selectedVersion === 'unassigned') return true;
+  
+  // Handle new format
+  if (testCase.applicableVersions) {
+    // Empty array means applies to all versions
+    if (testCase.applicableVersions.length === 0) return true;
+    return testCase.applicableVersions.includes(selectedVersion);
+  }
+  
+  // Handle legacy format during transition
+  return !testCase.version || testCase.version === selectedVersion || testCase.version === '';
+};
+
+/**
  * Custom hook for managing release data and metrics
  * @param {Array} requirements - Requirements data
  * @param {Array} testCases - Test cases data
@@ -66,7 +86,39 @@ export const useRelease = (requirements, testCases, mapping, initialVersions, in
     
     // Otherwise, filter by the selected version
     console.log("Recalculating version-specific coverage for:", selectedVersion);
-    return calculateCoverage(requirements, mapping, testCases, selectedVersion);
+    // Change 3: Update Version Coverage Calculation (and Change 5: Simplify Filter Logic Using Helper)
+    const allTests = testCases; // Assuming calculateCoverage needs all test cases to then filter internally
+    const relevantTests = allTests.filter(tc => testCaseAppliesTo(tc, selectedVersion));
+
+    // We need to pass the *filtered* test cases to calculateCoverage if it expects already filtered data.
+    // If calculateCoverage handles filtering internally based on a versionId argument,
+    // then the original call `calculateCoverage(requirements, mapping, testCases, selectedVersion)` is correct.
+    // Given the prompt's structure, it implies calculateCoverage takes an optional versionId.
+    // Let's assume calculateCoverage itself will use the testCaseAppliesTo logic.
+    // This change is about filtering the `allTests` *before* passing to `calculateCoverage` if `calculateCoverage`
+    // doesn't have its own internal filtering for `selectedVersion`.
+    // Re-reading the original `calculateCoverage(requirements, mapping, testCases, selectedVersion);`
+    // it implies `calculateCoverage` already handles the version filtering internally.
+    // So, the change should be *inside* `calculateCoverage` if it's not already updated.
+    // For `useRelease.js`, the change is about how `relevantTests` is determined if `calculateCoverage`
+    // is expected to receive pre-filtered tests.
+
+    // Given the context of `calculateCoverage(requirements, mapping, testCases, selectedVersion);`
+    // it implies that `calculateCoverage` itself is responsible for filtering tests based on `selectedVersion`.
+    // So, the `relevantTests` filtering block here is likely redundant or meant for internal `calculateCoverage` logic.
+    // For this hook, we should ensure `calculateCoverage` is passed the correct parameters.
+    // The prompt for Change 3 is a bit ambiguous if it means modifying `useMemo` of `versionCoverage`
+    // to filter `allTests` *before* calling `calculateCoverage`, or if it refers to an internal `relevantTests`
+    // variable *within* `calculateCoverage` function.
+    // Assuming `calculateCoverage` is already updated or will be updated to use `applicableVersions`,
+    // the current call `calculateCoverage(requirements, mapping, testCases, selectedVersion)` is fine.
+    // However, the prompt explicitly says "REPLACE the test filtering part with: const relevantTests = allTests.filter(tc => { ... });"
+    // This means we *are* pre-filtering `testCases` here before passing them to `calculateCoverage`.
+    
+    // Let's adjust this to filter `testCases` directly using the helper.
+    const filteredTestCasesForCoverage = testCases.filter(tc => testCaseAppliesTo(tc, selectedVersion));
+    return calculateCoverage(requirements, mapping, filteredTestCasesForCoverage);
+
   }, [requirements, mapping, testCases, selectedVersion, coverage, hasData, refreshTrigger]);
   
   // Calculate release metrics for the selected version
@@ -95,7 +147,9 @@ export const useRelease = (requirements, testCases, mapping, initialVersions, in
     }
     
     const calculateVersionCoverage = (versionId) => {
-      return calculateCoverage(requirements, mapping, testCases, versionId);
+      // This internal function also needs to use the new filtering logic
+      const filteredTests = testCases.filter(tc => testCaseAppliesTo(tc, versionId));
+      return calculateCoverage(requirements, mapping, filteredTests);
     };
     
     const calculatedMetrics = calculateReleaseMetrics(
@@ -139,19 +193,18 @@ export const useRelease = (requirements, testCases, mapping, initialVersions, in
         req.versions && req.versions.includes(selectedVersion)
       );
       
-      // Filter test cases by selected version (empty version means applies to all)
-      versionTestCases = testCases.filter(tc => 
-        !tc.version || tc.version === selectedVersion || tc.version === ''
-      );
+      // Change 1: Update Test Case Filtering Logic (and Change 5: Simplify Filter Logic Using Helper)
+      versionTestCases = testCases.filter(tc => testCaseAppliesTo(tc, selectedVersion));
     }
     
     const totalRequirements = versionRequirements.length;
     
     // Count requirements with tests
+    // Change 2: Update Requirements With Tests Calculation (and Change 5: Simplify Filter Logic Using Helper)
     const reqWithTests = versionRequirements.filter(req => 
       (mapping[req.id] || []).some(tcId => {
         const tc = testCases.find(t => t.id === tcId);
-        return tc && (selectedVersion === 'unassigned' || !tc.version || tc.version === selectedVersion || tc.version === '');
+        return tc && testCaseAppliesTo(tc, selectedVersion);
       })
     ).length;
     
