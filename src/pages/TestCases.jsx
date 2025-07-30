@@ -84,15 +84,7 @@ const TestCaseRow = ({
                   {testCase.name}
                 </div>
               )}
-              {/* Show description only if it's different from both ID and name */}
-              {testCase.description &&
-               testCase.description !== testCase.id &&
-               testCase.description !== testCase.name && (
-                <div className="text-xs text-gray-500 truncate">
-                  {testCase.description.substring(0, 50)}
-                  {testCase.description.length > 50 && '...'}
-                </div>
-              )}
+              
             </div>
           </div>
         </td>
