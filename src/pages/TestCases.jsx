@@ -21,6 +21,8 @@ import {
   ChevronRight,
   ChevronUp,
   AlertTriangle,
+  FileText,
+  Code,
   Copy // NEW: Copy icon for duplicate action
 } from 'lucide-react';
 import MainLayout from '../components/Layout/MainLayout';
@@ -248,13 +250,281 @@ const TestCaseRow = ({
       </tr>
 
       {/* Expanded Failure Details Row */}
-      {isFailureExpanded && (testCase.status === 'Failed' || testCase.status === 'Not Found') && (
-        <tr className={`flex w-full ${testCase.status === 'Failed' ? 'bg-red-50 border-l-4 border-red-400' : 'bg-orange-50 border-l-4 border-orange-400'}`}>
-          <td colSpan="8" className="p-4 w-full"> {/* colSpan changed to 8 */}
-            <FailureDetailsPanel testCase={testCase} />
-          </td>
-        </tr>
-      )}
+{/* Expanded Failure Details Row */}
+{isFailureExpanded && (testCase.status === 'Failed' || testCase.status === 'Not Found') && (
+  <tr className={`flex w-full`}>
+    <td colSpan="8" className="p-0 w-full">
+      <div className={`${
+        testCase.status === 'Failed' 
+          ? 'bg-gradient-to-r from-red-50 to-gray-50 border-l-4 border-red-400' 
+          : 'bg-gradient-to-r from-orange-50 to-gray-50 border-l-4 border-orange-400'
+      }`}>
+        <div className="p-6">
+          {/* Header Section */}
+          <div className="flex items-center justify-between mb-6 pb-4 border-b border-gray-200">
+            <div className="flex items-center space-x-3">
+              <div className={`w-2 h-2 rounded-full ${
+                testCase.status === 'Failed' ? 'bg-red-500' : 'bg-orange-500'
+              }`}></div>
+              <h3 className="text-lg font-semibold text-gray-900">
+                {testCase.status === 'Failed' ? 'Failure Details' : 'Issue Details'}
+              </h3>
+            </div>
+            <div className="flex items-center space-x-2">
+              <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                testCase.status === 'Failed' ? 'bg-red-100 text-red-800' : 'bg-orange-100 text-orange-800'
+              }`}>
+                {testCase.status}
+              </span>
+            </div>
+          </div>
+
+          {/* Error Summary - Compact Horizontal */}
+          <div className="mb-6">
+            <div className="bg-white rounded-lg p-4 shadow-sm border">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center">
+                  <div className={`w-1 h-6 rounded mr-3 ${
+                    testCase.status === 'Failed' ? 'bg-red-500' : 'bg-orange-500'
+                  }`}></div>
+                  <h4 className="font-semibold text-gray-900">Error Summary</h4>
+                </div>
+                <button 
+                  onClick={() => navigator.clipboard.writeText(
+                    `${(testCase.failure && testCase.failure.type) || 'Test Failure'}: ${(testCase.failure && testCase.failure.message) || 'Test execution failed'}`
+                  )}
+                  className="text-xs text-gray-500 hover:text-gray-700 px-2 py-1 rounded hover:bg-gray-100"
+                  title="Copy error message"
+                >
+                  📋 Copy
+                </button>
+              </div>
+              <div className="flex items-start space-x-4">
+                <div className="flex-1">
+                  <div className="flex items-center space-x-2 mb-2 flex-wrap">
+                    <div className={`font-medium ${testCase.status === 'Failed' ? 'text-red-800' : 'text-orange-800'}`}>
+                      {(testCase.failure && testCase.failure.type) || 
+                       (testCase.status === 'Not Found' ? 'Test result not found in artifacts' : 'Test Failure')}
+                    </div>
+                    {/* Assertion Type Badge - Prominently displayed */}
+                    {testCase.failure?.assertionType && (
+                      <span className="text-xs bg-red-100 text-red-800 px-2 py-1 rounded font-mono">
+                        {testCase.failure.assertionType}
+                      </span>
+                    )}
+                    {(() => {
+                      const errorType = testCase.failure?.type || '';
+                      if (errorType.includes('Timeout') || errorType.includes('timeout')) {
+                        return <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">⏱️ Timing Issue</span>
+                      } else if (errorType.includes('Element') || errorType.includes('element')) {
+                        return <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">🎯 Element Issue</span>
+                      } else if (errorType.includes('Assert') || errorType.includes('assert')) {
+                        return <span className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded">⚖️ Assertion</span>
+                      } else if (errorType.includes('Connection') || errorType.includes('Network')) {
+                        return <span className="text-xs bg-orange-100 text-orange-800 px-2 py-1 rounded">🌐 Network</span>
+                      }
+                      return null;
+                    })()}
+                  </div>
+                  <div className={`${testCase.status === 'Failed' ? 'text-red-700' : 'text-orange-700'} break-words leading-relaxed text-sm`}>
+                    {(testCase.failure && testCase.failure.message) || 
+                     (testCase.status === 'Not Found' ? 'Test result not found in artifacts' : 'Test execution failed')}
+                  </div>
+                </div>
+                {testCase.failure?.parsingSource && (
+                  <div className="flex flex-col space-y-1">
+                    <span className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded">
+                      {testCase.failure.parsingSource}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Stack Trace - Full Width */}
+          {testCase.failure?.stackTrace && (
+            <div className="mb-6">
+              <div className="bg-white rounded-lg p-4 shadow-sm border">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center">
+                    <div className="w-1 h-6 bg-gray-500 rounded mr-3"></div>
+                    <h4 className="font-semibold text-gray-900">Stack Trace</h4>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-xs text-gray-500">
+                      {testCase.failure.stackTrace.split('\n').length} lines
+                    </span>
+                    <button 
+                      onClick={() => navigator.clipboard.writeText(testCase.failure.stackTrace)}
+                      className="text-xs text-gray-500 hover:text-gray-700 px-2 py-1 rounded hover:bg-gray-100"
+                      title="Copy stack trace"
+                    >
+                      📋 Copy
+                    </button>
+                  </div>
+                </div>
+                <div className="relative">
+                  <div className="bg-gray-900 text-green-400 p-4 rounded font-mono text-xs overflow-auto h-80 border">
+                    <pre className="whitespace-pre-wrap">
+                      {testCase.failure.stackTrace.split('\n').map((line, index) => (
+                        <div 
+                          key={index} 
+                          className={`${
+                            line.includes('at ') && (line.includes('.spec.') || line.includes('.test.') || line.includes(testCase.name)) 
+                              ? 'bg-red-900 bg-opacity-50 text-red-300' 
+                              : ''
+                          }`}
+                        >
+                          {line}
+                        </div>
+                      ))}
+                    </pre>
+                  </div>
+                  <div className="absolute bottom-3 left-3 text-xs text-gray-400 bg-gray-800 bg-opacity-75 px-2 py-1 rounded">
+                    <span className="inline-block w-3 h-3 bg-red-900 bg-opacity-50 rounded mr-1"></span>
+                    Test-related frames highlighted
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Assertion Details - Full Width */}
+          {testCase.failure?.assertion?.available && (
+            <div className="mb-6">
+              <div className="bg-white rounded-lg p-4 shadow-sm border">
+                <div className="flex items-center mb-3">
+                  <div className="w-1 h-6 bg-purple-500 rounded mr-3"></div>
+                  <h4 className="font-semibold text-gray-900">Assertion Details</h4>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <span className="text-xs font-medium text-green-700">Expected:</span>
+                    <div className="font-mono bg-green-50 p-3 rounded mt-1 border border-green-200 break-all text-sm">
+                      {testCase.failure.assertion.expected || 'N/A'}
+                    </div>
+                  </div>
+                  <div>
+                    <span className="text-xs font-medium text-red-700">Actual:</span>
+                    <div className="font-mono bg-red-50 p-3 rounded mt-1 border border-red-200 break-all text-sm">
+                      {testCase.failure.assertion.actual || 'N/A'}
+                    </div>
+                  </div>
+                </div>
+                {testCase.failure.assertion.operator && (
+                  <div className="mt-3 pt-3 border-t border-gray-100">
+                    <span className="text-sm font-medium text-gray-600">Operator:</span>
+                    <span className="text-sm ml-2 font-mono">{testCase.failure.assertion.operator}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Bottom Row - Technical Details */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="bg-white rounded-lg p-4 shadow-sm border">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center">
+                  <div className="w-1 h-6 bg-blue-500 rounded mr-3"></div>
+                  <h4 className="font-semibold text-gray-900">Technical Details</h4>
+                </div>
+                {(testCase.failure?.location?.display || testCase.failure?.file || testCase.file) && (
+                  <button 
+                    onClick={() => navigator.clipboard.writeText(
+                      testCase.failure?.location?.display || testCase.failure?.file || testCase.file || ''
+                    )}
+                    className="text-xs text-blue-600 hover:text-blue-800 px-2 py-1 rounded hover:bg-blue-50"
+                    title="Copy file path"
+                  >
+                    📂 Copy Path
+                  </button>
+                )}
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <div className="flex items-center space-x-1 text-xs font-medium text-gray-600">
+                    <FileText size={12} />
+                    <span>{testCase.failure?.location ? 'Error Location' : 'File Location'}</span>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="font-mono text-xs text-gray-800 break-all bg-blue-50 px-2 py-1 rounded">
+                      {testCase.failure?.location 
+                        ? testCase.failure.location.display 
+                        : (testCase.failure?.file || testCase.file || 'N/A')
+                      }
+                    </div>
+                    {testCase.failure?.location && (
+                      <div className="text-xs text-red-600 font-medium">
+                        ➤ Line {testCase.failure.location.line}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <div className="flex items-center space-x-1 text-xs font-medium text-gray-600">
+                    <Code size={12} />
+                    <span>Method</span>
+                  </div>
+                  <div className="font-mono text-xs text-gray-800 break-all">
+                    {testCase.failure?.method || testCase.method || testCase.name}
+                  </div>
+                  {(testCase.failure?.classname || testCase.classname) && (
+                    <div className="text-xs text-gray-500 break-all">
+                      Class: {testCase.failure.classname || testCase.classname}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-lg p-4 shadow-sm border">
+              <div className="flex items-center mb-3">
+                <div className="w-1 h-6 bg-indigo-500 rounded mr-3"></div>
+                <h4 className="font-semibold text-gray-900">Execution Context</h4>
+              </div>
+              <div className="space-y-3">
+                <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                  <span className="text-sm text-gray-600">Framework</span>
+                  <div className="text-right">
+                    <div className="text-sm font-medium text-gray-900">
+                      {testCase.execution?.framework?.name || 'Unknown'}
+                    </div>
+                    {testCase.execution?.framework?.version && (
+                      <div className="text-xs text-gray-500">v{testCase.execution.framework.version}</div>
+                    )}
+                  </div>
+                </div>
+                <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                  <span className="text-sm text-gray-600">Duration</span>
+                  <span className="text-sm font-medium text-gray-900">
+                    {testCase.duration ? `${testCase.duration}ms` : 'N/A'}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center py-2">
+                  <span className="text-sm text-gray-600">Executed At</span>
+                  <span className="text-sm font-medium text-gray-900">
+                    {testCase.lastExecuted ? new Date(testCase.lastExecuted).toLocaleString() : 'N/A'}
+                  </span>
+                </div>
+                {testCase.execution?.parsingSource && (
+                  <div className="pt-2 border-t border-gray-100">
+                    <span className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded inline-block">
+                      {testCase.execution.parsingSource}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+
+        </div>
+      </div>
+    </td>
+  </tr>
+)}
 
       {/* Expanded Row Content - IMPROVED UI/UX */}
       {isExpanded && (

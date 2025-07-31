@@ -14,7 +14,6 @@ const Releases = () => {
   const [isNewReleaseModalOpen, setIsNewReleaseModalOpen] = useState(false);
   const [isEditVersionModalOpen, setIsEditVersionModalOpen] = useState(false);
   const [editingVersion, setEditingVersion] = useState(null);
-  const [notification, setNotification] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   
   // Use the version context with loading state
@@ -56,21 +55,16 @@ const Releases = () => {
     });
   }, [versions, versionsLoading]);
 
-  // Show notification and auto-hide after 3 seconds
-  const showNotification = (message, type = 'success') => {
-    setNotification({ message, type });
-    setTimeout(() => setNotification(null), 3000);
-  };
-
   // Handler for adding a new version
   const handleAddVersion = (newVersion) => {
     try {
       console.log('Releases: Adding version:', newVersion);
       dataStore.addVersion(newVersion);
-      showNotification(`Version "${newVersion.name}" created successfully!`);
+      // Removed success notification
     } catch (error) {
       console.error("Error adding version:", error);
-      showNotification(error.message, 'error');
+      // You can keep error notifications if needed, or remove this too
+      // showNotification(error.message, 'error');
     }
   };
   
@@ -79,10 +73,11 @@ const Releases = () => {
     try {
       console.log('Releases: Updating version:', versionId, updateData);
       dataStore.updateVersion(versionId, updateData);
-      showNotification('Version updated successfully!');
+      // Removed success notification
     } catch (error) {
       console.error("Error updating version:", error);
-      showNotification(error.message, 'error');
+      // You can keep error notifications if needed, or remove this too
+      // showNotification(error.message, 'error');
     }
   };
 
@@ -105,10 +100,6 @@ const Releases = () => {
       try {
         console.log('Releases: Deleting version:', versionId);
         
-        // Get version name for notification
-        const versionToDelete = versions.find(v => v && v.id === versionId);
-        const versionName = versionToDelete ? versionToDelete.name : versionId;
-        
         dataStore.deleteVersion(versionId);
         
         // If the deleted version was selected, switch to unassigned view
@@ -116,10 +107,11 @@ const Releases = () => {
           setSelectedVersion('unassigned');
         }
         
-        showNotification(`Version "${versionName}" deleted successfully!`);
+        // Removed success notification
       } catch (error) {
         console.error("Error deleting version:", error);
-        showNotification(error.message, 'error');
+        // You can keep error notifications if needed, or remove this too
+        // showNotification(error.message, 'error');
       }
     }
   };
@@ -164,32 +156,6 @@ const Releases = () => {
       {process.env.NODE_ENV === 'development' && (
         <div className="mb-4 p-2 bg-gray-100 rounded text-xs text-gray-600">
           Debug: {versions.length} versions loaded, hasData: {hasData.toString()}
-        </div>
-      )}
-
-      {/* Notification Toast */}
-      {notification && (
-        <div className={`fixed top-4 right-4 z-50 p-4 rounded-md shadow-lg ${
-          notification.type === 'success' ? 'bg-green-100 text-green-800 border border-green-200' : 'bg-red-100 text-red-800 border border-red-200'
-        }`}>
-          <div className="flex">
-            <div className="ml-3">
-              <p className="text-sm font-medium">{notification.message}</p>
-            </div>
-            <div className="ml-auto pl-3">
-              <button
-                onClick={() => setNotification(null)}
-                className={`inline-flex rounded-md p-1.5 ${
-                  notification.type === 'success' ? 'text-green-500 hover:bg-green-200' : 'text-red-500 hover:bg-red-200'
-                } focus:outline-none`}
-              >
-                <span className="sr-only">Dismiss</span>
-                <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                </svg>
-              </button>
-            </div>
-          </div>
         </div>
       )}
 
