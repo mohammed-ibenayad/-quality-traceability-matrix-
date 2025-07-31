@@ -175,6 +175,17 @@ const ImportTestCases = ({ onImportSuccess }) => {
         .map(step => step.trim())
         .filter(step => step.length > 0);
     };
+
+    // 1. ADD REQUIREMENT ID PARSING FUNCTION
+    // Parse requirement IDs from CSV
+    const parseRequirementIds = (reqText) => {
+      if (!reqText) return [];
+      return reqText.toString().split(',')
+        .map(req => req.trim())
+        .filter(req => req.length > 0)
+        .filter(req => /^REQ-\d+$/i.test(req)); // Validate format
+    };
+    
     // Build tags array from multiple TestRail fields
     const buildTags = (row) => {
       const tags = [];
@@ -250,12 +261,20 @@ const generateId = (row) => {
       status: row['Status'] || 'Not Run',
       automationStatus: mapAutomationStatus(row['Automation Candidate'] || row['Is Automated']),
           
+      // 2. UPDATE THE mappedTestCase OBJECT
+      requirementIds: parseRequirementIds(
+        row['Requirement IDs'] || 
+        row['RequirementIDs'] || 
+        row['Requirements'] || 
+        row['Req IDs'] || 
+        ''
+      ),
+          
       // Default values for required Quality Tracker fields
       // Keep version for backward compatibility during CSV import, it will be migrated later by processTestCaseData
       version: (row['Version'] || '').toString(), 
       // Attempt to parse applicableVersions from CSV if present
       applicableVersions: row['Applicable Versions'] ? row['Applicable Versions'].toString().split(',').map(v => v.trim()).filter(Boolean) : undefined,
-      requirementIds: [], // Will be populated separately if needed
       assignee: (row['Created By'] || row['Assigned To'] || '').toString(),
       lastExecuted: '',
       executedBy: '',
@@ -399,54 +418,85 @@ const generateId = (row) => {
         errors.push(`Test case at index ${index} (${tc.id || 'unknown'}): version must be a string`);
       }
     });
-    
+
+    // 3. ADD REQUIREMENT EXISTENCE VALIDATION
+    // NEW: Validate requirement existence if importing with mappings
+    if (importOption === 'withMapping') {
+      const existingRequirements = new Set(dataStore.getRequirements().map(req => req.id));
+      
+      data.forEach((tc, index) => {
+        if (tc.requirementIds && Array.isArray(tc.requirementIds) && tc.requirementIds.length > 0) {
+          tc.requirementIds.forEach(reqId => {
+            if (!existingRequirements.has(reqId)) {
+              errors.push(`Requirement '${reqId}' referenced by test case ${tc.id || `at index ${index}`} does not exist in the system`);
+            }
+          });
+        }
+      });
+    }
+
     return errors;
   };
 
-  // Process the import
+  // 4. UPDATE HANDLE IMPORT TO PROCESS MAPPINGS
   const handleImport = () => {
-    if (!processedData || !validationSuccess) return;
-    
+    if (!processedData || processedData.length === 0) {
+      return;
+    }
+
     try {
-      // Update the DataStore with test cases
-      const updatedTestCases = dataStore.setTestCases(processedData);
+      // FIXED: Get existing test cases and append new ones instead of replacing
+      const existingTestCases = dataStore.getTestCases();
+      const existingIds = new Set(existingTestCases.map(tc => tc.id));
       
-      // If importing with mapping, extract and update mappings
+      // Filter out duplicates (if any exist)
+      const newTestCases = processedData.filter(tc => !existingIds.has(tc.id));
+      
+      // Show warning if there are duplicates being skipped
+      const duplicateCount = processedData.length - newTestCases.length;
+      if (duplicateCount > 0) {
+        const proceed = window.confirm(
+          `${duplicateCount} test case(s) with duplicate IDs will be skipped. ` +
+          `Continue importing ${newTestCases.length} new test cases?`
+        );
+        if (!proceed) return;
+      }
+
+      // FIXED: Combine existing + new test cases instead of replacing
+      const allTestCases = [...existingTestCases, ...newTestCases];
+      
+      // Update the data store with combined data
+      dataStore.setTestCases(allTestCases);
+
+      // NEW: Process requirement mappings if option is selected
       if (importOption === 'withMapping') {
-        const mappings = extractMappings(processedData);
-        
-        // Update the mapping in the DataStore
+        const mappings = extractMappings(newTestCases);
         if (Object.keys(mappings).length > 0) {
+          // FIXED: Use updateMappings instead of setMapping
           dataStore.updateMappings(mappings);
+          console.log('✅ Updated requirement mappings:', mappings);
         }
       }
-      
-      // Notify parent component of successful import
+
+      // Call success handler with only the NEW test cases for reporting
       if (onImportSuccess) {
-        onImportSuccess(updatedTestCases);
+        onImportSuccess(newTestCases);
       }
+
+      // Show success message
+      // alert(`Successfully imported ${newTestCases.length} test cases!`);
       
       // Reset the form
-      resetForm();
-
-      // Change 6: Update Import Success Message
-      const migrationCount = processedData.filter(tc => tc.hasOwnProperty('version') && !tc.applicableVersions).length;
-      const migrationMessage = migrationCount > 0 ? 
-        ` (${migrationCount} test cases migrated from legacy format)` : '';
-
-      // Assuming setImportStatus is a state setter for a message display
-      // This part of the prompt is slightly out of context for this file,
-      // as setImportStatus is not defined here.
-      // If it were, it would look like this:
-      // setImportStatus({
-      //   success: true,
-      //   message: `Successfully imported ${updatedTestCases.length} test cases${migrationMessage}`,
-      // });
-      console.log(`Successfully imported ${updatedTestCases.length} test cases${migrationMessage}`);
+      setFile(null);
+      setProcessedData(null);
+      setValidationSuccess(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
 
     } catch (error) {
-      console.error("Error importing test cases:", error);
-      setValidationErrors([`Error importing data: ${error.message}`]);
+      console.error('Import error:', error);
+      alert('Import failed: ' + error.message);
     }
   };
 
@@ -489,6 +539,226 @@ const generateId = (row) => {
   };
 
   console.log('🎯 Before render - showGitHubImport is:', showGitHubImport);
+
+  // 5. UPDATE CSV TEMPLATE TO INCLUDE REQUIREMENT IDs
+  // Generate simple CSV template with 3 sample test cases
+  const generateCSVTemplate = () => {
+    const csvData = [
+      {
+        'ID': 'TC_001',
+        'Title': 'Login with valid credentials',
+        'Description': 'Verify user can login with valid username and password',
+        'Section': 'Authentication',
+        'Priority': 'High',
+        'Status': 'Not Run',
+        'Automation Candidate': 'Yes',
+        'Test steps': 'Step 1: Navigate to login page\nStep 2: Enter valid username\nStep 3: Enter valid password\nStep 4: Click login button',
+        'Expected Result': 'User should be successfully logged in and redirected to dashboard',
+        'Type': 'Functional',
+        'Preconditions': 'User account must exist in the system',
+        'Applicable Versions': 'v1.0,v1.1,v2.0',
+        'Requirement IDs': 'REQ-001,REQ-002', // NEW: Added requirement mapping
+        'Estimate': '2m'
+      },
+      {
+        'ID': 'TC_002', 
+        'Title': 'Login with invalid credentials',
+        'Description': 'Verify appropriate error message when using invalid credentials',
+        'Section': 'Authentication > Negative Testing',
+        'Priority': 'Medium',
+        'Status': 'Not Run',
+        'Automation Candidate': 'Yes',
+        'Test steps': 'Step 1: Navigate to login page\nStep 2: Enter invalid username\nStep 3: Enter invalid password\nStep 4: Click login button',
+        'Expected Result': 'Error message should be displayed indicating invalid credentials',
+        'Type': 'Negative',
+        'Preconditions': 'Application must be accessible',
+        'Applicable Versions': 'v1.0,v1.1,v2.0',
+        'Requirement IDs': 'REQ-001', // NEW: Added requirement mapping
+        'Estimate': '1m'
+      },
+      {
+        'ID': 'TC_003',
+        'Title': 'Add product to cart',
+        'Description': 'Verify user can add products to shopping cart',
+        'Section': 'E-commerce > Cart Management',
+        'Priority': 'High',
+        'Status': 'Not Run', 
+        'Automation Candidate': 'No',
+        'Test steps': 'Step 1: Browse product catalog\nStep 2: Select a product\nStep 3: Choose quantity\nStep 4: Click add to cart button\nStep 5: Verify cart contents',
+        'Expected Result': 'Product should be added to cart with correct quantity and price',
+        'Type': 'Functional',
+        'Preconditions': 'User must be logged in and products must be available',
+        'Applicable Versions': 'v2.0',
+        'Requirement IDs': 'REQ-003,REQ-004', // NEW: Added requirement mapping
+        'Estimate': '3m'
+      }
+    ];
+
+    // Convert to CSV format
+    const csvHeaders = Object.keys(csvData[0]);
+    const csvRows = csvData.map(row => 
+      csvHeaders.map(header => {
+        const value = row[header];
+        // Escape quotes and wrap in quotes if contains comma, newline, or quote
+        if (typeof value === 'string' && (value.includes(',') || value.includes('\n') || value.includes('"'))) {
+          return `"${value.replace(/"/g, '""')}"`;
+        }
+        return value;
+      }).join(',')
+    );
+    
+    const csvContent = [csvHeaders.join(','), ...csvRows].join('\n');
+    
+    // Create and download file
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', 'sample-testcases.csv');
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // Generate comprehensive CSV template with all possible column variations
+  const generateFullCSVTemplate = () => {
+    const comprehensiveTemplate = [
+      {
+        // ID variations (system tries these in order)
+        'ID': 'TC_001',
+        'TC ID': '',  // Alternative ID column name
+        'Test Case ID': '',  // Alternative ID column name
+        'TestCase ID': '',   // Alternative ID column name  
+        'Case ID': '',       // Alternative ID column name
+        
+        // Name/Title variations
+        'Title': 'Sample Test Case Name',
+        'Test Case': '',     // Alternative name column
+        
+        // Description
+        'Description': 'Detailed description of what this test case validates',
+        
+        // Steps variations  
+        'Test steps': 'Step 1: Action to perform\nStep 2: Another action\nStep 3: Verification step',
+        'Steps': '',         // Alternative steps column
+        'Steps (Text)': '',  // Alternative steps column (your current format)
+        
+        // Expected Result variations
+        'Expected Result': 'Expected outcome after executing all steps',
+        'Expected': '',      // Alternative expected result column
+        
+        // Categorization variations
+        'Section': 'Module > Sub-module',  // Supports hierarchical structure
+        'Module': '',          // Alternative category
+        'Suite': '',           // Alternative category  
+        'Category': '',        // Alternative category
+        
+        // Preconditions variations
+        'Preconditions': 'Prerequisites that must be met before executing this test',
+        'Precondition': '',    // Alternative preconditions
+        'Pre-requisites': '',  // Alternative preconditions
+        
+        // Test Data
+        'Test Data': 'Any specific test data needed for this test case',
+        'TestData': '',      // Alternative test data column
+        
+        // Priority (High/Medium/Low or 1/2/3 or Critical/Major/Minor)
+        'Priority': 'High',
+        
+        // Status (Passed/Failed/Not Run/Blocked/Not Found)
+        'Status': 'Not Run',
+        
+        // Automation variations
+        'Automation Candidate': 'Yes',  // Yes/No
+        'Is Automated': '',             // Alternative automation column
+        'Automation Type': '',          // Alternative (like Ranorex, None)
+        
+        // Versioning (new format preferred)  
+        'Applicable Versions': 'v1.0,v1.1,v2.0',  // Comma-separated list
+        'Version': '',                          // Legacy single version
+        
+        // Additional fields
+        'Type': 'Functional',        // Test type (Functional, Regression, etc.)
+        'Test Level': '',            // Test level classification
+        'Environment': '',           // Test environment
+        'Estimate': '2m',            // Time estimate
+        'Created By': '',            // Test case author
+        'Assigned To': '' ,           // Test case assignee
+        // 6. UPDATE FULL CSV TEMPLATE TO INCLUDE REQUIREMENT ID COLUMNS
+        // Requirement Mapping (add this after the 'Additional fields' section)
+        'Requirement IDs': 'REQ-001,REQ-002,REQ-003',  // Comma-separated requirement IDs
+        'RequirementIDs': '',                          // Alternative column name
+        'Requirements': '',                            // Alternative column name  
+        'Req IDs': ''                                 // Alternative column name
+      }
+    ];
+
+    // Add explanatory comments as additional rows (will be ignored during import)
+    const instructionRows = [
+      {
+        'ID': '# INSTRUCTIONS - DELETE THESE ROWS BEFORE IMPORTING',
+        'Title': 'Only fill the columns you need - empty columns will be ignored',
+        'Description': 'The system supports multiple column name variations for flexibility',
+        'Test steps': 'Multi-line steps are supported using newlines within quotes',
+        'Expected Result': 'This is a template - delete instruction rows before importing',
+        'Section': 'Use > for hierarchical sections like "Module > Sub-module"',
+        'Priority': 'High/Medium/Low or 1/2/3 or Critical/Major/Minor',
+        'Status': 'Passed/Failed/Not Run/Blocked/Not Found',
+        'Automation Candidate': 'Yes/No',
+        'Applicable Versions': 'Comma-separated: v1.0,v1.1,v2.0 (empty = all versions)',
+        'Type': 'Functional/Regression/Acceptance/Negative/etc',
+        'Estimate': 'Time estimates like 30s, 2m, 1h',
+        'Preconditions': 'Prerequisites needed before running this test',
+        // 7. UPDATE INSTRUCTION ROWS IN FULL TEMPLATE
+        'Requirement IDs': 'Comma-separated: REQ-001,REQ-002 (for traceability)',
+      },
+      {
+        'ID': '# COLUMN ALTERNATIVES - DELETE THIS ROW',
+        'Title': 'ID: TC ID, Test Case ID, TestCase ID, Case ID',
+        'Description': 'Title: Test Case',  
+        'Test steps': 'Steps, Steps (Text)',
+        'Expected Result': 'Expected',
+        'Section': 'Module, Suite, Category',
+        'Priority': 'Same values work for all priority columns',
+        'Status': 'Standard test execution statuses',
+        'Automation Candidate': 'Is Automated, Automation Type',  
+        'Applicable Versions': 'Version (for single version)',
+        'Type': 'Test Level, Environment also become tags',
+        'Estimate': 'Duration estimates in human readable format',
+        'Preconditions': 'Precondition, Pre-requisites',
+        // 7. UPDATE INSTRUCTION ROWS IN FULL TEMPLATE
+        'Requirement IDs': 'RequirementIDs, Requirements, Req IDs',
+      }
+    ];
+
+    const allData = [...instructionRows, ...comprehensiveTemplate];
+    
+    // Convert to CSV
+    const headers = Object.keys(allData[0]);
+    const csvRows = allData.map(row => 
+      headers.map(header => {
+        const value = row[header] || '';
+        if (typeof value === 'string' && (value.includes(',') || value.includes('\n') || value.includes('"'))) {
+          return `"${value.replace(/"/g, '""')}"`;
+        }
+        return value;
+      }).join(',')
+    );
+    
+    const csvContent = [headers.join(','), ...csvRows].join('\n');
+    
+    // Download file
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', 'comprehensive-testcases-template.csv');
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   // If showing GitHub import, render that component
   if (showGitHubImport) {
@@ -672,6 +942,10 @@ const generateId = (row) => {
               {importOption === 'withMapping' && (
                 <p className="mt-1">
                   {Object.keys(extractMappings(processedData)).length} requirements will be mapped
+                  {/* 8. ADD IMPORT OPTION VALIDATION MESSAGE */}
+                  {Object.keys(extractMappings(processedData)).length === 0 && 
+                    <span className="text-yellow-600"> (No requirement IDs found in test cases)</span>
+                  }
                 </p>
               )}
               <details className="mt-2">
@@ -706,7 +980,7 @@ const generateId = (row) => {
         </div>
       )}
 
-      {/* Enhanced Sample File Section with JSON and CSV downloads */}
+      {/* REPLACED Enhanced Sample File Section with new content */}
       <div className="mb-4 text-sm bg-gray-50 p-3 rounded border border-gray-200">
         <p className="font-medium mb-1">Need a sample file?</p>
         <div className="flex items-center justify-between">
@@ -721,23 +995,35 @@ const generateId = (row) => {
               </svg>
               JSON Sample
             </a>
-            <a 
-              href="/sample-testcases.csv" 
-              download 
+            <button
+              onClick={generateCSVTemplate}
               className="text-blue-600 hover:underline flex items-center"
             >
               <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
                 <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd"></path>
               </svg>
               CSV Sample
-            </a>
+            </button>
           </div>
-          <button
-            className="px-2 py-1 bg-gray-200 text-gray-700 rounded text-xs hover:bg-gray-300"
-            onClick={() => window.loadSampleData && window.loadSampleData()}
-          >
-            Load Sample Data
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={generateFullCSVTemplate}
+              className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs hover:bg-blue-200"
+              title="Download comprehensive template with all possible column variations and instructions"
+            >
+              Full Template
+            </button>
+            <button
+              className="px-2 py-1 bg-gray-200 text-gray-700 rounded text-xs hover:bg-gray-300"
+              onClick={() => window.loadSampleData && window.loadSampleData()}
+            >
+              Load Sample Data
+            </button>
+          </div>
+        </div>
+        <div className="mt-2 text-xs text-gray-600">
+          <p><strong>CSV Sample:</strong> 3 realistic test cases ready to import</p>
+          <p><strong>Full Template:</strong> Shows all supported column variations with instructions</p>
         </div>
       </div>
       
