@@ -57,7 +57,7 @@ function convertRequirements() {
         usageFrequency: req.usageFrequency || 3,
         testDepthFactor: parseFloat(tdf.toFixed(1)),
         minTestCases: minTestCases,
-        versions: req.versions || ['v1.0'],
+        versions: req.versions || ['sample-v1.0'],
         status: req.status || 'Active',
         owner: req.owner,
         tags: req.tags || []
@@ -90,101 +90,25 @@ function convertTestCases() {
     const cleanedJson = removeComments(publicFile);
     const testCases = JSON.parse(cleanedJson);
     
-    // Change 1: Update Test Case Conversion Function
+    // Convert test cases - they already have the new applicableVersions format
     const convertedTestCases = testCases.map(tc => {
       const converted = { ...tc };
       
-      // Convert version field to applicableVersions
-      if (tc.version !== undefined) {
-        if (tc.version && tc.version !== '') {
-          // Single version becomes array
-          converted.applicableVersions = [tc.version];
-        } else {
-          // Empty/null version becomes empty array (applies to all)
-          converted.applicableVersions = [];
-        }
-        // Remove old version field
-        delete converted.version;
-      } else if (!tc.applicableVersions) {
-        // No version info means applies to all versions
-        converted.applicableVersions = [];
-      }
-      
       // Ensure applicableVersions is always an array
       if (!Array.isArray(converted.applicableVersions)) {
-        converted.applicableVersions = converted.applicableVersions ? [converted.applicableVersions] : [];
+        converted.applicableVersions = converted.applicableVersions ? [converted.applicableVersions] : ['sample-v1.0'];
+      }
+      
+      // If applicableVersions is empty, set to sample version
+      if (converted.applicableVersions.length === 0) {
+        converted.applicableVersions = ['sample-v1.0'];
       }
       
       return converted;
     });
 
-    // Change 2: Add Strategic Version Assignment Logic
-    const enhancedTestCases = convertedTestCases.map(tc => {
-      const enhanced = { ...tc };
-      
-      // Strategic version assignment based on test case characteristics
-      if (tc.id) {
-        // Core login/authentication tests - apply to multiple versions
-        if (tc.name && (tc.name.toLowerCase().includes('login') || 
-                       tc.name.toLowerCase().includes('auth') ||
-                       tc.name.toLowerCase().includes('user login') ||
-                       tc.name.toLowerCase().includes('customer registration'))) {
-          enhanced.applicableVersions = ['v1.0', 'v1.1', 'v2.0'];
-        }
-        
-        // Performance tests - apply to all versions (empty array)
-        else if (tc.name && tc.name.toLowerCase().includes('performance')) {
-          enhanced.applicableVersions = [];
-        }
-        
-        // New feature tests - apply to newer versions only
-        else if (tc.name && (tc.name.toLowerCase().includes('two-factor') ||
-                           tc.name.toLowerCase().includes('2fa') ||
-                           tc.name.toLowerCase().includes('advanced'))) {
-          enhanced.applicableVersions = ['v1.1', 'v2.0'];
-        }
-        
-        // API tests - version specific (example, adjust based on actual data)
-        else if (tc.name && tc.name.toLowerCase().includes('api')) {
-          // API v1 tests
-          if (tc.name.toLowerCase().includes('v1')) {
-            enhanced.applicableVersions = ['v1.0', 'v1.1'];
-          }
-          // API v2 tests
-          else if (tc.name.toLowerCase().includes('v2')) {
-            enhanced.applicableVersions = ['v2.0'];
-          }
-          // General API tests
-          else {
-            enhanced.applicableVersions = ['v1.0', 'v1.1', 'v2.0'];
-          }
-        }
-        
-        // Legacy feature tests - older versions only
-        else if (tc.name && tc.name.toLowerCase().includes('legacy')) {
-          enhanced.applicableVersions = ['v1.0'];
-        }
-        
-        // If no specific assignment and it had a version, keep that version
-        else if (enhanced.applicableVersions.length === 0 && tc.hasOwnProperty('version')) {
-          if (tc.version && tc.version !== '') {
-            enhanced.applicableVersions = [tc.version];
-          } else {
-            enhanced.applicableVersions = []; // Explicitly set to empty array if legacy was empty
-          }
-        }
-      }
-      
-      // Ensure applicableVersions is always an array, even if not explicitly assigned above
-      if (!Array.isArray(enhanced.applicableVersions)) {
-          enhanced.applicableVersions = [];
-      }
-
-      return enhanced;
-    });
-    
-    // Change 5: Add Validation Function and use it
-    const validationResult = validatePhase1Conversion(enhancedTestCases);
+    // Validate the conversion
+    const validationResult = validateSampleConversion(convertedTestCases);
 
     if (!validationResult.valid) {
       console.error('❌ Validation failed:');
@@ -197,54 +121,34 @@ function convertTestCases() {
       validationResult.warnings.forEach(warning => console.warn(`   ${warning}`));
     }
 
-    console.log('✅ Phase 1 conversion validation passed:');
-    console.log(`   📊 ${validationResult.stats.hasApplicableVersions}/${validationResult.stats.totalTests} test cases use new format`);
-    console.log(`   🌐 ${validationResult.stats.universalTests} universal test cases (all versions)`);
-    console.log(`   🔄 ${validationResult.stats.multiVersionTests} multi-version test cases`);
+    console.log('✅ Sample data conversion validation passed:');
+    console.log(`   📊 ${validationResult.stats.totalTests} test cases processed`);
+    console.log(`   🏷️ ${validationResult.stats.sampleIdentified} clearly marked as sample data`);
 
     // Generate the JS module file
     const output = `// src/data/testcases.js
-// Generated from public/sample-testcases.jsonc with applicableVersions format
-const testCases = ${JSON.stringify(enhancedTestCases, null, 2)};
+// Generated from public/sample-testcases.jsonc - SAMPLE DATA
+const testCases = ${JSON.stringify(convertedTestCases, null, 2)};
 
 export default testCases;`;
     
     // Write to src/data/testcases.js
     fs.writeFileSync('src/data/testcases.js', output);
-    console.log('✅ Successfully converted test cases to src/data/testcases.js with applicableVersions format');
-    console.log(`📊 Processed ${enhancedTestCases.length} test cases`);
+    console.log('✅ Successfully converted test cases to src/data/testcases.js');
     
-    // Log version distribution for verification
-    const versionStats = {};
-    enhancedTestCases.forEach(tc => {
-      if (tc.applicableVersions.length === 0) {
-        versionStats['All Versions'] = (versionStats['All Versions'] || 0) + 1;
-      } else {
-        tc.applicableVersions.forEach(version => {
-          versionStats[version] = (versionStats[version] || 0) + 1;
-        });
-      }
-    });
-    
-    console.log('📈 Version distribution:');
-    Object.entries(versionStats).forEach(([version, count]) => {
-      console.log(`   ${version}: ${count} test cases`);
-    });
-    
-    return enhancedTestCases;
+    return convertedTestCases;
   } catch (error) {
     console.error('❌ Error converting test cases:', error.message);
     throw error;
   }
 }
 
-// Change 3: Update generateMapping Function
-// Generate mapping from test cases with requirementIds and version validation
+// Generate mapping from test cases with requirementIds
 function generateMapping(testCases) {
   const mapping = {};
   const mappingStats = {
     totalMappings: 0,
-    versionCoverage: {}
+    sampleMappings: 0
   };
   
   testCases.forEach(tc => {
@@ -257,17 +161,10 @@ function generateMapping(testCases) {
           mapping[reqId].push(tc.id);
           mappingStats.totalMappings++;
           
-          // Track version coverage for this mapping
-          const versions = tc.applicableVersions && tc.applicableVersions.length > 0 
-            ? tc.applicableVersions 
-            : ['All Versions']; // If applicableVersions is empty, it applies to 'All Versions'
-          
-          versions.forEach(version => {
-            if (!mappingStats.versionCoverage[version]) {
-              mappingStats.versionCoverage[version] = new Set();
-            }
-            mappingStats.versionCoverage[version].add(reqId);
-          });
+          // Count sample mappings
+          if (reqId.includes('SAMPLE') || tc.id.includes('SAMPLE')) {
+            mappingStats.sampleMappings++;
+          }
         }
       });
     }
@@ -275,7 +172,7 @@ function generateMapping(testCases) {
   
   // Generate the JS module file
   const output = `// src/data/mapping.js
-// Generated from test case requirementIds in public/sample-testcases.jsonc
+// Generated from test case requirementIds - SAMPLE DATA
 const mapping = ${JSON.stringify(mapping, null, 2)};
 
 export default mapping;`;
@@ -284,22 +181,17 @@ export default mapping;`;
   fs.writeFileSync('src/data/mapping.js', output);
   console.log('✅ Successfully generated mapping to src/data/mapping.js');
   console.log(`🔗 Generated ${mappingStats.totalMappings} requirement-test mappings`);
-  
-  // Log version coverage
-  console.log('📋 Requirements coverage by version:');
-  Object.entries(mappingStats.versionCoverage).forEach(([version, reqSet]) => {
-    console.log(`   ${version}: ${reqSet.size} requirements covered`);
-  });
+  console.log(`🏷️ ${mappingStats.sampleMappings} sample data mappings identified`);
   
   return mapping;
 }
 
-// Generate enhanced versions data
+// Generate single sample version
 function generateVersions() {
   const versions = [
     { 
-      id: 'v1.0', 
-      name: 'Version 1.0', 
+      id: 'sample-v1.0', 
+      name: '[SAMPLE] Demo Version 1.0', 
       releaseDate: '2024-08-15', 
       status: 'Released',
       qualityGates: [
@@ -307,92 +199,58 @@ function generateVersions() {
         { id: 'test_pass_rate', name: 'Test Pass Rate', target: 75, actual: 0, status: 'passed' },
         { id: 'overall_req_coverage', name: 'Overall Requirements Coverage', target: 50, actual: 0, status: 'passed' }
       ]
-    },
-    { 
-      id: 'v1.1', 
-      name: 'Version 1.1', 
-      releaseDate: '2024-12-01', 
-      status: 'Planned',
-      qualityGates: [
-        { id: 'critical_req_coverage', name: 'Critical Requirements Test Coverage', target: 80, actual: 0, status: 'failed' },
-        { id: 'test_pass_rate', name: 'Test Pass Rate', target: 85, actual: 0, status: 'failed' },
-        { id: 'overall_req_coverage', name: 'Overall Requirements Coverage', target: 70, actual: 0, status: 'failed' }
-      ]
-    },
-    { 
-      id: 'v2.0', 
-      name: 'Version 2.0', 
-      releaseDate: '2025-03-15', 
-      status: 'Planned',
-      qualityGates: [
-        { id: 'critical_req_coverage', name: 'Critical Requirements Test Coverage', target: 90, actual: 0, status: 'failed' },
-        { id: 'test_pass_rate', name: 'Test Pass Rate', target: 90, actual: 0, status: 'failed' },
-        { id: 'overall_req_coverage', name: 'Overall Requirements Coverage', target: 80, actual: 0, status: 'failed' }
-      ]
     }
   ];
   
   // Generate the JS module file
   const output = `// src/data/versions.js
-// Enhanced version data for converted sample files
+// SAMPLE DATA - Single demo version for testing
 const versions = ${JSON.stringify(versions, null, 2)};
 
 export default versions;`;
   
   // Write to src/data/versions.js
   fs.writeFileSync('src/data/versions.js', output);
-  console.log('✅ Successfully generated versions to src/data/versions.js');
+  console.log('✅ Successfully generated single sample version to src/data/versions.js');
   
   return versions;
 }
 
-// Change 5: Add Validation Function
-/**
- * Validate the converted test cases for Phase 1 requirements
- * @param {Array} testCases - Converted test cases
- * @returns {Object} Validation results
- */
-function validatePhase1Conversion(testCases) {
+// Validation function for sample data conversion
+function validateSampleConversion(testCases) {
   const validation = {
     valid: true,
     warnings: [],
     errors: [],
     stats: {
       totalTests: testCases.length,
-      hasApplicableVersions: 0,
-      hasLegacyVersion: 0,
-      universalTests: 0,
-      multiVersionTests: 0
+      sampleIdentified: 0,
+      hasApplicableVersions: 0
     }
   };
   
   testCases.forEach((tc, index) => {
-    // Check for new format
+    // Check for sample identification
+    if (tc.id && tc.id.includes('SAMPLE') && tc.name && tc.name.includes('[SAMPLE]')) {
+      validation.stats.sampleIdentified++;
+    }
+    
+    // Check for applicableVersions
     if (tc.applicableVersions !== undefined) {
       validation.stats.hasApplicableVersions++;
       
       if (!Array.isArray(tc.applicableVersions)) {
         validation.errors.push(`Test case ${tc.id || index}: applicableVersions must be an array`);
         validation.valid = false;
-      } else {
-        if (tc.applicableVersions.length === 0) {
-          validation.stats.universalTests++;
-        } else if (tc.applicableVersions.length > 1) {
-          validation.stats.multiVersionTests++;
-        }
       }
-    }
-    
-    // Check for legacy format (should ideally be removed after conversion)
-    if (tc.version !== undefined) {
-      validation.stats.hasLegacyVersion++;
-      validation.warnings.push(`Test case ${tc.id || index}: still has legacy 'version' field`);
-    }
-    
-    // Validation rules: must have applicableVersions defined
-    if (tc.applicableVersions === undefined) {
+    } else {
       validation.errors.push(`Test case ${tc.id || index}: missing applicableVersions field`);
       validation.valid = false;
+    }
+    
+    // Warning for non-sample data (in case user mixed real data)
+    if (tc.id && !tc.id.includes('SAMPLE')) {
+      validation.warnings.push(`Test case ${tc.id}: does not appear to be sample data (missing SAMPLE identifier)`);
     }
   });
   
@@ -401,8 +259,8 @@ function validatePhase1Conversion(testCases) {
 
 // Main conversion function
 function convertSampleFiles() {
-  console.log('🚀 Starting conversion of public sample files to src/data format...\n');
-  console.log('🔄 Phase 1: Converting to applicableVersions[] format...\n');
+  console.log('🚀 Starting conversion of sample files to src/data format...\n');
+  console.log('🏷️ Converting to clearly identified sample data format...\n');
   
   try {
     // Ensure src/data directory exists
@@ -412,27 +270,33 @@ function convertSampleFiles() {
     
     // Convert files
     const requirements = convertRequirements();
-    const testCases = convertTestCases(); // This now returns enhancedTestCases
-    const mapping = generateMapping(testCases); // Use the result from convertTestCases
+    const testCases = convertTestCases();
+    const mapping = generateMapping(testCases);
     const versions = generateVersions();
     
-    console.log('\n🎉 Phase 1 conversion completed successfully!');
-    console.log(`📊 Converted ${requirements.length} requirements`);
-    console.log(`🧪 Converted ${testCases.length} test cases with applicableVersions format`);
-    console.log(`🔗 Generated ${Object.keys(mapping).length} requirement mappings`);
-    console.log(`📦 Generated ${versions.length} versions`);
+    console.log('\n🎉 Sample data conversion completed successfully!');
+    console.log(`📊 Converted ${requirements.length} sample requirements`);
+    console.log(`🧪 Converted ${testCases.length} sample test cases`);
+    console.log(`🔗 Generated ${Object.keys(mapping).length} sample requirement mappings`);
+    console.log(`📦 Generated ${versions.length} sample version (single release)`);
     
-    console.log('\n📝 Next steps:');
+    console.log('\n📝 Sample Data Features:');
+    console.log('• All items clearly marked with [SAMPLE] prefix in names');
+    console.log('• IDs prefixed with SAMPLE- for easy identification');
+    console.log('• Single version (sample-v1.0) to simplify demo');
+    console.log('• Easy to identify and delete sample data');
+    console.log('• Tags include "Sample" for filtering');
+    
+    console.log('\n🗑️ To remove sample data:');
+    console.log('• Filter by "Sample" tag to select all sample items');
+    console.log('• Search for "SAMPLE" or "[SAMPLE]" to find all sample data');
+    console.log('• Look for items with owners containing "[SAMPLE]"');
+    
+    console.log('\n✅ Next steps:');
     console.log('1. Review the generated files in src/data/');
     console.log('2. Test the application with "Load Sample Data"');
-    console.log('3. Verify multi-version test case functionality');
-    console.log('4. Check traceability matrix with version filtering');
-    
-    console.log('\n🆕 Phase 1 Features Enabled:');
-    console.log('• Test cases can now apply to multiple versions');
-    console.log('• Enhanced version filtering in dashboard and matrix');
-    console.log('• Backward compatibility with legacy single-version format');
-    console.log('• Strategic version assignments for better demonstration');
+    console.log('3. Verify sample data is clearly identifiable');
+    console.log('4. Test deletion of sample data when ready');
     
   } catch (error) {
     console.error('\n💥 Conversion failed:', error.message);

@@ -2,9 +2,9 @@
 // Generated from public/sample-requirements.jsonc
 const requirements = [
   {
-    "id": "REQ-001",
-    "name": "User Authentication",
-    "description": "Users should be able to log in to their account using valid credentials.",
+    "id": "SAMPLE-REQ-001",
+    "name": "[SAMPLE] User Authentication",
+    "description": "[DEMO] Users should be able to log in to their account using valid credentials.",
     "priority": "High",
     "type": "Functional",
     "businessImpact": 5,
@@ -14,21 +14,21 @@ const requirements = [
     "testDepthFactor": 3.9,
     "minTestCases": 5,
     "versions": [
-      "v1.0",
-      "v1.1"
+      "sample-v1.0"
     ],
     "status": "Active",
-    "owner": "Authentication Team",
+    "owner": "[SAMPLE] Authentication Team",
     "tags": [
+      "Sample",
       "Authentication",
       "Account",
       "Security"
     ]
   },
   {
-    "id": "REQ-002",
-    "name": "Dashboard Content and Display",
-    "description": "The homepage dashboard should display all essential e-commerce elements including top bar with currency switcher and account options, header with logo and navigation, main navigation categories, featured product cards with complete information, brand logos section, and footer.",
+    "id": "SAMPLE-REQ-002",
+    "name": "[SAMPLE] Dashboard Content and Display",
+    "description": "[DEMO] The homepage dashboard should display all essential e-commerce elements including top bar with currency switcher and account options, header with logo and navigation, main navigation categories, featured product cards with complete information, brand logos section, and footer.",
     "priority": "High",
     "type": "Functional",
     "businessImpact": 5,
@@ -38,11 +38,12 @@ const requirements = [
     "testDepthFactor": 3.8,
     "minTestCases": 5,
     "versions": [
-      "v1.0"
+      "sample-v1.0"
     ],
     "status": "Active",
-    "owner": "Frontend Team",
+    "owner": "[SAMPLE] Frontend Team",
     "tags": [
+      "Sample",
       "Dashboard",
       "Homepage",
       "UI",
@@ -51,9 +52,9 @@ const requirements = [
     ]
   },
   {
-    "id": "REQ-003",
-    "name": "Interactions with Dashboard Elements",
-    "description": "Users should be able to interact with all dashboard elements including navigation between categories, adding products to wishlist and cart, accessing cart summary, product comparison, currency switching, account navigation, and all clickable elements with proper redirection functionality.",
+    "id": "SAMPLE-REQ-003",
+    "name": "[SAMPLE] Interactions with Dashboard Elements",
+    "description": "[DEMO] Users should be able to interact with all dashboard elements including navigation between categories, adding products to wishlist and cart, accessing cart summary, product comparison, currency switching, account navigation, and all clickable elements with proper redirection functionality.",
     "priority": "High",
     "type": "Functional",
     "businessImpact": 5,
@@ -63,11 +64,12 @@ const requirements = [
     "testDepthFactor": 4.1,
     "minTestCases": 8,
     "versions": [
-      "v1.0"
+      "sample-v1.0"
     ],
     "status": "Active",
-    "owner": "Frontend Team",
+    "owner": "[SAMPLE] Frontend Team",
     "tags": [
+      "Sample",
       "Interactions",
       "Navigation",
       "User Experience",
