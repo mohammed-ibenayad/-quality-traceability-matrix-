@@ -23,6 +23,7 @@ import {
   AlertTriangle,
   FileText,
   Code,
+  X,
   Copy // NEW: Copy icon for duplicate action
 } from 'lucide-react';
 import MainLayout from '../components/Layout/MainLayout';
@@ -34,6 +35,8 @@ import ViewTestCaseModal from '../components/TestCases/ViewTestCaseModal';
 import EditTestCaseModal from '../components/TestCases/EditTestCaseModal';
 import { useVersionContext } from '../context/VersionContext';
 import dataStore from '../services/DataStore';
+import BulkActionsPanel from '../components/TestCases/BulkActionsPanel';
+
 
 // Helper function to format last execution date
 const formatLastExecution = (lastExecuted) => {
@@ -81,16 +84,20 @@ const getVersionTags = (testCase) => {
 // TestCaseRow Component (updated with view action and optimized layout)
 const TestCaseRow = ({
   testCase,
+  versions,
+  selectedVersion,
   onSelect,
-  onView, // NEW: View action
+  onView,
   onEdit,
   onDelete,
   onExecute,
   isSelected,
   isExpanded,
   onToggleExpand,
-  expandedTests, // Prop for failure expansion
-  onToggleFailureExpand // NEW: Handler for failure expansion
+  expandedTests,
+  onToggleFailureExpand,
+  setModalVersions, // Add this line
+  setShowVersionModal // Add this line
 }) => {
   const isFailureExpanded = expandedTests.has(testCase.id);
 
@@ -214,6 +221,74 @@ const TestCaseRow = ({
             )}
           </div>
         </td>
+        <td className="px-2 py-3 w-24 flex-shrink-0">
+
+          <div className="text-xs text-gray-500">
+    {testCase.applicableVersions?.length > 0 ? (
+      <div>
+        <div className="flex flex-wrap gap-1">
+          {(() => {
+            // Smart display: always show current version first if it's assigned
+            const currentVersionAssigned = testCase.applicableVersions.includes(selectedVersion);
+            const otherVersions = testCase.applicableVersions.filter(v => v !== selectedVersion);
+            
+            let versionsToShow = [];
+            let remainingCount = 0;
+            
+            if (currentVersionAssigned) {
+              // Show current version first, then fill remaining slot
+              versionsToShow = [selectedVersion, ...otherVersions.slice(0, 1)];
+              remainingCount = Math.max(0, testCase.applicableVersions.length - 2);
+            } else {
+              // No current version assigned, show first 2
+              versionsToShow = testCase.applicableVersions.slice(0, 2);
+              remainingCount = Math.max(0, testCase.applicableVersions.length - 2);
+            }
+            
+            return (
+              <>
+                {versionsToShow.map(versionId => {
+                  const version = versions.find(v => v.id === versionId);
+                  const isCurrent = versionId === selectedVersion;
+                  return (
+                    <span 
+                      key={versionId} 
+                      className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs ${
+                        isCurrent 
+                          ? 'bg-green-100 text-green-800 font-medium ring-1 ring-green-300' 
+                          : 'bg-blue-100 text-blue-800'
+                      }`}
+                    >
+                      {isCurrent && '★ '}{version?.name || versionId}
+                    </span>
+                  );
+                })}
+                {remainingCount > 0 && (
+                  <button
+                    onClick={() => {
+                      setModalVersions({
+                        versions: testCase.applicableVersions,
+                        testCaseId: testCase.id,
+                        testCaseName: testCase.name
+                      });
+                      setShowVersionModal(true);
+                    }}
+                    className="text-xs text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded cursor-pointer hover:bg-blue-100 transition-colors font-medium"
+                  >
+                    +{remainingCount} more
+                  </button>
+                )}
+              </>
+            );
+          })()}
+        </div>
+      </div>
+    ) : (
+      <span className="text-gray-400 italic text-xs">All</span>
+    )}
+  </div>
+ 
+</td>
         <td className="px-2 py-3 w-24 flex-shrink-0">
           <div className="flex items-center justify-end space-x-1">
             {/* NEW: View button */}
@@ -788,6 +863,13 @@ const TestCases = () => {
   const [expandedTests, setExpandedTests] = useState(new Set());
   const [allExpanded, setAllExpanded] = useState(false);
 
+  const [showVersionAssignmentModal, setShowVersionAssignmentModal] = useState(false);
+  const [versionAssignmentAction, setVersionAssignmentAction] = useState(null);
+  const [selectedVersionForAssignment, setSelectedVersionForAssignment] = useState('');
+  const [showVersionModal, setShowVersionModal] = useState(false);
+  const [modalVersions, setModalVersions] = useState(null);
+
+
   // Load data from DataStore
   useEffect(() => {
     const updateData = () => {
@@ -1105,6 +1187,40 @@ const TestCases = () => {
     }
   };
 
+  // Bulk version assignment handler
+const handleBulkVersionAssignment = (versionId, action) => {
+  if (selectedTestCases.size === 0) return;
+  
+  setSelectedVersionForAssignment(versionId);
+  setVersionAssignmentAction(action);
+  setShowVersionAssignmentModal(true);
+};
+
+const confirmVersionAssignment = async () => {
+  try {
+    const testCaseIds = Array.from(selectedTestCases);
+    
+    await dataStore.updateTestCaseVersions(
+      testCaseIds, 
+      selectedVersionForAssignment, 
+      versionAssignmentAction
+    );
+    
+    // Clear selection and close modal
+    setSelectedTestCases(new Set());
+    setShowVersionAssignmentModal(false);
+    
+    // Show success message
+    const versionName = versions.find(v => v.id === selectedVersionForAssignment)?.name;
+    const actionText = versionAssignmentAction === 'add' ? 'added to' : 'removed from';
+    alert(`${testCaseIds.length} test cases ${actionText} ${versionName}`);
+    
+  } catch (error) {
+    console.error('Version assignment failed:', error);
+    alert('Version assignment failed: ' + error.message);
+  }
+};
+
   // Handle tag selection
   const handleTagToggle = (tag) => {
     setSelectedTags(prev => {
@@ -1204,6 +1320,7 @@ const TestCases = () => {
           actionPath="/import#testcases-tab"
           icon="testcases"
         />
+        
       </MainLayout>
     );
   }
@@ -1546,39 +1663,18 @@ const TestCases = () => {
         </div>
 
         {/* Bulk Actions */}
-        {selectedTestCases.size > 0 && (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <div className="flex items-center justify-between">
-              <span className="text-blue-700">
-                {selectedTestCases.size} test case(s) selected
-              </span>
-              <div className="flex gap-2">
-                <button
-                  onClick={executeSelectedTests}
-                  className="inline-flex items-center px-3 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 text-sm"
-                  disabled={selectedTestCases.size === 0}
-                  title="Execute selected test cases"
-                >
-                  <Play className="mr-1" size={14} />
-                  Run Tests
-                </button>
-                <button
-                  onClick={handleBulkDelete}
-                  className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 flex items-center"
-                >
-                  <Trash2 size={14} className="mr-1" />
-                  Delete Selected
-                </button>
-                <button
-                  onClick={handleClearSelection}
-                  className="px-3 py-1 bg-gray-600 text-white rounded hover:bg-gray-700"
-                >
-                  Clear Selection
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+        {/* Enhanced Bulk Actions with Version Assignment */}
+{selectedTestCases.size > 0 && (
+  <BulkActionsPanel
+    selectedCount={selectedTestCases.size}
+    availableVersions={availableVersions}
+    onVersionAssign={handleBulkVersionAssignment}
+    onExecuteTests={executeSelectedTests}
+    onBulkDelete={handleBulkDelete}
+    onClearSelection={handleClearSelection}
+  />
+)}
+        
 
         {/* Test Cases Table - Grouped by Category */}
         <div className="space-y-4">
@@ -1633,26 +1729,31 @@ const TestCases = () => {
                           <th className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase w-20 flex-shrink-0">Auto.</th> {/* Changed from Automation */}
                           <th className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase w-20 flex-shrink-0">Reqs.</th> {/* Changed from Requirements */}
                           <th className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase w-20 flex-shrink-0">Last Run</th>
+                          <th className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase w-24 flex-shrink-0">Versions</th>
                           <th className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase w-24 flex-shrink-0">Actions</th>
                         </tr>
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
                         {categoryTests.map((testCase) => (
-                          <TestCaseRow
-                            key={testCase.id}
-                            testCase={testCase}
-                            onSelect={handleTestCaseSelection}
-                            onView={handleViewTestCase} // Pass view handler
-                            onEdit={handleEditTestCase}
-                            onDelete={handleDeleteTestCase}
-                            onExecute={handleExecuteTestCase}
-                            isSelected={selectedTestCases.has(testCase.id)}
-                            isExpanded={expandedRows.has(testCase.id)}
-                            onToggleExpand={toggleRowExpansion}
-                            expandedTests={expandedTests}
-                            onToggleFailureExpand={toggleTestExpansion} // Pass the correct handler
-                          />
-                        ))}
+  <TestCaseRow
+  key={testCase.id}
+  testCase={testCase}
+  versions={versions}
+  selectedVersion={selectedVersion}
+  onSelect={handleTestCaseSelection}
+  onView={handleViewTestCase}
+  onEdit={handleEditTestCase}
+  onDelete={handleDeleteTestCase}
+  onExecute={handleExecuteTestCase}
+  isSelected={selectedTestCases.has(testCase.id)}
+  isExpanded={expandedRows.has(testCase.id)}
+  onToggleExpand={toggleRowExpansion}
+  expandedTests={expandedTests}
+  onToggleFailureExpand={toggleTestExpansion}
+  setModalVersions={setModalVersions} // Add this line
+  setShowVersionModal={setShowVersionModal} // Add this line
+/>
+))}
                       </tbody>
                     </table>
                   </div>
@@ -1717,6 +1818,67 @@ const TestCases = () => {
             onVersionToggle={handleVersionToggle} // Pass the new handler
           />
         )}
+
+      {/* Version Details Modal */}
+        {showVersionModal && modalVersions && (
+          <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
+            <div className="relative bg-white p-6 border w-96 shadow-lg rounded-lg m-4">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-medium text-gray-900">
+                  Version Coverage
+                </h3>
+                <button
+                  onClick={() => setShowVersionModal(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+              
+              <div className="mb-4">
+                <p className="text-sm text-gray-600 mb-3">
+                  <strong>{modalVersions.testCaseId}</strong> applies to {modalVersions.versions.length} version{modalVersions.versions.length !== 1 ? 's' : ''}:
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  {modalVersions.versions.map(vId => {
+                    const v = versions.find(ver => ver.id === vId);
+                    const isCurrent = vId === selectedVersion;
+                    return (
+                      <div 
+                        key={vId} 
+                        className={`px-3 py-2 rounded text-sm font-medium text-center ${
+                          isCurrent 
+                            ? 'bg-green-100 text-green-800 ring-2 ring-green-300' 
+                            : 'bg-gray-100 text-gray-700'
+                        }`}
+                      >
+                        {isCurrent && '★ '}{v?.name || vId}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+              
+              {modalVersions.versions.includes(selectedVersion) && (
+                <div className="bg-green-50 border border-green-200 rounded p-3">
+                  <p className="text-green-800 text-sm font-medium">
+                    ✓ This test case applies to the currently selected version
+                  </p>
+                </div>
+              )}
+              
+              <div className="flex justify-end mt-4">
+                <button
+                  onClick={() => setShowVersionModal(false)}
+                  className="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        )} 
+        
       </div>
     </MainLayout>
   );

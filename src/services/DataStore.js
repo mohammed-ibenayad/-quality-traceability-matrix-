@@ -723,6 +723,291 @@ deleteRequirement(requirementId) {
 
     return updatedTestCase;
   }
+  /**
+ * Update versions for multiple test cases (bulk assignment)
+ * @param {string[]} testCaseIds - Array of test case IDs to update
+ * @param {string} versionId - Version ID to add or remove
+ * @param {string} action - 'add' or 'remove'
+ * @returns {Object} Summary of the operation
+ */
+updateTestCaseVersions(testCaseIds, versionId, action) {
+  if (!Array.isArray(testCaseIds) || testCaseIds.length === 0) {
+    throw new Error('testCaseIds must be a non-empty array');
+  }
+  
+  if (!versionId || typeof versionId !== 'string') {
+    throw new Error('versionId must be a non-empty string');
+  }
+  
+  if (!['add', 'remove'].includes(action)) {
+    throw new Error('action must be either "add" or "remove"');
+  }
+
+  const results = {
+    successful: [],
+    failed: [],
+    skipped: [],
+    action,
+    versionId
+  };
+
+  console.log(`🔄 Bulk ${action} version "${versionId}" for ${testCaseIds.length} test cases`);
+
+  testCaseIds.forEach(testCaseId => {
+    try {
+      const index = this._testCases.findIndex(tc => tc.id === testCaseId);
+      
+      if (index === -1) {
+        results.failed.push({ testCaseId, error: 'Test case not found' });
+        return;
+      }
+
+      const testCase = this._testCases[index];
+      const currentVersions = Array.isArray(testCase.applicableVersions) 
+        ? [...testCase.applicableVersions]
+        : (testCase.version ? [testCase.version] : []);
+
+      let newVersions;
+      let changed = false;
+
+      if (action === 'add') {
+        if (!currentVersions.includes(versionId)) {
+          newVersions = [...currentVersions, versionId];
+          changed = true;
+        } else {
+          results.skipped.push({ testCaseId, reason: 'Already assigned to version' });
+          return;
+        }
+      } else { // remove
+        if (currentVersions.includes(versionId)) {
+          newVersions = currentVersions.filter(v => v !== versionId);
+          changed = true;
+        } else {
+          results.skipped.push({ testCaseId, reason: 'Not assigned to version' });
+          return;
+        }
+      }
+
+      if (changed) {
+        // Update the test case
+        this._testCases[index] = {
+          ...testCase,
+          applicableVersions: newVersions,
+          // Remove legacy version field to prevent confusion
+          version: undefined
+        };
+
+        results.successful.push({ 
+          testCaseId, 
+          previousVersions: currentVersions,
+          newVersions 
+        });
+      }
+
+    } catch (error) {
+      results.failed.push({ testCaseId, error: error.message });
+    }
+  });
+
+  // Save to localStorage if any changes were made
+  if (results.successful.length > 0) {
+    this._saveToLocalStorage('testCases', this._testCases);
+    this._notifyListeners();
+    
+    console.log(`✅ Bulk version assignment completed: ${results.successful.length} successful, ${results.failed.length} failed, ${results.skipped.length} skipped`);
+  }
+
+  return results;
+}
+/**
+ * Validate version assignment before execution
+ * @param {string[]} testCaseIds - Test case IDs to validate
+ * @param {string} versionId - Version ID to validate
+ * @param {string} action - 'add' or 'remove'  
+ * @returns {Object} Validation result with warnings and errors
+ */
+validateVersionAssignment(testCaseIds, versionId, action) {
+  const validation = {
+    valid: true,
+    errors: [],
+    warnings: [],
+    summary: {
+      total: testCaseIds.length,
+      found: 0,
+      alreadyAssigned: 0,
+      notAssigned: 0,
+      wouldChange: 0
+    }
+  };
+
+  // Validate inputs
+  if (!Array.isArray(testCaseIds) || testCaseIds.length === 0) {
+    validation.errors.push('No test cases selected');
+    validation.valid = false;
+    return validation;
+  }
+
+  if (!versionId) {
+    validation.errors.push('No version selected');
+    validation.valid = false;
+    return validation;
+  }
+
+  // Check each test case
+  testCaseIds.forEach(testCaseId => {
+    const testCase = this._testCases.find(tc => tc.id === testCaseId);
+    
+    if (!testCase) {
+      validation.errors.push(`Test case ${testCaseId} not found`);
+      return;
+    }
+
+    validation.summary.found++;
+
+    const currentVersions = Array.isArray(testCase.applicableVersions) 
+      ? testCase.applicableVersions
+      : (testCase.version ? [testCase.version] : []);
+
+    const isAssigned = currentVersions.includes(versionId);
+
+    if (action === 'add') {
+      if (isAssigned) {
+        validation.summary.alreadyAssigned++;
+      } else {
+        validation.summary.wouldChange++;
+      }
+    } else { // remove
+      if (isAssigned) {
+        validation.summary.wouldChange++;
+      } else {
+        validation.summary.notAssigned++;
+      }
+    }
+  });
+
+  // Generate warnings
+  if (action === 'add' && validation.summary.alreadyAssigned > 0) {
+    validation.warnings.push(`${validation.summary.alreadyAssigned} test cases already assigned to this version`);
+  }
+  
+  if (action === 'remove' && validation.summary.notAssigned > 0) {
+    validation.warnings.push(`${validation.summary.notAssigned} test cases not assigned to this version`);
+  }
+
+  if (validation.summary.wouldChange === 0) {
+    validation.warnings.push('No test cases will be changed by this operation');
+  }
+
+  validation.valid = validation.errors.length === 0;
+  return validation;
+}
+/**
+ * Get summary of version assignments across test cases
+ * @param {string[]} testCaseIds - Optional filter by test case IDs
+ * @returns {Object} Version assignment statistics
+ */
+getVersionAssignmentSummary(testCaseIds = null) {
+  const testCasesToAnalyze = testCaseIds 
+    ? this._testCases.filter(tc => testCaseIds.includes(tc.id))
+    : this._testCases;
+
+  const versionCounts = {};
+  const unassignedCount = testCasesToAnalyze.filter(tc => {
+    const versions = Array.isArray(tc.applicableVersions) 
+      ? tc.applicableVersions
+      : (tc.version ? [tc.version] : []);
+    
+    if (versions.length === 0) return true;
+    
+    versions.forEach(versionId => {
+      versionCounts[versionId] = (versionCounts[versionId] || 0) + 1;
+    });
+    
+    return false;
+  }).length;
+
+  return {
+    totalTestCases: testCasesToAnalyze.length,
+    unassignedCount,
+    versionCounts,
+    mostUsedVersion: Object.keys(versionCounts).reduce((a, b) => 
+      versionCounts[a] > versionCounts[b] ? a : b, null),
+    assignmentCoverage: testCasesToAnalyze.length > 0 
+      ? Math.round(((testCasesToAnalyze.length - unassignedCount) / testCasesToAnalyze.length) * 100)
+      : 0
+  };
+}
+
+/**
+ * Get detailed version assignment statistics for reporting
+ * @returns {Object} Comprehensive version statistics
+ */
+getVersionAssignmentStatistics() {
+  const stats = {
+    overview: {
+      totalTestCases: this._testCases.length,
+      assignedTestCases: 0,
+      unassignedTestCases: 0,
+      averageVersionsPerTestCase: 0
+    },
+    byVersion: {},
+    legacyFormatCount: 0,
+    newFormatCount: 0
+  };
+
+  let totalVersionAssignments = 0;
+
+  this._testCases.forEach(tc => {
+    // Track format usage
+    if (tc.applicableVersions) {
+      stats.newFormatCount++;
+      
+      if (tc.applicableVersions.length > 0) {
+        stats.overview.assignedTestCases++;
+        totalVersionAssignments += tc.applicableVersions.length;
+        
+        tc.applicableVersions.forEach(versionId => {
+          if (!stats.byVersion[versionId]) {
+            stats.byVersion[versionId] = {
+              testCaseCount: 0,
+              testCaseIds: []
+            };
+          }
+          stats.byVersion[versionId].testCaseCount++;
+          stats.byVersion[versionId].testCaseIds.push(tc.id);
+        });
+      } else {
+        stats.overview.unassignedTestCases++;
+      }
+    } else if (tc.version) {
+      stats.legacyFormatCount++;
+      
+      if (tc.version) {
+        stats.overview.assignedTestCases++;
+        totalVersionAssignments++;
+        
+        if (!stats.byVersion[tc.version]) {
+          stats.byVersion[tc.version] = {
+            testCaseCount: 0,
+            testCaseIds: []
+          };
+        }
+        stats.byVersion[tc.version].testCaseCount++;
+        stats.byVersion[tc.version].testCaseIds.push(tc.id);
+      } else {
+        stats.overview.unassignedTestCases++;
+      }
+    } else {
+      stats.overview.unassignedTestCases++;
+    }
+  });
+
+  stats.overview.averageVersionsPerTestCase = stats.overview.assignedTestCases > 0
+    ? Math.round((totalVersionAssignments / stats.overview.assignedTestCases) * 100) / 100
+    : 0;
+
+  return stats;
+}
 
   /**
    * Delete a test case
@@ -960,6 +1245,17 @@ updateVersion(versionId, updateData) {
  * @returns {boolean} True if successful
  */
 deleteVersion(versionId) {
+  // Add this at the start of the existing deleteVersion method
+console.log(`🗑️ Deleting version "${versionId}" - checking test case assignments`);
+
+const affectedTestCases = this._testCases.filter(tc => {
+  const versions = Array.isArray(tc.applicableVersions) 
+    ? tc.applicableVersions
+    : (tc.version === versionId ? [tc.version] : []);
+  return versions.includes(versionId);
+});
+
+console.log(`📊 Found ${affectedTestCases.length} test cases assigned to version "${versionId}"`);
   const index = this._versions.findIndex(v => v.id === versionId);
   
   if (index === -1) {
