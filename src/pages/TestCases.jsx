@@ -36,6 +36,8 @@ import EditTestCaseModal from '../components/TestCases/EditTestCaseModal';
 import { useVersionContext } from '../context/VersionContext';
 import dataStore from '../services/DataStore';
 import BulkActionsPanel from '../components/TestCases/BulkActionsPanel';
+import TestCaseRowActions from '../components/TestCases/TestCaseRowActions';
+
 
 
 // Helper function to format last execution date
@@ -91,6 +93,7 @@ const TestCaseRow = ({
   onEdit,
   onDelete,
   onExecute,
+  onDuplicate, 
   isSelected,
   isExpanded,
   onToggleExpand,
@@ -290,37 +293,14 @@ const TestCaseRow = ({
  
 </td>
         <td className="px-2 py-3 w-24 flex-shrink-0">
-          <div className="flex items-center justify-end space-x-1">
-            {/* NEW: View button */}
-            <button
-              onClick={() => onView(testCase)}
-              className="text-blue-600 hover:text-blue-900 p-1 rounded hover:bg-blue-50"
-              title="View Details"
-            >
-              <Eye size={14} />
-            </button>
-            <button
-              onClick={() => onExecute(testCase)}
-              className="text-green-600 hover:text-green-900 p-1 rounded hover:bg-green-50"
-              title="Execute Test"
-            >
-              <Play size={14} />
-            </button>
-            <button
-              onClick={() => onEdit(testCase)}
-              className="text-gray-600 hover:text-gray-900 p-1 rounded hover:bg-gray-50"
-              title="Edit Test Case"
-            >
-              <Edit size={14} />
-            </button>
-            <button
-              onClick={() => onDelete(testCase.id)}
-              className="text-red-600 hover:text-red-900 p-1 rounded hover:bg-red-50"
-              title="Delete Test Case"
-            >
-              <Trash2 size={14} />
-            </button>
-          </div>
+          <TestCaseRowActions
+            testCase={testCase}
+            onView={onView}
+            onEdit={onEdit}
+            onDelete={onDelete}
+            onExecute={onExecute}
+            onDuplicate={onDuplicate}
+          />
         </td>
       </tr>
 
@@ -1119,6 +1099,7 @@ const TestCases = () => {
   };
 
   // Handle duplicate test case - NEW
+  // Handle duplicate test case
   const handleDuplicateTestCase = (testCase) => {
     const duplicatedTestCase = {
       ...testCase,
@@ -1730,8 +1711,7 @@ const confirmVersionAssignment = async () => {
                           <th className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase w-20 flex-shrink-0">Reqs.</th> {/* Changed from Requirements */}
                           <th className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase w-20 flex-shrink-0">Last Run</th>
                           <th className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase w-24 flex-shrink-0">Versions</th>
-                          <th className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase w-24 flex-shrink-0">Actions</th>
-                        </tr>
+                          <th className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase w-24 flex-shrink-0">Actions</th>                        </tr>
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
                         {categoryTests.map((testCase) => (
@@ -1745,6 +1725,7 @@ const confirmVersionAssignment = async () => {
   onEdit={handleEditTestCase}
   onDelete={handleDeleteTestCase}
   onExecute={handleExecuteTestCase}
+  onDuplicate={handleDuplicateTestCase}
   isSelected={selectedTestCases.has(testCase.id)}
   isExpanded={expandedRows.has(testCase.id)}
   onToggleExpand={toggleRowExpansion}
@@ -1878,6 +1859,63 @@ const confirmVersionAssignment = async () => {
             </div>
           </div>
         )} 
+
+        {/* Version Assignment Confirmation Modal */}
+{showVersionAssignmentModal && (
+  <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
+    <div className="relative bg-white p-6 border w-96 shadow-lg rounded-lg m-4">
+      <div className="flex justify-between items-center mb-4">
+        <h3 className="text-lg font-medium text-gray-900">
+          Confirm Version Assignment
+        </h3>
+        <button
+          onClick={() => setShowVersionAssignmentModal(false)}
+          className="text-gray-400 hover:text-gray-600"
+        >
+          <X size={20} />
+        </button>
+      </div>
+      
+      <div className="mb-6">
+        <p className="text-sm text-gray-600 mb-2">
+          You are about to <strong>{versionAssignmentAction}</strong> {selectedTestCases.size} test case{selectedTestCases.size !== 1 ? 's' : ''}:
+        </p>
+        
+        <div className="bg-blue-50 border border-blue-200 rounded p-3 mb-4">
+          <div className="text-sm font-medium text-blue-800">
+            {versionAssignmentAction === 'add' ? 'Add to' : 'Remove from'} version: 
+            <span className="ml-1 font-bold">
+              {versions.find(v => v.id === selectedVersionForAssignment)?.name || selectedVersionForAssignment}
+            </span>
+          </div>
+        </div>
+
+        <div className="text-xs text-gray-500">
+          {selectedTestCases.size} test case{selectedTestCases.size !== 1 ? 's' : ''} selected
+        </div>
+      </div>
+      
+      <div className="flex justify-end space-x-3">
+        <button
+          onClick={() => setShowVersionAssignmentModal(false)}
+          className="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={confirmVersionAssignment}
+          className={`px-4 py-2 text-white rounded hover:opacity-90 ${
+            versionAssignmentAction === 'add' 
+              ? 'bg-green-600 hover:bg-green-700' 
+              : 'bg-red-600 hover:bg-red-700'
+          }`}
+        >
+          {versionAssignmentAction === 'add' ? 'Add to Version' : 'Remove from Version'}
+        </button>
+      </div>
+    </div>
+  </div>
+)}
         
       </div>
     </MainLayout>
