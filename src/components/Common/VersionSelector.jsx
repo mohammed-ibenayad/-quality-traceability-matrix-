@@ -125,7 +125,6 @@ const VersionSelector = ({
               <span className="mr-2">📊</span>
               <div>
                 <div className="font-medium">All Items</div>
-                <div className="text-xs text-gray-500">View all test cases</div>
               </div>
             </div>
             {selectedVersion === 'unassigned' && <Check size={16} className="text-blue-600" />}
@@ -205,7 +204,7 @@ const VersionSelector = ({
               {selectedInfo.icon} {selectedInfo.name}
             </div>
             <div className="text-xs text-gray-500">
-              {selectedVersion === 'unassigned' ? 'All test cases' : `Version: ${selectedInfo.id}`}
+              {selectedVersion === 'unassigned' ? 'All Items' : `Version: ${selectedInfo.id}`}
             </div>
           </div>
         </div>

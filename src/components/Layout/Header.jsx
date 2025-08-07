@@ -1,5 +1,7 @@
 import React from 'react';
 import NewReleaseModal from '../Releases/NewReleaseModal';
+import VersionSelector from '../Common/VersionSelector';
+
 
 const Header = ({ 
   title, 
@@ -18,7 +20,7 @@ const Header = ({
   };
 
   return (
-    <header className="bg-white shadow h-16 flex items-center justify-between px-6">
+    <header className="sticky top-0 z-50 bg-white shadow h-16 flex items-center justify-between px-6">
       <div className="flex items-center">
         <h1 className="text-lg font-semibold">{title}</h1>
       </div>
@@ -26,20 +28,14 @@ const Header = ({
         {hasData && (
           <div className="flex items-center gap-2">
             {versions && versions.length > 0 && (
-              <div className="flex items-center">
-                <span className="mr-2 text-sm text-gray-500">Version:</span>
-                <select 
-                  value={selectedVersion}
-                  onChange={(e) => setSelectedVersion(e.target.value)}
-                  className="border rounded p-1.5 text-sm"
-                >
-                  <option value="unassigned">Unassigned/All Items</option>
-                  {versions.map(v => (
-                    <option key={v.id} value={v.id}>{v.name}</option>
-                  ))}
-                </select>
-              </div>
-            )}
+  <VersionSelector
+    selectedVersion={selectedVersion}
+    versions={versions}
+    onVersionChange={setSelectedVersion}
+    className="w-64"
+    showCounts={false}
+  />
+)}
             
             {/* New Release Button */}
             {onAddVersion && (
