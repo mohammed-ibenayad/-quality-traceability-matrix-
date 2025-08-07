@@ -823,6 +823,9 @@ const TestCases = () => {
   const [versionFilter, setVersionFilter] = useState('All'); // This filter is now handled by selectedVersion from context
   const [selectedTags, setSelectedTags] = useState(new Set());
   const [selectedTestCases, setSelectedTestCases] = useState(new Set());
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const [automationFilter, setAutomationFilter] = useState('All');
+  const [showAllTags, setShowAllTags] = useState(false);
   const [expandedRows, setExpandedRows] = useState(new Set()); // Corrected line
 
   // Add new state variables for tag filter
@@ -867,6 +870,55 @@ const TestCases = () => {
     // Clean up subscription
     return () => unsubscribe();
   }, []);
+
+  // Auto-reset filters when version changes to avoid confusion
+useEffect(() => {
+  // Don't reset on initial load
+  if (!selectedVersion) return;
+  
+  // Get tags available in the new version
+  const newVersionTestCases = selectedVersion === 'unassigned' 
+    ? testCases 
+    : testCases.filter(tc => {
+        if (tc.applicableVersions) {
+          if (tc.applicableVersions.length === 0) return true;
+          return tc.applicableVersions.includes(selectedVersion);
+        }
+        return !tc.version || tc.version === selectedVersion || tc.version === '';
+      });
+  
+  const tagsInNewVersion = new Set();
+  newVersionTestCases.forEach(tc => {
+    if (tc.tags && Array.isArray(tc.tags)) {
+      tc.tags.forEach(tag => tagsInNewVersion.add(tag));
+    }
+  });
+  
+  // Reset selected tags that don't exist in the new version
+  setSelectedTags(prev => {
+    const validTags = new Set();
+    prev.forEach(tag => {
+      if (tagsInNewVersion.has(tag)) {
+        validTags.add(tag);
+      }
+    });
+    
+    // If some tags were removed, also reset status filter to "All" to avoid double confusion
+    if (validTags.size < prev.size) {
+      console.log('🔄 Version changed: Resetting invalid filters');
+      setStatusFilter('All');
+      setSearchQuery(''); // Optional: also reset search
+    }
+    
+    return validTags;
+  });
+  
+  // Optional: Reset other filters too
+  // setStatusFilter('All');
+  // setPriorityFilter('All');
+  // setAutomationFilter('All');
+  
+}, [selectedVersion, testCases]); // Triggers when version changes
 
   // NEW: Get linked requirements for the currently viewing test case
   const linkedRequirements = useMemo(() => {
@@ -946,54 +998,100 @@ const TestCases = () => {
   }, [availableTags, tagSearchQuery]);
 
 
-  const filteredTestCases = useMemo(() => {
-    return versionFilteredTestCases.filter(testCase => {
-      // Search filter
-      const matchesSearch = !searchQuery ||
-                            testCase.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                            testCase.id.toLowerCase().includes(searchQuery.toLowerCase());
+ const filteredTestCases = useMemo(() => {
+  console.log('🔍 Filtering Debug:', {
+    versionFilteredCount: versionFilteredTestCases.length,
+    selectedVersion,
+    selectedTags: Array.from(selectedTags),
+    sampleTestCaseTags: versionFilteredTestCases.slice(0, 3).map(tc => ({ id: tc.id, tags: tc.tags }))
+  });
 
-      // Status filter
-      const matchesStatus = statusFilter === 'All' || testCase.status === statusFilter;
+  return versionFilteredTestCases.filter(testCase => {
+    // Search filter
+    const matchesSearch = !searchQuery ||
+                          testCase.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          testCase.id.toLowerCase().includes(searchQuery.toLowerCase());
 
-      // Priority filter
-      const matchesPriority = priorityFilter === 'All' || testCase.priority === priorityFilter;
+    // Status filter
+    const matchesStatus = statusFilter === 'All' || testCase.status === statusFilter;
 
-      // Tag filter - test case must have ANY of the selected tags (changed from ALL for better UX)
-      const matchesTags = selectedTags.size === 0 ||
-                          (testCase.tags && Array.isArray(testCase.tags) &&
-                           Array.from(selectedTags).some(tag => testCase.tags.includes(tag)));
+    // Priority filter
+    const matchesPriority = priorityFilter === 'All' || testCase.priority === priorityFilter;
 
-      // Version filter is now handled by `versionFilteredTestCases`
-      return matchesSearch && matchesStatus && matchesPriority && matchesTags;
-    });
-  }, [versionFilteredTestCases, searchQuery, statusFilter, priorityFilter, selectedTags]);
+    // Automation filter
+    const matchesAutomation = automationFilter === 'All' || testCase.automationStatus === automationFilter;
+
+    // Tag filter - Enhanced debugging
+    const matchesTags = selectedTags.size === 0 ||
+                        (testCase.tags && Array.isArray(testCase.tags) &&
+                         Array.from(selectedTags).some(tag => testCase.tags.includes(tag)));
+
+    // Debug specific test case if it has the Sample tag
+    if (testCase.tags && testCase.tags.includes('Sample')) {
+      console.log('🏷️ Sample tag test case:', {
+        id: testCase.id,
+        tags: testCase.tags,
+        selectedTags: Array.from(selectedTags),
+        matchesTags,
+        matchesSearch,
+        matchesStatus,
+        matchesPriority,
+        matchesAutomation
+      });
+    }
+
+    return matchesSearch && matchesStatus && matchesPriority && matchesAutomation && matchesTags;
+  });
+}, [versionFilteredTestCases, searchQuery, statusFilter, priorityFilter, automationFilter, selectedTags]);
 
   // Calculate summary statistics
-  const summaryStats = useMemo(() => {
-    const total = filteredTestCases.length;
-    const passed = filteredTestCases.filter(tc => tc.status === 'Passed').length;
-    const failed = filteredTestCases.filter(tc => tc.status === 'Failed').length;
-    const notRun = filteredTestCases.filter(tc => tc.status === 'Not Run').length;
-    const blocked = filteredTestCases.filter(tc => tc.status === 'Blocked').length;
-    const notFound = filteredTestCases.filter(tc => tc.status === 'Not Found').length;
-    const automated = filteredTestCases.filter(tc => tc.automationStatus === 'Automated').length;
-    const linked = filteredTestCases.filter(tc => tc.requirementIds && tc.requirementIds.length > 0).length;
+  // Calculate summary statistics
+const summaryStats = useMemo(() => {
+  // Base counts from version-filtered test cases (before other filters)
+  const totalBase = versionFilteredTestCases.length;
+  const passedBase = versionFilteredTestCases.filter(tc => tc.status === 'Passed').length;
+  const failedBase = versionFilteredTestCases.filter(tc => tc.status === 'Failed').length;
+  const notRunBase = versionFilteredTestCases.filter(tc => tc.status === 'Not Run').length;
+  const blockedBase = versionFilteredTestCases.filter(tc => tc.status === 'Blocked').length;
+  const notFoundBase = versionFilteredTestCases.filter(tc => tc.status === 'Not Found').length;
+  const automatedBase = versionFilteredTestCases.filter(tc => tc.automationStatus === 'Automated').length;
+  const linkedBase = versionFilteredTestCases.filter(tc => tc.requirementIds && tc.requirementIds.length > 0).length;
 
-    return {
-      total,
-      passed,
-      failed,
-      notRun,
-      blocked,
-      notFound,
-      automated,
-      linked,
-      passRate: total > 0 ? Math.round((passed / total) * 100) : 0,
-      automationRate: total > 0 ? Math.round((automated / total) * 100) : 0,
-      linkageRate: total > 0 ? Math.round((linked / total) * 100) : 0
-    };
-  }, [filteredTestCases]);
+  // Current filtered counts (for display in metrics cards)
+  const total = filteredTestCases.length;
+  const passed = filteredTestCases.filter(tc => tc.status === 'Passed').length;
+  const failed = filteredTestCases.filter(tc => tc.status === 'Failed').length;
+  const notRun = filteredTestCases.filter(tc => tc.status === 'Not Run').length;
+  const blocked = filteredTestCases.filter(tc => tc.status === 'Blocked').length;
+  const notFound = filteredTestCases.filter(tc => tc.status === 'Not Found').length;
+  const automated = filteredTestCases.filter(tc => tc.automationStatus === 'Automated').length;
+  const linked = filteredTestCases.filter(tc => tc.requirementIds && tc.requirementIds.length > 0).length;
+
+  return {
+    // Current filtered counts (for metrics cards)
+    total,
+    passed,
+    failed,
+    notRun,
+    blocked,
+    notFound,
+    automated,
+    linked,
+    passRate: total > 0 ? Math.round((passed / total) * 100) : 0,
+    automationRate: total > 0 ? Math.round((automated / total) * 100) : 0,
+    linkageRate: total > 0 ? Math.round((linked / total) * 100) : 0,
+    
+    // Base counts (for status filter buttons)
+    totalBase,
+    passedBase,
+    failedBase,
+    notRunBase,
+    blockedBase,
+    notFoundBase,
+    automatedBase,
+    linkedBase
+  };
+}, [filteredTestCases, versionFilteredTestCases]);
 
   // Handle test case selection
   const handleTestCaseSelection = (testCaseId, checked) => {
@@ -1203,17 +1301,20 @@ const confirmVersionAssignment = async () => {
 };
 
   // Handle tag selection
-  const handleTagToggle = (tag) => {
-    setSelectedTags(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(tag)) {
-        newSet.delete(tag);
-      } else {
-        newSet.add(tag);
-      }
-      return newSet;
-    });
-  };
+  // Find your handleTagToggle function and update it:
+const handleTagToggle = (tag) => {
+  setSelectedTags(prev => {
+    const newSet = new Set(prev);
+    if (newSet.has(tag)) {
+      newSet.delete(tag);
+    } else {
+      newSet.add(tag);
+      // Auto-reset status filter when selecting a tag to avoid confusion
+      setStatusFilter('All');
+    }
+    return newSet;
+  });
+};
 
   // Clear all selected tags
   const handleClearTags = () => {
@@ -1320,328 +1421,296 @@ const confirmVersionAssignment = async () => {
         )}
 
         {/* Header */}
-        <div className="flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-gray-900">Test Cases</h1>
-          <div className="flex items-center space-x-3">
-            <button
-              onClick={handleNewTestCase}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center"
-            >
-              <Plus className="mr-2" size={16} />
-              Add
-            </button>
-          </div>
-        </div>
-
-        {/* Summary Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
-          <div className="bg-white p-4 rounded-lg shadow">
-            <div className="text-2xl font-bold text-gray-900">{summaryStats.total}</div>
-            <div className="text-sm text-gray-500">Total Test Cases</div>
-          </div>
-          <div className="bg-white p-4 rounded-lg shadow">
-            <div className="text-2xl font-bold text-green-600">{summaryStats.passed}</div>
-            <div className="text-sm text-gray-500">Passed</div>
-          </div>
-          <div className="bg-white p-4 rounded-lg shadow">
-            <div className="text-2xl font-bold text-red-600">{summaryStats.failed}</div>
-            <div className="text-sm text-gray-500">Failed</div>
-          </div>
-          <div className="bg-white p-4 rounded-lg shadow">
-            <div className="text-2xl font-bold text-gray-600">{summaryStats.notRun}</div>
-            <div className="text-sm text-gray-500">Not Run</div>
-          </div>
-          <div className="bg-white p-4 rounded-lg shadow">
-            <div className="text-2xl font-bold text-yellow-600">{summaryStats.blocked}</div>
-            <div className="text-sm text-gray-500">Blocked</div>
-          </div>
-          <div className="bg-white p-4 rounded-lg shadow">
-            <div className="text-2xl font-bold text-blue-600">{summaryStats.automationRate}%</div>
-            <div className="text-sm text-gray-500">Automated</div>
-          </div>
-          <div className="bg-white p-4 rounded-lg shadow">
-            <div className="text-2xl font-bold text-purple-600">{summaryStats.linkageRate}%</div>
-            <div className="text-sm text-gray-500">Linked</div>
-          </div>
-        </div>
-
-        {/* Filters Section */}
-        <div className="bg-white p-4 rounded-lg shadow">
-          {/* CHANGE 1: Update the grid layout in the Filters Section */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-end">
-            {/* CHANGE 3: Update the Search section to accommodate Priority filter */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Search</label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
-                <input
-                  type="text"
-                  placeholder="Search test cases..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 p-2 border rounded-lg w-full focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
+        {/* TOP SECTION: Title + Quick Actions + Key Metrics */}
+      <div className="bg-white rounded-lg shadow p-6">
+        {/* Header Row */}
+        <div className="flex justify-between items-start mb-6">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">Test Cases</h1>
+            {selectedVersion !== 'unassigned' && (
+              <div className="text-sm text-gray-600">
+                Version: <span className="font-medium text-blue-600">
+                  {versions.find(v => v.id === selectedVersion)?.name || selectedVersion}
+                </span>
               </div>
-            </div>
-
-            {/* CHANGE 2: Update the filters to remove Status and Priority from the main grid */}
-            {/* Status Filter */}
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            >
-              <option value="All">All Status</option>
-              <option value="Passed">Passed</option>
-              <option value="Failed">Failed</option>
-              <option value="Not Found">Not Found</option>
-              <option value="Blocked">Blocked</option>
-              <option value="Not Run">Not Run</option>
-            </select>
-
-            {/* CHANGE 4: Add Priority Filter after Status Filter */}
-            {/* Priority Filter */}
-            <select
-              value={priorityFilter}
-              onChange={(e) => setPriorityFilter(e.target.value)}
-              className="p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            >
-              <option value="All">All Priorities</option>
-              <option value="High">High</option>
-              <option value="Medium">Medium</option>
-              <option value="Low">Low</option>
-            </select>
+            )}
           </div>
+          <button
+            onClick={handleNewTestCase}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center"
+          >
+            <Plus className="mr-2" size={16} />
+            Add
+          </button>
+        </div>
 
-          {/* Enhanced Tag Filter Section - Collapsible */}
-          {availableTags.length > 0 && (
-            <div className="mt-4">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center space-x-3">
-                  <button
-                    onClick={() => setShowTagFilter(!showTagFilter)}
-                    className="flex items-center space-x-2 text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors"
-                  >
-                    <Filter size={16} />
-                    <span>Filter by Tags</span>
-                    <ChevronDown
-                      className={`transform transition-transform ${showTagFilter ? 'rotate-180' : ''}`}
-                      size={16}
-                    />
-                    {selectedTags.size > 0 && (
-                      <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full ml-2">
-                        {selectedTags.size}
-                      </span>
-                    )}
-                  </button>
+        {/* KEY METRICS - Condensed Dashboard */}
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 mb-6">
+          <div className="bg-gray-50 p-3 rounded-lg border">
+            <div className="text-xl font-bold text-gray-900">{summaryStats.total}</div>
+            <div className="text-xs text-gray-600">Total</div>
+          </div>
+          <div className="bg-green-50 p-3 rounded-lg border">
+            <div className="text-xl font-bold text-green-600">{summaryStats.passed}</div>
+            <div className="text-xs text-gray-600">Passed</div>
+          </div>
+          <div className="bg-red-50 p-3 rounded-lg border">
+            <div className="text-xl font-bold text-red-600">{summaryStats.failed}</div>
+            <div className="text-xs text-gray-600">Failed</div>
+          </div>
+          <div className="bg-gray-50 p-3 rounded-lg border">
+            <div className="text-xl font-bold text-gray-600">{summaryStats.notRun}</div>
+            <div className="text-xs text-gray-600">Not Run</div>
+          </div>
+          <div className="bg-yellow-50 p-3 rounded-lg border">
+            <div className="text-xl font-bold text-yellow-600">{summaryStats.blocked}</div>
+            <div className="text-xs text-gray-600">Blocked</div>
+          </div>
+          <div className="bg-blue-50 p-3 rounded-lg border">
+            <div className="text-xl font-bold text-blue-600">{summaryStats.automationRate}%</div>
+            <div className="text-xs text-gray-600">Automated</div>
+          </div>
+          <div className="bg-purple-50 p-3 rounded-lg border">
+            <div className="text-xl font-bold text-purple-600">{summaryStats.linkageRate}%</div>
+            <div className="text-xs text-gray-600">Linked</div>
+          </div>
+        </div>
 
-                  {/* Show tag count and available tags indicator */}
-                  <span className="text-xs text-gray-500">
-                    ({availableTags.length} available)
+        {/* QUICK FILTERS - Status Pills */}
+        {/* QUICK FILTERS - Status Pills */}
+{/* QUICK FILTERS - Status Pills */}
+<div className="flex items-center justify-between">
+  <div className="flex flex-wrap gap-2">
+    <button
+      onClick={() => setStatusFilter('All')}
+      className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
+        statusFilter === 'All'
+          ? 'bg-gray-200 text-gray-800 ring-2 ring-gray-400'
+          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+      }`}
+    >
+      📊 All ({summaryStats.totalBase})
+    </button>
+    <button
+      onClick={() => setStatusFilter('Failed')}
+      className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
+        statusFilter === 'Failed'
+          ? 'bg-red-200 text-red-800 ring-2 ring-red-400'
+          : 'bg-red-100 text-red-700 hover:bg-red-200'
+      }`}
+    >
+      🔴 Failed ({summaryStats.failedBase})
+    </button>
+    {summaryStats.notFoundBase > 0 && (
+      <button
+        onClick={() => setStatusFilter('Not Found')}
+        className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
+          statusFilter === 'Not Found'
+            ? 'bg-orange-200 text-orange-800 ring-2 ring-orange-400'
+            : 'bg-orange-100 text-orange-700 hover:bg-orange-200'
+        }`}
+      >
+        ⚠️ Issues ({summaryStats.notFoundBase})
+      </button>
+    )}
+    <button
+      onClick={() => setStatusFilter('Passed')}
+      className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
+        statusFilter === 'Passed'
+          ? 'bg-green-200 text-green-800 ring-2 ring-green-400'
+          : 'bg-green-100 text-green-700 hover:bg-green-200'
+      }`}
+    >
+      ✅ Passed ({summaryStats.passedBase})
+    </button>
+    <button
+      onClick={() => setStatusFilter('Not Run')}
+      className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
+        statusFilter === 'Not Run'
+          ? 'bg-blue-200 text-blue-800 ring-2 ring-blue-400'
+          : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+      }`}
+    >
+      ⏸️ Not Run ({summaryStats.notRunBase})
+    </button>
+  </div>
+  
+  {/* Your expand/collapse button stays the same */}
+</div>
+      </div>
+
+      {/* MIDDLE SECTION: Advanced Filters (Collapsible) */}
+      <div className="bg-white rounded-lg shadow">
+        <button
+          onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+          className="w-full px-6 py-4 flex items-center justify-between text-left hover:bg-gray-50 transition-colors"
+        >
+          <div className="flex items-center space-x-3">
+            <Filter size={20} className="text-gray-400" />
+            <div>
+              <div className="font-medium text-gray-900">Advanced Filters</div>
+              <div className="text-sm text-gray-500">
+                Search, priority, automation, tags, and more
+                {(searchQuery || priorityFilter !== 'All' || selectedTags.size > 0) && (
+                  <span className="ml-2 px-2 py-0.5 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">
+                    {[
+                      searchQuery && 'search',
+                      priorityFilter !== 'All' && 'priority',
+                      selectedTags.size > 0 && `${selectedTags.size} tags`
+                    ].filter(Boolean).join(', ')} active
                   </span>
-                </div>
-
-                {selectedTags.size > 0 && (
-                  <button
-                    onClick={handleClearTags}
-                    className="text-xs text-gray-500 hover:text-gray-700 px-2 py-1 rounded hover:bg-gray-100"
-                  >
-                    Clear all ({selectedTags.size})
-                  </button>
                 )}
               </div>
-
-              {/* Selected Tags Preview - Always visible when there are selected tags */}
-              {selectedTags.size > 0 && (
-                <div className="mb-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
-                  <div className="text-xs font-medium text-blue-700 mb-2">Active Tag Filters:</div>
-                  <div className="flex flex-wrap gap-2">
-                    {Array.from(selectedTags).map(tag => (
-                      <span
-                        key={tag}
-                        className="inline-flex items-center px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-full"
-                      >
-                        {tag}
-                        <button
-                          onClick={() => handleTagToggle(tag)}
-                          className="ml-1 text-blue-600 hover:text-blue-900 font-bold"
-                          title="Remove tag"
-                        >
-                          ×
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Collapsible Tag Selection Area */}
-              {showTagFilter && (
-                <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
-                  {/* Tag Search */}
-                  {availableTags.length > 10 && (
-                    <div className="mb-3">
-                      <div className="relative">
-                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={14} />
-                        <input
-                          type="text"
-                          placeholder="Search tags..."
-                          value={tagSearchQuery}
-                          onChange={(e) => setTagSearchQuery(e.target.value)}
-                          className="pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-md w-full focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Tag Grid */}
-                  <div className="max-h-48 overflow-y-auto">
-                    {filteredAvailableTags.length > 0 ? (
-                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
-                        {filteredAvailableTags.map(tag => (
-                          <button
-                            key={tag}
-                            onClick={() => handleTagToggle(tag)}
-                            className={`px-3 py-2 text-sm font-medium transition-all duration-200 rounded-md border ${
-                              selectedTags.has(tag)
-                                ? 'bg-blue-500 text-white border-blue-500 shadow-sm'
-                                : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 hover:border-gray-400'
-                            }`}
-                            title={`Toggle ${tag} filter`}
-                          >
-                            <div className="flex items-center justify-between">
-                              <span className="truncate">{tag}</span>
-                              {selectedTags.has(tag) && (
-                                <CheckCircle size={14} className="ml-1 flex-shrink-0" />
-                              )}
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="text-center py-4 text-gray-500 text-sm">
-                        {tagSearchQuery ? `No tags found matching "${tagSearchQuery}"` : 'No tags available'}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Filter Stats */}
-                  <div className="mt-3 pt-3 border-t border-gray-300">
-                    <div className="flex items-center justify-between text-xs text-gray-600">
-                      <span>
-                        {filteredAvailableTags.length} of {availableTags.length} tags shown
-                      </span>
-                      {selectedTags.size > 0 && (
-                        <span>
-                          Filtering by {selectedTags.size} tag{selectedTags.size !== 1 ? 's' : ''}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Quick Actions */}
-                  <div className="mt-3 pt-3 border-t border-gray-300 flex justify-between">
-                    <button
-                      onClick={() => {
-                        const allFilteredTags = new Set([...selectedTags, ...filteredAvailableTags]);
-                        setSelectedTags(allFilteredTags);
-                      }}
-                      disabled={filteredAvailableTags.length === 0}
-                      className="text-xs text-blue-600 hover:text-blue-800 disabled:text-gray-400 disabled:cursor-not-allowed"
-                    >
-                      Select All Visible
-                    </button>
-                    <button
-                      onClick={() => setShowTagFilter(false)}
-                      className="text-xs text-gray-600 hover:text-gray-800"
-                    >
-                      Close Filter
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* Tag Filter Summary - Always visible for context */}
-              {selectedTags.size > 0 && (
-                <div className="mt-2 text-xs text-gray-600">
-                  Showing test cases with any of these tags: {Array.from(selectedTags).join(', ')}
-                </div>
-              )}
             </div>
-          )}
-        </div>
-
-        {/* Enhanced Filters Section with Expand/Collapse */}
-        <div className="flex justify-between items-center mb-4">
-          <div className="flex space-x-2">
-            {/* Status Filter Buttons */}
-            <button
-              onClick={() => setStatusFilter('Failed')}
-              className={`px-3 py-1 rounded-full text-sm transition-colors ${
-                statusFilter === 'Failed'
-                  ? 'bg-red-200 text-red-800'
-                  : 'bg-red-100 text-red-700 hover:bg-red-200'
-              }`}
-            >
-              🔴 Failed ({summaryStats.failed})
-            </button>
-
-            {summaryStats.notFound > 0 && (
-              <button
-                onClick={() => setStatusFilter('Not Found')}
-                className={`px-3 py-1 rounded-full text-sm transition-colors ${
-                  statusFilter === 'Not Found'
-                    ? 'bg-orange-200 text-orange-800'
-                    : 'bg-orange-100 text-orange-700 hover:bg-orange-200'
-                }`}
-              >
-                ⚠️ Issues ({summaryStats.notFound})
-              </button>
-            )}
-
-            <button
-              onClick={() => setStatusFilter('Passed')}
-              className={`px-3 py-1 rounded-full text-sm transition-colors ${
-                statusFilter === 'Passed'
-                  ? 'bg-green-200 text-green-800'
-                  : 'bg-green-100 text-green-700 hover:bg-green-200'
-              }`}
-            >
-              ✅ Passed ({summaryStats.passed})
-            </button>
-
-            <button
-              onClick={() => setStatusFilter('All')}
-              className={`px-3 py-1 rounded-full text-sm transition-colors ${
-                statusFilter === 'All'
-                  ? 'bg-blue-200 text-blue-800'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              📊 All ({summaryStats.total})
-            </button>
           </div>
+          <ChevronDown 
+            className={`transform transition-transform ${showAdvancedFilters ? 'rotate-180' : ''}`} 
+            size={20} 
+          />
+        </button>
 
-          {/* Expand/Collapse All Button */}
-          {(summaryStats.failed > 0 || summaryStats.notFound > 0) && (
-            <button
-              onClick={toggleExpandAll}
-              className="flex items-center space-x-2 px-3 py-1 bg-gray-100 text-gray-700 rounded-md text-sm hover:bg-gray-200 transition-colors"
-            >
-              {allExpanded ? (
-                <>
-                  <ChevronUp size={16} />
-                  <span>Collapse All</span>
-                </>
-              ) : (
-                <>
-                  <ChevronDown size={16} />
-                  <span>Expand All Failures</span>
-                </>
-              )}
-            </button>
-          )}
-        </div>
+        {showAdvancedFilters && (
+          <div className="px-6 pb-6 border-t border-gray-200">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
+              {/* Search */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Search</label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
+                  <input
+                    type="text"
+                    placeholder="Search test cases..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                  {searchQuery && (
+                    <button
+                      onClick={() => setSearchQuery('')}
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    >
+                      <X size={16} />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Priority Filter */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Priority</label>
+                <select
+                  value={priorityFilter}
+                  onChange={(e) => setPriorityFilter(e.target.value)}
+                  className="w-full py-2 px-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="All">All Priorities</option>
+                  <option value="High">High Priority</option>
+                  <option value="Medium">Medium Priority</option>
+                  <option value="Low">Low Priority</option>
+                </select>
+              </div>
+
+              {/* Automation Filter */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Automation</label>
+                <select
+                  value={automationFilter}
+                  onChange={(e) => setAutomationFilter(e.target.value)}
+                  className="w-full py-2 px-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="All">All Types</option>
+                  <option value="Automated">Automated Only</option>
+                  <option value="Manual">Manual Only</option>
+                  <option value="Semi-Automated">Semi-Automated</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Tags Section */}
+            {availableTags.length > 0 && (
+  <div className="mt-4">
+    <label className="block text-sm font-medium text-gray-700 mb-2">Tags</label>
+    <div className="flex flex-wrap gap-2">
+      {availableTags
+        .map(tag => {
+          // Count test cases for this tag in current version
+          const tagCount = versionFilteredTestCases.filter(tc => 
+            tc.tags && Array.isArray(tc.tags) && tc.tags.includes(tag)
+          ).length;
+          return { tag, count: tagCount };
+        })
+        .filter(({ count }) => count > 0) // Only show tags with test cases
+        .slice(0, showAllTags ? availableTags.length : 10)
+        .map(({ tag, count }) => (
+          <button
+            key={tag}
+            onClick={() => handleTagToggle(tag)}
+            className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
+              selectedTags.has(tag)
+                ? 'bg-blue-500 text-white'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            {tag} ({count})
+            {selectedTags.has(tag) && <X size={12} className="ml-1 inline" />}
+          </button>
+        ))}
+      
+      {/* Show "more" button only if there are hidden tags with counts > 0 */}
+      {availableTags.filter(tag => {
+        const tagCount = versionFilteredTestCases.filter(tc => 
+          tc.tags && Array.isArray(tc.tags) && tc.tags.includes(tag)
+        ).length;
+        return tagCount > 0;
+      }).length > 10 && (
+        <button
+          onClick={() => setShowAllTags(!showAllTags)}
+          className="px-3 py-1 rounded-full text-sm text-blue-600 bg-blue-50 hover:bg-blue-100"
+        >
+          {showAllTags ? 'Show Less' : `+${availableTags.filter(tag => {
+            const tagCount = versionFilteredTestCases.filter(tc => 
+              tc.tags && Array.isArray(tc.tags) && tc.tags.includes(tag)
+            ).length;
+            return tagCount > 0;
+          }).length - 10} more`}
+        </button>
+      )}
+    </div>
+    {selectedTags.size > 0 && (
+      <button
+        onClick={handleClearTags}
+        className="mt-2 text-sm text-gray-500 hover:text-gray-700"
+      >
+        Clear all tags ({selectedTags.size})
+      </button>
+    )}
+  </div>
+)}
+
+            {/* Filter Actions */}
+            <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-200">
+              <div className="text-sm text-gray-500">
+                Showing {filteredTestCases.length} of {versionFilteredTestCases.length} test cases
+              </div>
+              <button
+                onClick={() => {
+                  setSearchQuery('');
+                  setPriorityFilter('All');
+                  setAutomationFilter('All');
+                  setSelectedTags(new Set());
+                }}
+                className="text-sm text-blue-600 hover:text-blue-800"
+              >
+                Clear all filters
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+        
+    
+
+       
 
         {/* Bulk Actions */}
         {/* Enhanced Bulk Actions with Version Assignment */}
