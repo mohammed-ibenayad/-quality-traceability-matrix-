@@ -24,7 +24,11 @@ import {
   FileText,
   Code,
   X,
-  Copy // NEW: Copy icon for duplicate action
+  Copy, // NEW: Copy icon for duplicate action
+  Hash,     // 🆕 ADD - for tag icon  
+  Minus,    // 🆕 ADD - for remove operations
+  Tag  
+  
 } from 'lucide-react';
 import MainLayout from '../components/Layout/MainLayout';
 import EmptyState from '../components/Common/EmptyState';
@@ -852,6 +856,11 @@ const TestCases = () => {
   const [showVersionModal, setShowVersionModal] = useState(false);
   const [modalVersions, setModalVersions] = useState(null);
 
+  const [showTagAssignmentModal, setShowTagAssignmentModal] = useState(false);
+  const [selectedTagsForAssignment, setSelectedTagsForAssignment] = useState([]);
+  const [tagAssignmentAction, setTagAssignmentAction] = useState('add');
+
+
 
   // Load data from DataStore
   useEffect(() => {
@@ -980,14 +989,8 @@ useEffect(() => {
 
   // Get unique tags from all test cases
   const availableTags = useMemo(() => {
-    const tags = new Set();
-    testCases.forEach(tc => {
-      if (tc.tags && Array.isArray(tc.tags)) {
-        tc.tags.forEach(tag => tags.add(tag));
-      }
-    });
-    return Array.from(tags).sort();
-  }, [testCases]);
+  return dataStore.getAllTags();
+}, [testCases]);
 
   // Add this computed value for filtered tags
   const filteredAvailableTags = useMemo(() => {
@@ -1270,9 +1273,249 @@ const summaryStats = useMemo(() => {
 const handleBulkVersionAssignment = (versionId, action) => {
   if (selectedTestCases.size === 0) return;
   
+  console.log('Bulk version assignment:', { versionId, action, selectedCount: selectedTestCases.size });
+  
   setSelectedVersionForAssignment(versionId);
   setVersionAssignmentAction(action);
   setShowVersionAssignmentModal(true);
+};
+
+/**
+ * NEW: Bulk tag assignment handler
+ */
+const handleBulkTagAssignment = (tags, action) => {
+  if (selectedTestCases.size === 0) return;
+  
+  console.log('Bulk tag assignment:', { tags, action, selectedCount: selectedTestCases.size });
+  
+  // Validate the operation before showing modal
+  const testCaseIds = Array.from(selectedTestCases);
+  const validation = dataStore.validateTagOperation(testCaseIds, tags, action);
+  
+  if (!validation.valid) {
+    alert('Cannot proceed with tag operation:\n' + validation.errors.join('\n'));
+    return;
+  }
+
+  // Show warnings if any
+  if (validation.warnings.length > 0) {
+    const proceed = confirm(
+      `Tag operation warnings:\n${validation.warnings.join('\n')}\n\nDo you want to continue?`
+    );
+    if (!proceed) return;
+  }
+  
+  setSelectedTagsForAssignment(tags);
+  setTagAssignmentAction(action);
+  setShowTagAssignmentModal(true);
+};
+
+/**
+ * NEW: Confirm tag assignment
+ */
+const confirmTagAssignment = async () => {
+  try {
+    const testCaseIds = Array.from(selectedTestCases);
+    
+    console.log('Confirming tag assignment:', {
+      testCaseIds: testCaseIds.length,
+      tags: selectedTagsForAssignment,
+      action: tagAssignmentAction
+    });
+    
+    const result = await dataStore.updateTestCaseTags(
+      testCaseIds, 
+      selectedTagsForAssignment, 
+      tagAssignmentAction
+    );
+    
+    // Clear selection and close modal
+    setSelectedTestCases(new Set());
+    setShowTagAssignmentModal(false);
+    
+    // Show detailed success message
+    const actionText = tagAssignmentAction === 'add' ? 'added to' : 'removed from';
+    const tagText = selectedTagsForAssignment.length === 1 
+      ? `"${selectedTagsForAssignment[0]}"` 
+      : `${selectedTagsForAssignment.length} tags`;
+    
+    if (result.successful.length > 0) {
+      let message = `✅ ${tagText} ${actionText} ${result.successful.length} test case${result.successful.length !== 1 ? 's' : ''}`;
+      
+      // Add details for partial operations
+      const details = [];
+      if (result.skipped.length > 0) {
+        details.push(`${result.skipped.length} skipped (no changes needed)`);
+      }
+      if (result.failed.length > 0) {
+        details.push(`${result.failed.length} failed`);
+      }
+      
+      if (details.length > 0) {
+        message += `\n\nDetails: ${details.join(', ')}`;
+      }
+      
+      alert(message);
+    } else {
+      alert(`ℹ️ No changes were made. ${result.skipped.length + result.failed.length} test cases were not modified.`);
+    }
+    
+  } catch (error) {
+    console.error('Tag assignment failed:', error);
+    alert('❌ Tag assignment failed: ' + error.message);
+    
+    // Don't clear the modal so user can retry
+    setShowTagAssignmentModal(false);
+  }
+};
+
+/**
+ * NEW: Enhanced export functionality
+ */
+const handleExportSelected = () => {
+  if (selectedTestCases.size === 0) return;
+
+  const selectedIds = Array.from(selectedTestCases);
+  const selectedTestCaseObjects = testCases.filter(tc => selectedIds.includes(tc.id));
+  
+  // Create export data with enhanced information
+  const exportData = selectedTestCaseObjects.map(tc => ({
+    id: tc.id,
+    name: tc.name,
+    description: tc.description,
+    category: tc.category,
+    status: tc.status,
+    priority: tc.priority,
+    automationStatus: tc.automationStatus,
+    tags: tc.tags?.join(', ') || '',
+    applicableVersions: tc.applicableVersions?.join(', ') || tc.version || '',
+    requirementIds: tc.requirementIds?.join(', ') || '',
+    assignee: tc.assignee || '',
+    estimatedDuration: tc.estimatedDuration || '',
+    lastExecuted: tc.lastExecuted || 'Never'
+  }));
+
+  // Convert to CSV
+  const csvContent = convertToCSV(exportData);
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement('a');
+  
+  if (link.download !== undefined) {
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `test-cases-export-${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
+  // Clear selection after export
+  setSelectedTestCases(new Set());
+  alert(`✅ Exported ${selectedTestCaseObjects.length} test cases to CSV file.`);
+};
+
+/**
+ * Helper function to convert data to CSV
+ */
+const convertToCSV = (data) => {
+  const headers = Object.keys(data[0]);
+  const csvContent = [
+    headers.join(','),
+    ...data.map(row => 
+      headers.map(header => {
+        const value = row[header]?.toString() || '';
+        // Escape quotes and wrap in quotes if contains comma, quote, or newline
+        return value.includes(',') || value.includes('"') || value.includes('\n')
+          ? `"${value.replace(/"/g, '""')}"` 
+          : value;
+      }).join(',')
+    )
+  ].join('\n');
+  
+  return csvContent;
+};
+
+/**
+ * NEW: Tag Assignment Confirmation Modal Component
+ * Add this component inside your TestCases component (before the return statement)
+ */
+const TagAssignmentModal = () => {
+  if (!showTagAssignmentModal) return null;
+
+  const actionText = tagAssignmentAction === 'add' ? 'add' : 'remove';
+  const prepositionText = tagAssignmentAction === 'add' ? 'to' : 'from';
+  const colorClass = tagAssignmentAction === 'add' ? 'text-green-600' : 'text-red-600';
+  const bgColorClass = tagAssignmentAction === 'add' ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200';
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+        <h3 className="text-lg font-semibold mb-4 flex items-center">
+          <Hash className={`mr-2 ${colorClass}`} size={20} />
+          Confirm Tag {tagAssignmentAction === 'add' ? 'Addition' : 'Removal'}
+        </h3>
+        
+        <div className={`p-4 rounded-lg ${bgColorClass} mb-4`}>
+          <p className="text-sm mb-3">
+            You are about to <strong className={colorClass}>{actionText}</strong> the following tag{selectedTagsForAssignment.length !== 1 ? 's' : ''}{' '}
+            <strong className={colorClass}>{prepositionText}</strong> {selectedTestCases.size} selected test case{selectedTestCases.size !== 1 ? 's' : ''}:
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {selectedTagsForAssignment.map(tag => (
+              <span 
+                key={tag} 
+                className={`inline-flex items-center px-3 py-1 text-sm font-medium rounded-full ${
+                  tagAssignmentAction === 'add' 
+                    ? 'bg-green-100 text-green-800 border border-green-300' 
+                    : 'bg-red-100 text-red-800 border border-red-300'
+                }`}
+              >
+                <Tag size={14} className="mr-1" />
+                {tag}
+              </span>
+            ))}
+          </div>
+        </div>
+
+        <div className="text-sm text-gray-600 mb-6 p-3 bg-gray-50 rounded">
+          <strong>Selected test cases ({selectedTestCases.size}):</strong>
+          <div className="mt-1 text-xs">
+            {Array.from(selectedTestCases).slice(0, 5).map(id => {
+              const tc = testCases.find(t => t.id === id);
+              return tc?.name || id;
+            }).join(', ')}
+            {selectedTestCases.size > 5 && ` and ${selectedTestCases.size - 5} more...`}
+          </div>
+        </div>
+
+        <div className="flex space-x-3">
+          <button
+            onClick={confirmTagAssignment}
+            className={`flex-1 py-2 px-4 rounded font-medium transition-colors flex items-center justify-center ${
+              tagAssignmentAction === 'add'
+                ? 'bg-green-600 text-white hover:bg-green-700'
+                : 'bg-red-600 text-white hover:bg-red-700'
+            }`}
+          >
+            {tagAssignmentAction === 'add' ? (
+              <Plus size={16} className="mr-2" />
+            ) : (
+              <Minus size={16} className="mr-2" />
+            )}
+            Confirm {tagAssignmentAction === 'add' ? 'Addition' : 'Removal'}
+          </button>
+          <button
+            onClick={() => setShowTagAssignmentModal(false)}
+            className="flex-1 py-2 px-4 border border-gray-300 rounded font-medium text-gray-700 hover:bg-gray-50 transition-colors flex items-center justify-center"
+          >
+            <X size={16} className="mr-2" />
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 };
 
 const confirmVersionAssignment = async () => {
@@ -1718,10 +1961,13 @@ const handleTagToggle = (tag) => {
   <BulkActionsPanel
     selectedCount={selectedTestCases.size}
     availableVersions={availableVersions}
+    availableTags={availableTags}              // 🆕 ADD THIS LINE
     onVersionAssign={handleBulkVersionAssignment}
+    onTagsUpdate={handleBulkTagAssignment}     // 🆕 ADD THIS LINE
     onExecuteTests={executeSelectedTests}
     onBulkDelete={handleBulkDelete}
     onClearSelection={handleClearSelection}
+    onExport={handleExportSelected}            // 🆕 ADD THIS LINE (optional)
   />
 )}
         
@@ -1928,7 +2174,7 @@ const handleTagToggle = (tag) => {
             </div>
           </div>
         )} 
-
+<TagAssignmentModal />
         {/* Version Assignment Confirmation Modal */}
 {showVersionAssignmentModal && (
   <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">

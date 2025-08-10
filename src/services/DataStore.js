@@ -22,6 +22,8 @@ class DataStoreService {
     this._loadPersistedData();
   }
 
+
+
   /**
    * Load persisted data from localStorage
    * @private
@@ -1841,6 +1843,273 @@ getVersion(versionId) {
     
     return this._testCases.filter(tc => this.testCaseAppliesTo(tc, versionId));
   }
+
+
+  // Add these methods to your DataStore.js class
+// Copy and paste each method into your existing DataStore class
+
+/**
+ * Update tags for multiple test cases
+ * @param {string[]} testCaseIds - Array of test case IDs to update
+ * @param {string[]} tags - Array of tags to add or remove
+ * @param {string} action - 'add' or 'remove'
+ * @returns {Object} Operation result with success/failure counts
+ */
+updateTestCaseTags(testCaseIds, tags, action = 'add') {
+  const results = {
+    successful: [],
+    failed: [],
+    skipped: [],
+    summary: {
+      total: testCaseIds.length,
+      tagsAffected: tags.length,
+      action: action
+    }
+  };
+
+  // Validate inputs
+  if (!Array.isArray(testCaseIds) || testCaseIds.length === 0) {
+    throw new Error('No test cases selected for tag update');
+  }
+
+  if (!Array.isArray(tags) || tags.length === 0) {
+    throw new Error('No tags specified for update');
+  }
+
+  if (!['add', 'remove'].includes(action)) {
+    throw new Error('Action must be either "add" or "remove"');
+  }
+
+  // Process each test case
+  testCaseIds.forEach(testCaseId => {
+    try {
+      const testCaseIndex = this._testCases.findIndex(tc => tc.id === testCaseId);
+      
+      if (testCaseIndex === -1) {
+        results.failed.push({ 
+          testCaseId, 
+          error: 'Test case not found',
+          tags: tags
+        });
+        return;
+      }
+
+      const testCase = { ...this._testCases[testCaseIndex] };
+      const currentTags = Array.isArray(testCase.tags) ? [...testCase.tags] : [];
+      let updatedTags = [...currentTags];
+      let hasChanges = false;
+
+      if (action === 'add') {
+        // Add tags that don't already exist
+        tags.forEach(tag => {
+          if (!updatedTags.includes(tag)) {
+            updatedTags.push(tag);
+            hasChanges = true;
+          }
+        });
+      } else if (action === 'remove') {
+        // Remove specified tags
+        const initialLength = updatedTags.length;
+        updatedTags = updatedTags.filter(tag => !tags.includes(tag));
+        hasChanges = updatedTags.length !== initialLength;
+      }
+
+      // Skip if no changes needed
+      if (!hasChanges) {
+        results.skipped.push({
+          testCaseId,
+          reason: action === 'add' ? 'Tags already exist' : 'Tags not found',
+          currentTags,
+          requestedTags: tags
+        });
+        return;
+      }
+
+      // Update the test case
+      this._testCases[testCaseIndex] = {
+        ...testCase,
+        tags: updatedTags.sort(), // Keep tags sorted for consistency
+        lastModified: new Date().toISOString()
+      };
+
+      results.successful.push({
+        testCaseId,
+        previousTags: currentTags,
+        newTags: updatedTags,
+        addedTags: action === 'add' ? tags.filter(tag => !currentTags.includes(tag)) : [],
+        removedTags: action === 'remove' ? tags.filter(tag => currentTags.includes(tag)) : []
+      });
+
+    } catch (error) {
+      results.failed.push({
+        testCaseId,
+        error: error.message,
+        tags: tags
+      });
+    }
+  });
+
+  // Save to localStorage if any changes were made
+  if (results.successful.length > 0) {
+    this._saveToLocalStorage('testCases', this._testCases);
+    this._notifyListeners();
+    
+    console.log(`✅ Bulk tag ${action} completed: ${results.successful.length} successful, ${results.failed.length} failed, ${results.skipped.length} skipped`);
+  }
+
+  return results;
+}
+
+/**
+ * Get all unique tags from test cases
+ * @returns {string[]} Array of unique tags sorted alphabetically
+ */
+getAllTags() {
+  const tags = new Set();
+  this._testCases.forEach(tc => {
+    if (tc.tags && Array.isArray(tc.tags)) {
+      tc.tags.forEach(tag => tags.add(tag));
+    }
+  });
+  return Array.from(tags).sort();
+}
+
+/**
+ * Get tag usage statistics
+ * @returns {Array} Array of objects with tag name and usage count
+ */
+getTagStats() {
+  const tagCounts = {};
+  this._testCases.forEach(tc => {
+    if (tc.tags && Array.isArray(tc.tags)) {
+      tc.tags.forEach(tag => {
+        tagCounts[tag] = (tagCounts[tag] || 0) + 1;
+      });
+    }
+  });
+
+  return Object.entries(tagCounts)
+    .map(([tag, count]) => ({ tag, count, percentage: Math.round((count / this._testCases.length) * 100) }))
+    .sort((a, b) => b.count - a.count);
+}
+
+/**
+ * Validate tag operations before execution
+ * @param {string[]} testCaseIds - Test case IDs to validate
+ * @param {string[]} tags - Tags to validate
+ * @param {string} action - 'add' or 'remove'
+ * @returns {Object} Validation result with warnings and errors
+ */
+validateTagOperation(testCaseIds, tags, action) {
+  const validation = {
+    valid: true,
+    errors: [],
+    warnings: [],
+    summary: {
+      total: testCaseIds.length,
+      found: 0,
+      wouldChange: 0,
+      alreadyHaveTags: 0,
+      missingTags: 0
+    }
+  };
+
+  // Validate inputs
+  if (!Array.isArray(testCaseIds) || testCaseIds.length === 0) {
+    validation.errors.push('No test cases selected');
+    validation.valid = false;
+    return validation;
+  }
+
+  if (!Array.isArray(tags) || tags.length === 0) {
+    validation.errors.push('No tags specified');
+    validation.valid = false;
+    return validation;
+  }
+
+  // Validate tag names
+  const invalidTags = tags.filter(tag => !tag.trim() || tag.length > 50);
+  if (invalidTags.length > 0) {
+    validation.errors.push(`Invalid tag names: ${invalidTags.join(', ')}`);
+    validation.valid = false;
+  }
+
+  // Check each test case
+  testCaseIds.forEach(testCaseId => {
+    const testCase = this._testCases.find(tc => tc.id === testCaseId);
+    
+    if (!testCase) {
+      validation.errors.push(`Test case ${testCaseId} not found`);
+      return;
+    }
+
+    validation.summary.found++;
+
+    const currentTags = Array.isArray(testCase.tags) ? testCase.tags : [];
+    
+    if (action === 'add') {
+      const newTags = tags.filter(tag => !currentTags.includes(tag));
+      if (newTags.length > 0) {
+        validation.summary.wouldChange++;
+      } else {
+        validation.summary.alreadyHaveTags++;
+      }
+    } else if (action === 'remove') {
+      const existingTags = tags.filter(tag => currentTags.includes(tag));
+      if (existingTags.length > 0) {
+        validation.summary.wouldChange++;
+      } else {
+        validation.summary.missingTags++;
+      }
+    }
+  });
+
+  // Generate warnings
+  if (action === 'add' && validation.summary.alreadyHaveTags > 0) {
+    validation.warnings.push(`${validation.summary.alreadyHaveTags} test case(s) already have some of these tags`);
+  }
+
+  if (action === 'remove' && validation.summary.missingTags > 0) {
+    validation.warnings.push(`${validation.summary.missingTags} test case(s) don't have some of these tags`);
+  }
+
+  if (validation.summary.wouldChange === 0) {
+    validation.warnings.push('No test cases will be modified by this operation');
+  }
+
+  return validation;
+}
+
+/**
+ * Clean up unused tags (remove tags not used by any test case)
+ * @returns {Object} Cleanup result with removed tags
+ */
+cleanupUnusedTags() {
+  const usedTags = new Set();
+  const allDefinedTags = new Set();
+
+  // Collect all tags currently in use
+  this._testCases.forEach(tc => {
+    if (tc.tags && Array.isArray(tc.tags)) {
+      tc.tags.forEach(tag => {
+        usedTags.add(tag);
+        allDefinedTags.add(tag);
+      });
+    }
+  });
+
+  // For this implementation, we don't store tags separately from test cases,
+  // so this method primarily serves to validate tag consistency
+  const result = {
+    totalTags: allDefinedTags.size,
+    usedTags: usedTags.size,
+    removedTags: [],
+    message: `All ${usedTags.size} tags are currently in use`
+  };
+
+  console.log('Tag cleanup completed:', result);
+  return result;
+}
 }
 
 // Create singleton instance
