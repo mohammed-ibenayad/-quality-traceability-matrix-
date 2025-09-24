@@ -21,6 +21,7 @@ import TDFInfoTooltip from '../components/Common/TDFInfoTooltip';
 import { useVersionContext } from '../context/VersionContext';
 import { calculateCoverage } from '../utils/coverage';
 import dataStore from '../services/DataStore';
+import BulkActionsPanel from '../components/Common/BulkActionsPanel';
 
 /**
  * Helper function to check if a test case applies to a version
@@ -67,6 +68,11 @@ const getVersionTags = (testCase) => {
 const getVersionDisplayText = (testCase) => {
   const tags = getVersionTags(testCase);
   return tags.length > 3 ? `${tags.length} versions` : tags.join(', ');
+};
+
+// Add this helper function near the top with other helper functions
+const getAllTags = (requirements) => {
+  return [...new Set(requirements.flatMap(req => req.tags || []))];
 };
 
 const Requirements = () => {
@@ -302,6 +308,95 @@ const Requirements = () => {
     );
   }
 
+  // Bulk action handlers
+  const handleBulkVersionAssignment = (versionId, action) => {
+    try {
+      const currentRequirements = dataStore.getRequirements();
+      const updatedRequirements = currentRequirements.map(req =>
+        selectedRequirements.has(req.id)
+          ? {
+              ...req,
+              versions: action === 'add'
+                ? [...new Set([...(req.versions || []), versionId])]
+                : (req.versions || []).filter(v => v !== versionId),
+              updatedAt: new Date().toISOString()
+            }
+          : req
+      );
+      dataStore.setRequirements(updatedRequirements);
+      setSelectedRequirements(new Set());
+    } catch (error) {
+      console.error('Version assignment failed:', error);
+      alert('Version assignment failed: ' + error.message);
+    }
+  };
+
+  const handleBulkTagsUpdate = (tags, action) => {
+    try {
+      const currentRequirements = dataStore.getRequirements();
+      const updatedRequirements = currentRequirements.map(req =>
+        selectedRequirements.has(req.id)
+          ? {
+              ...req,
+              tags: action === 'add'
+                ? [...new Set([...(req.tags || []), ...tags])]
+                : (req.tags || []).filter(t => !tags.includes(t)),
+              updatedAt: new Date().toISOString()
+            }
+          : req
+      );
+      dataStore.setRequirements(updatedRequirements);
+      setSelectedRequirements(new Set());
+    } catch (error) {
+      console.error('Tags update failed:', error);
+      alert('Tags update failed: ' + error.message);
+    }
+  };
+
+  const handleExportSelected = () => {
+    if (selectedRequirements.size === 0) return;
+
+    const selectedIds = Array.from(selectedRequirements);
+    const selectedReqs = requirements.filter(req => selectedIds.includes(req.id));
+    
+    const exportData = selectedReqs.map(req => ({
+      id: req.id,
+      name: req.name,
+      description: req.description,
+      type: req.type,
+      priority: req.priority,
+      status: req.status,
+      versions: req.versions?.join(', ') || '',
+      tags: req.tags?.join(', ') || '',
+      businessImpact: req.businessImpact,
+      technicalComplexity: req.technicalComplexity,
+      regulatoryFactor: req.regulatoryFactor,
+      usageFrequency: req.usageFrequency,
+      testDepthFactor: req.testDepthFactor
+    }));
+
+    // Convert to CSV
+    const headers = Object.keys(exportData[0]);
+    const csvContent = [
+      headers.join(','),
+      ...exportData.map(row => 
+        headers.map(header => {
+          const value = row[header]?.toString() || '';
+          return value.includes(',') ? `"${value}"` : value;
+        }).join(',')
+      )
+    ].join('\n');
+
+    // Download CSV
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `requirements-export-${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+
+    setSelectedRequirements(new Set());
+  };
+
   return (
     <MainLayout title="Requirements" hasData={hasData}>
       <div className="space-y-6">
@@ -403,28 +498,19 @@ const Requirements = () => {
 
         {/* Bulk Actions */}
         {selectedRequirements.size > 0 && (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <div className="flex items-center justify-between">
-              <span className="text-blue-700">
-                {selectedRequirements.size} requirement(s) selected
-              </span>
-              <div className="flex gap-2">
-                <button
-                  onClick={handleBulkDelete}
-                  className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 flex items-center"
-                >
-                  <Trash2 size={14} className="mr-1" />
-                  Delete Selected
-                </button>
-                <button
-                  onClick={() => setSelectedRequirements(new Set())}
-                  className="px-3 py-1 bg-gray-600 text-white rounded hover:bg-gray-700"
-                >
-                  Clear Selection
-                </button>
-              </div>
-            </div>
-          </div>
+          <BulkActionsPanel
+            selectedCount={selectedRequirements.size}
+            itemType="requirement"
+            availableVersions={versions}
+            availableTags={getAllTags(requirements)} // Pass requirements array
+            onVersionAssign={handleBulkVersionAssignment}
+            onTagsUpdate={handleBulkTagsUpdate}
+            onBulkDelete={handleBulkDelete}
+            onClearSelection={() => setSelectedRequirements(new Set())}
+            showExecuteButton={false}
+            showExportButton={true}
+            onExport={handleExportSelected}
+          />
         )}
 
         {/* Requirements Table */}
