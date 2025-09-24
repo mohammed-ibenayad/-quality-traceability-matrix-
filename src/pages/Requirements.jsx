@@ -674,11 +674,11 @@ const Requirements = () => {
                                         <div className="bg-gray-50 rounded-lg p-3">
                                           <div className="flex items-center justify-between mb-2">
                                             <span className="text-sm font-medium text-gray-700">Business Impact</span>
-                                            <span className="text-lg font-bold text-blue-600">{req.businessImpact}/5</span>
+                                            <span className="text-lg font-bold text-gray-600">{req.businessImpact}/5</span>
                                           </div>
                                           <div className="w-full bg-gray-200 rounded-full h-2">
                                             <div 
-                                              className="bg-blue-500 h-2 rounded-full" 
+                                              className="bg-gray-500 h-2 rounded-full" 
                                               style={{width: `${(req.businessImpact / 5) * 100}%`}}
                                             ></div>
                                           </div>
@@ -686,11 +686,11 @@ const Requirements = () => {
                                         <div className="bg-gray-50 rounded-lg p-3">
                                           <div className="flex items-center justify-between mb-2">
                                             <span className="text-sm font-medium text-gray-700">Technical Complexity</span>
-                                            <span className="text-lg font-bold text-orange-600">{req.technicalComplexity}/5</span>
+                                            <span className="text-lg font-bold text-gray-600">{req.technicalComplexity}/5</span>
                                           </div>
                                           <div className="w-full bg-gray-200 rounded-full h-2">
                                             <div 
-                                              className="bg-orange-500 h-2 rounded-full" 
+                                              className="bg-gray-500 h-2 rounded-full" 
                                               style={{width: `${(req.technicalComplexity / 5) * 100}%`}}
                                             ></div>
                                           </div>
@@ -698,11 +698,11 @@ const Requirements = () => {
                                         <div className="bg-gray-50 rounded-lg p-3">
                                           <div className="flex items-center justify-between mb-2">
                                             <span className="text-sm font-medium text-gray-700">Regulatory Factor</span>
-                                            <span className="text-lg font-bold text-red-600">{req.regulatoryFactor}/5</span>
+                                            <span className="text-lg font-bold text-gray-600">{req.regulatoryFactor}/5</span>
                                           </div>
                                           <div className="w-full bg-gray-200 rounded-full h-2">
                                             <div 
-                                              className="bg-red-500 h-2 rounded-full" 
+                                              className="bg-gray-500 h-2 rounded-full" 
                                               style={{width: `${(req.regulatoryFactor / 5) * 100}%`}}
                                             ></div>
                                           </div>
@@ -714,7 +714,7 @@ const Requirements = () => {
                                           </div>
                                           <div className="w-full bg-gray-200 rounded-full h-2">
                                             <div 
-                                              className="bg-green-500 h-2 rounded-full" 
+                                              className="bg-gray-500 h-2 rounded-full" 
                                               style={{width: `${(req.usageFrequency / 5) * 100}%`}}
                                             ></div>
                                           </div>
@@ -847,38 +847,7 @@ const Requirements = () => {
                                       </div>
                                     )}
 
-                                    {/* Change 1: Linked Test Cases with Enhanced Version Display */}
-                                    {linkedTestCount > 0 && (
-                                      <div className="bg-white rounded-lg p-4 shadow-sm border">
-                                        <h4 className="font-semibold text-gray-900 mb-3">Linked Test Cases</h4>
-                                        <div className="space-y-2">
-                                          {linkedTests.map(tc => (
-                                            <div key={tc.id} className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                                              <div className="flex-1">
-                                                <span className="text-sm font-medium">{tc.name}</span>
-                                                <div className="flex items-center mt-1 space-x-2">
-                                                  <span className="text-xs text-gray-500">Status: {tc.status}</span>
-                                                  <div className="flex flex-wrap gap-1">
-                                                    {getVersionTags(tc).map((version, index) => (
-                                                      <span 
-                                                        key={index} 
-                                                        className={`px-2 py-0.5 rounded text-xs font-medium ${
-                                                          version === 'All Versions' 
-                                                            ? 'bg-green-100 text-green-700' 
-                                                            : 'bg-blue-100 text-blue-700'
-                                                        }`}
-                                                      >
-                                                        {version}
-                                                      </span>
-                                                    ))}
-                                                  </div>
-                                                </div>
-                                              </div>
-                                            </div>
-                                          ))}
-                                        </div>
-                                      </div>
-                                    )}
+                                    
                                   </div>
                                 </div>
                               </div>
