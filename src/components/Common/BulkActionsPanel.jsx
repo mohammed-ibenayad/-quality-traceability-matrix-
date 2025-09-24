@@ -1,4 +1,4 @@
-// Complete BulkActionsPanel.jsx - Enhanced with Tag Management
+// Complete BulkActionsPanel.jsx - Enhanced with Tag Management and Generic Support
 // Replace your entire BulkActionsPanel.jsx file with this content
 
 import React, { useState, useMemo } from 'react';
@@ -20,13 +20,21 @@ import {
 
 /**
  * Enhanced Bulk Actions Panel with comprehensive tag editing and version management
+ * Now supports both test cases and requirements
  */
 const BulkActionsPanel = ({
   selectedCount,
   availableVersions = [],
-  availableTags = [], // NEW: Available tags from test cases
+  availableTags = [], // Available tags from items
+  
+  // NEW: Generic props to customize the component
+  itemType = "test case", // "test case" or "requirement"
+  showExecuteButton = true, // Only show for test cases
+  showExportButton = false, // Can be enabled for both
+  
+  // Existing callbacks
   onVersionAssign,
-  onTagsUpdate, // NEW: Callback for tag updates
+  onTagsUpdate, // Callback for tag updates
   onExecuteTests,
   onBulkDelete,
   onClearSelection,
@@ -38,7 +46,7 @@ const BulkActionsPanel = ({
   const [versionSearchQuery, setVersionSearchQuery] = useState('');
   const [versionActiveTab, setVersionActiveTab] = useState('add');
 
-  // Tag management state - NEW
+  // Tag management state
   const [showTagsDropdown, setShowTagsDropdown] = useState(false);
   const [tagSearchQuery, setTagSearchQuery] = useState('');
   const [tagActiveTab, setTagActiveTab] = useState('add');
@@ -58,7 +66,7 @@ const BulkActionsPanel = ({
     );
   }, [availableVersions, versionSearchQuery]);
 
-  // Filter tags based on search query - NEW
+  // Filter tags based on search query
   const filteredTags = useMemo(() => {
     if (!tagSearchQuery) return availableTags;
     return availableTags.filter(tag => 
@@ -106,7 +114,7 @@ const BulkActionsPanel = ({
     setVersionSearchQuery('');
   };
 
-  // Tag action handlers - NEW
+  // Tag action handlers
   const handleTagAction = (action, tags) => {
     if (onTagsUpdate) {
       onTagsUpdate(Array.isArray(tags) ? tags : [tags], action);
@@ -177,24 +185,26 @@ const BulkActionsPanel = ({
   return (
     <div className={`relative bg-blue-50 border border-blue-200 rounded-lg p-4 ${className}`}>
       <div className="flex items-center justify-between">
-        {/* Selection Info */}
+        {/* Selection Info - UPDATED to be generic */}
         <div className="flex items-center space-x-2">
           <div className="text-blue-800 font-medium">
-            {selectedCount} test case{selectedCount !== 1 ? 's' : ''} selected
+            {selectedCount} {itemType}{selectedCount !== 1 ? 's' : ''} selected
           </div>
         </div>
 
         {/* Action Buttons - LIGHTER OUTLINE STYLE */}
         <div className="flex items-center space-x-2">
-          {/* Execute Tests Button - PRESERVE EXISTING PATTERN */}
-          <button
-            onClick={onExecuteTests}
-            className="px-3 py-1 border border-green-500 text-green-700 bg-green-50 rounded hover:bg-green-100 hover:border-green-600 text-sm transition-colors flex items-center"
-            title="Execute selected test cases"
-          >
-            <Play size={14} className="mr-1" />
-            Execute ({selectedCount})
-          </button>
+          {/* Execute Tests Button - Only show for test cases */}
+          {showExecuteButton && onExecuteTests && (
+            <button
+              onClick={onExecuteTests}
+              className="px-3 py-1 border border-green-500 text-green-700 bg-green-50 rounded hover:bg-green-100 hover:border-green-600 text-sm transition-colors flex items-center"
+              title={`Execute selected ${itemType}s`}
+            >
+              <Play size={14} className="mr-1" />
+              Execute ({selectedCount})
+            </button>
+          )}
 
           {/* Version Assignment Dropdown */}
           {availableVersions.length > 0 && (
@@ -341,7 +351,7 @@ const BulkActionsPanel = ({
                     )}
                   </div>
 
-                  {/* Action Summary */}
+                  {/* Action Summary - UPDATED to be generic */}
                   <div className="border-t border-gray-100 p-3 bg-gray-50 text-xs text-gray-600">
                     <div className="flex items-center justify-center">
                       <span className={`font-medium ${
@@ -356,7 +366,7 @@ const BulkActionsPanel = ({
             </div>
           )}
 
-          {/* Tags Management Dropdown - NEW */}
+          {/* Tags Management Dropdown */}
           {availableTags.length > 0 && (
             <div className="relative">
               <button
@@ -531,13 +541,13 @@ const BulkActionsPanel = ({
                     )}
                   </div>
 
-                  {/* Action Summary */}
+                  {/* Action Summary - UPDATED to be generic */}
                   <div className="border-t border-gray-100 p-3 bg-gray-50 text-xs text-gray-600">
                     <div className="flex items-center justify-center">
                       <span className={`font-medium ${
                         tagActiveTab === 'add' ? 'text-green-600' : 'text-red-600'
                       }`}>
-                        {tagActiveTab === 'add' ? 'Adding' : 'Removing'} tags {tagActiveTab === 'add' ? 'to' : 'from'} selected test cases
+                        {tagActiveTab === 'add' ? 'Adding' : 'Removing'} tags {tagActiveTab === 'add' ? 'to' : 'from'} selected {itemType}s
                       </span>
                     </div>
                   </div>
@@ -546,29 +556,29 @@ const BulkActionsPanel = ({
             </div>
           )}
 
-          {/* Export Button - PRESERVE EXISTING PATTERN */}
-          {onExport && (
+          {/* Export Button - Show conditionally */}
+          {showExportButton && onExport && (
             <button
               onClick={onExport}
               className="px-3 py-1 border border-orange-500 text-orange-700 bg-orange-50 rounded hover:bg-orange-100 hover:border-orange-600 text-sm transition-colors flex items-center"
-              title="Export selected test cases"
+              title={`Export selected ${itemType}s`}
             >
               <FileDown size={14} className="mr-1" />
               Export ({selectedCount})
             </button>
           )}
 
-          {/* Delete Button - PRESERVE EXISTING PATTERN */}
+          {/* Delete Button - UPDATED tooltip to be generic */}
           <button
             onClick={onBulkDelete}
             className="px-3 py-1 border border-red-500 text-red-700 bg-red-50 rounded hover:bg-red-100 hover:border-red-600 text-sm transition-colors flex items-center"
-            title="Delete selected test cases"
+            title={`Delete selected ${itemType}s`}
           >
             <Trash2 size={14} className="mr-1" />
             Delete ({selectedCount})
           </button>
 
-          {/* Clear Selection - PRESERVE EXISTING PATTERN */}
+          {/* Clear Selection - UPDATED tooltip to be generic */}
           <button
             onClick={onClearSelection}
             className="px-3 py-1 border border-gray-400 text-gray-700 bg-gray-50 rounded hover:bg-gray-100 hover:border-gray-500 text-sm transition-colors flex items-center"
@@ -580,16 +590,18 @@ const BulkActionsPanel = ({
         </div>
       </div>
 
-      {/* Enhanced Selection Summary - PRESERVE EXISTING PATTERNS */}
+      {/* Enhanced Selection Summary - UPDATED to be generic */}
       <div className="mt-3 pt-3 border-t border-blue-200">
         <div className="flex items-center justify-between text-xs">
           <div className="flex items-center space-x-4 text-blue-600">
             <span>Quick Actions Available:</span>
             <div className="flex items-center space-x-2">
-              <span className="flex items-center">
-                <Play size={12} className="mr-1" />
-                Execute ({selectedCount})
-              </span>
+              {showExecuteButton && onExecuteTests && (
+                <span className="flex items-center">
+                  <Play size={12} className="mr-1" />
+                  Execute ({selectedCount})
+                </span>
+              )}
               {availableVersions.length > 0 && (
                 <span className="flex items-center">
                   <Settings size={12} className="mr-1" />
@@ -610,8 +622,9 @@ const BulkActionsPanel = ({
           </div>
           
           <div className="text-blue-500">
-            {selectedCount === 1 ? 'Select more test cases for additional bulk operations' : 
-             `${selectedCount} test cases selected`}
+            {selectedCount === 1 ? 
+              `Select more ${itemType}s for additional bulk operations` : 
+              `${selectedCount} ${itemType}s selected`}
           </div>
         </div>
       </div>

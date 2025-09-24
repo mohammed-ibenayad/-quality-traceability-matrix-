@@ -39,7 +39,7 @@ import ViewTestCaseModal from '../components/TestCases/ViewTestCaseModal';
 import EditTestCaseModal from '../components/TestCases/EditTestCaseModal';
 import { useVersionContext } from '../context/VersionContext';
 import dataStore from '../services/DataStore';
-import BulkActionsPanel from '../components/TestCases/BulkActionsPanel';
+import BulkActionsPanel from '../components/Common/BulkActionsPanel';
 import TestCaseRowActions from '../components/TestCases/TestCaseRowActions';
 
 
@@ -1962,6 +1962,9 @@ const handleTagToggle = (tag) => {
     selectedCount={selectedTestCases.size}
     availableVersions={availableVersions}
     availableTags={availableTags}              // 🆕 ADD THIS LINE
+    itemType="test case"           // ADD THIS
+    showExecuteButton={true}       // ADD THIS 
+    showExportButton={true}
     onVersionAssign={handleBulkVersionAssignment}
     onTagsUpdate={handleBulkTagAssignment}     // 🆕 ADD THIS LINE
     onExecuteTests={executeSelectedTests}
