@@ -76,7 +76,7 @@ const getAllTags = (requirements) => {
 };
 
 const Requirements = () => {
-  // State to hold the data from DataStore
+  // Move ALL useState declarations to the top
   const [requirements, setRequirements] = useState([]);
   const [testCases, setTestCases] = useState([]);
   const [mapping, setMapping] = useState({});
@@ -91,6 +91,14 @@ const Requirements = () => {
   const [selectedRequirements, setSelectedRequirements] = useState(new Set());
   const [expandedRows, setExpandedRows] = useState(new Set());
   
+  // Add the modal state hooks here, before any conditional logic
+  const [showVersionAssignmentModal, setShowVersionAssignmentModal] = useState(false);
+  const [versionAssignmentAction, setVersionAssignmentAction] = useState(null);
+  const [selectedVersionForAssignment, setSelectedVersionForAssignment] = useState('');
+  const [showTagAssignmentModal, setShowTagAssignmentModal] = useState(false);
+  const [selectedTagsForAssignment, setSelectedTagsForAssignment] = useState([]);
+  const [tagAssignmentAction, setTagAssignmentAction] = useState('add');
+
   // Get version context
   const { selectedVersion, versions } = useVersionContext();
   
@@ -245,12 +253,28 @@ const Requirements = () => {
   const handleDeleteRequirement = (reqId) => {
     if (window.confirm('Are you sure you want to delete this requirement?')) {
       try {
-        dataStore.deleteRequirement(reqId);
+        // Get current requirements
+        const currentRequirements = dataStore.getRequirements();
+        
+        // Filter out the requirement to delete
+        const updatedRequirements = currentRequirements.filter(req => req.id !== reqId);
+        
+        // Update DataStore with filtered requirements
+        dataStore.setRequirements(updatedRequirements);
+        
+        // Also remove any mappings for this requirement
+        const currentMapping = dataStore.getMapping();
+        delete currentMapping[reqId];
+        dataStore.setMapping(currentMapping);
+        
+        // Clear from selection if selected
         setSelectedRequirements(prev => {
           const newSet = new Set(prev);
           newSet.delete(reqId);
           return newSet;
         });
+
+        console.log('✅ Requirement deleted successfully');
       } catch (error) {
         console.error('Error deleting requirement:', error);
         alert('Error deleting requirement: ' + error.message);
@@ -264,10 +288,28 @@ const Requirements = () => {
     
     if (window.confirm(`Are you sure you want to delete ${selectedRequirements.size} requirement(s)?`)) {
       try {
-        Array.from(selectedRequirements).forEach(reqId => {
-          dataStore.deleteRequirement(reqId);
+        // Get current requirements
+        const currentRequirements = dataStore.getRequirements();
+        
+        // Filter out selected requirements
+        const updatedRequirements = currentRequirements.filter(
+          req => !selectedRequirements.has(req.id)
+        );
+        
+        // Update DataStore with filtered requirements
+        dataStore.setRequirements(updatedRequirements);
+        
+        // Also remove mappings for deleted requirements
+        const currentMapping = dataStore.getMapping();
+        selectedRequirements.forEach(reqId => {
+          delete currentMapping[reqId];
         });
+        dataStore.setMapping(currentMapping);
+        
+        // Clear selection
         setSelectedRequirements(new Set());
+
+        console.log(`✅ ${selectedRequirements.size} requirements deleted successfully`);
       } catch (error) {
         console.error('Error deleting requirements:', error);
         alert('Error deleting requirements: ' + error.message);
@@ -310,47 +352,19 @@ const Requirements = () => {
 
   // Bulk action handlers
   const handleBulkVersionAssignment = (versionId, action) => {
-    try {
-      const currentRequirements = dataStore.getRequirements();
-      const updatedRequirements = currentRequirements.map(req =>
-        selectedRequirements.has(req.id)
-          ? {
-              ...req,
-              versions: action === 'add'
-                ? [...new Set([...(req.versions || []), versionId])]
-                : (req.versions || []).filter(v => v !== versionId),
-              updatedAt: new Date().toISOString()
-            }
-          : req
-      );
-      dataStore.setRequirements(updatedRequirements);
-      setSelectedRequirements(new Set());
-    } catch (error) {
-      console.error('Version assignment failed:', error);
-      alert('Version assignment failed: ' + error.message);
-    }
+    if (selectedRequirements.size === 0) return;
+    
+    setSelectedVersionForAssignment(versionId);
+    setVersionAssignmentAction(action);
+    setShowVersionAssignmentModal(true);
   };
 
   const handleBulkTagsUpdate = (tags, action) => {
-    try {
-      const currentRequirements = dataStore.getRequirements();
-      const updatedRequirements = currentRequirements.map(req =>
-        selectedRequirements.has(req.id)
-          ? {
-              ...req,
-              tags: action === 'add'
-                ? [...new Set([...(req.tags || []), ...tags])]
-                : (req.tags || []).filter(t => !tags.includes(t)),
-              updatedAt: new Date().toISOString()
-            }
-          : req
-      );
-      dataStore.setRequirements(updatedRequirements);
-      setSelectedRequirements(new Set());
-    } catch (error) {
-      console.error('Tags update failed:', error);
-      alert('Tags update failed: ' + error.message);
-    }
+    if (selectedRequirements.size === 0) return;
+    
+    setSelectedTagsForAssignment(tags);
+    setTagAssignmentAction(action);
+    setShowTagAssignmentModal(true);
   };
 
   const handleExportSelected = () => {
@@ -395,6 +409,171 @@ const Requirements = () => {
     link.click();
 
     setSelectedRequirements(new Set());
+  };
+
+  // Add confirmation handler for version assignment
+  const confirmVersionAssignment = async () => {
+    try {
+      const updatedRequirements = requirements.map(req =>
+        selectedRequirements.has(req.id)
+          ? {
+              ...req,
+              versions: versionAssignmentAction === 'add'
+                ? [...new Set([...(req.versions || []), selectedVersionForAssignment])]
+                : (req.versions || []).filter(v => v !== selectedVersionForAssignment),
+              updatedAt: new Date().toISOString()
+            }
+          : req
+      );
+      
+      dataStore.setRequirements(updatedRequirements);
+      setSelectedRequirements(new Set());
+      setShowVersionAssignmentModal(false);
+      
+      // Show success message
+      const versionName = versions.find(v => v.id === selectedVersionForAssignment)?.name;
+      const actionText = versionAssignmentAction === 'add' ? 'added to' : 'removed from';
+      alert(`✅ ${selectedRequirements.size} requirements ${actionText} ${versionName}`);
+      
+    } catch (error) {
+      console.error('Version assignment failed:', error);
+      alert('❌ Version assignment failed: ' + error.message);
+    }
+  };
+
+  // Add confirmation handler for tag assignment
+  const confirmTagAssignment = async () => {
+    try {
+      const updatedRequirements = requirements.map(req =>
+        selectedRequirements.has(req.id)
+          ? {
+              ...req,
+              tags: tagAssignmentAction === 'add'
+                ? [...new Set([...(req.tags || []), ...selectedTagsForAssignment])]
+                : (req.tags || []).filter(t => !selectedTagsForAssignment.includes(t)),
+              updatedAt: new Date().toISOString()
+            }
+          : req
+      );
+      
+      dataStore.setRequirements(updatedRequirements);
+      setSelectedRequirements(new Set());
+      setShowTagAssignmentModal(false);
+      
+      // Show success message
+      const actionText = tagAssignmentAction === 'add' ? 'added to' : 'removed from';
+      const tagText = selectedTagsForAssignment.length === 1 
+        ? `"${selectedTagsForAssignment[0]}"` 
+        : `${selectedTagsForAssignment.length} tags`;
+      alert(`✅ Tag ${tagText} ${actionText} ${selectedRequirements.size} requirements`);
+      
+    } catch (error) {
+      console.error('Tag assignment failed:', error);
+      alert('❌ Tag assignment failed: ' + error.message);
+    }
+  };
+
+  // Define modal components outside the main component
+  const VersionAssignmentModal = ({ 
+    show, 
+    onClose, 
+    onConfirm, 
+    action, 
+    version, 
+    selectedCount, 
+    versions 
+  }) => {
+    if (!show) return null;
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+          <h3 className="text-lg font-semibold mb-4">
+            Confirm Version {action === 'add' ? 'Addition' : 'Removal'}
+          </h3>
+          
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+            <p className="text-sm mb-2">
+              You are about to <strong>{action}</strong> {selectedCount} requirement(s) {action === 'add' ? 'to' : 'from'}:
+            </p>
+            <div className="font-medium text-blue-800">
+              {versions.find(v => v.id === version)?.name || version}
+            </div>
+          </div>
+
+          <div className="flex space-x-3">
+            <button
+              onClick={onConfirm}
+              className={`flex-1 py-2 px-4 rounded font-medium ${
+                action === 'add'
+                  ? 'bg-blue-600 text-white hover:bg-blue-700'
+                  : 'bg-red-600 text-white hover:bg-red-700'
+              }`}
+            >
+              Confirm {action === 'add' ? 'Addition' : 'Removal'}
+            </button>
+            <button
+              onClick={onClose}
+              className="flex-1 py-2 px-4 border border-gray-300 rounded font-medium text-gray-700 hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const TagAssignmentModal = ({ 
+    show, 
+    onClose, 
+    onConfirm, 
+    action, 
+    tags, 
+    selectedCount 
+  }) => {
+    if (!show) return null;
+
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+          <h3 className="text-lg font-semibold mb-4">
+            Confirm Tag {action === 'add' ? 'Addition' : 'Removal'}
+          </h3>
+          
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+            <p className="text-sm mb-2">
+              You are about to <strong>{action}</strong> the following tags {action === 'add' ? 'to' : 'from'} {selectedCount} requirement(s):
+            </p>
+            <div className="flex flex-wrap gap-2 mt-2">
+              {tags.map(tag => (
+                <span key={tag} className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-sm">
+                  {tag}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex space-x-3">
+            <button
+              onClick={onConfirm}
+              className={`flex-1 py-2 px-4 rounded font-medium ${
+                action === 'add'
+                  ? 'bg-blue-600 text-white hover:bg-blue-700'
+                  : 'bg-red-600 text-white hover:bg-red-700'
+              }`}
+            >
+              Confirm {action === 'add' ? 'Addition' : 'Removal'}
+            </button>
+            <button
+              onClick={onClose}
+              className="flex-1 py-2 px-4 border border-gray-300 rounded font-medium text-gray-700 hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -965,6 +1144,26 @@ const Requirements = () => {
             onCancel={() => setEditingRequirement(null)}
           />
         )}
+
+        {/* Version and Tag Assignment Modals */}
+        <VersionAssignmentModal
+          show={showVersionAssignmentModal}
+          onClose={() => setShowVersionAssignmentModal(false)}
+          onConfirm={confirmVersionAssignment}
+          action={versionAssignmentAction}
+          version={selectedVersionForAssignment}
+          selectedCount={selectedRequirements.size}
+          versions={versions}
+        />
+        
+        <TagAssignmentModal
+          show={showTagAssignmentModal}
+          onClose={() => setShowTagAssignmentModal(false)}
+          onConfirm={confirmTagAssignment}
+          action={tagAssignmentAction}
+          tags={selectedTagsForAssignment}
+          selectedCount={selectedRequirements.size}
+        />
       </div>
     </MainLayout>
   );

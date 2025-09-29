@@ -115,6 +115,12 @@ const BulkActionsPanel = ({
   };
 
   // Tag action handlers
+  const handleTagsUpdate = (tags, action) => {
+    if (onTagsUpdate) {
+      onTagsUpdate(tags, action); // This will trigger the modal
+    }
+  };
+
   const handleTagAction = (action, tags) => {
     if (onTagsUpdate) {
       onTagsUpdate(Array.isArray(tags) ? tags : [tags], action);
