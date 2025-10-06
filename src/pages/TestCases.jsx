@@ -1140,11 +1140,20 @@ const summaryStats = useMemo(() => {
     setSelectedTestCases(new Set());
   };
 
+  const selectedAutomatedTestCases = useMemo(() => {
+  return Array.from(selectedTestCases)
+    .map(id => filteredTestCases.find(tc => tc.id === id))
+    .filter(tc => tc && (tc.automationStatus === 'Automated' || tc.automationStatus === 'Semi-Automated'));
+}, [selectedTestCases, filteredTestCases]);
+
   // Execute selected test cases
   const executeSelectedTests = () => {
-    if (selectedTestCases.size === 0) return;
-    setShowExecutionModal(true);
-  };
+  if (selectedAutomatedTestCases.length === 0) {
+    alert('No automated test cases selected. Only automated and semi-automated tests can be executed.');
+    return;
+  }
+  setShowExecutionModal(true);
+};
 
   // Toggle row expansion
   const toggleRowExpansion = (testCaseId) => {
@@ -1634,6 +1643,13 @@ const handleTagToggle = (tag) => {
     });
   };
 
+  const selectedTestCasesArray = Array.from(selectedTestCases)
+  .map(id => filteredTestCases.find(tc => tc.id === id))
+  .filter(Boolean);
+
+const hasAutomatedTests = selectedTestCasesArray.some(
+  tc => tc.automationStatus === 'Automated' || tc.automationStatus === 'Semi-Automated'
+);
 
   if (!hasTestCases) {
     return (
@@ -1957,20 +1973,23 @@ const handleTagToggle = (tag) => {
 
         {/* Bulk Actions */}
         {/* Enhanced Bulk Actions with Version Assignment */}
+
+        
 {selectedTestCases.size > 0 && (
   <BulkActionsPanel
     selectedCount={selectedTestCases.size}
+    automatedCount={selectedAutomatedTestCases.length}  // ✅ ADD THIS LINE
     availableVersions={availableVersions}
-    availableTags={availableTags}              // 🆕 ADD THIS LINE
-    itemType="test case"           // ADD THIS
-    showExecuteButton={true}       // ADD THIS 
+    availableTags={availableTags}
+    itemType="test case"
+    showExecuteButton={selectedAutomatedTestCases.length > 0}
     showExportButton={true}
     onVersionAssign={handleBulkVersionAssignment}
-    onTagsUpdate={handleBulkTagAssignment}     // 🆕 ADD THIS LINE
+    onTagsUpdate={handleBulkTagAssignment}
     onExecuteTests={executeSelectedTests}
     onBulkDelete={handleBulkDelete}
     onClearSelection={handleClearSelection}
-    onExport={handleExportSelected}            // 🆕 ADD THIS LINE (optional)
+    onExport={handleExportSelected}
   />
 )}
         
@@ -2091,7 +2110,7 @@ const handleTagToggle = (tag) => {
         {showExecutionModal && (
           <TestExecutionModal
             requirement={null}
-            testCases={Array.from(selectedTestCases).map(id => filteredTestCases.find(tc => tc.id === id)).filter(Boolean)}
+            testCases={selectedAutomatedTestCases}
             isOpen={showExecutionModal}
             onClose={() => {
               setShowExecutionModal(false);

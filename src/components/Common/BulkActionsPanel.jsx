@@ -31,6 +31,7 @@ const BulkActionsPanel = ({
   itemType = "test case", // "test case" or "requirement"
   showExecuteButton = true, // Only show for test cases
   showExportButton = false, // Can be enabled for both
+  automatedCount = 0,
   
   // Existing callbacks
   onVersionAssign,
@@ -208,7 +209,7 @@ const BulkActionsPanel = ({
               title={`Execute selected ${itemType}s`}
             >
               <Play size={14} className="mr-1" />
-              Execute ({selectedCount})
+              Execute ({automatedCount || selectedCount})
             </button>
           )}
 

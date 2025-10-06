@@ -191,36 +191,46 @@ const ViewTestCaseModal = ({ testCase, isOpen, onClose, onEdit, onExecute, onDup
           </div>
 
           {/* Quick Actions */}
-          <div className="flex space-x-3 mt-4">
-            <button
-              onClick={() => onEdit(testCase)}
-              className="flex items-center px-4 py-2 bg-white bg-opacity-20 hover:bg-opacity-30 rounded-md text-sm font-medium transition-colors"
-            >
-              <Edit3 className="w-4 h-4 mr-2" />
-              Edit
-            </button>
-            <button
-              onClick={() => onExecute(testCase)}
-              className="flex items-center px-4 py-2 bg-white bg-opacity-20 hover:bg-opacity-30 rounded-md text-sm font-medium transition-colors"
-            >
-              <Play className="w-4 h-4 mr-2" />
-              Execute
-            </button>
-            <button
-              onClick={() => onDuplicate(testCase)}
-              className="flex items-center px-4 py-2 bg-white bg-opacity-20 hover:bg-opacity-30 rounded-md text-sm font-medium transition-colors"
-            >
-              <Copy className="w-4 h-4 mr-2" />
-              Duplicate
-            </button>
-            <button
-              onClick={() => onDelete(testCase.id)}
-              className="flex items-center px-4 py-2 bg-red-500 bg-opacity-80 hover:bg-opacity-100 rounded-md text-sm font-medium transition-colors"
-            >
-              <Trash2 className="w-4 h-4 mr-2" />
-              Delete
-            </button>
-          </div>
+<div className="flex space-x-3 mt-4">
+  <button
+    onClick={() => onEdit(testCase)}
+    className="flex items-center px-4 py-2 bg-white bg-opacity-20 hover:bg-opacity-30 rounded-md text-sm font-medium transition-colors"
+  >
+    <Edit3 className="w-4 h-4 mr-2" />
+    Edit
+  </button>
+  
+  {/* Only show Execute button for Automated or Semi-Automated tests */}
+  {(testCase.automationStatus === 'Automated' || testCase.automationStatus === 'Semi-Automated') && (
+    <button
+      onClick={() => onExecute(testCase)}
+      className="flex items-center px-4 py-2 bg-white bg-opacity-20 hover:bg-opacity-30 rounded-md text-sm font-medium transition-colors"
+    >
+      <Play className="w-4 h-4 mr-2" />
+      Execute
+    </button>
+  )}
+  
+  <button
+    onClick={() => onDuplicate(testCase)}
+    className="flex items-center px-4 py-2 bg-white bg-opacity-20 hover:bg-opacity-30 rounded-md text-sm font-medium transition-colors"
+  >
+    <Copy className="w-4 h-4 mr-2" />
+    Duplicate
+  </button>
+  
+  <button
+    onClick={() => {
+      if (window.confirm(`Are you sure you want to delete test case "${testCase.id}"?`)) {
+        onDelete(testCase.id);
+      }
+    }}
+    className="flex items-center px-4 py-2 bg-red-500 bg-opacity-20 hover:bg-opacity-30 rounded-md text-sm font-medium transition-colors"
+  >
+    <Trash2 className="w-4 h-4 mr-2" />
+    Delete
+  </button>
+</div>
         </div>
 
         {/* Content */}
