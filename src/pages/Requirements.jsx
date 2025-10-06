@@ -23,6 +23,9 @@ import { calculateCoverage } from '../utils/coverage';
 import dataStore from '../services/DataStore';
 import BulkActionsPanel from '../components/Common/BulkActionsPanel';
 
+import { useLocation } from 'react-router-dom';
+
+
 /**
  * Helper function to check if a test case applies to a version
  * @param {Object} testCase - Test case object
@@ -82,6 +85,8 @@ const Requirements = () => {
   const [mapping, setMapping] = useState({});
   const [editingRequirement, setEditingRequirement] = useState(null);
   const [hasData, setHasData] = useState(false);
+  const location = useLocation();
+
   
   // UI State
   const [searchQuery, setSearchQuery] = useState('');
@@ -112,13 +117,19 @@ const Requirements = () => {
     };
     
     updateData();
+
+    if (location.state?.searchQuery) {
+    setSearchQuery(location.state.searchQuery);
+    // Clear the state after using it
+    window.history.replaceState({}, document.title);
+  }
     
     // Subscribe to DataStore changes
     const unsubscribe = dataStore.subscribe(updateData);
     
     // Clean up subscription
     return () => unsubscribe();
-  }, []);
+  }, [location]);
 
   // Calculate version-specific coverage
   const versionCoverage = useMemo(() => {
@@ -137,20 +148,29 @@ const Requirements = () => {
     : requirements.filter(req => req.versions && req.versions.includes(selectedVersion));
 
   // Apply search and filters
-  const filteredRequirements = useMemo(() => {
-    return versionFilteredRequirements.filter(req => {
-      const matchesSearch = req.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                           req.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                           req.description.toLowerCase().includes(searchQuery.toLowerCase());
+  // Apply search and filters
+const filteredRequirements = useMemo(() => {
+  return versionFilteredRequirements.filter(req => {
+    // Enhanced search to handle multiple requirement IDs separated by spaces
+    const matchesSearch = !searchQuery || (() => {
+      // Split search query by spaces to get individual search terms
+      const searchTerms = searchQuery.toLowerCase().trim().split(/\s+/);
       
-      const matchesPriority = priorityFilter === 'All' || req.priority === priorityFilter;
-      const matchesStatus = statusFilter === 'All' || req.status === statusFilter;
-      const matchesType = typeFilter === 'All' || req.type === typeFilter;
-      
-      return matchesSearch && matchesPriority && matchesStatus && matchesType;
-    });
-  }, [versionFilteredRequirements, searchQuery, priorityFilter, statusFilter, typeFilter]);
-
+      // Check if ANY search term matches the requirement
+      return searchTerms.some(term => 
+        req.name.toLowerCase().includes(term) ||
+        req.id.toLowerCase().includes(term) ||
+        req.description.toLowerCase().includes(term)
+      );
+    })();
+    
+    const matchesPriority = priorityFilter === 'All' || req.priority === priorityFilter;
+    const matchesStatus = statusFilter === 'All' || req.status === statusFilter;
+    const matchesType = typeFilter === 'All' || req.type === typeFilter;
+    
+    return matchesSearch && matchesPriority && matchesStatus && matchesType;
+  });
+}, [versionFilteredRequirements, searchQuery, priorityFilter, statusFilter, typeFilter]);
   // Calculate summary statistics
   const stats = useMemo(() => {
     const total = filteredRequirements.length;

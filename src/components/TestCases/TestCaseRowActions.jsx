@@ -15,6 +15,8 @@ import {
   ChevronUp
 } from 'lucide-react';
 
+import { useNavigate } from 'react-router-dom'
+
 const TestCaseRowActions = ({ 
   testCase, 
   onView, 
@@ -26,6 +28,9 @@ const TestCaseRowActions = ({
   const [showDropdown, setShowDropdown] = useState(false);
   const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 });
   const buttonRef = useRef(null);
+
+  const navigate = useNavigate();
+
 
   // Calculate dropdown position when opening
   useEffect(() => {
@@ -94,18 +99,21 @@ const TestCaseRowActions = ({
 
       {/* View Linked Requirements - if has requirements */}
       {testCase.requirementIds && testCase.requirementIds.length > 0 && (
-        <button
-          onClick={() => {
-            // Navigate to requirements with filter
-            window.location.href = `/requirements?filter=${testCase.requirementIds[0]}`;
-            setShowDropdown(false);
-          }}
-          className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center"
-        >
-          <Link size={14} className="mr-3 text-gray-400" />
-          View Requirements ({testCase.requirementIds.length})
-        </button>
-      )}
+  <button
+    onClick={() => {
+      // Navigate to requirements page and trigger search
+      const searchTerm = testCase.requirementIds.join(' ');
+      navigate(`/requirements`, { 
+        state: { searchQuery: searchTerm } 
+      });
+      setShowDropdown(false);
+    }}
+    className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center"
+  >
+    <Link size={14} className="mr-3 text-gray-400" />
+    View Requirements ({testCase.requirementIds.length})
+  </button>
+)}
 
       {/* Separator before destructive action */}
       <div className="border-t border-gray-100 my-1"></div>
