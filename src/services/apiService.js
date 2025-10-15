@@ -47,7 +47,7 @@ export const importDataToDatabase = async (data) => {
       mappings: data.mappings ? Object.keys(data.mappings).length : 0
     });
 
-    const response = await fetch(`${API_BASE_URL}/api/import`, {
+    const response = await fetch(`${API_BASE_URL}/import`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
