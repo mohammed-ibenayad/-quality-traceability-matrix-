@@ -5,6 +5,15 @@
 
 // Get API URL from environment with multiple fallbacks
 const getApiBaseUrl = () => {
+  // Check if we're in production (deployed)
+  const isProduction = window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
+  
+  if (isProduction) {
+    // In production, use nginx proxy (no port - goes through nginx)
+    return `http://${window.location.hostname}/api`;
+  }
+  
+  // For local development
   // Try Vite variable first (for Vite builds)
   if (import.meta.env.VITE_API_URL) {
     return import.meta.env.VITE_API_URL;
@@ -15,12 +24,7 @@ const getApiBaseUrl = () => {
     return process.env.REACT_APP_API_URL;
   }
   
-  // Check if backend is enabled and use production server IP
-  if (process.env.REACT_APP_BACKEND_ENABLED !== 'false' && process.env.REACT_APP_PRODUCTION_SERVER_IP) {
-    return `http://${process.env.REACT_APP_PRODUCTION_SERVER_IP}:3002`;
-  }
-  
-  // Default fallback
+  // Default fallback for development
   return 'http://localhost:3002';
 };
 
