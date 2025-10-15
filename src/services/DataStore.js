@@ -138,11 +138,12 @@ _getApiBaseUrl() {
                        window.location.hostname !== '127.0.0.1';
   
   if (isProduction) {
-    // In production, use the server's API port
-    return `http://${window.location.hostname}:3002`;
+    // In production, use nginx proxy (same as apiService.js does)
+    // NO PORT - nginx handles the routing to port 3002 internally
+    return `http://${window.location.hostname}`;
   }
   
-  // For local development
+  // For local development - direct to API server port
   if (import.meta.env && import.meta.env.VITE_API_URL) {
     return import.meta.env.VITE_API_URL;
   }
@@ -153,6 +154,7 @@ _getApiBaseUrl() {
   
   return 'http://localhost:3002';
 }
+
   /**
    * Load persisted data from localStorage
    * @private
