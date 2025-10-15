@@ -10,20 +10,149 @@ import defaultVersions from '../data/versions';
  */
 class DataStoreService {
   constructor() {
-    // Initialize with empty data
-    this._requirements = [];
-    this._testCases = [];
-    this._mapping = {};
-    this._versions = [];
-    this._listeners = [];
-    this._hasInitializedData = false;
+  // Initialize with empty data
+  this._requirements = [];
+  this._testCases = [];
+  this._mapping = {};
+  this._versions = [];
+  this._listeners = [];
+  this._hasInitializedData = false;
 
-    // Load persisted data from localStorage
+  // Initialize data from database or localStorage
+  this._initializeData();
+}
+
+/**
+ * Initialize data from database or localStorage
+ * @private
+ */
+async _initializeData() {
+  console.log('🚀 Initializing DataStore...');
+  
+  // Try loading from database first
+  const dbLoaded = await this.loadFromDatabase();
+  
+  // If database load failed or returned no data, fallback to localStorage
+  if (!dbLoaded || !this._hasInitializedData) {
+    console.log('📂 Falling back to localStorage...');
     this._loadPersistedData();
   }
+  
+  console.log('✅ DataStore initialization complete');
+}
 
+/**
+ * Load data from database API
+ * @returns {Promise<boolean>} True if successful
+ */
+async loadFromDatabase() {
+  try {
+    console.log('🔄 Loading data from database API...');
+    
+    // Get API base URL
+    const API_BASE_URL = this._getApiBaseUrl();
+    console.log('📡 API URL:', API_BASE_URL);
+    
+    // Fetch requirements
+    console.log('📥 Fetching requirements...');
+    const reqResponse = await fetch(`${API_BASE_URL}/api/requirements`);
+    if (reqResponse.ok) {
+      const reqData = await reqResponse.json();
+      if (reqData.success && Array.isArray(reqData.data)) {
+        this._requirements = reqData.data;
+        console.log(`✅ Loaded ${this._requirements.length} requirements from database`);
+      }
+    } else {
+      console.error('❌ Failed to fetch requirements:', reqResponse.status);
+    }
+    
+    // Fetch test cases
+    console.log('📥 Fetching test cases...');
+    const tcResponse = await fetch(`${API_BASE_URL}/api/test-cases`);
+    if (tcResponse.ok) {
+      const tcData = await tcResponse.json();
+      if (tcData.success && Array.isArray(tcData.data)) {
+        this._testCases = tcData.data.map(tc => this._migrateTestCaseVersionFormat(tc));
+        console.log(`✅ Loaded ${this._testCases.length} test cases from database`);
+      }
+    } else {
+      console.error('❌ Failed to fetch test cases:', tcResponse.status);
+    }
+    
+    // Fetch versions
+    console.log('📥 Fetching versions...');
+    const versionResponse = await fetch(`${API_BASE_URL}/api/versions`);
+    if (versionResponse.ok) {
+      const versionData = await versionResponse.json();
+      if (versionData.success && Array.isArray(versionData.data)) {
+        this._versions = versionData.data;
+        console.log(`✅ Loaded ${this._versions.length} versions from database`);
+      }
+    } else {
+      console.error('❌ Failed to fetch versions:', versionResponse.status);
+    }
+    
+    // Fetch mappings
+    console.log('📥 Fetching mappings...');
+    const mappingResponse = await fetch(`${API_BASE_URL}/api/mappings`);
+    if (mappingResponse.ok) {
+      const mappingData = await mappingResponse.json();
+      if (mappingData.success && mappingData.data) {
+        this._mapping = mappingData.data;
+        console.log(`✅ Loaded mappings from database`);
+      }
+    } else {
+      console.error('❌ Failed to fetch mappings:', mappingResponse.status);
+    }
+    
+    // Mark as initialized if we have data
+    if (this._requirements.length > 0 || this._testCases.length > 0) {
+      this._hasInitializedData = true;
+      console.log('🎯 DataStore initialized with database data');
+    }
+    
+    // Save to localStorage for offline use
+    this._saveToLocalStorage('requirements', this._requirements);
+    this._saveToLocalStorage('testCases', this._testCases);
+    this._saveToLocalStorage('mapping', this._mapping);
+    this._saveToLocalStorage('versions', this._versions);
+    
+    // Notify listeners
+    this._notifyListeners();
+    
+    return true;
+  } catch (error) {
+    console.error('❌ Failed to load from database:', error);
+    return false;
+  }
+}
 
-
+/**
+ * Get API base URL
+ * @private
+ * @returns {string} API base URL
+ */
+_getApiBaseUrl() {
+  // Check if we're in production
+  const isProduction = window.location.hostname !== 'localhost' && 
+                       window.location.hostname !== '127.0.0.1';
+  
+  if (isProduction) {
+    // In production, use the server's API port
+    return `http://${window.location.hostname}:3002`;
+  }
+  
+  // For local development
+  if (import.meta.env && import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL;
+  }
+  
+  if (typeof process !== 'undefined' && process.env && process.env.REACT_APP_API_URL) {
+    return process.env.REACT_APP_API_URL;
+  }
+  
+  return 'http://localhost:3002';
+}
   /**
    * Load persisted data from localStorage
    * @private
