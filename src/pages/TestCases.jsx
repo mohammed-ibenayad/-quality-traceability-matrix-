@@ -144,10 +144,10 @@ const TestCaseRow = ({
         <td className="px-2 py-3 w-20 flex-shrink-0">
           <div className="flex flex-col items-start">
             <span className={`inline-flex px-2 py-1 text-xs font-medium rounded ${testCase.status === 'Passed' ? 'bg-green-100 text-green-800' :
-                testCase.status === 'Failed' ? 'bg-red-100 text-red-800' :
-                  testCase.status === 'Blocked' ? 'bg-yellow-100 text-yellow-800' :
-                    testCase.status === 'Not Found' ? 'bg-orange-100 text-orange-800' :
-                      'bg-gray-100 text-gray-800'
+              testCase.status === 'Failed' ? 'bg-red-100 text-red-800' :
+                testCase.status === 'Blocked' ? 'bg-yellow-100 text-yellow-800' :
+                  testCase.status === 'Not Found' ? 'bg-orange-100 text-orange-800' :
+                    'bg-gray-100 text-gray-800'
               }`}>
               {testCase.status === 'Not Run' ? 'Not Run' : testCase.status}
             </span>
@@ -178,16 +178,16 @@ const TestCaseRow = ({
         </td>
         <td className="px-2 py-3 w-16 flex-shrink-0">
           <span className={`inline-flex px-2 py-1 text-xs font-medium rounded ${testCase.priority === 'High' ? 'bg-red-50 text-red-600' :
-              testCase.priority === 'Medium' ? 'bg-yellow-50 text-yellow-600' :
-                'bg-gray-50 text-gray-600'
+            testCase.priority === 'Medium' ? 'bg-yellow-50 text-yellow-600' :
+              'bg-gray-50 text-gray-600'
             }`}>
             {testCase.priority} {/* Show full priority name */}
           </span>
         </td>
         <td className="px-2 py-3 w-20 flex-shrink-0">
           <span className={`inline-flex px-2 py-1 text-xs font-medium rounded ${testCase.automationStatus === 'Automated' ? 'bg-blue-100 text-blue-800' :
-              testCase.automationStatus === 'Semi-Automated' ? 'bg-purple-100 text-purple-800' :
-                'bg-gray-100 text-gray-800'
+            testCase.automationStatus === 'Semi-Automated' ? 'bg-purple-100 text-purple-800' :
+              'bg-gray-100 text-gray-800'
             }`}>
             {testCase.automationStatus === 'Automated' ? 'Auto' :
               testCase.automationStatus === 'Semi-Automated' ? 'Semi' : 'Manual'}
@@ -258,8 +258,8 @@ const TestCaseRow = ({
                             <span
                               key={versionId}
                               className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs ${isCurrent
-                                  ? 'bg-green-100 text-green-800 font-medium ring-1 ring-green-300'
-                                  : 'bg-blue-100 text-blue-800'
+                                ? 'bg-green-100 text-green-800 font-medium ring-1 ring-green-300'
+                                : 'bg-blue-100 text-blue-800'
                                 }`}
                             >
                               {isCurrent && '★ '}{version?.name || versionId}
@@ -310,8 +310,8 @@ const TestCaseRow = ({
         <tr className={`flex w-full`}>
           <td colSpan="8" className="p-0 w-full">
             <div className={`${testCase.status === 'Failed'
-                ? 'bg-gradient-to-r from-red-50 to-gray-50 border-l-4 border-red-400'
-                : 'bg-gradient-to-r from-orange-50 to-gray-50 border-l-4 border-orange-400'
+              ? 'bg-gradient-to-r from-red-50 to-gray-50 border-l-4 border-red-400'
+              : 'bg-gradient-to-r from-orange-50 to-gray-50 border-l-4 border-orange-400'
               }`}>
               <div className="p-6">
                 {/* Header Section */}
@@ -422,8 +422,8 @@ const TestCaseRow = ({
                               <div
                                 key={index}
                                 className={`${line.includes('at ') && (line.includes('.spec.') || line.includes('.test.') || line.includes(testCase.name))
-                                    ? 'bg-red-900 bg-opacity-50 text-red-300'
-                                    : ''
+                                  ? 'bg-red-900 bg-opacity-50 text-red-300'
+                                  : ''
                                   }`}
                               >
                                 {line}
@@ -591,17 +591,17 @@ const TestCaseRow = ({
                   <div className="flex items-center space-x-2">
                     {/* Status Badge */}
                     <span className={`px-3 py-1 rounded-full text-xs font-medium ${testCase.status === 'Passed' ? 'bg-green-100 text-green-800' :
-                        testCase.status === 'Failed' ? 'bg-red-100 text-red-800' :
-                          testCase.status === 'Blocked' ? 'bg-yellow-100 text-yellow-800' :
-                            testCase.status === 'Not Found' ? 'bg-orange-100 text-orange-800' :
-                              'bg-gray-100 text-gray-800'
+                      testCase.status === 'Failed' ? 'bg-red-100 text-red-800' :
+                        testCase.status === 'Blocked' ? 'bg-yellow-100 text-yellow-800' :
+                          testCase.status === 'Not Found' ? 'bg-orange-100 text-orange-800' :
+                            'bg-gray-100 text-gray-800'
                       }`}>
                       {testCase.status}
                     </span>
                     {/* Priority Badge */}
                     <span className={`px-3 py-1 rounded-full text-xs font-medium ${testCase.priority === 'High' ? 'bg-red-100 text-red-800' :
-                        testCase.priority === 'Medium' ? 'bg-yellow-100 text-yellow-800' :
-                          'bg-green-100 text-green-800'
+                      testCase.priority === 'Medium' ? 'bg-yellow-100 text-yellow-800' :
+                        'bg-green-100 text-green-800'
                       }`}>
                       {testCase.priority} Priority
                     </span>
@@ -694,8 +694,8 @@ const TestCaseRow = ({
                         <div className="flex justify-between items-center py-2 border-b border-gray-100">
                           <span className="text-sm text-gray-600">Automation</span>
                           <span className={`text-xs px-2 py-1 rounded-full font-medium ${testCase.automationStatus === 'Automated' ? 'bg-blue-100 text-blue-800' :
-                              testCase.automationStatus === 'Semi-Automated' ? 'bg-purple-100 text-purple-800' :
-                                'bg-gray-100 text-gray-800'
+                            testCase.automationStatus === 'Semi-Automated' ? 'bg-purple-100 text-purple-800' :
+                              'bg-gray-100 text-gray-800'
                             }`}>
                             {testCase.automationStatus}
                           </span>
@@ -728,8 +728,8 @@ const TestCaseRow = ({
                       <div className="space-y-3">
                         <div className="flex items-center space-x-3">
                           <div className={`w-3 h-3 rounded-full ${testCase.status === 'Passed' ? 'bg-green-500' :
-                              testCase.status === 'Failed' ? 'bg-red-500' :
-                                'bg-gray-400'
+                            testCase.status === 'Failed' ? 'bg-red-500' :
+                              'bg-gray-400'
                             }`}></div>
                           <div>
                             <div className="text-sm font-medium text-gray-900">
@@ -1487,8 +1487,8 @@ const TestCases = () => {
                 <span
                   key={tag}
                   className={`inline-flex items-center px-3 py-1 text-sm font-medium rounded-full ${tagAssignmentAction === 'add'
-                      ? 'bg-green-100 text-green-800 border border-green-300'
-                      : 'bg-red-100 text-red-800 border border-red-300'
+                    ? 'bg-green-100 text-green-800 border border-green-300'
+                    : 'bg-red-100 text-red-800 border border-red-300'
                     }`}
                 >
                   <Tag size={14} className="mr-1" />
@@ -1513,8 +1513,8 @@ const TestCases = () => {
             <button
               onClick={confirmTagAssignment}
               className={`flex-1 py-2 px-4 rounded font-medium transition-colors flex items-center justify-center ${tagAssignmentAction === 'add'
-                  ? 'bg-green-600 text-white hover:bg-green-700'
-                  : 'bg-red-600 text-white hover:bg-red-700'
+                ? 'bg-green-600 text-white hover:bg-green-700'
+                : 'bg-red-600 text-white hover:bg-red-700'
                 }`}
             >
               {tagAssignmentAction === 'add' ? (
@@ -1661,15 +1661,16 @@ const TestCases = () => {
     tc => tc.automationStatus === 'Automated' || tc.automationStatus === 'Semi-Automated'
   );
 
-  if (!hasTestCases) {
+  if (requirements.length === 0) {
     return (
       <MainLayout title="Test Cases" hasData={false}>
         <EmptyState
           title="No Test Cases Found"
-          message="Import test cases to start managing your test suite. You can import from GitHub repositories or upload JSON files."
-          actionText="Import Test Cases"
-          actionPath="/import#testcases-tab"
-          icon="testcases"
+          message="Get started by importing your test cases to begin tracking your test coverage."
+          actionText="Create Test Cases"
+          actionPath="/import#testcases-tab"  // Navigate to import page with test cases tab selected
+          icon="tests"  // Use the tests icon
+          className="mt-8"
         />
 
       </MainLayout>
@@ -1681,9 +1682,9 @@ const TestCases = () => {
       <div className="space-y-6">
         {/* Version indicator for unassigned view */}
         {selectedVersion === 'unassigned' && (
-          <div className="bg-blue-100 p-4 rounded-lg mb-6 text-blue-800">
-            <div className="font-medium">Showing All Items (Unassigned View)</div>
-            <p className="text-sm mt-1">
+          <div className="mb-4 bg-blue-50 p-3 rounded border border-blue-100">
+    <h3 className="text-sm font-medium text-blue-800 mb-2">Showing All Items (Unassigned View)</h3>
+    <p className="text-xs text-blue-700 mt-1">
               This view shows all test cases, including those that may be assigned to versions that haven't been created yet.
             </p>
           </div>
@@ -1753,8 +1754,8 @@ const TestCases = () => {
               <button
                 onClick={() => setStatusFilter('All')}
                 className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${statusFilter === 'All'
-                    ? 'bg-gray-200 text-gray-800 ring-2 ring-gray-400'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  ? 'bg-gray-200 text-gray-800 ring-2 ring-gray-400'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                   }`}
               >
                 📊 All ({summaryStats.totalBase})
@@ -1762,8 +1763,8 @@ const TestCases = () => {
               <button
                 onClick={() => setStatusFilter('Failed')}
                 className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${statusFilter === 'Failed'
-                    ? 'bg-red-200 text-red-800 ring-2 ring-red-400'
-                    : 'bg-red-100 text-red-700 hover:bg-red-200'
+                  ? 'bg-red-200 text-red-800 ring-2 ring-red-400'
+                  : 'bg-red-100 text-red-700 hover:bg-red-200'
                   }`}
               >
                 🔴 Failed ({summaryStats.failedBase})
@@ -1772,8 +1773,8 @@ const TestCases = () => {
                 <button
                   onClick={() => setStatusFilter('Not Found')}
                   className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${statusFilter === 'Not Found'
-                      ? 'bg-orange-200 text-orange-800 ring-2 ring-orange-400'
-                      : 'bg-orange-100 text-orange-700 hover:bg-orange-200'
+                    ? 'bg-orange-200 text-orange-800 ring-2 ring-orange-400'
+                    : 'bg-orange-100 text-orange-700 hover:bg-orange-200'
                     }`}
                 >
                   ⚠️ Issues ({summaryStats.notFoundBase})
@@ -1782,8 +1783,8 @@ const TestCases = () => {
               <button
                 onClick={() => setStatusFilter('Passed')}
                 className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${statusFilter === 'Passed'
-                    ? 'bg-green-200 text-green-800 ring-2 ring-green-400'
-                    : 'bg-green-100 text-green-700 hover:bg-green-200'
+                  ? 'bg-green-200 text-green-800 ring-2 ring-green-400'
+                  : 'bg-green-100 text-green-700 hover:bg-green-200'
                   }`}
               >
                 ✅ Passed ({summaryStats.passedBase})
@@ -1791,8 +1792,8 @@ const TestCases = () => {
               <button
                 onClick={() => setStatusFilter('Not Run')}
                 className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${statusFilter === 'Not Run'
-                    ? 'bg-blue-200 text-blue-800 ring-2 ring-blue-400'
-                    : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                  ? 'bg-blue-200 text-blue-800 ring-2 ring-blue-400'
+                  : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
                   }`}
               >
                 ⏸️ Not Run ({summaryStats.notRunBase})
@@ -1910,8 +1911,8 @@ const TestCases = () => {
                           key={tag}
                           onClick={() => handleTagToggle(tag)}
                           className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${selectedTags.has(tag)
-                              ? 'bg-blue-500 text-white'
-                              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                            ? 'bg-blue-500 text-white'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                             }`}
                         >
                           {tag} ({count})
@@ -2169,8 +2170,8 @@ const TestCases = () => {
                       <div
                         key={vId}
                         className={`px-3 py-2 rounded text-sm font-medium text-center ${isCurrent
-                            ? 'bg-green-100 text-green-800 ring-2 ring-green-300'
-                            : 'bg-gray-100 text-gray-700'
+                          ? 'bg-green-100 text-green-800 ring-2 ring-green-300'
+                          : 'bg-gray-100 text-gray-700'
                           }`}
                       >
                         {isCurrent && '★ '}{v?.name || vId}
@@ -2245,8 +2246,8 @@ const TestCases = () => {
                 <button
                   onClick={confirmVersionAssignment}
                   className={`px-4 py-2 text-white rounded hover:opacity-90 ${versionAssignmentAction === 'add'
-                      ? 'bg-green-600 hover:bg-green-700'
-                      : 'bg-red-600 hover:bg-red-700'
+                    ? 'bg-green-600 hover:bg-green-700'
+                    : 'bg-red-600 hover:bg-red-700'
                     }`}
                 >
                   {versionAssignmentAction === 'add' ? 'Add to Version' : 'Remove from Version'}

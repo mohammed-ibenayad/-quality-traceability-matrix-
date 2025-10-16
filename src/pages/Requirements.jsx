@@ -326,20 +326,20 @@ const filteredRequirements = useMemo(() => {
     });
   };
 
-  // CHANGED: Check for requirements.length === 0 instead of !hasData
-  if (requirements.length === 0) {
-    return (
-      <MainLayout title="Requirements" hasData={hasData}>
-        <EmptyState 
-          title="No Requirements Found" 
-          message="Get started by importing your requirements to begin tracking your quality metrics."
-          actionText="Import Requirements"
-          actionPath="/import#requirements-tab"
-          icon="requirements"
-        />
-      </MainLayout>
-    );
-  }
+if (requirements.length === 0) {
+  return (
+    <MainLayout title="Requirements" hasData={hasData}>
+      <EmptyState 
+        title="No Requirements Found" 
+        message="Get started by importing your requirements to begin tracking your quality metrics."
+        actionText="Create Requirements" 
+        actionPath="/import#requirements-tab"  // Using actionPath for navigation
+        icon="requirements" 
+        className="mt-8"
+      />
+    </MainLayout>
+  );
+}
 
   // Bulk action handlers
   const handleBulkVersionAssignment = (versionId, action) => {

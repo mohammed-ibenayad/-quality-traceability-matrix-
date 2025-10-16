@@ -23,7 +23,7 @@ const MainLayout = ({
             setSelectedVersion={setSelectedVersion}
             versions={versions}
             hasData={hasData}
-            onAddVersion={onAddVersion}
+            onAddVersion={title !== "Release Management" ? onAddVersion : null}
           />
           {/* BALANCED APPROACH: Reasonable padding for visual comfort, more space than original */}
           <main className="px-3 py-4 flex-grow">

@@ -1,20 +1,17 @@
 import React, { useState, useRef } from 'react';
 import { GitBranch } from 'lucide-react';
-import Papa from 'papaparse'; // NEW: Add Papa Parse for CSV parsing
+import Papa from 'papaparse';
 import dataStore from '../../services/DataStore';
-import GitHubImportTestCases from './GitHubImportTestCases'; // Corrected import path
+import GitHubImportTestCases from './GitHubImportTestCases';
 
 /**
  * Enhanced component for importing test case data via multiple sources
- * This adds GitHub import as a new tab to your existing import interface
  */
 const ImportTestCases = ({ onImportSuccess }) => {
   // Check if this is being used in a tabbed interface
   const [showGitHubImport, setShowGitHubImport] = useState(false);
   
-  console.log('🔄 ImportTestCases render - showGitHubImport:', showGitHubImport);
-  
-  // File import state (existing functionality)
+  // File import state
   const [file, setFile] = useState(null);
   const [isValidating, setIsValidating] = useState(false);
   const [validationErrors, setValidationErrors] = useState([]);
@@ -54,7 +51,7 @@ const ImportTestCases = ({ onImportSuccess }) => {
     setValidationSuccess(false);
     setProcessedData(null);
 
-    // Check file type - ADD .csv support
+    // Check file type
     const validExtensions = ['.json', '.jsonc', '.csv'];
     const fileName = selectedFile.name.toLowerCase();
     const hasValidExtension = validExtensions.some(ext => fileName.endsWith(ext));
@@ -73,7 +70,7 @@ const ImportTestCases = ({ onImportSuccess }) => {
     }
   };
 
-  // NEW: Parse JSON/JSONC files
+  // Parse JSON/JSONC files
   const parseJSONFile = (selectedFile) => {
     const reader = new FileReader();
       
@@ -81,240 +78,296 @@ const ImportTestCases = ({ onImportSuccess }) => {
       try {
         const fileContent = event.target.result;
         // Parse JSONC (remove comments first)
-        const jsonContent = fileContent.replace(/\/\*[\s\S]*?\*\/|([^\\:]|^)\/\/.*$/gm, '$1');
-        const testCases = JSON.parse(jsonContent);
-              
-        // Validate test case structure
-        const errors = validateTestCaseData(testCases);
-              
-        if (errors.length === 0) {
-          // Process the data
-          const processed = processTestCaseData(testCases);
-          setProcessedData(processed);
-          setValidationSuccess(true);
-        } else {
-          // Change 4: Update Validation Error Messages
-          errors.push(""); // Empty line for spacing
-          errors.push("📝 Format Notes:");
-          errors.push("• Use 'applicableVersions: []' instead of 'version' for better flexibility");
-          errors.push("• Empty applicableVersions array means the test applies to all versions");
-          errors.push("• Multiple versions can be specified: ['v1.0', 'v1.1', 'v2.0']");
-          setValidationErrors(errors);
+        const jsonContent = fileContent.replace(/\/\*[\s\S]*?\*\/|([^\\:]|^)\/\/.*$/gm, '');
+        const data = JSON.parse(jsonContent);
+        
+        // Ensure it's an array
+        const testCasesArray = Array.isArray(data) ? data : [data];
+        
+        // Validate the test case data
+        const validationErrors = validateTestCases(testCasesArray);
+        
+        if (validationErrors.length > 0) {
+          setValidationErrors(validationErrors);
+          setIsValidating(false);
+          return;
         }
+        
+        // Set processed data and validation success
+        setProcessedData(testCasesArray);
+        setValidationSuccess(true);
+        setIsValidating(false);
       } catch (error) {
-        setValidationErrors([`Invalid JSON format: ${error.message}`]);
+        console.error("JSON parse error:", error);
+        setValidationErrors([`Error parsing file: ${error.message}`]);
+        setIsValidating(false);
       }
-          
-      setIsValidating(false);
     };
-      
+    
     reader.onerror = () => {
       setValidationErrors(['Error reading file']);
       setIsValidating(false);
     };
-      
+    
     reader.readAsText(selectedFile);
   };
 
-  // NEW: Parse CSV files (generic format)
-  const parseCSVFile = (file) => {
-    Papa.parse(file, {
+  // Parse CSV files with improved error handling
+  const parseCSVFile = (selectedFile) => {
+    Papa.parse(selectedFile, {
       header: true,
       dynamicTyping: true,
       skipEmptyLines: true,
-      transformHeader: (header) => header.trim(),
+      transformHeader: header => header.trim(), // Trim whitespace from headers
       complete: (results) => {
-        try {
-          console.log('📊 CSV parsing complete. Rows found:', results.data.length);
-          console.log('📋 CSV headers:', results.meta.fields);
-                  
-          if (results.errors.length > 0) {
-            console.warn('⚠️ CSV parsing warnings:', results.errors);
-          }
-                  
-          const mappedData = results.data.map(mapCSVRowToQualityTracker); // Updated function call
-          const errors = validateTestCaseData(mappedData);
-                  
-          if (errors.length === 0) {
-            const processed = processTestCaseData(mappedData);
-            setProcessedData(processed);
-            setValidationSuccess(true);
-            console.log('✅ CSV import successful:', processed.length, 'test cases');
-          } else {
-            // Change 4: Update Validation Error Messages
-            errors.push(""); // Empty line for spacing
-            errors.push("📝 Format Notes:");
-            errors.push("• Use 'applicableVersions: []' instead of 'version' for better flexibility");
-            errors.push("• Empty applicableVersions array means the test applies to all versions");
-            errors.push("• Multiple versions can be specified: ['v1.0', 'v1.1', 'v2.0']");
-            setValidationErrors(errors);
-            console.error('❌ CSV validation errors:', errors);
-          }
-        } catch (error) {
-          setValidationErrors([`CSV processing error: ${error.message}`]);
-          console.error('❌ CSV processing error:', error);
+        console.log("Papa parse results:", results); // Debug logging
+        
+        if (results.errors && results.errors.length > 0) {
+          console.error("CSV parsing errors:", results.errors); // Debug logging
+          setValidationErrors(results.errors.map(err => `CSV Error: ${err.message}`));
+          setIsValidating(false);
+          return;
         }
-        setIsValidating(false);
+
+        try {
+          // Transform CSV data to match test cases structure
+          const transformedData = transformCSVToTestCases(results.data);
+          
+          // Check if we have any valid rows
+          if (transformedData.length === 0) {
+            setValidationErrors(['No valid test cases found in the file. Please ensure your CSV has at least one row with ID and Name/Title columns.']);
+            setIsValidating(false);
+            return;
+          }
+          
+          // Validate the test cases data
+          const validationErrors = validateTestCases(transformedData);
+          
+          if (validationErrors.length > 0) {
+            setValidationErrors(validationErrors);
+            setIsValidating(false);
+            return;
+          }
+          
+          // Set processed data and validation success
+          setProcessedData(transformedData);
+          setValidationSuccess(true);
+          setIsValidating(false);
+        } catch (error) {
+          console.error("CSV transform error:", error);
+          setValidationErrors([`Error processing CSV: ${error.message}`]);
+          setIsValidating(false);
+        }
       },
       error: (error) => {
-        setValidationErrors([`CSV file error: ${error.message}`]);
-        console.error('❌ CSV file error:', error);
+        console.error("Papa parse error:", error); // Debug logging
+        setValidationErrors([`Error parsing CSV: ${error.message}`]);
         setIsValidating(false);
       }
     });
   };
 
-  // NEW: Convert CSV row to Quality Tracker format
-  const mapCSVRowToQualityTracker = (row) => { // Renamed function
-    console.log('🔄 Mapping CSV row:', row); // Updated console log
-      
-    // Parse test steps (handle multi-line or numbered steps)
-    const parseSteps = (stepsText) => {
-      if (!stepsText) return [];
-      return stepsText.toString().split('\n')
-        .map(step => step.trim())
-        .filter(step => step.length > 0);
-    };
-
-    // 1. ADD REQUIREMENT ID PARSING FUNCTION
-    // Parse requirement IDs from CSV
-    const parseRequirementIds = (reqText) => {
-      if (!reqText) return [];
-      return reqText.toString().split(',')
-        .map(req => req.trim())
-        .filter(req => req.length > 0)
-        .filter(req => /^REQ-\d+$/i.test(req)); // Validate format
-    };
+  // Transform CSV data to match test cases structure
+  const transformCSVToTestCases = (csvData) => {
+    console.log("CSV data:", csvData); // Debug logging
     
-    // Build tags array from multiple TestRail fields
-    const buildTags = (row) => {
-      const tags = [];
-      if (row['Type']) tags.push(row['Type'].toString().trim());
-      if (row['Test Level']) tags.push(row['Test Level'].toString().trim());
-      if (row['Environment']) tags.push(row['Environment'].toString().trim());
-      if (row['Is Automated'] && row['Is Automated'].toString().toLowerCase() === 'yes') {
-        tags.push('Regression');
-      }
-      return tags.filter(Boolean);
-    };
-    // Convert TestRail priority format
-    const mapPriority = (priority) => {
-      if (!priority) return 'Medium';
-      const priorityStr = priority.toString().toLowerCase();
-      const mapping = {
-        'high': 'High', 'medium': 'Medium', 'low': 'Low',
-        '1': 'High', '2': 'Medium', '3': 'Low',
-        'critical': 'High', 'major': 'High', 'minor': 'Low'
-      };
-      return mapping[priorityStr] || priority || 'Medium';
-    };
-    // Convert automation status
-    const mapAutomationStatus = (automationCandidate) => {
-      if (!automationCandidate) return 'Manual';
-      const candidate = automationCandidate.toString().toLowerCase();
-      return candidate === 'yes' ? 'Automated' : 'Manual';
-    };
-    // Generate ID if missing
-const generateId = (row) => {
-  // Try common ID column names
-  const idFields = ['TC ID', 'ID', 'Test Case ID', 'TestCase ID', 'Case ID'];
-  
-  for (const field of idFields) {
-    if (row[field]) {
-      let id = row[field].toString().trim();
-      
-      // If ID already starts with TC, use as-is
-      if (id.startsWith('TC')) {
-        return id;
-      }
-      
-      // If it's just a number, add TC_ prefix
-      if (/^\d+$/.test(id)) {
-        return `TC_${id.padStart(3, '0')}`;
-      }
-      
-      // Otherwise, add TC_ prefix
-      return `TC_${id}`;
+    // Check if we have actual data
+    if (!csvData || csvData.length === 0) {
+      throw new Error("CSV file appears to be empty");
     }
-  }
-  
-  // Fallback: generate sequential ID
-  return `TC_${Date.now().toString().slice(-6)}`;
-};
-    const mappedTestCase = {
-      id: generateId(row),
-      name: (row['Title'] || row['Test Case'] || 'Untitled Test Case').toString(),
-      description: (row['Description'] || row['Title'] || '').toString(),
-          
-      // NEW CSV fields for enhanced test case data
-      category: (row['Module'] || row['Suite'] || row['Section'] || row['Category'] || '').toString(), // Added 'Category'
-      preconditions: (row['Pre-requisites'] || row['Precondition'] || row['Preconditions'] || '').toString(),
-      testData: (row['Test Data'] || row['TestData'] || '').toString(),
-          
-      // Parse complex fields
-      steps: parseSteps(row['Test steps'] || row['Steps'] || ''),
-      expectedResult: (row['Expected Result'] || row['Expected'] || '').toString(),
-      tags: buildTags(row),
-          
-      // Map existing fields
-      priority: mapPriority(row['Priority']),
-      status: row['Status'] || 'Not Run',
-      automationStatus: mapAutomationStatus(row['Automation Candidate'] || row['Is Automated']),
-          
-      // 2. UPDATE THE mappedTestCase OBJECT
-      requirementIds: parseRequirementIds(
-        row['Requirement IDs'] || 
-        row['RequirementIDs'] || 
-        row['Requirements'] || 
-        row['Req IDs'] || 
-        ''
-      ),
-          
-      // Default values for required Quality Tracker fields
-      // Keep version for backward compatibility during CSV import, it will be migrated later by processTestCaseData
-      version: (row['Version'] || '').toString(), 
-      // Attempt to parse applicableVersions from CSV if present
-      applicableVersions: row['Applicable Versions'] ? row['Applicable Versions'].toString().split(',').map(v => v.trim()).filter(Boolean) : undefined,
-      assignee: (row['Created By'] || row['Assigned To'] || '').toString(),
-      lastExecuted: '',
-      executedBy: '',
-      estimatedDuration: parseInt(row['Estimated Duration']) || 0,
-      automationPath: (row['Automation Path'] || '').toString()
-    };
-    console.log('✅ Mapped test case:', mappedTestCase.id, '-', mappedTestCase.name);
-    return mappedTestCase;
+    
+    // Check the column names in the CSV
+    const firstRow = csvData[0];
+    console.log("CSV columns:", Object.keys(firstRow)); // Debug logging
+    
+    return csvData.map((row, index) => {
+      // Create a new test case object with case-insensitive field mapping
+      // This handles variations in column names regardless of case
+      const keysLower = Object.keys(row).reduce((acc, key) => {
+        acc[key.toLowerCase()] = key;
+        return acc;
+      }, {});
+      
+      // Function to get value regardless of case
+      const getValue = (possibleNames) => {
+        for (const name of possibleNames) {
+          // Try exact match first
+          if (row[name] !== undefined) return row[name];
+          // Then try case-insensitive match
+          const lowerName = name.toLowerCase();
+          if (keysLower[lowerName] && row[keysLower[lowerName]] !== undefined) {
+            return row[keysLower[lowerName]];
+          }
+        }
+        return undefined;
+      };
+      
+      // Extract steps as array
+      let steps = [];
+      const stepsValue = getValue(['Test steps', 'Steps', 'Steps (Text)', 'test_steps']);
+      if (stepsValue) {
+        if (typeof stepsValue === 'string') {
+          // Split by newlines if it's a string
+          steps = stepsValue.split('\n').filter(s => s.trim());
+        } else if (Array.isArray(stepsValue)) {
+          steps = stepsValue;
+        }
+      }
+      
+      // Extract requirement IDs as array
+      let requirementIds = [];
+      const reqIdsValue = getValue(['Requirement IDs', 'RequirementIDs', 'Requirements', 'Req IDs', 'requirement_ids']);
+      if (reqIdsValue) {
+        if (typeof reqIdsValue === 'string') {
+          // Split by commas if it's a string
+          requirementIds = reqIdsValue.split(',').map(id => id.trim()).filter(id => id);
+        } else if (Array.isArray(reqIdsValue)) {
+          requirementIds = reqIdsValue;
+        }
+      }
+      
+      // Extract applicable versions as array
+      let applicableVersions = [];
+      const versionsValue = getValue(['Applicable Versions', 'Version', 'Versions', 'applicable_versions']);
+      if (versionsValue) {
+        if (typeof versionsValue === 'string') {
+          // Split by commas if it's a string
+          applicableVersions = versionsValue.split(',').map(v => v.trim()).filter(v => v);
+        } else if (Array.isArray(versionsValue)) {
+          applicableVersions = versionsValue;
+        }
+      }
+      
+      // Extract tags as array
+      let tags = [];
+      const tagsValue = getValue(['Tags', 'tags']);
+      if (tagsValue) {
+        if (typeof tagsValue === 'string') {
+          // Split by commas if it's a string
+          tags = tagsValue.split(',').map(tag => tag.trim()).filter(tag => tag);
+        } else if (Array.isArray(tagsValue)) {
+          tags = tagsValue;
+        }
+      }
+      
+      // Extract values with flexible column name matching
+      const testCase = {
+        id: getValue(['id', 'ID', 'TC ID', 'Test Case ID', 'TestCase ID', 'Case ID']) || `TC-${index + 1}`,
+        name: getValue(['name', 'Name', 'title', 'Title', 'Test Case', 'test_name']) || '',
+        description: getValue(['description', 'Description', 'details', 'Details']) || '',
+        steps: steps,
+        expectedResult: getValue(['Expected Result', 'Expected', 'expected_result']) || '',
+        priority: mapPriority(getValue(['priority', 'Priority'])),
+        status: getValue(['status', 'Status']) || 'Not Run',
+        automationStatus: mapAutomationStatus(getValue(['Automation Candidate', 'Is Automated', 'Automation Type', 'automation_status'])),
+        category: getValue(['category', 'Category', 'section', 'Section', 'module', 'Module', 'suite', 'Suite']) || '',
+        preconditions: getValue(['preconditions', 'Preconditions', 'Pre-requisites', 'Precondition']) || '',
+        estimatedDuration: parseEstimatedDuration(getValue(['Estimate', 'Duration', 'estimated_duration', 'Time'])),
+        assignee: getValue(['assignee', 'Assigned To', 'Created By', 'assigned_to']) || '',
+        requirementIds: requirementIds,
+        applicableVersions: applicableVersions,
+        tags: tags,
+        testType: getValue(['Type', 'Test Type', 'Test Level', 'Environment']) || 'Functional'
+      };
+
+      console.log(`Created test case ${index}:`, testCase); // Debug logging
+      
+      return testCase;
+    }).filter(tc => tc.id && tc.name); // Filter out any rows without ID or name
   };
 
-  // Process test case data 
-  const processTestCaseData = (testCases) => {
-    // Change 2: Update Data Processing Function
-    return testCases.map(tc => {
-      // Migrate from legacy format to new format if needed
-      let processedTC = { ...tc };
-      
-      // If using old format (has 'version' but not 'applicableVersions'), convert to new format
-      if (processedTC.version !== undefined && !processedTC.applicableVersions) {
-        if (processedTC.version && processedTC.version !== '') {
-          processedTC.applicableVersions = [processedTC.version];
-        } else {
-          processedTC.applicableVersions = []; // Empty version means applies to all
-        }
-        // Remove the old version field
-        delete processedTC.version;
+  // Helper to map priority values
+  const mapPriority = (priority) => {
+    if (!priority) return 'Medium';
+    
+    const val = String(priority).toLowerCase();
+    if (['high', '1', 'critical'].includes(val)) return 'High';
+    if (['medium', '2', 'major'].includes(val)) return 'Medium';
+    if (['low', '3', 'minor'].includes(val)) return 'Low';
+    
+    return 'Medium';
+  };
+
+  // Helper to map automation status values
+  const mapAutomationStatus = (status) => {
+    if (!status) return 'Manual';
+    
+    const val = String(status).toLowerCase();
+    if (['yes', 'true', 'automated', 'automation'].includes(val)) return 'Automated';
+    if (['planned', 'in progress', 'candidate', 'automating'].includes(val)) return 'Candidate';
+    if (['no', 'false', 'manual', 'none'].includes(val)) return 'Manual';
+    
+    return 'Manual';
+  };
+
+  // Helper to parse estimated duration
+  const parseEstimatedDuration = (value) => {
+    if (!value) return 5; // Default 5 minutes
+    
+    if (typeof value === 'number') return value;
+    
+    // Try to parse string like "2m", "30s", "1h"
+    const str = String(value).toLowerCase();
+    if (str.endsWith('s')) return parseInt(str) / 60 || 1; // seconds to minutes
+    if (str.endsWith('m')) return parseInt(str) || 5; // minutes
+    if (str.endsWith('h')) return parseInt(str) * 60 || 60; // hours to minutes
+    
+    return parseInt(str) || 5; // Just try to parse as number, default 5 minutes
+  };
+
+  // Validate test cases data
+  const validateTestCases = (testCases) => {
+    const errors = [];
+    
+    if (!testCases || testCases.length === 0) {
+      errors.push('No test cases found in the file');
+      return errors;
+    }
+    
+    console.log(`Validating ${testCases.length} test cases`); // Debug logging
+    
+    // Check for required fields and format validation
+    testCases.forEach((tc, index) => {
+      // If this is an empty object or missing crucial fields, skip detailed validation
+      if (!tc || Object.keys(tc).length === 0) {
+        errors.push(`Empty test case object at index ${index}`);
+        return;
       }
       
-      // Ensure applicableVersions exists (default to empty array if still undefined)
-      if (!processedTC.applicableVersions) {
-        processedTC.applicableVersions = [];
+      console.log(`Validating test case ${index}:`, tc.id); // Debug logging
+      
+      // Validate ID is present
+      if (!tc.id) {
+        errors.push(`Missing ID for test case at index ${index}`);
       }
       
-      return {
-        ...processedTC,
-        automationStatus: processedTC.automationStatus || 'Manual',
-        status: processedTC.status || 'Not Run',
-        lastExecuted: processedTC.lastExecuted || ''
-      };
+      // Validate name is present
+      if (!tc.name || (typeof tc.name === 'string' && tc.name.trim() === '')) {
+        errors.push(`Missing Name/Title for test case with ID ${tc.id || `at index ${index}`}`);
+      }
+      
+      // Validate steps is an array
+      if (tc.steps && !Array.isArray(tc.steps)) {
+        errors.push(`Steps for ${tc.id || `test case at index ${index}`} should be an array of strings`);
+      }
+      
+      // Validate requirementIds is an array
+      if (tc.requirementIds && !Array.isArray(tc.requirementIds)) {
+        errors.push(`Requirement IDs for ${tc.id || `test case at index ${index}`} should be an array of strings`);
+      }
+      
+      // Validate applicableVersions is an array
+      if (tc.applicableVersions && !Array.isArray(tc.applicableVersions)) {
+        errors.push(`Applicable Versions for ${tc.id || `test case at index ${index}`} should be an array of strings`);
+      }
+      
+      // Validate tags is an array
+      if (tc.tags && !Array.isArray(tc.tags)) {
+        errors.push(`Tags for ${tc.id || `test case at index ${index}`} should be an array of strings`);
+      }
     });
+    
+    return errors;
   };
 
   // Extract requirement mappings from test cases
@@ -322,7 +375,7 @@ const generateId = (row) => {
     const mappings = {};
     
     testCases.forEach(tc => {
-      if (tc.requirementIds && Array.isArray(tc.requirementIds)) {
+      if (tc.requirementIds && Array.isArray(tc.requirementIds) && tc.requirementIds.length > 0) {
         tc.requirementIds.forEach(reqId => {
           if (!mappings[reqId]) {
             mappings[reqId] = [];
@@ -337,115 +390,14 @@ const generateId = (row) => {
     return mappings;
   };
 
-  // Validate test case data structure
-  const validateTestCaseData = (data) => {
-    const errors = [];
-    
-    if (!Array.isArray(data)) {
-      errors.push('Test case data must be an array');
-      return errors;
-    }
-
-    const requiredFields = ['id', 'name'];
-    const validStatuses = ['Passed', 'Failed', 'Not Run', 'Blocked', 'Not Found'];
-    const validAutomationStatuses = ['Automated', 'Manual', 'Planned'];
-    const ids = new Set();
-    
-    data.forEach((tc, index) => {
-      requiredFields.forEach(field => {
-        if (tc[field] === undefined) {
-          errors.push(`Test case at index ${index} (${tc.id || 'unknown'}) is missing required field '${field}'`);
-        }
-      });
-      
-      if (tc.id) {
-        if (ids.has(tc.id)) {
-          errors.push(`Duplicate ID '${tc.id}' found`);
-        } else {
-          ids.add(tc.id);
-        }
-        
-        if (!/^TC_\d+$/.test(tc.id)) {
-          // errors.push(`Invalid ID format for '${tc.id}'. Expected format: TC_XXX where XXX is a number`);
-        }
-      }
-      
-      if (tc.status && !validStatuses.includes(tc.status)) {
-        errors.push(`Invalid status '${tc.status}' for ${tc.id || `test case at index ${index}`}. Must be one of: ${validStatuses.join(', ')}`);
-      }
-      
-      if (tc.automationStatus && !validAutomationStatuses.includes(tc.automationStatus)) {
-        errors.push(`Invalid automationStatus '${tc.automationStatus}' for ${tc.id || `test case at index ${index}`}. Must be one of: ${validAutomationStatuses.join(', ')}`);
-      }
-      
-      if (tc.requirementIds) {
-        if (!Array.isArray(tc.requirementIds)) {
-          errors.push(`requirementIds for ${tc.id || `test case at index ${index}`} must be an array`);
-        } else {
-          tc.requirementIds.forEach(reqId => {
-            if (!/^REQ-\d+$/.test(reqId)) {
-              errors.push(`Invalid requirement ID format '${reqId}' for test case ${tc.id || `at index ${index}`}. Expected format: REQ-XXX`);
-            }
-          });
-        }
-      }
-      
-      if (tc.lastExecuted && tc.lastExecuted !== '') {
-        if (isNaN(Date.parse(tc.lastExecuted))) {
-          errors.push(`Invalid date format for lastExecuted '${tc.lastExecuted}' for ${tc.id || `test case at index ${index}`}`);
-        }
-      }
-
-      // Change 1: Update Validation Function - Add applicableVersions validation
-      if (tc.applicableVersions !== undefined) {
-        if (!Array.isArray(tc.applicableVersions)) {
-          errors.push(`Test case at index ${index} (${tc.id || 'unknown'}): applicableVersions must be an array`);
-        } else {
-          // Validate each version in the array
-          tc.applicableVersions.forEach((version, vIndex) => {
-            if (typeof version !== 'string') {
-              errors.push(`Test case at index ${index} (${tc.id || 'unknown'}): applicableVersions[${vIndex}] must be a string`);
-            }
-            if (version.trim() === '') {
-              errors.push(`Test case at index ${index} (${tc.id || 'unknown'}): applicableVersions[${vIndex}] cannot be empty`);
-            }
-          });
-        }
-      }
-
-      // Keep backward compatibility validation for legacy version field
-      if (tc.version !== undefined && typeof tc.version !== 'string') {
-        errors.push(`Test case at index ${index} (${tc.id || 'unknown'}): version must be a string`);
-      }
-    });
-
-    // 3. ADD REQUIREMENT EXISTENCE VALIDATION
-    // NEW: Validate requirement existence if importing with mappings
-    if (importOption === 'withMapping') {
-      const existingRequirements = new Set(dataStore.getRequirements().map(req => req.id));
-      
-      data.forEach((tc, index) => {
-        if (tc.requirementIds && Array.isArray(tc.requirementIds) && tc.requirementIds.length > 0) {
-          tc.requirementIds.forEach(reqId => {
-            if (!existingRequirements.has(reqId)) {
-              errors.push(`Requirement '${reqId}' referenced by test case ${tc.id || `at index ${index}`} does not exist in the system`);
-            }
-          });
-        }
-      });
-    }
-
-    return errors;
-  };
-
-  // 4. UPDATE HANDLE IMPORT TO PROCESS MAPPINGS
+  // Process the import
   const handleImport = () => {
     if (!processedData || processedData.length === 0) {
       return;
     }
 
     try {
-      // FIXED: Get existing test cases and append new ones instead of replacing
+      // Get existing test cases and append new ones instead of replacing
       const existingTestCases = dataStore.getTestCases();
       const existingIds = new Set(existingTestCases.map(tc => tc.id));
       
@@ -462,17 +414,16 @@ const generateId = (row) => {
         if (!proceed) return;
       }
 
-      // FIXED: Combine existing + new test cases instead of replacing
+      // Combine existing + new test cases
       const allTestCases = [...existingTestCases, ...newTestCases];
       
       // Update the data store with combined data
       dataStore.setTestCases(allTestCases);
 
-      // NEW: Process requirement mappings if option is selected
+      // Process requirement mappings if option is selected
       if (importOption === 'withMapping') {
         const mappings = extractMappings(newTestCases);
         if (Object.keys(mappings).length > 0) {
-          // FIXED: Use updateMappings instead of setMapping
           dataStore.updateMappings(mappings);
           console.log('✅ Updated requirement mappings:', mappings);
         }
@@ -482,9 +433,6 @@ const generateId = (row) => {
       if (onImportSuccess) {
         onImportSuccess(newTestCases);
       }
-
-      // Show success message
-      // alert(`Successfully imported ${newTestCases.length} test cases!`);
       
       // Reset the form
       setFile(null);
@@ -513,93 +461,107 @@ const generateId = (row) => {
 
   // Handle GitHub import success
   const handleGitHubImportSuccess = (importedTestCases) => {
-    console.log('✅ GitHub import success called with:', importedTestCases);
     if (onImportSuccess) {
       onImportSuccess(importedTestCases);
     }
     // Switch back to file import view after successful GitHub import
-    console.log('🔄 Switching back to file import view');
     setShowGitHubImport(false);
   };
 
   // Handle GitHub button click
   const handleGitHubButtonClick = () => {
-    console.log('🔵 GitHub button clicked! Current showGitHubImport:', showGitHubImport);
-    console.log('🔄 Setting showGitHubImport to true...');
     setShowGitHubImport(true);
-    console.log('✅ setShowGitHubImport(true) called');
   };
 
   // Handle back button click
   const handleBackButtonClick = () => {
-    console.log('⬅️ Back button clicked!');
-    console.log('🔄 Setting showGitHubImport to false...');
     setShowGitHubImport(false);
-    console.log('✅ setShowGitHubImport(false) called');
   };
 
-  console.log('🎯 Before render - showGitHubImport is:', showGitHubImport);
-
-  // 5. UPDATE CSV TEMPLATE TO INCLUDE REQUIREMENT IDs
-  // Generate simple CSV template with 3 sample test cases
+  // Generate simple CSV template with sample test cases
   const generateCSVTemplate = () => {
     const csvData = [
       {
-        'ID': 'TC_001',
-        'Title': 'Login with valid credentials',
-        'Description': 'Verify user can login with valid username and password',
+        'ID': 'SAMPLE-TC-001',
+        'Title': '[SAMPLE] Login with valid credentials',
+        'Description': '[DEMO] Verify that a user can successfully log in using valid credentials',
         'Section': 'Authentication',
         'Priority': 'High',
         'Status': 'Not Run',
-        'Automation Candidate': 'Yes',
-        'Test steps': 'Step 1: Navigate to login page\nStep 2: Enter valid username\nStep 3: Enter valid password\nStep 4: Click login button',
-        'Expected Result': 'User should be successfully logged in and redirected to dashboard',
+        'Automation Candidate': 'Automated',
+        'Test steps': 'Navigate to the login page\nEnter valid username in the username field\nEnter valid password in the password field\nClick the Login button',
+        'Expected Result': 'User should be successfully logged in and redirected to the dashboard with a welcome message',
         'Type': 'Functional',
-        'Preconditions': 'User account must exist in the system',
-        'Applicable Versions': 'v1.0,v1.1,v2.0',
-        'Requirement IDs': 'REQ-001,REQ-002', // NEW: Added requirement mapping
+        'Preconditions': 'User account must exist in the system with valid credentials',
+        'Applicable Versions': 'sample-v1.0',
+        'Requirement IDs': 'SAMPLE-REQ-001,SAMPLE-REQ-002',
+        'Tags': 'Sample,Authentication,Login,Smoke Test',
         'Estimate': '2m'
       },
       {
-        'ID': 'TC_002', 
-        'Title': 'Login with invalid credentials',
-        'Description': 'Verify appropriate error message when using invalid credentials',
-        'Section': 'Authentication > Negative Testing',
+        'ID': 'SAMPLE-TC-002', 
+        'Title': '[SAMPLE] Login with invalid credentials',
+        'Description': '[DEMO] Verify appropriate error message when using invalid credentials',
+        'Section': 'Authentication',
         'Priority': 'Medium',
         'Status': 'Not Run',
-        'Automation Candidate': 'Yes',
-        'Test steps': 'Step 1: Navigate to login page\nStep 2: Enter invalid username\nStep 3: Enter invalid password\nStep 4: Click login button',
-        'Expected Result': 'Error message should be displayed indicating invalid credentials',
+        'Automation Candidate': 'Automated',
+        'Test steps': 'Navigate to the login page\nEnter invalid username in the username field\nEnter invalid password in the password field\nClick the Login button\nVerify error message is displayed',
+        'Expected Result': 'Error message should be displayed: Invalid username or password. Please try again.',
         'Type': 'Negative',
-        'Preconditions': 'Application must be accessible',
-        'Applicable Versions': 'v1.0,v1.1,v2.0',
-        'Requirement IDs': 'REQ-001', // NEW: Added requirement mapping
+        'Preconditions': 'Login page must be accessible',
+        'Applicable Versions': 'sample-v1.0',
+        'Requirement IDs': 'SAMPLE-REQ-001',
+        'Tags': 'Sample,Authentication,Login,Negative Testing',
         'Estimate': '1m'
       },
       {
-        'ID': 'TC_003',
-        'Title': 'Add product to cart',
-        'Description': 'Verify user can add products to shopping cart',
-        'Section': 'E-commerce > Cart Management',
+        'ID': 'SAMPLE-TC-003',
+        'Title': '[SAMPLE] Dashboard Elements Display',
+        'Description': '[DEMO] Verify that all dashboard elements display correctly',
+        'Section': 'User Interface',
         'Priority': 'High',
-        'Status': 'Not Run', 
-        'Automation Candidate': 'No',
-        'Test steps': 'Step 1: Browse product catalog\nStep 2: Select a product\nStep 3: Choose quantity\nStep 4: Click add to cart button\nStep 5: Verify cart contents',
-        'Expected Result': 'Product should be added to cart with correct quantity and price',
-        'Type': 'Functional',
-        'Preconditions': 'User must be logged in and products must be available',
-        'Applicable Versions': 'v2.0',
-        'Requirement IDs': 'REQ-003,REQ-004', // NEW: Added requirement mapping
+        'Status': 'Not Run',
+        'Automation Candidate': 'Manual',
+        'Test steps': 'Navigate to the dashboard\nVerify header elements are displayed\nVerify main content area is formatted correctly\nVerify sidebar navigation works\nVerify footer links are accessible',
+        'Expected Result': 'All dashboard elements should be properly displayed and formatted according to design specifications',
+        'Type': 'UI',
+        'Preconditions': 'User must be logged in',
+        'Applicable Versions': 'sample-v1.0',
+        'Requirement IDs': 'SAMPLE-REQ-002',
+        'Tags': 'Sample,Dashboard,UI,Display',
         'Estimate': '3m'
       }
     ];
 
-    // Convert to CSV format
-    const csvHeaders = Object.keys(csvData[0]);
-    const csvRows = csvData.map(row => 
-      csvHeaders.map(header => {
-        const value = row[header];
-        // Escape quotes and wrap in quotes if contains comma, newline, or quote
+    // Add instructional row
+    const instructionRows = [
+      {
+        'ID': '# DELETE THIS ROW BEFORE IMPORTING',
+        'Title': 'Sample test cases for import - Delete this instruction row',
+        'Description': 'This template shows the common fields used for test cases',
+        'Section': 'Use > for hierarchical sections',
+        'Priority': 'High/Medium/Low',
+        'Status': 'Not Run/Passed/Failed',
+        'Automation Candidate': 'Manual/Automated/Candidate',
+        'Test steps': 'Use new lines to separate steps',
+        'Expected Result': 'What should happen when test runs',
+        'Type': 'Functional/UI/API/etc.',
+        'Preconditions': 'What must be set up first',
+        'Applicable Versions': 'Comma-separated versions',
+        'Requirement IDs': 'Comma-separated requirement IDs',
+        'Tags': 'Comma-separated tags',
+        'Estimate': 'Time estimates like 30s, 2m, 1h'
+      }
+    ];
+
+    const allData = [...instructionRows, ...csvData];
+    
+    // Convert to CSV
+    const headers = Object.keys(allData[0]);
+    const csvRows = allData.map(row => 
+      headers.map(header => {
+        const value = row[header] || '';
         if (typeof value === 'string' && (value.includes(',') || value.includes('\n') || value.includes('"'))) {
           return `"${value.replace(/"/g, '""')}"`;
         }
@@ -607,14 +569,14 @@ const generateId = (row) => {
       }).join(',')
     );
     
-    const csvContent = [csvHeaders.join(','), ...csvRows].join('\n');
+    const csvContent = [headers.join(','), ...csvRows].join('\n');
     
-    // Create and download file
+    // Download file
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
     link.setAttribute('href', url);
-    link.setAttribute('download', 'sample-testcases.csv');
+    link.setAttribute('download', 'testcases-template.csv');
     link.style.visibility = 'hidden';
     document.body.appendChild(link);
     link.click();
@@ -626,71 +588,66 @@ const generateId = (row) => {
     const comprehensiveTemplate = [
       {
         // ID variations (system tries these in order)
-        'ID': 'TC_001',
+        'ID': 'SAMPLE-TC-001',
         'TC ID': '',  // Alternative ID column name
         'Test Case ID': '',  // Alternative ID column name
         'TestCase ID': '',   // Alternative ID column name  
         'Case ID': '',       // Alternative ID column name
         
         // Name/Title variations
-        'Title': 'Sample Test Case Name',
+        'Title': '[SAMPLE] Comprehensive Test Case Example',
         'Test Case': '',     // Alternative name column
         
         // Description
-        'Description': 'Detailed description of what this test case validates',
+        'Description': '[DEMO] This is a comprehensive example showing all possible fields',
         
         // Steps variations  
-        'Test steps': 'Step 1: Action to perform\nStep 2: Another action\nStep 3: Verification step',
+        'Test steps': 'Step 1: Do something\nStep 2: Do something else\nStep 3: Verify result',
         'Steps': '',         // Alternative steps column
-        'Steps (Text)': '',  // Alternative steps column (your current format)
+        'Steps (Text)': '',  // Alternative steps column
         
         // Expected Result variations
-        'Expected Result': 'Expected outcome after executing all steps',
+        'Expected Result': 'The expected outcome after executing all steps',
         'Expected': '',      // Alternative expected result column
         
-        // Categorization variations
-        'Section': 'Module > Sub-module',  // Supports hierarchical structure
-        'Module': '',          // Alternative category
-        'Suite': '',           // Alternative category  
-        'Category': '',        // Alternative category
+        // Section/Category variations
+        'Section': 'Main Module > Sub Module > Feature',
+        'Module': '',        // Alternative section column
+        'Suite': '',         // Alternative section column
+        'Category': '',      // Alternative section column
         
-        // Preconditions variations
-        'Preconditions': 'Prerequisites that must be met before executing this test',
-        'Precondition': '',    // Alternative preconditions
-        'Pre-requisites': '',  // Alternative preconditions
+        // Priority
+        'Priority': 'High',  // High/Medium/Low or 1/2/3 or Critical/Major/Minor
         
-        // Test Data
-        'Test Data': 'Any specific test data needed for this test case',
-        'TestData': '',      // Alternative test data column
-        
-        // Priority (High/Medium/Low or 1/2/3 or Critical/Major/Minor)
-        'Priority': 'High',
-        
-        // Status (Passed/Failed/Not Run/Blocked/Not Found)
-        'Status': 'Not Run',
+        // Status
+        'Status': 'Not Run', // Not Run, Passed, Failed, Blocked, etc.
         
         // Automation variations
-        'Automation Candidate': 'Yes',  // Yes/No
-        'Is Automated': '',             // Alternative automation column
-        'Automation Type': '',          // Alternative (like Ranorex, None)
+        'Automation Candidate': 'Yes',
+        'Is Automated': '',  // Alternative automation column
+        'Automation Type': '',// Alternative automation column
         
-        // Versioning (new format preferred)  
-        'Applicable Versions': 'v1.0,v1.1,v2.0',  // Comma-separated list
-        'Version': '',                          // Legacy single version
+        // Versions
+        'Applicable Versions': 'v1.0,v1.1,v2.0',
+        'Version': '',       // Alternative version column (single)
         
-        // Additional fields
-        'Type': 'Functional',        // Test type (Functional, Regression, etc.)
-        'Test Level': '',            // Test level classification
-        'Environment': '',           // Test environment
-        'Estimate': '2m',            // Time estimate
-        'Created By': '',            // Test case author
-        'Assigned To': '' ,           // Test case assignee
-        // 6. UPDATE FULL CSV TEMPLATE TO INCLUDE REQUIREMENT ID COLUMNS
-        // Requirement Mapping (add this after the 'Additional fields' section)
+        // Tags and Type
+        'Type': 'Functional',
+        'Tags': 'Sample,Comprehensive,Template',
+        
+        // Other common fields
+        'Preconditions': 'System must be in a specific state before test execution',
+        'Test Level': 'System',     // Test level classification
+        'Environment': 'Production',// Test environment
+        'Estimate': '5m',           // Time estimate
+        'Created By': 'QA Team',    // Test case author
+        'Assigned To': 'Tester',    // Test case assignee
+        
+        // Requirement Mapping columns
         'Requirement IDs': 'REQ-001,REQ-002,REQ-003',  // Comma-separated requirement IDs
         'RequirementIDs': '',                          // Alternative column name
         'Requirements': '',                            // Alternative column name  
-        'Req IDs': ''                                 // Alternative column name
+        'Req IDs': ''                                  // Alternative column name
       }
     ];
 
@@ -701,34 +658,32 @@ const generateId = (row) => {
         'Title': 'Only fill the columns you need - empty columns will be ignored',
         'Description': 'The system supports multiple column name variations for flexibility',
         'Test steps': 'Multi-line steps are supported using newlines within quotes',
-        'Expected Result': 'This is a template - delete instruction rows before importing',
+        'Expected Result': 'This is a comprehensive template - delete instruction rows before importing',
         'Section': 'Use > for hierarchical sections like "Module > Sub-module"',
         'Priority': 'High/Medium/Low or 1/2/3 or Critical/Major/Minor',
-        'Status': 'Passed/Failed/Not Run/Blocked/Not Found',
-        'Automation Candidate': 'Yes/No',
+        'Status': 'Not Run/Passed/Failed/Blocked',
+        'Automation Candidate': 'Yes/No or Automated/Manual/Candidate',
         'Applicable Versions': 'Comma-separated: v1.0,v1.1,v2.0 (empty = all versions)',
         'Type': 'Functional/Regression/Acceptance/Negative/etc',
         'Estimate': 'Time estimates like 30s, 2m, 1h',
         'Preconditions': 'Prerequisites needed before running this test',
-        // 7. UPDATE INSTRUCTION ROWS IN FULL TEMPLATE
         'Requirement IDs': 'Comma-separated: REQ-001,REQ-002 (for traceability)',
       },
       {
         'ID': '# COLUMN ALTERNATIVES - DELETE THIS ROW',
-        'Title': 'ID: TC ID, Test Case ID, TestCase ID, Case ID',
-        'Description': 'Title: Test Case',  
-        'Test steps': 'Steps, Steps (Text)',
-        'Expected Result': 'Expected',
-        'Section': 'Module, Suite, Category',
+        'Title': 'Alternative names: Test Case',
+        'Description': 'Alternative names: Details',  
+        'Test steps': 'Alternative names: Steps, Steps (Text)',
+        'Expected Result': 'Alternative names: Expected',
+        'Section': 'Alternative names: Module, Suite, Category',
         'Priority': 'Same values work for all priority columns',
         'Status': 'Standard test execution statuses',
-        'Automation Candidate': 'Is Automated, Automation Type',  
-        'Applicable Versions': 'Version (for single version)',
+        'Automation Candidate': 'Alternative names: Is Automated, Automation Type',  
+        'Applicable Versions': 'Alternative names: Version (for single version)',
         'Type': 'Test Level, Environment also become tags',
         'Estimate': 'Duration estimates in human readable format',
-        'Preconditions': 'Precondition, Pre-requisites',
-        // 7. UPDATE INSTRUCTION ROWS IN FULL TEMPLATE
-        'Requirement IDs': 'RequirementIDs, Requirements, Req IDs',
+        'Preconditions': 'Alternative names: Precondition, Pre-requisites',
+        'Requirement IDs': 'Alternative names: RequirementIDs, Requirements, Req IDs',
       }
     ];
 
@@ -762,7 +717,6 @@ const generateId = (row) => {
 
   // If showing GitHub import, render that component
   if (showGitHubImport) {
-    console.log('🎨 Rendering GitHub import interface');
     return (
       <div className="bg-white p-6 rounded shadow">
         <div className="flex items-center justify-between mb-6">
@@ -779,71 +733,130 @@ const generateId = (row) => {
     );
   }
 
-  console.log('🎨 Rendering file import interface');
-
-  // Sample data template
-  // Change 3: Update Sample Data Template
-  const sampleTemplate = {
-    id: "TC-001",
-    name: "Sample Test Case", 
-    description: "Description of what this test case validates",
-    steps: [
-      "Step 1: Action to perform", 
-      "Step 2: Another action", 
-      "Step 3: Final verification step"
-    ],
-    expectedResult: "Expected outcome of the test",
-    priority: "High", // High, Medium, Low
-    automationStatus: "Manual", // Automated, Manual, Semi-Automated
-    status: "Not Run", // Passed, Failed, Not Run, Blocked
-    applicableVersions: ["v1.0", "v1.1"], // Array of versions this test applies to (empty array = all versions)
-    requirementIds: ["REQ-001"], // Array of requirement IDs this test covers
-    lastExecuted: null
-  };
-
-  // Change 5: Update Field Documentation
-  const fieldDescriptions = {
-    id: "Unique identifier for the test case (e.g., 'TC-001')",
-    name: "Name or title of the test case",
-    description: "Detailed description of the test case",
-    steps: "Array of steps to execute the test case",
-    expectedResult: "The expected outcome or behavior after executing the steps",
-    priority: "Importance of the test case (High, Medium, Low)",
-    automationStatus: "Whether the test is automated (Automated, Manual, Semi-Automated)",
-    status: "Current execution status (Passed, Failed, Not Run, Blocked)",
-    applicableVersions: "Array of versions this test applies to (e.g., ['v1.0', 'v1.1']). Empty array means applies to all versions.",
-    version: "Legacy field - use 'applicableVersions' instead", // DEPRECATED
-    requirementIds: "Array of requirement IDs this test covers (e.g., ['REQ-001'])",
-    lastExecuted: "Timestamp of the last execution (ISO 8601 format or null)",
-    category: "Category or module the test belongs to (e.g., 'Authentication')",
-    preconditions: "Conditions that must be met before executing the test",
-    testData: "Any data required for the test (e.g., 'user_credentials.json')",
-    assignee: "Person responsible for the test case",
-    executionTime: "Time taken for execution in minutes",
-    automationPath: "Path to the automation script (if automated)"
-  };
-
   return (
     <div className="bg-white p-6 rounded shadow">
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex justify-between items-center mb-4">
         <h2 className="text-xl font-semibold">Import Test Cases</h2>
-        {!showGitHubImport && (
-          <button
-            onClick={handleGitHubButtonClick}
-            className="flex items-center px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm"
-          >
-            <GitBranch className="h-4 w-4 mr-2" />
-            Import from GitHub
-          </button>
+        <button
+          onClick={handleGitHubButtonClick}
+          className="flex items-center text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-3 py-2 rounded transition-colors"
+        >
+          <GitBranch className="h-4 w-4 mr-2" />
+          Import from GitHub
+        </button>
+      </div>
+      
+      {/* File Upload Area */}
+      <div 
+        className={`mb-4 border-2 border-dashed rounded-lg p-6 text-center ${
+          file ? 
+            (validationErrors.length > 0 ? 'border-red-300 bg-red-50' : 
+             validationSuccess ? 'border-green-300 bg-green-50' : 'border-blue-300 bg-blue-50') 
+            : 'border-gray-300 hover:border-blue-400 hover:bg-blue-50'
+        }`}
+        onDrop={handleDrop}
+        onDragOver={handleDragOver}
+      >
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".json,.jsonc,.csv"
+          onChange={handleFileChange}
+          className="hidden"
+          id="test-case-file-input"
+        />
+        
+        {!file && (
+          <div>
+            <svg className="w-12 h-12 mx-auto text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+            </svg>
+            <p className="mt-4 text-gray-700">
+              Drag and drop your JSON, JSONC, or CSV file here or{' '}
+              <label htmlFor="test-case-file-input" className="text-blue-600 hover:text-blue-800 cursor-pointer">
+                browse
+              </label>
+            </p>
+            <p className="mt-2 text-sm text-gray-500">
+              Supported file types: .json, .jsonc, .csv
+            </p>
+            
+            {/* Add download template links */}
+            <div className="mt-4 flex justify-center space-x-4">
+              <a 
+                href="/sample-testcases.jsonc" 
+                download 
+                className="text-sm text-blue-600 hover:text-blue-800"
+              >
+                Download JSON Template
+              </a>
+              <span className="text-gray-400">|</span>
+              <div className="relative inline-block">
+                <button
+                  type="button"
+                  className="text-sm text-blue-600 hover:text-blue-800"
+                  id="csv-dropdown-button"
+                  onClick={() => {
+                    const menu = document.getElementById('csv-dropdown-menu');
+                    if (menu) menu.classList.toggle('hidden');
+                  }}
+                >
+                  Download CSV Template
+                </button>
+                <div
+                  id="csv-dropdown-menu"
+                  className="hidden origin-top-right absolute right-0 mt-2 w-40 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5"
+                >
+                  <div className="py-1">
+                    <button
+                      onClick={() => {
+                        generateCSVTemplate();
+                        document.getElementById('csv-dropdown-menu').classList.add('hidden');
+                      }}
+                      className="text-gray-700 block w-full text-left px-4 py-2 text-sm hover:bg-gray-100"
+                    >
+                      Simple Template
+                    </button>
+                    <button
+                      onClick={() => {
+                        generateFullCSVTemplate();
+                        document.getElementById('csv-dropdown-menu').classList.add('hidden');
+                      }}
+                      className="text-gray-700 block w-full text-left px-4 py-2 text-sm hover:bg-gray-100 border-t border-gray-100"
+                    >
+                      Complete Template
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {file && (
+          <div>
+            <p className="text-lg mb-2">
+              <span className="font-medium">{file.name}</span> ({Math.round(file.size / 1024)} KB)
+            </p>
+            
+            {isValidating && (
+              <div className="my-4 flex items-center justify-center">
+                <svg className="w-6 h-6 animate-spin text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                </svg>
+                <span className="ml-2 text-blue-600">Validating...</span>
+              </div>
+            )}
+          </div>
         )}
       </div>
       
+
+      
       {/* Import Options */}
-      <div className="mb-4">
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Import Option
-        </label>
-        <div className="flex space-x-4">
+      <div className="mb-4 bg-blue-50 p-3 rounded border border-blue-100">
+        <h3 className="text-sm font-medium text-blue-800 mb-2">Import Options:</h3>
+        <div className="flex items-center space-x-4">
           <label className="inline-flex items-center">
             <input
               type="radio"
@@ -853,87 +866,56 @@ const generateId = (row) => {
               checked={importOption === 'withMapping'}
               onChange={() => setImportOption('withMapping')}
             />
-            <span className="ml-2">Import with requirement mappings</span>
+            <span className="ml-2 text-sm text-blue-800">Import with requirement mappings</span>
           </label>
           <label className="inline-flex items-center">
             <input
               type="radio"
               className="form-radio text-blue-600"
               name="importOption"
-              value="onlyTestCases"
-              checked={importOption === 'onlyTestCases'}
-              onChange={() => setImportOption('onlyTestCases')}
+              value="noMapping"
+              checked={importOption === 'noMapping'}
+              onChange={() => setImportOption('noMapping')}
             />
-            <span className="ml-2">Import test cases only</span>
+            <span className="ml-2 text-sm text-blue-800">Import test cases only</span>
           </label>
         </div>
-        <p className="mt-1 text-sm text-gray-500">
-          {importOption === 'withMapping' 
-            ? 'Test cases containing requirementIds will be linked to those requirements automatically.'
-            : 'Only test case data will be imported. Existing mappings will be preserved.'}
+        <p className="text-xs text-blue-700 mt-1">
+          When importing with mappings, test cases that include requirement IDs will be automatically linked to those requirements.
         </p>
       </div>
       
-      {/* Enhanced File Upload Area - Following ImportRequirements pattern */}
-      <div 
-        className={`mb-4 border-2 border-dashed rounded-lg p-6 text-center ${
-          file ? 'border-blue-300 bg-blue-50' : 'border-gray-300'
-        }`}
-        onDrop={handleDrop}
-        onDragOver={handleDragOver}
-      >
-        <div className="mb-3">
-          <svg className="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true">
-            <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4h-12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-          <p className="mt-1 text-sm text-gray-600">
-            Drag and drop your JSON, JSONC, or CSV file here, or
-          </p>
-        </div>
-        
-        <input
-          type="file"
-          accept=".json,.jsonc,.csv"
-          onChange={handleFileChange}
-          ref={fileInputRef}
-          className="hidden"
-          id="file-upload"
-        />
-        
-        <div className="flex gap-3 justify-center">
-          <label
-            htmlFor="file-upload"
-            className="cursor-pointer inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-          >
-            Select File
-          </label>
+      {/* Validation Errors */}
+      {validationErrors.length > 0 && (
+        <div className="mb-4 p-4 bg-red-50 border border-red-300 rounded-md">
+          <h3 className="text-red-700 text-md font-semibold mb-2">Validation Errors:</h3>
+          <ul className="list-disc list-inside text-red-600 text-sm space-y-1">
+            {validationErrors.map((error, index) => (
+              <li key={index}>{error}</li>
+            ))}
+          </ul>
           
-          <button
-            onClick={resetForm}
-            className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-md shadow-sm hover:bg-gray-50 focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-          >
-            Reset
-          </button>
-        </div>
-        
-        {file && (
-          <div className="mt-3 text-sm text-gray-600">
-            Selected file: <span className="font-medium">{file.name}</span> ({(file.size / 1024).toFixed(1)} KB)
+          {/* Show Reset button when validation fails */}
+          <div className="flex justify-end mt-4">
+            <button
+              onClick={resetForm}
+              className="flex items-center px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-md shadow-sm hover:bg-gray-50 focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            >
+              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+              </svg>
+              Reset
+            </button>
           </div>
-        )}
-      </div>
+        </div>
+      )}
       
-      {/* Validation Success - Moved right after file upload area */}
+      {/* Validation Success */}
       {validationSuccess && (
-        <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded">
-          <h3 className="text-green-700 font-medium mb-2 flex items-center">
-            <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"></path>
-            </svg>
-            File Validated Successfully
-          </h3>
-          <p className="text-green-700 text-sm mb-3">
-            Your test case file has been validated and processed. Ready to import.
+        <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-md">
+          <h3 className="text-green-700 text-md font-semibold mb-2">Validation Successful</h3>
+          <p className="text-green-600">
+            Ready to import.
           </p>
           
           {processedData && (
@@ -942,7 +924,6 @@ const generateId = (row) => {
               {importOption === 'withMapping' && (
                 <p className="mt-1">
                   {Object.keys(extractMappings(processedData)).length} requirements will be mapped
-                  {/* 8. ADD IMPORT OPTION VALIDATION MESSAGE */}
                   {Object.keys(extractMappings(processedData)).length === 0 && 
                     <span className="text-yellow-600"> (No requirement IDs found in test cases)</span>
                   }
@@ -957,7 +938,7 @@ const generateId = (row) => {
                       {tc.applicableVersions && tc.applicableVersions.length > 0 && (
                         <span> [Versions: {tc.applicableVersions.join(', ')}]</span>
                       )}
-                      {tc.requirementIds && importOption === 'withMapping' && (
+                      {tc.requirementIds && importOption === 'withMapping' && tc.requirementIds.length > 0 && (
                         <span> → {tc.requirementIds.join(', ')}</span>
                       )}
                     </div>
@@ -967,96 +948,28 @@ const generateId = (row) => {
             </div>
           )}
 
-          {/* Import button moved inside validation success box */}
-          <button
-            onClick={handleImport}
-            className="flex items-center px-4 py-2 bg-green-600 text-white rounded-md shadow-sm hover:bg-green-700 focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors"
-          >
-            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"></path>
-            </svg>
-            Confirm & Import Data
-          </button>
-        </div>
-      )}
-
-      {/* REPLACED Enhanced Sample File Section with new content */}
-      <div className="mb-4 text-sm bg-gray-50 p-3 rounded border border-gray-200">
-        <p className="font-medium mb-1">Need a sample file?</p>
-        <div className="flex items-center justify-between">
-          <div className="flex gap-3">
-            <a 
-              href="/sample-testcases.jsonc" 
-              download 
-              className="text-blue-600 hover:underline flex items-center"
-            >
-              <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-                <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd"></path>
-              </svg>
-              JSON Sample
-            </a>
+          {/* Action buttons */}
+          <div className="flex gap-3 mt-4">
             <button
-              onClick={generateCSVTemplate}
-              className="text-blue-600 hover:underline flex items-center"
+              onClick={handleImport}
+              className="flex items-center px-4 py-2 bg-green-600 text-white rounded-md shadow-sm hover:bg-green-700 focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors"
             >
-              <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-                <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd"></path>
+              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
               </svg>
-              CSV Sample
+              Confirm and Import
+            </button>
+            
+            <button
+              onClick={resetForm}
+              className="flex items-center px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-md shadow-sm hover:bg-gray-50 focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            >
+              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+              </svg>
+              Reset
             </button>
           </div>
-          <div className="flex gap-2">
-            <button
-              onClick={generateFullCSVTemplate}
-              className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs hover:bg-blue-200"
-              title="Download comprehensive template with all possible column variations and instructions"
-            >
-              Full Template
-            </button>
-            <button
-              className="px-2 py-1 bg-gray-200 text-gray-700 rounded text-xs hover:bg-gray-300"
-              onClick={() => window.loadSampleData && window.loadSampleData()}
-            >
-              Load Sample Data
-            </button>
-          </div>
-        </div>
-        <div className="mt-2 text-xs text-gray-600">
-          <p><strong>CSV Sample:</strong> 3 realistic test cases ready to import</p>
-          <p><strong>Full Template:</strong> Shows all supported column variations with instructions</p>
-        </div>
-      </div>
-      
-      {/* Validation Status */}
-      {isValidating && (
-        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded">
-          <p className="text-blue-700">
-            <svg className="inline w-5 h-5 mr-2 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-            Validating file...
-          </p>
-        </div>
-      )}
-      
-      {/* Validation Errors */}
-      {validationErrors.length > 0 && (
-        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded">
-          <h3 className="text-red-700 font-medium mb-2 flex items-center">
-            <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd"></path>
-            </svg>
-            Validation Errors:
-          </h3>
-          <ul className="list-disc pl-5 text-red-600 text-sm space-y-1">
-            {validationErrors.map((error, index) => (
-              <li key={index}>{error}</li>
-            ))}
-          </ul>
-          <p className="mt-3 text-sm text-red-700">
-            Please correct these errors and try again.
-          </p>
         </div>
       )}
     </div>

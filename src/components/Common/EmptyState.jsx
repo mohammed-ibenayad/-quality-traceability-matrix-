@@ -5,10 +5,10 @@ import { Link } from 'react-router-dom';
  * Reusable empty state component with action button
  * Supports both navigation (actionPath) and onClick handlers (onAction)
  */
-const EmptyState = ({ 
-  title = 'No data available', 
-  message = 'Start by importing your requirements and test cases', 
-  actionText = 'Import Data', 
+const EmptyState = ({
+  title = 'No data available',
+  message = 'Start by importing your requirements and test cases',
+  actionText = 'Import Data',
   actionPath = '/import',
   onAction = null, // New prop for onClick handler
   icon = 'data',
@@ -19,6 +19,11 @@ const EmptyState = ({
     data: (
       <svg className="w-16 h-16 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M4 7v10c0 2 1 3 3 3h10c2 0 3-1 3-3V7c0-2-1-3-3-3H7C5 4 4 5 4 7zm0 5h16"></path>
+      </svg>
+    ),
+    releases: (
+      <svg className="w-16 h-16 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M11 17l-5-5m0 0l5-5m-5 5h12"></path>
       </svg>
     ),
     requirements: (
@@ -39,22 +44,26 @@ const EmptyState = ({
   };
 
   // Button component styles
-  const buttonClasses = "inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500";
+  const buttonClasses = "flex items-center px-3 py-2 bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-800 rounded transition-colors text-sm";
 
   return (
-    <div className={`text-center py-12 px-6 bg-white rounded-lg shadow ${className}`}>
-      <div className="flex justify-center mb-4">
-        {icons[icon] || icons.data}
-      </div>
-      <h3 className="text-lg font-medium text-gray-900 mb-2">{title}</h3>
-      <p className="text-gray-500 mb-6 max-w-md mx-auto">{message}</p>
-      
-      {/* Conditional rendering: onClick handler vs navigation */}
+  <div className={`text-center py-12 px-6 bg-white rounded-lg shadow ${className}`}>
+    <div className="flex justify-center mb-4">
+      {icons[icon] || icons.data}
+    </div>
+    <h3 className="text-lg font-medium text-gray-900 mb-2">{title}</h3>
+    <p className="text-gray-500 mb-6 max-w-md mx-auto">{message}</p>
+    
+    {/* Centered button container */}
+    <div className="flex justify-center">
       {onAction ? (
         <button
           onClick={onAction}
           className={buttonClasses}
         >
+          <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+          </svg>
           {actionText}
         </button>
       ) : (
@@ -62,11 +71,15 @@ const EmptyState = ({
           to={actionPath}
           className={buttonClasses}
         >
+          <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+          </svg>
           {actionText}
         </Link>
       )}
     </div>
-  );
+  </div>
+);
 };
 
 export default EmptyState;

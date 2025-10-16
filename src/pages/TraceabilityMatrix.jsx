@@ -14,14 +14,14 @@ import dataStore from '../services/DataStore';
  */
 const testCaseAppliesTo = (testCase, selectedVersion) => {
   if (selectedVersion === 'unassigned') return true;
-  
+
   // Handle new format
   if (testCase.applicableVersions) {
     // Empty array means applies to all versions
     if (testCase.applicableVersions.length === 0) return true;
     return testCase.applicableVersions.includes(selectedVersion);
   }
-  
+
   // Handle legacy format during transition
   return !testCase.version || testCase.version === selectedVersion || testCase.version === '';
 };
@@ -37,11 +37,11 @@ const getVersionDisplayText = (testCase) => {
     if (testCase.applicableVersions.length === 0) {
       return 'All';
     }
-    return testCase.applicableVersions.length > 2 
+    return testCase.applicableVersions.length > 2
       ? `${testCase.applicableVersions.length} versions`
       : testCase.applicableVersions.join(', ');
   }
-  
+
   // Handle legacy format
   return testCase.version || 'All';
 };
@@ -50,16 +50,16 @@ const TraceabilityMatrix = () => {
   // State for collapsed test case view
   const [collapseTestCases, setCollapseTestCases] = useState(true);
   const [expandedRequirement, setExpandedRequirement] = useState(null);
-  
+
   // State to hold the data from DataStore
   const [requirements, setRequirements] = useState([]);
   const [testCases, setTestCases] = useState([]);
   const [mapping, setMapping] = useState({});
   const [hasData, setHasData] = useState(false);
-  
+
   // Get the version context
   const { selectedVersion } = useVersionContext();
-  
+
   // Load data from DataStore
   useEffect(() => {
     // Get data from DataStore
@@ -67,7 +67,7 @@ const TraceabilityMatrix = () => {
     setTestCases(dataStore.getTestCases());
     setMapping(dataStore.getMapping());
     setHasData(dataStore.hasData());
-    
+
     // Subscribe to DataStore changes
     const unsubscribe = dataStore.subscribe(() => {
       setRequirements(dataStore.getRequirements());
@@ -75,16 +75,16 @@ const TraceabilityMatrix = () => {
       setMapping(dataStore.getMapping());
       setHasData(dataStore.hasData());
     });
-    
+
     // Clean up subscription
     return () => unsubscribe();
   }, []);
-  
+
   // Calculate coverage based on current data and selected version
   const coverage = React.useMemo(() => {
     return calculateCoverage(requirements, mapping, testCases);
   }, [requirements, mapping, testCases]);
-  
+
   // Version-specific coverage
   const versionCoverage = React.useMemo(() => {
     if (selectedVersion === 'unassigned') {
@@ -94,23 +94,23 @@ const TraceabilityMatrix = () => {
     const filteredTests = testCases.filter(tc => testCaseAppliesTo(tc, selectedVersion));
     return calculateCoverage(requirements, mapping, filteredTests);
   }, [requirements, mapping, testCases, selectedVersion, coverage]);
-  
+
   // Filter requirements and test cases by selected version
-  const filteredRequirements = selectedVersion === 'unassigned' 
+  const filteredRequirements = selectedVersion === 'unassigned'
     ? requirements // Show all requirements for "unassigned"
     : requirements.filter(req => req.versions && req.versions.includes(selectedVersion));
-  
+
   // Change 1 & 5: Update Test Case Filtering in Matrix Logic and Simplify
   const filteredTestCases = selectedVersion === 'unassigned'
     ? testCases
     : testCases.filter(tc => testCaseAppliesTo(tc, selectedVersion));
-  
+
   // Toggle test case view
   const toggleTestCaseView = () => {
     setCollapseTestCases(!collapseTestCases);
     setExpandedRequirement(null);
   };
-  
+
   // Toggle specific requirement expansion
   const toggleRequirementExpansion = (reqId) => {
     setExpandedRequirement(expandedRequirement === reqId ? null : reqId);
@@ -126,28 +126,28 @@ const TraceabilityMatrix = () => {
         reqFullyAutomated: 0,
         reqFullyPassed: 0,
         totalTestCases: 0, // Ensure this is initialized
-        multiVersionTests: 0, 
+        multiVersionTests: 0,
         universalTests: 0
       };
     }
-    
+
     const totalRequirements = filteredRequirements.length;
-    
+
     // Count requirements with tests - Change 2 & 5: Update Coverage Calculation Logic and Simplify
-    const reqWithTests = filteredRequirements.filter(req => 
+    const reqWithTests = filteredRequirements.filter(req =>
       (mapping[req.id] || []).some(tcId => {
         const tc = testCases.find(t => t.id === tcId);
         return tc && testCaseAppliesTo(tc, selectedVersion);
       })
     ).length;
-    
+
     // Count fully automated requirements
-    const reqFullyAutomated = versionCoverage.filter(stat => 
+    const reqFullyAutomated = versionCoverage.filter(stat =>
       stat.automationPercentage === 100 && stat.totalTests > 0
     ).length;
-    
+
     // Count fully passed requirements
-    const reqFullyPassed = versionCoverage.filter(stat => 
+    const reqFullyPassed = versionCoverage.filter(stat =>
       stat.passPercentage === 100 && stat.totalTests > 0
     ).length;
 
@@ -155,7 +155,7 @@ const TraceabilityMatrix = () => {
     const totalTests = testCases.filter(tc => testCaseAppliesTo(tc, selectedVersion)).length;
 
     // Additional statistics for multi-version support
-    const multiVersionTests = testCases.filter(tc => 
+    const multiVersionTests = testCases.filter(tc =>
       tc.applicableVersions && tc.applicableVersions.length > 1
     ).length;
 
@@ -177,13 +177,13 @@ const TraceabilityMatrix = () => {
   }, [filteredRequirements, filteredTestCases, mapping, testCases, versionCoverage, selectedVersion, hasData]);
 
   return (
-    <MainLayout 
+    <MainLayout
       title="Requirements-Test Case Traceability Matrix"
       hasData={hasData}
     >
       {!hasData ? (
-        <EmptyState 
-          title="No Requirements or Test Cases Found" 
+        <EmptyState
+          title="No Requirements or Test Cases Found"
           message="To build your traceability matrix, you need to import requirements and test cases first."
           actionText="Import Data"
           actionPath="/import"
@@ -210,17 +210,17 @@ const TraceabilityMatrix = () => {
               <div className="text-sm text-gray-500">Total Test Cases (for selected version)</div>
             </div>
           </div>
-          
+
           {/* Version indicator for unassigned view */}
           {selectedVersion === 'unassigned' && (
-            <div className="bg-blue-100 p-4 rounded-lg mb-6 text-blue-800">
-              <div className="font-medium">Showing All Items (Unassigned View)</div>
-              <p className="text-sm mt-1">
+            <div className="mb-4 bg-blue-50 p-3 rounded border border-blue-100">
+    <h3 className="text-sm font-medium text-blue-800 mb-2">Showing All Items (Unassigned View)</h3>
+    <p className="text-xs text-blue-700 mt-1">
                 This view shows all requirements and test cases, including those that may be assigned to versions that haven't been created yet.
               </p>
             </div>
           )}
-          
+
           {/* Matrix Table - Now passing selectedVersion to MatrixTable */}
           <MatrixTable
             requirements={filteredRequirements}
@@ -235,7 +235,7 @@ const TraceabilityMatrix = () => {
             getVersionDisplayText={getVersionDisplayText} // Pass helper for display
             testCaseAppliesTo={testCaseAppliesTo} // Pass helper for internal filtering if needed
           />
-          
+
           {/* Information Panel */}
           <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="bg-white p-4 rounded shadow">
@@ -281,7 +281,7 @@ const TraceabilityMatrix = () => {
                 </table>
               </div>
             </div>
-            
+
             <div className="bg-white p-4 rounded shadow">
               <h3 className="text-lg font-semibold mb-2">Legend</h3>
               <div className="grid grid-cols-2 gap-2 text-sm">
