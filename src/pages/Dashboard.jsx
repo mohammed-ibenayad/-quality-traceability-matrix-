@@ -358,9 +358,9 @@ const Dashboard = () => {
           
           {/* Unassigned Warning Banner */}
           {selectedVersion === 'unassigned' && (
-            <div className="bg-blue-100 p-4 rounded-lg mb-6 text-blue-800">
-              <div className="font-medium">Showing All Items (Unassigned View)</div>
-              <p className="text-sm mt-1">
+            <div className="mb-4 bg-blue-50 p-3 rounded border border-blue-100">
+    <h3 className="text-sm font-medium text-blue-800 mb-2">Showing All Items (Unassigned View)</h3>
+    <p className="text-xs text-blue-700 mt-1">
                 This view shows metrics for all requirements and test cases, including those that may be assigned to versions that haven't been created yet. For specific release metrics, please select a version from the dropdown.
               </p>
             </div>

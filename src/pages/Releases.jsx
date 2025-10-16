@@ -121,6 +121,8 @@ const Releases = () => {
     setIsNewReleaseModalOpen(true);
   };
 
+  
+
   // Get status color class (for table view)
   const getStatusColor = (status) => {
     switch (status) {
@@ -194,7 +196,7 @@ const Releases = () => {
           message="Create your first release version to start tracking your quality metrics."
           actionText="Create Release"
           onAction={handleCreateRelease}
-          icon="metrics"
+          icon="releases"
           className="mt-8"
         />
       ) : viewMode === 'grid' ? (
