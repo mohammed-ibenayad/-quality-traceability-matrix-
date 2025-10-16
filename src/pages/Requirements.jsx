@@ -226,116 +226,87 @@ const filteredRequirements = useMemo(() => {
   };
 
   // Handle saving the edited requirement
-  const handleSaveRequirement = (updatedRequirement) => {
-    try {
-      console.log('Saving requirement:', updatedRequirement);
-      
-      // Get current requirements
-      const currentRequirements = dataStore.getRequirements();
-      
-      if (updatedRequirement.id) {
-        // UPDATE EXISTING: Find and replace the existing requirement
-        const index = currentRequirements.findIndex(req => req.id === updatedRequirement.id);
-        if (index !== -1) {
-          currentRequirements[index] = {
-            ...currentRequirements[index],
-            ...updatedRequirement,
-            updatedAt: new Date().toISOString()
-          };
-        } else {
-          throw new Error(`Requirement with ID ${updatedRequirement.id} not found`);
-        }
-      } else {
-        // CREATE NEW: Generate ID and add to requirements
-        const newRequirement = {
-          ...updatedRequirement,
-          id: `REQ_${Date.now()}`, // Generate unique ID
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        };
-        currentRequirements.push(newRequirement);
-      }
-      
-      // Save the updated requirements array back to DataStore
-      dataStore.setRequirements(currentRequirements);
-      
-      // Close the modal
-      setEditingRequirement(null);
-      
-      console.log('✅ Requirement saved successfully');
-    } catch (error) {
-      console.error("❌ Error saving requirement:", error);
-      alert('Error saving requirement: ' + error.message);
+  const handleSaveRequirement = async (updatedRequirement) => {
+  try {
+    console.log('Saving requirement:', updatedRequirement);
+    
+    if (updatedRequirement.id) {
+      // UPDATE EXISTING
+      console.log('Updating existing requirement:', updatedRequirement.id);
+      await dataStore.updateRequirement(updatedRequirement.id, {
+        ...updatedRequirement,
+        updatedAt: new Date().toISOString()
+      });
+      console.log('✅ Requirement updated successfully');
+    } else {
+      // CREATE NEW
+      const newRequirement = {
+        ...updatedRequirement,
+        id: `REQ-${Date.now()}`, // Generate unique ID
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+      console.log('Creating new requirement:', newRequirement.id);
+      await dataStore.addRequirement(newRequirement);
+      console.log('✅ Requirement created successfully');
     }
-  };
+    
+    // Close the modal
+    setEditingRequirement(null);
+    
+  } catch (error) {
+    console.error("❌ Error saving requirement:", error);
+    alert('Error saving requirement: ' + error.message);
+  }
+};
 
   // Handle requirement deletion
-  const handleDeleteRequirement = (reqId) => {
-    if (window.confirm('Are you sure you want to delete this requirement?')) {
-      try {
-        // Get current requirements
-        const currentRequirements = dataStore.getRequirements();
-        
-        // Filter out the requirement to delete
-        const updatedRequirements = currentRequirements.filter(req => req.id !== reqId);
-        
-        // Update DataStore with filtered requirements
-        dataStore.setRequirements(updatedRequirements);
-        
-        // Also remove any mappings for this requirement
-        const currentMapping = dataStore.getMapping();
-        delete currentMapping[reqId];
-        dataStore.setMapping(currentMapping);
-        
-        // Clear from selection if selected
-        setSelectedRequirements(prev => {
-          const newSet = new Set(prev);
-          newSet.delete(reqId);
-          return newSet;
-        });
+  const handleDeleteRequirement = async (reqId) => {
+  if (window.confirm('Are you sure you want to delete this requirement?')) {
+    try {
+      console.log('Deleting requirement:', reqId);
+      
+      // Delete from database (this will also update localStorage)
+      await dataStore.deleteRequirement(reqId);
+      
+      // Clear from selection if selected
+      setSelectedRequirements(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(reqId);
+        return newSet;
+      });
 
-        console.log('✅ Requirement deleted successfully');
-      } catch (error) {
-        console.error('Error deleting requirement:', error);
-        alert('Error deleting requirement: ' + error.message);
-      }
+      console.log('✅ Requirement deleted successfully');
+    } catch (error) {
+      console.error('❌ Error deleting requirement:', error);
+      alert('Error deleting requirement: ' + error.message);
     }
-  };
+  }
+};
 
   // Handle bulk delete
-  const handleBulkDelete = () => {
-    if (selectedRequirements.size === 0) return;
-    
-    if (window.confirm(`Are you sure you want to delete ${selectedRequirements.size} requirement(s)?`)) {
-      try {
-        // Get current requirements
-        const currentRequirements = dataStore.getRequirements();
-        
-        // Filter out selected requirements
-        const updatedRequirements = currentRequirements.filter(
-          req => !selectedRequirements.has(req.id)
-        );
-        
-        // Update DataStore with filtered requirements
-        dataStore.setRequirements(updatedRequirements);
-        
-        // Also remove mappings for deleted requirements
-        const currentMapping = dataStore.getMapping();
-        selectedRequirements.forEach(reqId => {
-          delete currentMapping[reqId];
-        });
-        dataStore.setMapping(currentMapping);
-        
-        // Clear selection
-        setSelectedRequirements(new Set());
-
-        console.log(`✅ ${selectedRequirements.size} requirements deleted successfully`);
-      } catch (error) {
-        console.error('Error deleting requirements:', error);
-        alert('Error deleting requirements: ' + error.message);
+  const handleBulkDelete = async () => {
+  if (selectedRequirements.size === 0) return;
+  
+  if (window.confirm(`Are you sure you want to delete ${selectedRequirements.size} requirement(s)?`)) {
+    try {
+      console.log(`Deleting ${selectedRequirements.size} requirements...`);
+      
+      // Delete each requirement (this will update database and localStorage)
+      for (const reqId of selectedRequirements) {
+        await dataStore.deleteRequirement(reqId);
       }
+      
+      // Clear selection
+      setSelectedRequirements(new Set());
+
+      console.log(`✅ ${selectedRequirements.size} requirements deleted successfully`);
+    } catch (error) {
+      console.error('❌ Error deleting requirements:', error);
+      alert('Error deleting requirements: ' + error.message);
     }
-  };
+  }
+};
 
   // Handle new requirement creation
   const handleNewRequirement = () => {

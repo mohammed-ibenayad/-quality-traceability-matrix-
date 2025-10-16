@@ -27,8 +27,8 @@ import {
   Copy, // NEW: Copy icon for duplicate action
   Hash,     // 🆕 ADD - for tag icon  
   Minus,    // 🆕 ADD - for remove operations
-  Tag  
-  
+  Tag
+
 } from 'lucide-react';
 import MainLayout from '../components/Layout/MainLayout';
 import EmptyState from '../components/Common/EmptyState';
@@ -64,7 +64,7 @@ const getVersionDisplayText = (testCase) => {
     }
     return testCase.applicableVersions.join(', ');
   }
-  
+
   // Handle legacy format
   return testCase.version || 'All Versions';
 };
@@ -77,11 +77,11 @@ const getVersionDisplayText = (testCase) => {
 const getVersionTags = (testCase) => {
   // Handle new format
   if (testCase.applicableVersions) {
-    return testCase.applicableVersions.length > 0 
-      ? testCase.applicableVersions 
+    return testCase.applicableVersions.length > 0
+      ? testCase.applicableVersions
       : ['All Versions'];
   }
-  
+
   // Handle legacy format
   return testCase.version ? [testCase.version] : ['All Versions'];
 };
@@ -97,7 +97,7 @@ const TestCaseRow = ({
   onEdit,
   onDelete,
   onExecute,
-  onDuplicate, 
+  onDuplicate,
   isSelected,
   isExpanded,
   onToggleExpand,
@@ -136,20 +136,19 @@ const TestCaseRow = ({
                   {testCase.name}
                 </div>
               )}
-              
+
             </div>
           </div>
         </td>
         {/* END OF REPLACEMENT */}
         <td className="px-2 py-3 w-20 flex-shrink-0">
           <div className="flex flex-col items-start">
-            <span className={`inline-flex px-2 py-1 text-xs font-medium rounded ${
-              testCase.status === 'Passed' ? 'bg-green-100 text-green-800' :
-              testCase.status === 'Failed' ? 'bg-red-100 text-red-800' :
-              testCase.status === 'Blocked' ? 'bg-yellow-100 text-yellow-800' :
-              testCase.status === 'Not Found' ? 'bg-orange-100 text-orange-800' :
-              'bg-gray-100 text-gray-800'
-            }`}>
+            <span className={`inline-flex px-2 py-1 text-xs font-medium rounded ${testCase.status === 'Passed' ? 'bg-green-100 text-green-800' :
+                testCase.status === 'Failed' ? 'bg-red-100 text-red-800' :
+                  testCase.status === 'Blocked' ? 'bg-yellow-100 text-yellow-800' :
+                    testCase.status === 'Not Found' ? 'bg-orange-100 text-orange-800' :
+                      'bg-gray-100 text-gray-800'
+              }`}>
               {testCase.status === 'Not Run' ? 'Not Run' : testCase.status}
             </span>
 
@@ -178,22 +177,20 @@ const TestCaseRow = ({
           </div>
         </td>
         <td className="px-2 py-3 w-16 flex-shrink-0">
-          <span className={`inline-flex px-2 py-1 text-xs font-medium rounded ${
-            testCase.priority === 'High' ? 'bg-red-50 text-red-600' :
-            testCase.priority === 'Medium' ? 'bg-yellow-50 text-yellow-600' :
-            'bg-gray-50 text-gray-600'
-          }`}>
+          <span className={`inline-flex px-2 py-1 text-xs font-medium rounded ${testCase.priority === 'High' ? 'bg-red-50 text-red-600' :
+              testCase.priority === 'Medium' ? 'bg-yellow-50 text-yellow-600' :
+                'bg-gray-50 text-gray-600'
+            }`}>
             {testCase.priority} {/* Show full priority name */}
           </span>
         </td>
         <td className="px-2 py-3 w-20 flex-shrink-0">
-          <span className={`inline-flex px-2 py-1 text-xs font-medium rounded ${
-            testCase.automationStatus === 'Automated' ? 'bg-blue-100 text-blue-800' :
-            testCase.automationStatus === 'Semi-Automated' ? 'bg-purple-100 text-purple-800' :
-            'bg-gray-100 text-gray-800'
-          }`}>
+          <span className={`inline-flex px-2 py-1 text-xs font-medium rounded ${testCase.automationStatus === 'Automated' ? 'bg-blue-100 text-blue-800' :
+              testCase.automationStatus === 'Semi-Automated' ? 'bg-purple-100 text-purple-800' :
+                'bg-gray-100 text-gray-800'
+            }`}>
             {testCase.automationStatus === 'Automated' ? 'Auto' :
-             testCase.automationStatus === 'Semi-Automated' ? 'Semi' : 'Manual'}
+              testCase.automationStatus === 'Semi-Automated' ? 'Semi' : 'Manual'}
           </span>
         </td>
         <td className="px-2 py-3 w-20 flex-shrink-0">
@@ -231,71 +228,70 @@ const TestCaseRow = ({
         <td className="px-2 py-3 w-24 flex-shrink-0">
 
           <div className="text-xs text-gray-500">
-    {testCase.applicableVersions?.length > 0 ? (
-      <div>
-        <div className="flex flex-wrap gap-1">
-          {(() => {
-            // Smart display: always show current version first if it's assigned
-            const currentVersionAssigned = testCase.applicableVersions.includes(selectedVersion);
-            const otherVersions = testCase.applicableVersions.filter(v => v !== selectedVersion);
-            
-            let versionsToShow = [];
-            let remainingCount = 0;
-            
-            if (currentVersionAssigned) {
-              // Show current version first, then fill remaining slot
-              versionsToShow = [selectedVersion, ...otherVersions.slice(0, 1)];
-              remainingCount = Math.max(0, testCase.applicableVersions.length - 2);
-            } else {
-              // No current version assigned, show first 2
-              versionsToShow = testCase.applicableVersions.slice(0, 2);
-              remainingCount = Math.max(0, testCase.applicableVersions.length - 2);
-            }
-            
-            return (
-              <>
-                {versionsToShow.map(versionId => {
-                  const version = versions.find(v => v.id === versionId);
-                  const isCurrent = versionId === selectedVersion;
-                  return (
-                    <span 
-                      key={versionId} 
-                      className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs ${
-                        isCurrent 
-                          ? 'bg-green-100 text-green-800 font-medium ring-1 ring-green-300' 
-                          : 'bg-blue-100 text-blue-800'
-                      }`}
-                    >
-                      {isCurrent && '★ '}{version?.name || versionId}
-                    </span>
-                  );
-                })}
-                {remainingCount > 0 && (
-                  <button
-                    onClick={() => {
-                      setModalVersions({
-                        versions: testCase.applicableVersions,
-                        testCaseId: testCase.id,
-                        testCaseName: testCase.name
-                      });
-                      setShowVersionModal(true);
-                    }}
-                    className="text-xs text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded cursor-pointer hover:bg-blue-100 transition-colors font-medium"
-                  >
-                    +{remainingCount} more
-                  </button>
-                )}
-              </>
-            );
-          })()}
-        </div>
-      </div>
-    ) : (
-      <span className="text-gray-400 italic text-xs">All</span>
-    )}
-  </div>
- 
-</td>
+            {testCase.applicableVersions?.length > 0 ? (
+              <div>
+                <div className="flex flex-wrap gap-1">
+                  {(() => {
+                    // Smart display: always show current version first if it's assigned
+                    const currentVersionAssigned = testCase.applicableVersions.includes(selectedVersion);
+                    const otherVersions = testCase.applicableVersions.filter(v => v !== selectedVersion);
+
+                    let versionsToShow = [];
+                    let remainingCount = 0;
+
+                    if (currentVersionAssigned) {
+                      // Show current version first, then fill remaining slot
+                      versionsToShow = [selectedVersion, ...otherVersions.slice(0, 1)];
+                      remainingCount = Math.max(0, testCase.applicableVersions.length - 2);
+                    } else {
+                      // No current version assigned, show first 2
+                      versionsToShow = testCase.applicableVersions.slice(0, 2);
+                      remainingCount = Math.max(0, testCase.applicableVersions.length - 2);
+                    }
+
+                    return (
+                      <>
+                        {versionsToShow.map(versionId => {
+                          const version = versions.find(v => v.id === versionId);
+                          const isCurrent = versionId === selectedVersion;
+                          return (
+                            <span
+                              key={versionId}
+                              className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs ${isCurrent
+                                  ? 'bg-green-100 text-green-800 font-medium ring-1 ring-green-300'
+                                  : 'bg-blue-100 text-blue-800'
+                                }`}
+                            >
+                              {isCurrent && '★ '}{version?.name || versionId}
+                            </span>
+                          );
+                        })}
+                        {remainingCount > 0 && (
+                          <button
+                            onClick={() => {
+                              setModalVersions({
+                                versions: testCase.applicableVersions,
+                                testCaseId: testCase.id,
+                                testCaseName: testCase.name
+                              });
+                              setShowVersionModal(true);
+                            }}
+                            className="text-xs text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded cursor-pointer hover:bg-blue-100 transition-colors font-medium"
+                          >
+                            +{remainingCount} more
+                          </button>
+                        )}
+                      </>
+                    );
+                  })()}
+                </div>
+              </div>
+            ) : (
+              <span className="text-gray-400 italic text-xs">All</span>
+            )}
+          </div>
+
+        </td>
         <td className="px-2 py-3 w-24 flex-shrink-0">
           <TestCaseRowActions
             testCase={testCase}
@@ -309,281 +305,276 @@ const TestCaseRow = ({
       </tr>
 
       {/* Expanded Failure Details Row */}
-{/* Expanded Failure Details Row */}
-{isFailureExpanded && (testCase.status === 'Failed' || testCase.status === 'Not Found') && (
-  <tr className={`flex w-full`}>
-    <td colSpan="8" className="p-0 w-full">
-      <div className={`${
-        testCase.status === 'Failed' 
-          ? 'bg-gradient-to-r from-red-50 to-gray-50 border-l-4 border-red-400' 
-          : 'bg-gradient-to-r from-orange-50 to-gray-50 border-l-4 border-orange-400'
-      }`}>
-        <div className="p-6">
-          {/* Header Section */}
-          <div className="flex items-center justify-between mb-6 pb-4 border-b border-gray-200">
-            <div className="flex items-center space-x-3">
-              <div className={`w-2 h-2 rounded-full ${
-                testCase.status === 'Failed' ? 'bg-red-500' : 'bg-orange-500'
-              }`}></div>
-              <h3 className="text-lg font-semibold text-gray-900">
-                {testCase.status === 'Failed' ? 'Failure Details' : 'Issue Details'}
-              </h3>
-            </div>
-            <div className="flex items-center space-x-2">
-              <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                testCase.status === 'Failed' ? 'bg-red-100 text-red-800' : 'bg-orange-100 text-orange-800'
+      {/* Expanded Failure Details Row */}
+      {isFailureExpanded && (testCase.status === 'Failed' || testCase.status === 'Not Found') && (
+        <tr className={`flex w-full`}>
+          <td colSpan="8" className="p-0 w-full">
+            <div className={`${testCase.status === 'Failed'
+                ? 'bg-gradient-to-r from-red-50 to-gray-50 border-l-4 border-red-400'
+                : 'bg-gradient-to-r from-orange-50 to-gray-50 border-l-4 border-orange-400'
               }`}>
-                {testCase.status}
-              </span>
-            </div>
-          </div>
-
-          {/* Error Summary - Compact Horizontal */}
-          <div className="mb-6">
-            <div className="bg-white rounded-lg p-4 shadow-sm border">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center">
-                  <div className={`w-1 h-6 rounded mr-3 ${
-                    testCase.status === 'Failed' ? 'bg-red-500' : 'bg-orange-500'
-                  }`}></div>
-                  <h4 className="font-semibold text-gray-900">Error Summary</h4>
-                </div>
-                <button 
-                  onClick={() => navigator.clipboard.writeText(
-                    `${(testCase.failure && testCase.failure.type) || 'Test Failure'}: ${(testCase.failure && testCase.failure.message) || 'Test execution failed'}`
-                  )}
-                  className="text-xs text-gray-500 hover:text-gray-700 px-2 py-1 rounded hover:bg-gray-100"
-                  title="Copy error message"
-                >
-                  📋 Copy
-                </button>
-              </div>
-              <div className="flex items-start space-x-4">
-                <div className="flex-1">
-                  <div className="flex items-center space-x-2 mb-2 flex-wrap">
-                    <div className={`font-medium ${testCase.status === 'Failed' ? 'text-red-800' : 'text-orange-800'}`}>
-                      {(testCase.failure && testCase.failure.type) || 
-                       (testCase.status === 'Not Found' ? 'Test result not found in artifacts' : 'Test Failure')}
-                    </div>
-                    {/* Assertion Type Badge - Prominently displayed */}
-                    {testCase.failure?.assertionType && (
-                      <span className="text-xs bg-red-100 text-red-800 px-2 py-1 rounded font-mono">
-                        {testCase.failure.assertionType}
-                      </span>
-                    )}
-                    {(() => {
-                      const errorType = testCase.failure?.type || '';
-                      if (errorType.includes('Timeout') || errorType.includes('timeout')) {
-                        return <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">⏱️ Timing Issue</span>
-                      } else if (errorType.includes('Element') || errorType.includes('element')) {
-                        return <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">🎯 Element Issue</span>
-                      } else if (errorType.includes('Assert') || errorType.includes('assert')) {
-                        return <span className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded">⚖️ Assertion</span>
-                      } else if (errorType.includes('Connection') || errorType.includes('Network')) {
-                        return <span className="text-xs bg-orange-100 text-orange-800 px-2 py-1 rounded">🌐 Network</span>
-                      }
-                      return null;
-                    })()}
-                  </div>
-                  <div className={`${testCase.status === 'Failed' ? 'text-red-700' : 'text-orange-700'} break-words leading-relaxed text-sm`}>
-                    {(testCase.failure && testCase.failure.message) || 
-                     (testCase.status === 'Not Found' ? 'Test result not found in artifacts' : 'Test execution failed')}
-                  </div>
-                </div>
-                {testCase.failure?.parsingSource && (
-                  <div className="flex flex-col space-y-1">
-                    <span className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded">
-                      {testCase.failure.parsingSource}
-                    </span>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Stack Trace - Full Width */}
-          {testCase.failure?.stackTrace && (
-            <div className="mb-6">
-              <div className="bg-white rounded-lg p-4 shadow-sm border">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center">
-                    <div className="w-1 h-6 bg-gray-500 rounded mr-3"></div>
-                    <h4 className="font-semibold text-gray-900">Stack Trace</h4>
+              <div className="p-6">
+                {/* Header Section */}
+                <div className="flex items-center justify-between mb-6 pb-4 border-b border-gray-200">
+                  <div className="flex items-center space-x-3">
+                    <div className={`w-2 h-2 rounded-full ${testCase.status === 'Failed' ? 'bg-red-500' : 'bg-orange-500'
+                      }`}></div>
+                    <h3 className="text-lg font-semibold text-gray-900">
+                      {testCase.status === 'Failed' ? 'Failure Details' : 'Issue Details'}
+                    </h3>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <span className="text-xs text-gray-500">
-                      {testCase.failure.stackTrace.split('\n').length} lines
+                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${testCase.status === 'Failed' ? 'bg-red-100 text-red-800' : 'bg-orange-100 text-orange-800'
+                      }`}>
+                      {testCase.status}
                     </span>
-                    <button 
-                      onClick={() => navigator.clipboard.writeText(testCase.failure.stackTrace)}
-                      className="text-xs text-gray-500 hover:text-gray-700 px-2 py-1 rounded hover:bg-gray-100"
-                      title="Copy stack trace"
-                    >
-                      📋 Copy
-                    </button>
                   </div>
                 </div>
-                <div className="relative">
-                  <div className="bg-gray-900 text-green-400 p-4 rounded font-mono text-xs overflow-auto h-80 border">
-                    <pre className="whitespace-pre-wrap">
-                      {testCase.failure.stackTrace.split('\n').map((line, index) => (
-                        <div 
-                          key={index} 
-                          className={`${
-                            line.includes('at ') && (line.includes('.spec.') || line.includes('.test.') || line.includes(testCase.name)) 
-                              ? 'bg-red-900 bg-opacity-50 text-red-300' 
-                              : ''
-                          }`}
-                        >
-                          {line}
-                        </div>
-                      ))}
-                    </pre>
-                  </div>
-                  <div className="absolute bottom-3 left-3 text-xs text-gray-400 bg-gray-800 bg-opacity-75 px-2 py-1 rounded">
-                    <span className="inline-block w-3 h-3 bg-red-900 bg-opacity-50 rounded mr-1"></span>
-                    Test-related frames highlighted
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
 
-          {/* Assertion Details - Full Width */}
-          {testCase.failure?.assertion?.available && (
-            <div className="mb-6">
-              <div className="bg-white rounded-lg p-4 shadow-sm border">
-                <div className="flex items-center mb-3">
-                  <div className="w-1 h-6 bg-purple-500 rounded mr-3"></div>
-                  <h4 className="font-semibold text-gray-900">Assertion Details</h4>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <span className="text-xs font-medium text-green-700">Expected:</span>
-                    <div className="font-mono bg-green-50 p-3 rounded mt-1 border border-green-200 break-all text-sm">
-                      {testCase.failure.assertion.expected || 'N/A'}
-                    </div>
-                  </div>
-                  <div>
-                    <span className="text-xs font-medium text-red-700">Actual:</span>
-                    <div className="font-mono bg-red-50 p-3 rounded mt-1 border border-red-200 break-all text-sm">
-                      {testCase.failure.assertion.actual || 'N/A'}
-                    </div>
-                  </div>
-                </div>
-                {testCase.failure.assertion.operator && (
-                  <div className="mt-3 pt-3 border-t border-gray-100">
-                    <span className="text-sm font-medium text-gray-600">Operator:</span>
-                    <span className="text-sm ml-2 font-mono">{testCase.failure.assertion.operator}</span>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Bottom Row - Technical Details */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="bg-white rounded-lg p-4 shadow-sm border">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center">
-                  <div className="w-1 h-6 bg-blue-500 rounded mr-3"></div>
-                  <h4 className="font-semibold text-gray-900">Technical Details</h4>
-                </div>
-                {(testCase.failure?.location?.display || testCase.failure?.file || testCase.file) && (
-                  <button 
-                    onClick={() => navigator.clipboard.writeText(
-                      testCase.failure?.location?.display || testCase.failure?.file || testCase.file || ''
-                    )}
-                    className="text-xs text-blue-600 hover:text-blue-800 px-2 py-1 rounded hover:bg-blue-50"
-                    title="Copy file path"
-                  >
-                    📂 Copy Path
-                  </button>
-                )}
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <div className="flex items-center space-x-1 text-xs font-medium text-gray-600">
-                    <FileText size={12} />
-                    <span>{testCase.failure?.location ? 'Error Location' : 'File Location'}</span>
-                  </div>
-                  <div className="space-y-1">
-                    <div className="font-mono text-xs text-gray-800 break-all bg-blue-50 px-2 py-1 rounded">
-                      {testCase.failure?.location 
-                        ? testCase.failure.location.display 
-                        : (testCase.failure?.file || testCase.file || 'N/A')
-                      }
-                    </div>
-                    {testCase.failure?.location && (
-                      <div className="text-xs text-red-600 font-medium">
-                        ➤ Line {testCase.failure.location.line}
+                {/* Error Summary - Compact Horizontal */}
+                <div className="mb-6">
+                  <div className="bg-white rounded-lg p-4 shadow-sm border">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center">
+                        <div className={`w-1 h-6 rounded mr-3 ${testCase.status === 'Failed' ? 'bg-red-500' : 'bg-orange-500'
+                          }`}></div>
+                        <h4 className="font-semibold text-gray-900">Error Summary</h4>
                       </div>
-                    )}
-                  </div>
-                </div>
-                <div className="space-y-1">
-                  <div className="flex items-center space-x-1 text-xs font-medium text-gray-600">
-                    <Code size={12} />
-                    <span>Method</span>
-                  </div>
-                  <div className="font-mono text-xs text-gray-800 break-all">
-                    {testCase.failure?.method || testCase.method || testCase.name}
-                  </div>
-                  {(testCase.failure?.classname || testCase.classname) && (
-                    <div className="text-xs text-gray-500 break-all">
-                      Class: {testCase.failure.classname || testCase.classname}
+                      <button
+                        onClick={() => navigator.clipboard.writeText(
+                          `${(testCase.failure && testCase.failure.type) || 'Test Failure'}: ${(testCase.failure && testCase.failure.message) || 'Test execution failed'}`
+                        )}
+                        className="text-xs text-gray-500 hover:text-gray-700 px-2 py-1 rounded hover:bg-gray-100"
+                        title="Copy error message"
+                      >
+                        📋 Copy
+                      </button>
                     </div>
-                  )}
+                    <div className="flex items-start space-x-4">
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-2 mb-2 flex-wrap">
+                          <div className={`font-medium ${testCase.status === 'Failed' ? 'text-red-800' : 'text-orange-800'}`}>
+                            {(testCase.failure && testCase.failure.type) ||
+                              (testCase.status === 'Not Found' ? 'Test result not found in artifacts' : 'Test Failure')}
+                          </div>
+                          {/* Assertion Type Badge - Prominently displayed */}
+                          {testCase.failure?.assertionType && (
+                            <span className="text-xs bg-red-100 text-red-800 px-2 py-1 rounded font-mono">
+                              {testCase.failure.assertionType}
+                            </span>
+                          )}
+                          {(() => {
+                            const errorType = testCase.failure?.type || '';
+                            if (errorType.includes('Timeout') || errorType.includes('timeout')) {
+                              return <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">⏱️ Timing Issue</span>
+                            } else if (errorType.includes('Element') || errorType.includes('element')) {
+                              return <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">🎯 Element Issue</span>
+                            } else if (errorType.includes('Assert') || errorType.includes('assert')) {
+                              return <span className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded">⚖️ Assertion</span>
+                            } else if (errorType.includes('Connection') || errorType.includes('Network')) {
+                              return <span className="text-xs bg-orange-100 text-orange-800 px-2 py-1 rounded">🌐 Network</span>
+                            }
+                            return null;
+                          })()}
+                        </div>
+                        <div className={`${testCase.status === 'Failed' ? 'text-red-700' : 'text-orange-700'} break-words leading-relaxed text-sm`}>
+                          {(testCase.failure && testCase.failure.message) ||
+                            (testCase.status === 'Not Found' ? 'Test result not found in artifacts' : 'Test execution failed')}
+                        </div>
+                      </div>
+                      {testCase.failure?.parsingSource && (
+                        <div className="flex flex-col space-y-1">
+                          <span className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded">
+                            {testCase.failure.parsingSource}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
 
-            <div className="bg-white rounded-lg p-4 shadow-sm border">
-              <div className="flex items-center mb-3">
-                <div className="w-1 h-6 bg-indigo-500 rounded mr-3"></div>
-                <h4 className="font-semibold text-gray-900">Execution Context</h4>
-              </div>
-              <div className="space-y-3">
-                <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                  <span className="text-sm text-gray-600">Framework</span>
-                  <div className="text-right">
-                    <div className="text-sm font-medium text-gray-900">
-                      {testCase.execution?.framework?.name || 'Unknown'}
+                {/* Stack Trace - Full Width */}
+                {testCase.failure?.stackTrace && (
+                  <div className="mb-6">
+                    <div className="bg-white rounded-lg p-4 shadow-sm border">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center">
+                          <div className="w-1 h-6 bg-gray-500 rounded mr-3"></div>
+                          <h4 className="font-semibold text-gray-900">Stack Trace</h4>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <span className="text-xs text-gray-500">
+                            {testCase.failure.stackTrace.split('\n').length} lines
+                          </span>
+                          <button
+                            onClick={() => navigator.clipboard.writeText(testCase.failure.stackTrace)}
+                            className="text-xs text-gray-500 hover:text-gray-700 px-2 py-1 rounded hover:bg-gray-100"
+                            title="Copy stack trace"
+                          >
+                            📋 Copy
+                          </button>
+                        </div>
+                      </div>
+                      <div className="relative">
+                        <div className="bg-gray-900 text-green-400 p-4 rounded font-mono text-xs overflow-auto h-80 border">
+                          <pre className="whitespace-pre-wrap">
+                            {testCase.failure.stackTrace.split('\n').map((line, index) => (
+                              <div
+                                key={index}
+                                className={`${line.includes('at ') && (line.includes('.spec.') || line.includes('.test.') || line.includes(testCase.name))
+                                    ? 'bg-red-900 bg-opacity-50 text-red-300'
+                                    : ''
+                                  }`}
+                              >
+                                {line}
+                              </div>
+                            ))}
+                          </pre>
+                        </div>
+                        <div className="absolute bottom-3 left-3 text-xs text-gray-400 bg-gray-800 bg-opacity-75 px-2 py-1 rounded">
+                          <span className="inline-block w-3 h-3 bg-red-900 bg-opacity-50 rounded mr-1"></span>
+                          Test-related frames highlighted
+                        </div>
+                      </div>
                     </div>
-                    {testCase.execution?.framework?.version && (
-                      <div className="text-xs text-gray-500">v{testCase.execution.framework.version}</div>
-                    )}
-                  </div>
-                </div>
-                <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                  <span className="text-sm text-gray-600">Duration</span>
-                  <span className="text-sm font-medium text-gray-900">
-                    {testCase.duration ? `${testCase.duration}ms` : 'N/A'}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center py-2">
-                  <span className="text-sm text-gray-600">Executed At</span>
-                  <span className="text-sm font-medium text-gray-900">
-                    {testCase.lastExecuted ? new Date(testCase.lastExecuted).toLocaleString() : 'N/A'}
-                  </span>
-                </div>
-                {testCase.execution?.parsingSource && (
-                  <div className="pt-2 border-t border-gray-100">
-                    <span className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded inline-block">
-                      {testCase.execution.parsingSource}
-                    </span>
                   </div>
                 )}
+
+                {/* Assertion Details - Full Width */}
+                {testCase.failure?.assertion?.available && (
+                  <div className="mb-6">
+                    <div className="bg-white rounded-lg p-4 shadow-sm border">
+                      <div className="flex items-center mb-3">
+                        <div className="w-1 h-6 bg-purple-500 rounded mr-3"></div>
+                        <h4 className="font-semibold text-gray-900">Assertion Details</h4>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <span className="text-xs font-medium text-green-700">Expected:</span>
+                          <div className="font-mono bg-green-50 p-3 rounded mt-1 border border-green-200 break-all text-sm">
+                            {testCase.failure.assertion.expected || 'N/A'}
+                          </div>
+                        </div>
+                        <div>
+                          <span className="text-xs font-medium text-red-700">Actual:</span>
+                          <div className="font-mono bg-red-50 p-3 rounded mt-1 border border-red-200 break-all text-sm">
+                            {testCase.failure.assertion.actual || 'N/A'}
+                          </div>
+                        </div>
+                      </div>
+                      {testCase.failure.assertion.operator && (
+                        <div className="mt-3 pt-3 border-t border-gray-100">
+                          <span className="text-sm font-medium text-gray-600">Operator:</span>
+                          <span className="text-sm ml-2 font-mono">{testCase.failure.assertion.operator}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Bottom Row - Technical Details */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <div className="bg-white rounded-lg p-4 shadow-sm border">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center">
+                        <div className="w-1 h-6 bg-blue-500 rounded mr-3"></div>
+                        <h4 className="font-semibold text-gray-900">Technical Details</h4>
+                      </div>
+                      {(testCase.failure?.location?.display || testCase.failure?.file || testCase.file) && (
+                        <button
+                          onClick={() => navigator.clipboard.writeText(
+                            testCase.failure?.location?.display || testCase.failure?.file || testCase.file || ''
+                          )}
+                          className="text-xs text-blue-600 hover:text-blue-800 px-2 py-1 rounded hover:bg-blue-50"
+                          title="Copy file path"
+                        >
+                          📂 Copy Path
+                        </button>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <div className="flex items-center space-x-1 text-xs font-medium text-gray-600">
+                          <FileText size={12} />
+                          <span>{testCase.failure?.location ? 'Error Location' : 'File Location'}</span>
+                        </div>
+                        <div className="space-y-1">
+                          <div className="font-mono text-xs text-gray-800 break-all bg-blue-50 px-2 py-1 rounded">
+                            {testCase.failure?.location
+                              ? testCase.failure.location.display
+                              : (testCase.failure?.file || testCase.file || 'N/A')
+                            }
+                          </div>
+                          {testCase.failure?.location && (
+                            <div className="text-xs text-red-600 font-medium">
+                              ➤ Line {testCase.failure.location.line}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <div className="flex items-center space-x-1 text-xs font-medium text-gray-600">
+                          <Code size={12} />
+                          <span>Method</span>
+                        </div>
+                        <div className="font-mono text-xs text-gray-800 break-all">
+                          {testCase.failure?.method || testCase.method || testCase.name}
+                        </div>
+                        {(testCase.failure?.classname || testCase.classname) && (
+                          <div className="text-xs text-gray-500 break-all">
+                            Class: {testCase.failure.classname || testCase.classname}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-white rounded-lg p-4 shadow-sm border">
+                    <div className="flex items-center mb-3">
+                      <div className="w-1 h-6 bg-indigo-500 rounded mr-3"></div>
+                      <h4 className="font-semibold text-gray-900">Execution Context</h4>
+                    </div>
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                        <span className="text-sm text-gray-600">Framework</span>
+                        <div className="text-right">
+                          <div className="text-sm font-medium text-gray-900">
+                            {testCase.execution?.framework?.name || 'Unknown'}
+                          </div>
+                          {testCase.execution?.framework?.version && (
+                            <div className="text-xs text-gray-500">v{testCase.execution.framework.version}</div>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                        <span className="text-sm text-gray-600">Duration</span>
+                        <span className="text-sm font-medium text-gray-900">
+                          {testCase.duration ? `${testCase.duration}ms` : 'N/A'}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center py-2">
+                        <span className="text-sm text-gray-600">Executed At</span>
+                        <span className="text-sm font-medium text-gray-900">
+                          {testCase.lastExecuted ? new Date(testCase.lastExecuted).toLocaleString() : 'N/A'}
+                        </span>
+                      </div>
+                      {testCase.execution?.parsingSource && (
+                        <div className="pt-2 border-t border-gray-100">
+                          <span className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded inline-block">
+                            {testCase.execution.parsingSource}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+
               </div>
             </div>
-          </div>
-
-
-        </div>
-      </div>
-    </td>
-  </tr>
-)}
+          </td>
+        </tr>
+      )}
 
       {/* Expanded Row Content - IMPROVED UI/UX */}
       {isExpanded && (
@@ -599,21 +590,19 @@ const TestCaseRow = ({
                   </div>
                   <div className="flex items-center space-x-2">
                     {/* Status Badge */}
-                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                      testCase.status === 'Passed' ? 'bg-green-100 text-green-800' :
-                      testCase.status === 'Failed' ? 'bg-red-100 text-red-800' :
-                      testCase.status === 'Blocked' ? 'bg-yellow-100 text-yellow-800' :
-                      testCase.status === 'Not Found' ? 'bg-orange-100 text-orange-800' :
-                      'bg-gray-100 text-gray-800'
-                    }`}>
+                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${testCase.status === 'Passed' ? 'bg-green-100 text-green-800' :
+                        testCase.status === 'Failed' ? 'bg-red-100 text-red-800' :
+                          testCase.status === 'Blocked' ? 'bg-yellow-100 text-yellow-800' :
+                            testCase.status === 'Not Found' ? 'bg-orange-100 text-orange-800' :
+                              'bg-gray-100 text-gray-800'
+                      }`}>
                       {testCase.status}
                     </span>
                     {/* Priority Badge */}
-                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                      testCase.priority === 'High' ? 'bg-red-100 text-red-800' :
-                      testCase.priority === 'Medium' ? 'bg-yellow-100 text-yellow-800' :
-                      'bg-green-100 text-green-800'
-                    }`}>
+                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${testCase.priority === 'High' ? 'bg-red-100 text-red-800' :
+                        testCase.priority === 'Medium' ? 'bg-yellow-100 text-yellow-800' :
+                          'bg-green-100 text-green-800'
+                      }`}>
                       {testCase.priority} Priority
                     </span>
                   </div>
@@ -704,11 +693,10 @@ const TestCaseRow = ({
                         </div>
                         <div className="flex justify-between items-center py-2 border-b border-gray-100">
                           <span className="text-sm text-gray-600">Automation</span>
-                          <span className={`text-xs px-2 py-1 rounded-full font-medium ${
-                            testCase.automationStatus === 'Automated' ? 'bg-blue-100 text-blue-800' :
-                            testCase.automationStatus === 'Semi-Automated' ? 'bg-purple-100 text-purple-800' :
-                            'bg-gray-100 text-gray-800'
-                          }`}>
+                          <span className={`text-xs px-2 py-1 rounded-full font-medium ${testCase.automationStatus === 'Automated' ? 'bg-blue-100 text-blue-800' :
+                              testCase.automationStatus === 'Semi-Automated' ? 'bg-purple-100 text-purple-800' :
+                                'bg-gray-100 text-gray-800'
+                            }`}>
                             {testCase.automationStatus}
                           </span>
                         </div>
@@ -739,11 +727,10 @@ const TestCaseRow = ({
                       <h4 className="font-semibold text-gray-900 mb-4">Execution History</h4>
                       <div className="space-y-3">
                         <div className="flex items-center space-x-3">
-                          <div className={`w-3 h-3 rounded-full ${
-                            testCase.status === 'Passed' ? 'bg-green-500' :
-                            testCase.status === 'Failed' ? 'bg-red-500' :
-                            'bg-gray-400'
-                          }`}></div>
+                          <div className={`w-3 h-3 rounded-full ${testCase.status === 'Passed' ? 'bg-green-500' :
+                              testCase.status === 'Failed' ? 'bg-red-500' :
+                                'bg-gray-400'
+                            }`}></div>
                           <div>
                             <div className="text-sm font-medium text-gray-900">
                               {testCase.lastExecuted ? 'Last Run' : 'Never Executed'}
@@ -881,53 +868,53 @@ const TestCases = () => {
   }, []);
 
   // Auto-reset filters when version changes to avoid confusion
-useEffect(() => {
-  // Don't reset on initial load
-  if (!selectedVersion) return;
-  
-  // Get tags available in the new version
-  const newVersionTestCases = selectedVersion === 'unassigned' 
-    ? testCases 
-    : testCases.filter(tc => {
+  useEffect(() => {
+    // Don't reset on initial load
+    if (!selectedVersion) return;
+
+    // Get tags available in the new version
+    const newVersionTestCases = selectedVersion === 'unassigned'
+      ? testCases
+      : testCases.filter(tc => {
         if (tc.applicableVersions) {
           if (tc.applicableVersions.length === 0) return true;
           return tc.applicableVersions.includes(selectedVersion);
         }
         return !tc.version || tc.version === selectedVersion || tc.version === '';
       });
-  
-  const tagsInNewVersion = new Set();
-  newVersionTestCases.forEach(tc => {
-    if (tc.tags && Array.isArray(tc.tags)) {
-      tc.tags.forEach(tag => tagsInNewVersion.add(tag));
-    }
-  });
-  
-  // Reset selected tags that don't exist in the new version
-  setSelectedTags(prev => {
-    const validTags = new Set();
-    prev.forEach(tag => {
-      if (tagsInNewVersion.has(tag)) {
-        validTags.add(tag);
+
+    const tagsInNewVersion = new Set();
+    newVersionTestCases.forEach(tc => {
+      if (tc.tags && Array.isArray(tc.tags)) {
+        tc.tags.forEach(tag => tagsInNewVersion.add(tag));
       }
     });
-    
-    // If some tags were removed, also reset status filter to "All" to avoid double confusion
-    if (validTags.size < prev.size) {
-      console.log('🔄 Version changed: Resetting invalid filters');
-      setStatusFilter('All');
-      setSearchQuery(''); // Optional: also reset search
-    }
-    
-    return validTags;
-  });
-  
-  // Optional: Reset other filters too
-  // setStatusFilter('All');
-  // setPriorityFilter('All');
-  // setAutomationFilter('All');
-  
-}, [selectedVersion, testCases]); // Triggers when version changes
+
+    // Reset selected tags that don't exist in the new version
+    setSelectedTags(prev => {
+      const validTags = new Set();
+      prev.forEach(tag => {
+        if (tagsInNewVersion.has(tag)) {
+          validTags.add(tag);
+        }
+      });
+
+      // If some tags were removed, also reset status filter to "All" to avoid double confusion
+      if (validTags.size < prev.size) {
+        console.log('🔄 Version changed: Resetting invalid filters');
+        setStatusFilter('All');
+        setSearchQuery(''); // Optional: also reset search
+      }
+
+      return validTags;
+    });
+
+    // Optional: Reset other filters too
+    // setStatusFilter('All');
+    // setPriorityFilter('All');
+    // setAutomationFilter('All');
+
+  }, [selectedVersion, testCases]); // Triggers when version changes
 
   // NEW: Get linked requirements for the currently viewing test case
   const linkedRequirements = useMemo(() => {
@@ -981,7 +968,7 @@ useEffect(() => {
         if (tc.applicableVersions.length === 0) return true;
         return tc.applicableVersions.includes(selectedVersion);
       }
-      
+
       // Handle legacy format during transition
       return !tc.version || tc.version === selectedVersion || tc.version === '';
     });
@@ -989,112 +976,112 @@ useEffect(() => {
 
   // Get unique tags from all test cases
   const availableTags = useMemo(() => {
-  return dataStore.getAllTags();
-}, [testCases]);
+    return dataStore.getAllTags();
+  }, [testCases]);
 
   // Add this computed value for filtered tags
   const filteredAvailableTags = useMemo(() => {
-      if (!tagSearchQuery) return availableTags;
-      return availableTags.filter(tag =>
-          tag.toLowerCase().includes(tagSearchQuery.toLowerCase())
-      );
+    if (!tagSearchQuery) return availableTags;
+    return availableTags.filter(tag =>
+      tag.toLowerCase().includes(tagSearchQuery.toLowerCase())
+    );
   }, [availableTags, tagSearchQuery]);
 
 
- const filteredTestCases = useMemo(() => {
-  console.log('🔍 Filtering Debug:', {
-    versionFilteredCount: versionFilteredTestCases.length,
-    selectedVersion,
-    selectedTags: Array.from(selectedTags),
-    sampleTestCaseTags: versionFilteredTestCases.slice(0, 3).map(tc => ({ id: tc.id, tags: tc.tags }))
-  });
+  const filteredTestCases = useMemo(() => {
+    console.log('🔍 Filtering Debug:', {
+      versionFilteredCount: versionFilteredTestCases.length,
+      selectedVersion,
+      selectedTags: Array.from(selectedTags),
+      sampleTestCaseTags: versionFilteredTestCases.slice(0, 3).map(tc => ({ id: tc.id, tags: tc.tags }))
+    });
 
-  return versionFilteredTestCases.filter(testCase => {
-    // Search filter
-    const matchesSearch = !searchQuery ||
-                          testCase.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          testCase.id.toLowerCase().includes(searchQuery.toLowerCase());
+    return versionFilteredTestCases.filter(testCase => {
+      // Search filter
+      const matchesSearch = !searchQuery ||
+        testCase.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        testCase.id.toLowerCase().includes(searchQuery.toLowerCase());
 
-    // Status filter
-    const matchesStatus = statusFilter === 'All' || testCase.status === statusFilter;
+      // Status filter
+      const matchesStatus = statusFilter === 'All' || testCase.status === statusFilter;
 
-    // Priority filter
-    const matchesPriority = priorityFilter === 'All' || testCase.priority === priorityFilter;
+      // Priority filter
+      const matchesPriority = priorityFilter === 'All' || testCase.priority === priorityFilter;
 
-    // Automation filter
-    const matchesAutomation = automationFilter === 'All' || testCase.automationStatus === automationFilter;
+      // Automation filter
+      const matchesAutomation = automationFilter === 'All' || testCase.automationStatus === automationFilter;
 
-    // Tag filter - Enhanced debugging
-    const matchesTags = selectedTags.size === 0 ||
-                        (testCase.tags && Array.isArray(testCase.tags) &&
-                         Array.from(selectedTags).some(tag => testCase.tags.includes(tag)));
+      // Tag filter - Enhanced debugging
+      const matchesTags = selectedTags.size === 0 ||
+        (testCase.tags && Array.isArray(testCase.tags) &&
+          Array.from(selectedTags).some(tag => testCase.tags.includes(tag)));
 
-    // Debug specific test case if it has the Sample tag
-    if (testCase.tags && testCase.tags.includes('Sample')) {
-      console.log('🏷️ Sample tag test case:', {
-        id: testCase.id,
-        tags: testCase.tags,
-        selectedTags: Array.from(selectedTags),
-        matchesTags,
-        matchesSearch,
-        matchesStatus,
-        matchesPriority,
-        matchesAutomation
-      });
-    }
+      // Debug specific test case if it has the Sample tag
+      if (testCase.tags && testCase.tags.includes('Sample')) {
+        console.log('🏷️ Sample tag test case:', {
+          id: testCase.id,
+          tags: testCase.tags,
+          selectedTags: Array.from(selectedTags),
+          matchesTags,
+          matchesSearch,
+          matchesStatus,
+          matchesPriority,
+          matchesAutomation
+        });
+      }
 
-    return matchesSearch && matchesStatus && matchesPriority && matchesAutomation && matchesTags;
-  });
-}, [versionFilteredTestCases, searchQuery, statusFilter, priorityFilter, automationFilter, selectedTags]);
+      return matchesSearch && matchesStatus && matchesPriority && matchesAutomation && matchesTags;
+    });
+  }, [versionFilteredTestCases, searchQuery, statusFilter, priorityFilter, automationFilter, selectedTags]);
 
   // Calculate summary statistics
   // Calculate summary statistics
-const summaryStats = useMemo(() => {
-  // Base counts from version-filtered test cases (before other filters)
-  const totalBase = versionFilteredTestCases.length;
-  const passedBase = versionFilteredTestCases.filter(tc => tc.status === 'Passed').length;
-  const failedBase = versionFilteredTestCases.filter(tc => tc.status === 'Failed').length;
-  const notRunBase = versionFilteredTestCases.filter(tc => tc.status === 'Not Run').length;
-  const blockedBase = versionFilteredTestCases.filter(tc => tc.status === 'Blocked').length;
-  const notFoundBase = versionFilteredTestCases.filter(tc => tc.status === 'Not Found').length;
-  const automatedBase = versionFilteredTestCases.filter(tc => tc.automationStatus === 'Automated').length;
-  const linkedBase = versionFilteredTestCases.filter(tc => tc.requirementIds && tc.requirementIds.length > 0).length;
+  const summaryStats = useMemo(() => {
+    // Base counts from version-filtered test cases (before other filters)
+    const totalBase = versionFilteredTestCases.length;
+    const passedBase = versionFilteredTestCases.filter(tc => tc.status === 'Passed').length;
+    const failedBase = versionFilteredTestCases.filter(tc => tc.status === 'Failed').length;
+    const notRunBase = versionFilteredTestCases.filter(tc => tc.status === 'Not Run').length;
+    const blockedBase = versionFilteredTestCases.filter(tc => tc.status === 'Blocked').length;
+    const notFoundBase = versionFilteredTestCases.filter(tc => tc.status === 'Not Found').length;
+    const automatedBase = versionFilteredTestCases.filter(tc => tc.automationStatus === 'Automated').length;
+    const linkedBase = versionFilteredTestCases.filter(tc => tc.requirementIds && tc.requirementIds.length > 0).length;
 
-  // Current filtered counts (for display in metrics cards)
-  const total = filteredTestCases.length;
-  const passed = filteredTestCases.filter(tc => tc.status === 'Passed').length;
-  const failed = filteredTestCases.filter(tc => tc.status === 'Failed').length;
-  const notRun = filteredTestCases.filter(tc => tc.status === 'Not Run').length;
-  const blocked = filteredTestCases.filter(tc => tc.status === 'Blocked').length;
-  const notFound = filteredTestCases.filter(tc => tc.status === 'Not Found').length;
-  const automated = filteredTestCases.filter(tc => tc.automationStatus === 'Automated').length;
-  const linked = filteredTestCases.filter(tc => tc.requirementIds && tc.requirementIds.length > 0).length;
+    // Current filtered counts (for display in metrics cards)
+    const total = filteredTestCases.length;
+    const passed = filteredTestCases.filter(tc => tc.status === 'Passed').length;
+    const failed = filteredTestCases.filter(tc => tc.status === 'Failed').length;
+    const notRun = filteredTestCases.filter(tc => tc.status === 'Not Run').length;
+    const blocked = filteredTestCases.filter(tc => tc.status === 'Blocked').length;
+    const notFound = filteredTestCases.filter(tc => tc.status === 'Not Found').length;
+    const automated = filteredTestCases.filter(tc => tc.automationStatus === 'Automated').length;
+    const linked = filteredTestCases.filter(tc => tc.requirementIds && tc.requirementIds.length > 0).length;
 
-  return {
-    // Current filtered counts (for metrics cards)
-    total,
-    passed,
-    failed,
-    notRun,
-    blocked,
-    notFound,
-    automated,
-    linked,
-    passRate: total > 0 ? Math.round((passed / total) * 100) : 0,
-    automationRate: total > 0 ? Math.round((automated / total) * 100) : 0,
-    linkageRate: total > 0 ? Math.round((linked / total) * 100) : 0,
-    
-    // Base counts (for status filter buttons)
-    totalBase,
-    passedBase,
-    failedBase,
-    notRunBase,
-    blockedBase,
-    notFoundBase,
-    automatedBase,
-    linkedBase
-  };
-}, [filteredTestCases, versionFilteredTestCases]);
+    return {
+      // Current filtered counts (for metrics cards)
+      total,
+      passed,
+      failed,
+      notRun,
+      blocked,
+      notFound,
+      automated,
+      linked,
+      passRate: total > 0 ? Math.round((passed / total) * 100) : 0,
+      automationRate: total > 0 ? Math.round((automated / total) * 100) : 0,
+      linkageRate: total > 0 ? Math.round((linked / total) * 100) : 0,
+
+      // Base counts (for status filter buttons)
+      totalBase,
+      passedBase,
+      failedBase,
+      notRunBase,
+      blockedBase,
+      notFoundBase,
+      automatedBase,
+      linkedBase
+    };
+  }, [filteredTestCases, versionFilteredTestCases]);
 
   // Handle test case selection
   const handleTestCaseSelection = (testCaseId, checked) => {
@@ -1141,19 +1128,19 @@ const summaryStats = useMemo(() => {
   };
 
   const selectedAutomatedTestCases = useMemo(() => {
-  return Array.from(selectedTestCases)
-    .map(id => filteredTestCases.find(tc => tc.id === id))
-    .filter(tc => tc && (tc.automationStatus === 'Automated' || tc.automationStatus === 'Semi-Automated'));
-}, [selectedTestCases, filteredTestCases]);
+    return Array.from(selectedTestCases)
+      .map(id => filteredTestCases.find(tc => tc.id === id))
+      .filter(tc => tc && (tc.automationStatus === 'Automated' || tc.automationStatus === 'Semi-Automated'));
+  }, [selectedTestCases, filteredTestCases]);
 
   // Execute selected test cases
   const executeSelectedTests = () => {
-  if (selectedAutomatedTestCases.length === 0) {
-    alert('No automated test cases selected. Only automated and semi-automated tests can be executed.');
-    return;
-  }
-  setShowExecutionModal(true);
-};
+    if (selectedAutomatedTestCases.length === 0) {
+      alert('No automated test cases selected. Only automated and semi-automated tests can be executed.');
+      return;
+    }
+    setShowExecutionModal(true);
+  };
 
   // Toggle row expansion
   const toggleRowExpansion = (testCaseId) => {
@@ -1196,7 +1183,7 @@ const summaryStats = useMemo(() => {
 
   // Handle test case editing (can be called from view modal)
   const handleEditTestCase = (testCase) => {
-    setEditingTestCase({...testCase});
+    setEditingTestCase({ ...testCase });
     setShowEditModal(true);
     setShowViewModal(false); // Close view modal when editing
   };
@@ -1226,347 +1213,370 @@ const summaryStats = useMemo(() => {
   };
 
   // Save test case (create or update)
-  const handleSaveTestCase = (testCaseData) => {
+  const handleSaveTestCase = async (testCaseData) => {
     try {
       if (testCaseData.id && testCases.find(tc => tc.id === testCaseData.id)) {
         // Update existing
-        dataStore.updateTestCase(testCaseData.id, testCaseData);
+        console.log('Updating test case:', testCaseData.id);
+        await dataStore.updateTestCase(testCaseData.id, testCaseData);
+        console.log('✅ Test case updated successfully');
       } else {
         // Create new
-        dataStore.addTestCase(testCaseData);
+        const newTestCase = {
+          ...testCaseData,
+          id: testCaseData.id || `TC-${Date.now()}`
+        };
+        console.log('Creating new test case:', newTestCase.id);
+        await dataStore.addTestCase(newTestCase);
+        console.log('✅ Test case created successfully');
       }
       setShowEditModal(false);
       setEditingTestCase(null);
     } catch (error) {
-      console.error('Error saving test case:', error);
+      console.error('❌ Error saving test case:', error);
       alert('Error saving test case: ' + error.message);
     }
   };
 
+
   // Delete test case
-  const handleDeleteTestCase = (testCaseId) => {
+  const handleDeleteTestCase = async (testCaseId) => {
     if (window.confirm('Are you sure you want to delete this test case?')) {
       try {
-        dataStore.deleteTestCase(testCaseId);
+        console.log('Deleting test case:', testCaseId);
+
+        // Delete from database (this will also update localStorage)
+        await dataStore.deleteTestCase(testCaseId);
+
+        // Clear from selection if selected
         setSelectedTestCases(prev => {
           const newSet = new Set(prev);
           newSet.delete(testCaseId);
           return newSet;
         });
-        setShowViewModal(false); // Close view modal if currently viewing deleted test case
+
+        // Close view modal if currently viewing deleted test case
+        setShowViewModal(false);
+
+        console.log('✅ Test case deleted successfully');
       } catch (error) {
-        console.error('Error deleting test case:', error);
-        alert('Error deleting test cases: ' + error.message);
+        console.error('❌ Error deleting test case:', error);
+        alert('Error deleting test case: ' + error.message);
       }
     }
   };
 
   // Handle bulk delete
-  const handleBulkDelete = () => {
+  const handleBulkDelete = async () => {
     if (selectedTestCases.size === 0) return;
 
     if (window.confirm(`Are you sure you want to delete ${selectedTestCases.size} test case(s)?`)) {
       try {
-        Array.from(selectedTestCases).forEach(testCaseId => {
-          dataStore.deleteTestCase(testCaseId);
-        });
+        console.log(`Deleting ${selectedTestCases.size} test cases...`);
+
+        // Delete each test case (this will update database and localStorage)
+        for (const testCaseId of selectedTestCases) {
+          await dataStore.deleteTestCase(testCaseId);
+        }
+
+        // Clear selection
         setSelectedTestCases(new Set());
+
+        console.log(`✅ ${selectedTestCases.size} test cases deleted successfully`);
       } catch (error) {
-        console.error('Error deleting test cases:', error);
+        console.error('❌ Error deleting test cases:', error);
         alert('Error deleting test cases: ' + error.message);
       }
     }
   };
 
   // Bulk version assignment handler
-const handleBulkVersionAssignment = (versionId, action) => {
-  if (selectedTestCases.size === 0) return;
-  
-  console.log('Bulk version assignment:', { versionId, action, selectedCount: selectedTestCases.size });
-  
-  setSelectedVersionForAssignment(versionId);
-  setVersionAssignmentAction(action);
-  setShowVersionAssignmentModal(true);
-};
+  const handleBulkVersionAssignment = (versionId, action) => {
+    if (selectedTestCases.size === 0) return;
 
-/**
- * NEW: Bulk tag assignment handler
- */
-const handleBulkTagAssignment = (tags, action) => {
-  if (selectedTestCases.size === 0) return;
-  
-  console.log('Bulk tag assignment:', { tags, action, selectedCount: selectedTestCases.size });
-  
-  // Validate the operation before showing modal
-  const testCaseIds = Array.from(selectedTestCases);
-  const validation = dataStore.validateTagOperation(testCaseIds, tags, action);
-  
-  if (!validation.valid) {
-    alert('Cannot proceed with tag operation:\n' + validation.errors.join('\n'));
-    return;
-  }
+    console.log('Bulk version assignment:', { versionId, action, selectedCount: selectedTestCases.size });
 
-  // Show warnings if any
-  if (validation.warnings.length > 0) {
-    const proceed = confirm(
-      `Tag operation warnings:\n${validation.warnings.join('\n')}\n\nDo you want to continue?`
-    );
-    if (!proceed) return;
-  }
-  
-  setSelectedTagsForAssignment(tags);
-  setTagAssignmentAction(action);
-  setShowTagAssignmentModal(true);
-};
+    setSelectedVersionForAssignment(versionId);
+    setVersionAssignmentAction(action);
+    setShowVersionAssignmentModal(true);
+  };
 
-/**
- * NEW: Confirm tag assignment
- */
-const confirmTagAssignment = async () => {
-  try {
+  /**
+   * NEW: Bulk tag assignment handler
+   */
+  const handleBulkTagAssignment = (tags, action) => {
+    if (selectedTestCases.size === 0) return;
+
+    console.log('Bulk tag assignment:', { tags, action, selectedCount: selectedTestCases.size });
+
+    // Validate the operation before showing modal
     const testCaseIds = Array.from(selectedTestCases);
-    
-    console.log('Confirming tag assignment:', {
-      testCaseIds: testCaseIds.length,
-      tags: selectedTagsForAssignment,
-      action: tagAssignmentAction
-    });
-    
-    const result = await dataStore.updateTestCaseTags(
-      testCaseIds, 
-      selectedTagsForAssignment, 
-      tagAssignmentAction
-    );
-    
-    // Clear selection and close modal
-    setSelectedTestCases(new Set());
-    setShowTagAssignmentModal(false);
-    
-    // Show detailed success message
-    const actionText = tagAssignmentAction === 'add' ? 'added to' : 'removed from';
-    const tagText = selectedTagsForAssignment.length === 1 
-      ? `"${selectedTagsForAssignment[0]}"` 
-      : `${selectedTagsForAssignment.length} tags`;
-    
-    if (result.successful.length > 0) {
-      let message = `✅ ${tagText} ${actionText} ${result.successful.length} test case${result.successful.length !== 1 ? 's' : ''}`;
-      
-      // Add details for partial operations
-      const details = [];
-      if (result.skipped.length > 0) {
-        details.push(`${result.skipped.length} skipped (no changes needed)`);
-      }
-      if (result.failed.length > 0) {
-        details.push(`${result.failed.length} failed`);
-      }
-      
-      if (details.length > 0) {
-        message += `\n\nDetails: ${details.join(', ')}`;
-      }
-      
-      alert(message);
-    } else {
-      alert(`ℹ️ No changes were made. ${result.skipped.length + result.failed.length} test cases were not modified.`);
+    const validation = dataStore.validateTagOperation(testCaseIds, tags, action);
+
+    if (!validation.valid) {
+      alert('Cannot proceed with tag operation:\n' + validation.errors.join('\n'));
+      return;
     }
-    
-  } catch (error) {
-    console.error('Tag assignment failed:', error);
-    alert('❌ Tag assignment failed: ' + error.message);
-    
-    // Don't clear the modal so user can retry
-    setShowTagAssignmentModal(false);
-  }
-};
 
-/**
- * NEW: Enhanced export functionality
- */
-const handleExportSelected = () => {
-  if (selectedTestCases.size === 0) return;
+    // Show warnings if any
+    if (validation.warnings.length > 0) {
+      const proceed = confirm(
+        `Tag operation warnings:\n${validation.warnings.join('\n')}\n\nDo you want to continue?`
+      );
+      if (!proceed) return;
+    }
 
-  const selectedIds = Array.from(selectedTestCases);
-  const selectedTestCaseObjects = testCases.filter(tc => selectedIds.includes(tc.id));
-  
-  // Create export data with enhanced information
-  const exportData = selectedTestCaseObjects.map(tc => ({
-    id: tc.id,
-    name: tc.name,
-    description: tc.description,
-    category: tc.category,
-    status: tc.status,
-    priority: tc.priority,
-    automationStatus: tc.automationStatus,
-    tags: tc.tags?.join(', ') || '',
-    applicableVersions: tc.applicableVersions?.join(', ') || tc.version || '',
-    requirementIds: tc.requirementIds?.join(', ') || '',
-    assignee: tc.assignee || '',
-    estimatedDuration: tc.estimatedDuration || '',
-    lastExecuted: tc.lastExecuted || 'Never'
-  }));
+    setSelectedTagsForAssignment(tags);
+    setTagAssignmentAction(action);
+    setShowTagAssignmentModal(true);
+  };
 
-  // Convert to CSV
-  const csvContent = convertToCSV(exportData);
-  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-  const link = document.createElement('a');
-  
-  if (link.download !== undefined) {
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', `test-cases-export-${new Date().toISOString().split('T')[0]}.csv`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  }
+  /**
+   * NEW: Confirm tag assignment
+   */
+  const confirmTagAssignment = async () => {
+    try {
+      const testCaseIds = Array.from(selectedTestCases);
 
-  // Clear selection after export
-  setSelectedTestCases(new Set());
-  alert(`✅ Exported ${selectedTestCaseObjects.length} test cases to CSV file.`);
-};
+      console.log('Confirming tag assignment:', {
+        testCaseIds: testCaseIds.length,
+        tags: selectedTagsForAssignment,
+        action: tagAssignmentAction
+      });
 
-/**
- * Helper function to convert data to CSV
- */
-const convertToCSV = (data) => {
-  const headers = Object.keys(data[0]);
-  const csvContent = [
-    headers.join(','),
-    ...data.map(row => 
-      headers.map(header => {
-        const value = row[header]?.toString() || '';
-        // Escape quotes and wrap in quotes if contains comma, quote, or newline
-        return value.includes(',') || value.includes('"') || value.includes('\n')
-          ? `"${value.replace(/"/g, '""')}"` 
-          : value;
-      }).join(',')
-    )
-  ].join('\n');
-  
-  return csvContent;
-};
+      const result = await dataStore.updateTestCaseTags(
+        testCaseIds,
+        selectedTagsForAssignment,
+        tagAssignmentAction
+      );
 
-/**
- * NEW: Tag Assignment Confirmation Modal Component
- * Add this component inside your TestCases component (before the return statement)
- */
-const TagAssignmentModal = () => {
-  if (!showTagAssignmentModal) return null;
+      // Clear selection and close modal
+      setSelectedTestCases(new Set());
+      setShowTagAssignmentModal(false);
 
-  const actionText = tagAssignmentAction === 'add' ? 'add' : 'remove';
-  const prepositionText = tagAssignmentAction === 'add' ? 'to' : 'from';
-  const colorClass = tagAssignmentAction === 'add' ? 'text-green-600' : 'text-red-600';
-  const bgColorClass = tagAssignmentAction === 'add' ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200';
+      // Show detailed success message
+      const actionText = tagAssignmentAction === 'add' ? 'added to' : 'removed from';
+      const tagText = selectedTagsForAssignment.length === 1
+        ? `"${selectedTagsForAssignment[0]}"`
+        : `${selectedTagsForAssignment.length} tags`;
 
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
-        <h3 className="text-lg font-semibold mb-4 flex items-center">
-          <Hash className={`mr-2 ${colorClass}`} size={20} />
-          Confirm Tag {tagAssignmentAction === 'add' ? 'Addition' : 'Removal'}
-        </h3>
-        
-        <div className={`p-4 rounded-lg ${bgColorClass} mb-4`}>
-          <p className="text-sm mb-3">
-            You are about to <strong className={colorClass}>{actionText}</strong> the following tag{selectedTagsForAssignment.length !== 1 ? 's' : ''}{' '}
-            <strong className={colorClass}>{prepositionText}</strong> {selectedTestCases.size} selected test case{selectedTestCases.size !== 1 ? 's' : ''}:
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {selectedTagsForAssignment.map(tag => (
-              <span 
-                key={tag} 
-                className={`inline-flex items-center px-3 py-1 text-sm font-medium rounded-full ${
-                  tagAssignmentAction === 'add' 
-                    ? 'bg-green-100 text-green-800 border border-green-300' 
-                    : 'bg-red-100 text-red-800 border border-red-300'
+      if (result.successful.length > 0) {
+        let message = `✅ ${tagText} ${actionText} ${result.successful.length} test case${result.successful.length !== 1 ? 's' : ''}`;
+
+        // Add details for partial operations
+        const details = [];
+        if (result.skipped.length > 0) {
+          details.push(`${result.skipped.length} skipped (no changes needed)`);
+        }
+        if (result.failed.length > 0) {
+          details.push(`${result.failed.length} failed`);
+        }
+
+        if (details.length > 0) {
+          message += `\n\nDetails: ${details.join(', ')}`;
+        }
+
+        alert(message);
+      } else {
+        alert(`ℹ️ No changes were made. ${result.skipped.length + result.failed.length} test cases were not modified.`);
+      }
+
+    } catch (error) {
+      console.error('Tag assignment failed:', error);
+      alert('❌ Tag assignment failed: ' + error.message);
+
+      // Don't clear the modal so user can retry
+      setShowTagAssignmentModal(false);
+    }
+  };
+
+  /**
+   * NEW: Enhanced export functionality
+   */
+  const handleExportSelected = () => {
+    if (selectedTestCases.size === 0) return;
+
+    const selectedIds = Array.from(selectedTestCases);
+    const selectedTestCaseObjects = testCases.filter(tc => selectedIds.includes(tc.id));
+
+    // Create export data with enhanced information
+    const exportData = selectedTestCaseObjects.map(tc => ({
+      id: tc.id,
+      name: tc.name,
+      description: tc.description,
+      category: tc.category,
+      status: tc.status,
+      priority: tc.priority,
+      automationStatus: tc.automationStatus,
+      tags: tc.tags?.join(', ') || '',
+      applicableVersions: tc.applicableVersions?.join(', ') || tc.version || '',
+      requirementIds: tc.requirementIds?.join(', ') || '',
+      assignee: tc.assignee || '',
+      estimatedDuration: tc.estimatedDuration || '',
+      lastExecuted: tc.lastExecuted || 'Never'
+    }));
+
+    // Convert to CSV
+    const csvContent = convertToCSV(exportData);
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+
+    if (link.download !== undefined) {
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', `test-cases-export-${new Date().toISOString().split('T')[0]}.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    // Clear selection after export
+    setSelectedTestCases(new Set());
+    alert(`✅ Exported ${selectedTestCaseObjects.length} test cases to CSV file.`);
+  };
+
+  /**
+   * Helper function to convert data to CSV
+   */
+  const convertToCSV = (data) => {
+    const headers = Object.keys(data[0]);
+    const csvContent = [
+      headers.join(','),
+      ...data.map(row =>
+        headers.map(header => {
+          const value = row[header]?.toString() || '';
+          // Escape quotes and wrap in quotes if contains comma, quote, or newline
+          return value.includes(',') || value.includes('"') || value.includes('\n')
+            ? `"${value.replace(/"/g, '""')}"`
+            : value;
+        }).join(',')
+      )
+    ].join('\n');
+
+    return csvContent;
+  };
+
+  /**
+   * NEW: Tag Assignment Confirmation Modal Component
+   * Add this component inside your TestCases component (before the return statement)
+   */
+  const TagAssignmentModal = () => {
+    if (!showTagAssignmentModal) return null;
+
+    const actionText = tagAssignmentAction === 'add' ? 'add' : 'remove';
+    const prepositionText = tagAssignmentAction === 'add' ? 'to' : 'from';
+    const colorClass = tagAssignmentAction === 'add' ? 'text-green-600' : 'text-red-600';
+    const bgColorClass = tagAssignmentAction === 'add' ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200';
+
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+          <h3 className="text-lg font-semibold mb-4 flex items-center">
+            <Hash className={`mr-2 ${colorClass}`} size={20} />
+            Confirm Tag {tagAssignmentAction === 'add' ? 'Addition' : 'Removal'}
+          </h3>
+
+          <div className={`p-4 rounded-lg ${bgColorClass} mb-4`}>
+            <p className="text-sm mb-3">
+              You are about to <strong className={colorClass}>{actionText}</strong> the following tag{selectedTagsForAssignment.length !== 1 ? 's' : ''}{' '}
+              <strong className={colorClass}>{prepositionText}</strong> {selectedTestCases.size} selected test case{selectedTestCases.size !== 1 ? 's' : ''}:
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {selectedTagsForAssignment.map(tag => (
+                <span
+                  key={tag}
+                  className={`inline-flex items-center px-3 py-1 text-sm font-medium rounded-full ${tagAssignmentAction === 'add'
+                      ? 'bg-green-100 text-green-800 border border-green-300'
+                      : 'bg-red-100 text-red-800 border border-red-300'
+                    }`}
+                >
+                  <Tag size={14} className="mr-1" />
+                  {tag}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          <div className="text-sm text-gray-600 mb-6 p-3 bg-gray-50 rounded">
+            <strong>Selected test cases ({selectedTestCases.size}):</strong>
+            <div className="mt-1 text-xs">
+              {Array.from(selectedTestCases).slice(0, 5).map(id => {
+                const tc = testCases.find(t => t.id === id);
+                return tc?.name || id;
+              }).join(', ')}
+              {selectedTestCases.size > 5 && ` and ${selectedTestCases.size - 5} more...`}
+            </div>
+          </div>
+
+          <div className="flex space-x-3">
+            <button
+              onClick={confirmTagAssignment}
+              className={`flex-1 py-2 px-4 rounded font-medium transition-colors flex items-center justify-center ${tagAssignmentAction === 'add'
+                  ? 'bg-green-600 text-white hover:bg-green-700'
+                  : 'bg-red-600 text-white hover:bg-red-700'
                 }`}
-              >
-                <Tag size={14} className="mr-1" />
-                {tag}
-              </span>
-            ))}
+            >
+              {tagAssignmentAction === 'add' ? (
+                <Plus size={16} className="mr-2" />
+              ) : (
+                <Minus size={16} className="mr-2" />
+              )}
+              Confirm {tagAssignmentAction === 'add' ? 'Addition' : 'Removal'}
+            </button>
+            <button
+              onClick={() => setShowTagAssignmentModal(false)}
+              className="flex-1 py-2 px-4 border border-gray-300 rounded font-medium text-gray-700 hover:bg-gray-50 transition-colors flex items-center justify-center"
+            >
+              <X size={16} className="mr-2" />
+              Cancel
+            </button>
           </div>
-        </div>
-
-        <div className="text-sm text-gray-600 mb-6 p-3 bg-gray-50 rounded">
-          <strong>Selected test cases ({selectedTestCases.size}):</strong>
-          <div className="mt-1 text-xs">
-            {Array.from(selectedTestCases).slice(0, 5).map(id => {
-              const tc = testCases.find(t => t.id === id);
-              return tc?.name || id;
-            }).join(', ')}
-            {selectedTestCases.size > 5 && ` and ${selectedTestCases.size - 5} more...`}
-          </div>
-        </div>
-
-        <div className="flex space-x-3">
-          <button
-            onClick={confirmTagAssignment}
-            className={`flex-1 py-2 px-4 rounded font-medium transition-colors flex items-center justify-center ${
-              tagAssignmentAction === 'add'
-                ? 'bg-green-600 text-white hover:bg-green-700'
-                : 'bg-red-600 text-white hover:bg-red-700'
-            }`}
-          >
-            {tagAssignmentAction === 'add' ? (
-              <Plus size={16} className="mr-2" />
-            ) : (
-              <Minus size={16} className="mr-2" />
-            )}
-            Confirm {tagAssignmentAction === 'add' ? 'Addition' : 'Removal'}
-          </button>
-          <button
-            onClick={() => setShowTagAssignmentModal(false)}
-            className="flex-1 py-2 px-4 border border-gray-300 rounded font-medium text-gray-700 hover:bg-gray-50 transition-colors flex items-center justify-center"
-          >
-            <X size={16} className="mr-2" />
-            Cancel
-          </button>
         </div>
       </div>
-    </div>
-  );
-};
-
-const confirmVersionAssignment = async () => {
-  try {
-    const testCaseIds = Array.from(selectedTestCases);
-    
-    await dataStore.updateTestCaseVersions(
-      testCaseIds, 
-      selectedVersionForAssignment, 
-      versionAssignmentAction
     );
-    
-    // Clear selection and close modal
-    setSelectedTestCases(new Set());
-    setShowVersionAssignmentModal(false);
-    
-    // Show success message
-    const versionName = versions.find(v => v.id === selectedVersionForAssignment)?.name;
-    const actionText = versionAssignmentAction === 'add' ? 'added to' : 'removed from';
-    alert(`${testCaseIds.length} test cases ${actionText} ${versionName}`);
-    
-  } catch (error) {
-    console.error('Version assignment failed:', error);
-    alert('Version assignment failed: ' + error.message);
-  }
-};
+  };
+
+  const confirmVersionAssignment = async () => {
+    try {
+      const testCaseIds = Array.from(selectedTestCases);
+
+      await dataStore.updateTestCaseVersions(
+        testCaseIds,
+        selectedVersionForAssignment,
+        versionAssignmentAction
+      );
+
+      // Clear selection and close modal
+      setSelectedTestCases(new Set());
+      setShowVersionAssignmentModal(false);
+
+      // Show success message
+      const versionName = versions.find(v => v.id === selectedVersionForAssignment)?.name;
+      const actionText = versionAssignmentAction === 'add' ? 'added to' : 'removed from';
+      alert(`${testCaseIds.length} test cases ${actionText} ${versionName}`);
+
+    } catch (error) {
+      console.error('Version assignment failed:', error);
+      alert('Version assignment failed: ' + error.message);
+    }
+  };
 
   // Handle tag selection
   // Find your handleTagToggle function and update it:
-const handleTagToggle = (tag) => {
-  setSelectedTags(prev => {
-    const newSet = new Set(prev);
-    if (newSet.has(tag)) {
-      newSet.delete(tag);
-    } else {
-      newSet.add(tag);
-      // Auto-reset status filter when selecting a tag to avoid confusion
-      setStatusFilter('All');
-    }
-    return newSet;
-  });
-};
+  const handleTagToggle = (tag) => {
+    setSelectedTags(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(tag)) {
+        newSet.delete(tag);
+      } else {
+        newSet.add(tag);
+        // Auto-reset status filter when selecting a tag to avoid confusion
+        setStatusFilter('All');
+      }
+      return newSet;
+    });
+  };
 
   // Clear all selected tags
   const handleClearTags = () => {
@@ -1644,12 +1654,12 @@ const handleTagToggle = (tag) => {
   };
 
   const selectedTestCasesArray = Array.from(selectedTestCases)
-  .map(id => filteredTestCases.find(tc => tc.id === id))
-  .filter(Boolean);
+    .map(id => filteredTestCases.find(tc => tc.id === id))
+    .filter(Boolean);
 
-const hasAutomatedTests = selectedTestCasesArray.some(
-  tc => tc.automationStatus === 'Automated' || tc.automationStatus === 'Semi-Automated'
-);
+  const hasAutomatedTests = selectedTestCasesArray.some(
+    tc => tc.automationStatus === 'Automated' || tc.automationStatus === 'Semi-Automated'
+  );
 
   if (!hasTestCases) {
     return (
@@ -1661,7 +1671,7 @@ const hasAutomatedTests = selectedTestCasesArray.some(
           actionPath="/import#testcases-tab"
           icon="testcases"
         />
-        
+
       </MainLayout>
     );
   }
@@ -1681,318 +1691,312 @@ const hasAutomatedTests = selectedTestCasesArray.some(
 
         {/* Header */}
         {/* TOP SECTION: Title + Quick Actions + Key Metrics */}
-      <div className="bg-white rounded-lg shadow p-6">
-        {/* Header Row */}
-        <div className="flex justify-between items-start mb-6">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">Test Cases</h1>
-            {selectedVersion !== 'unassigned' && (
-              <div className="text-sm text-gray-600">
-                Version: <span className="font-medium text-blue-600">
-                  {versions.find(v => v.id === selectedVersion)?.name || selectedVersion}
-                </span>
-              </div>
-            )}
-          </div>
-          <button
-            onClick={handleNewTestCase}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center"
-          >
-            <Plus className="mr-2" size={16} />
-            Add
-          </button>
-        </div>
-
-        {/* KEY METRICS - Condensed Dashboard */}
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 mb-6">
-          <div className="bg-gray-50 p-3 rounded-lg border">
-            <div className="text-xl font-bold text-gray-900">{summaryStats.total}</div>
-            <div className="text-xs text-gray-600">Total</div>
-          </div>
-          <div className="bg-green-50 p-3 rounded-lg border">
-            <div className="text-xl font-bold text-green-600">{summaryStats.passed}</div>
-            <div className="text-xs text-gray-600">Passed</div>
-          </div>
-          <div className="bg-red-50 p-3 rounded-lg border">
-            <div className="text-xl font-bold text-red-600">{summaryStats.failed}</div>
-            <div className="text-xs text-gray-600">Failed</div>
-          </div>
-          <div className="bg-gray-50 p-3 rounded-lg border">
-            <div className="text-xl font-bold text-gray-600">{summaryStats.notRun}</div>
-            <div className="text-xs text-gray-600">Not Run</div>
-          </div>
-          <div className="bg-yellow-50 p-3 rounded-lg border">
-            <div className="text-xl font-bold text-yellow-600">{summaryStats.blocked}</div>
-            <div className="text-xs text-gray-600">Blocked</div>
-          </div>
-          <div className="bg-blue-50 p-3 rounded-lg border">
-            <div className="text-xl font-bold text-blue-600">{summaryStats.automationRate}%</div>
-            <div className="text-xs text-gray-600">Automated</div>
-          </div>
-          <div className="bg-purple-50 p-3 rounded-lg border">
-            <div className="text-xl font-bold text-purple-600">{summaryStats.linkageRate}%</div>
-            <div className="text-xs text-gray-600">Linked</div>
-          </div>
-        </div>
-
-        {/* QUICK FILTERS - Status Pills */}
-        {/* QUICK FILTERS - Status Pills */}
-{/* QUICK FILTERS - Status Pills */}
-<div className="flex items-center justify-between">
-  <div className="flex flex-wrap gap-2">
-    <button
-      onClick={() => setStatusFilter('All')}
-      className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
-        statusFilter === 'All'
-          ? 'bg-gray-200 text-gray-800 ring-2 ring-gray-400'
-          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-      }`}
-    >
-      📊 All ({summaryStats.totalBase})
-    </button>
-    <button
-      onClick={() => setStatusFilter('Failed')}
-      className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
-        statusFilter === 'Failed'
-          ? 'bg-red-200 text-red-800 ring-2 ring-red-400'
-          : 'bg-red-100 text-red-700 hover:bg-red-200'
-      }`}
-    >
-      🔴 Failed ({summaryStats.failedBase})
-    </button>
-    {summaryStats.notFoundBase > 0 && (
-      <button
-        onClick={() => setStatusFilter('Not Found')}
-        className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
-          statusFilter === 'Not Found'
-            ? 'bg-orange-200 text-orange-800 ring-2 ring-orange-400'
-            : 'bg-orange-100 text-orange-700 hover:bg-orange-200'
-        }`}
-      >
-        ⚠️ Issues ({summaryStats.notFoundBase})
-      </button>
-    )}
-    <button
-      onClick={() => setStatusFilter('Passed')}
-      className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
-        statusFilter === 'Passed'
-          ? 'bg-green-200 text-green-800 ring-2 ring-green-400'
-          : 'bg-green-100 text-green-700 hover:bg-green-200'
-      }`}
-    >
-      ✅ Passed ({summaryStats.passedBase})
-    </button>
-    <button
-      onClick={() => setStatusFilter('Not Run')}
-      className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
-        statusFilter === 'Not Run'
-          ? 'bg-blue-200 text-blue-800 ring-2 ring-blue-400'
-          : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
-      }`}
-    >
-      ⏸️ Not Run ({summaryStats.notRunBase})
-    </button>
-  </div>
-  
-  {/* Your expand/collapse button stays the same */}
-</div>
-      </div>
-
-      {/* MIDDLE SECTION: Advanced Filters (Collapsible) */}
-      <div className="bg-white rounded-lg shadow">
-        <button
-          onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-          className="w-full px-6 py-4 flex items-center justify-between text-left hover:bg-gray-50 transition-colors"
-        >
-          <div className="flex items-center space-x-3">
-            <Filter size={20} className="text-gray-400" />
+        <div className="bg-white rounded-lg shadow p-6">
+          {/* Header Row */}
+          <div className="flex justify-between items-start mb-6">
             <div>
-              <div className="font-medium text-gray-900">Advanced Filters</div>
-              <div className="text-sm text-gray-500">
-                Search, priority, automation, tags, and more
-                {(searchQuery || priorityFilter !== 'All' || selectedTags.size > 0) && (
-                  <span className="ml-2 px-2 py-0.5 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">
-                    {[
-                      searchQuery && 'search',
-                      priorityFilter !== 'All' && 'priority',
-                      selectedTags.size > 0 && `${selectedTags.size} tags`
-                    ].filter(Boolean).join(', ')} active
+              <h1 className="text-2xl font-bold text-gray-900 mb-2">Test Cases</h1>
+              {selectedVersion !== 'unassigned' && (
+                <div className="text-sm text-gray-600">
+                  Version: <span className="font-medium text-blue-600">
+                    {versions.find(v => v.id === selectedVersion)?.name || selectedVersion}
                   </span>
-                )}
-              </div>
+                </div>
+              )}
+            </div>
+            <button
+              onClick={handleNewTestCase}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center"
+            >
+              <Plus className="mr-2" size={16} />
+              Add
+            </button>
+          </div>
+
+          {/* KEY METRICS - Condensed Dashboard */}
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 mb-6">
+            <div className="bg-gray-50 p-3 rounded-lg border">
+              <div className="text-xl font-bold text-gray-900">{summaryStats.total}</div>
+              <div className="text-xs text-gray-600">Total</div>
+            </div>
+            <div className="bg-green-50 p-3 rounded-lg border">
+              <div className="text-xl font-bold text-green-600">{summaryStats.passed}</div>
+              <div className="text-xs text-gray-600">Passed</div>
+            </div>
+            <div className="bg-red-50 p-3 rounded-lg border">
+              <div className="text-xl font-bold text-red-600">{summaryStats.failed}</div>
+              <div className="text-xs text-gray-600">Failed</div>
+            </div>
+            <div className="bg-gray-50 p-3 rounded-lg border">
+              <div className="text-xl font-bold text-gray-600">{summaryStats.notRun}</div>
+              <div className="text-xs text-gray-600">Not Run</div>
+            </div>
+            <div className="bg-yellow-50 p-3 rounded-lg border">
+              <div className="text-xl font-bold text-yellow-600">{summaryStats.blocked}</div>
+              <div className="text-xs text-gray-600">Blocked</div>
+            </div>
+            <div className="bg-blue-50 p-3 rounded-lg border">
+              <div className="text-xl font-bold text-blue-600">{summaryStats.automationRate}%</div>
+              <div className="text-xs text-gray-600">Automated</div>
+            </div>
+            <div className="bg-purple-50 p-3 rounded-lg border">
+              <div className="text-xl font-bold text-purple-600">{summaryStats.linkageRate}%</div>
+              <div className="text-xs text-gray-600">Linked</div>
             </div>
           </div>
-          <ChevronDown 
-            className={`transform transition-transform ${showAdvancedFilters ? 'rotate-180' : ''}`} 
-            size={20} 
-          />
-        </button>
 
-        {showAdvancedFilters && (
-          <div className="px-6 pb-6 border-t border-gray-200">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
-              {/* Search */}
+          {/* QUICK FILTERS - Status Pills */}
+          {/* QUICK FILTERS - Status Pills */}
+          {/* QUICK FILTERS - Status Pills */}
+          <div className="flex items-center justify-between">
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => setStatusFilter('All')}
+                className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${statusFilter === 'All'
+                    ? 'bg-gray-200 text-gray-800 ring-2 ring-gray-400'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+              >
+                📊 All ({summaryStats.totalBase})
+              </button>
+              <button
+                onClick={() => setStatusFilter('Failed')}
+                className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${statusFilter === 'Failed'
+                    ? 'bg-red-200 text-red-800 ring-2 ring-red-400'
+                    : 'bg-red-100 text-red-700 hover:bg-red-200'
+                  }`}
+              >
+                🔴 Failed ({summaryStats.failedBase})
+              </button>
+              {summaryStats.notFoundBase > 0 && (
+                <button
+                  onClick={() => setStatusFilter('Not Found')}
+                  className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${statusFilter === 'Not Found'
+                      ? 'bg-orange-200 text-orange-800 ring-2 ring-orange-400'
+                      : 'bg-orange-100 text-orange-700 hover:bg-orange-200'
+                    }`}
+                >
+                  ⚠️ Issues ({summaryStats.notFoundBase})
+                </button>
+              )}
+              <button
+                onClick={() => setStatusFilter('Passed')}
+                className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${statusFilter === 'Passed'
+                    ? 'bg-green-200 text-green-800 ring-2 ring-green-400'
+                    : 'bg-green-100 text-green-700 hover:bg-green-200'
+                  }`}
+              >
+                ✅ Passed ({summaryStats.passedBase})
+              </button>
+              <button
+                onClick={() => setStatusFilter('Not Run')}
+                className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${statusFilter === 'Not Run'
+                    ? 'bg-blue-200 text-blue-800 ring-2 ring-blue-400'
+                    : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                  }`}
+              >
+                ⏸️ Not Run ({summaryStats.notRunBase})
+              </button>
+            </div>
+
+            {/* Your expand/collapse button stays the same */}
+          </div>
+        </div>
+
+        {/* MIDDLE SECTION: Advanced Filters (Collapsible) */}
+        <div className="bg-white rounded-lg shadow">
+          <button
+            onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+            className="w-full px-6 py-4 flex items-center justify-between text-left hover:bg-gray-50 transition-colors"
+          >
+            <div className="flex items-center space-x-3">
+              <Filter size={20} className="text-gray-400" />
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Search</label>
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
-                  <input
-                    type="text"
-                    placeholder="Search test cases..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  />
-                  {searchQuery && (
-                    <button
-                      onClick={() => setSearchQuery('')}
-                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                    >
-                      <X size={16} />
-                    </button>
+                <div className="font-medium text-gray-900">Advanced Filters</div>
+                <div className="text-sm text-gray-500">
+                  Search, priority, automation, tags, and more
+                  {(searchQuery || priorityFilter !== 'All' || selectedTags.size > 0) && (
+                    <span className="ml-2 px-2 py-0.5 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">
+                      {[
+                        searchQuery && 'search',
+                        priorityFilter !== 'All' && 'priority',
+                        selectedTags.size > 0 && `${selectedTags.size} tags`
+                      ].filter(Boolean).join(', ')} active
+                    </span>
                   )}
                 </div>
               </div>
-
-              {/* Priority Filter */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Priority</label>
-                <select
-                  value={priorityFilter}
-                  onChange={(e) => setPriorityFilter(e.target.value)}
-                  className="w-full py-2 px-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                >
-                  <option value="All">All Priorities</option>
-                  <option value="High">High Priority</option>
-                  <option value="Medium">Medium Priority</option>
-                  <option value="Low">Low Priority</option>
-                </select>
-              </div>
-
-              {/* Automation Filter */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Automation</label>
-                <select
-                  value={automationFilter}
-                  onChange={(e) => setAutomationFilter(e.target.value)}
-                  className="w-full py-2 px-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                >
-                  <option value="All">All Types</option>
-                  <option value="Automated">Automated Only</option>
-                  <option value="Manual">Manual Only</option>
-                  <option value="Semi-Automated">Semi-Automated</option>
-                </select>
-              </div>
             </div>
-
-            {/* Tags Section */}
-            {availableTags.length > 0 && (
-  <div className="mt-4">
-    <label className="block text-sm font-medium text-gray-700 mb-2">Tags</label>
-    <div className="flex flex-wrap gap-2">
-      {availableTags
-        .map(tag => {
-          // Count test cases for this tag in current version
-          const tagCount = versionFilteredTestCases.filter(tc => 
-            tc.tags && Array.isArray(tc.tags) && tc.tags.includes(tag)
-          ).length;
-          return { tag, count: tagCount };
-        })
-        .filter(({ count }) => count > 0) // Only show tags with test cases
-        .slice(0, showAllTags ? availableTags.length : 10)
-        .map(({ tag, count }) => (
-          <button
-            key={tag}
-            onClick={() => handleTagToggle(tag)}
-            className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
-              selectedTags.has(tag)
-                ? 'bg-blue-500 text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            {tag} ({count})
-            {selectedTags.has(tag) && <X size={12} className="ml-1 inline" />}
+            <ChevronDown
+              className={`transform transition-transform ${showAdvancedFilters ? 'rotate-180' : ''}`}
+              size={20}
+            />
           </button>
-        ))}
-      
-      {/* Show "more" button only if there are hidden tags with counts > 0 */}
-      {availableTags.filter(tag => {
-        const tagCount = versionFilteredTestCases.filter(tc => 
-          tc.tags && Array.isArray(tc.tags) && tc.tags.includes(tag)
-        ).length;
-        return tagCount > 0;
-      }).length > 10 && (
-        <button
-          onClick={() => setShowAllTags(!showAllTags)}
-          className="px-3 py-1 rounded-full text-sm text-blue-600 bg-blue-50 hover:bg-blue-100"
-        >
-          {showAllTags ? 'Show Less' : `+${availableTags.filter(tag => {
-            const tagCount = versionFilteredTestCases.filter(tc => 
-              tc.tags && Array.isArray(tc.tags) && tc.tags.includes(tag)
-            ).length;
-            return tagCount > 0;
-          }).length - 10} more`}
-        </button>
-      )}
-    </div>
-    {selectedTags.size > 0 && (
-      <button
-        onClick={handleClearTags}
-        className="mt-2 text-sm text-gray-500 hover:text-gray-700"
-      >
-        Clear all tags ({selectedTags.size})
-      </button>
-    )}
-  </div>
-)}
 
-            {/* Filter Actions */}
-            <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-200">
-              <div className="text-sm text-gray-500">
-                Showing {filteredTestCases.length} of {versionFilteredTestCases.length} test cases
+          {showAdvancedFilters && (
+            <div className="px-6 pb-6 border-t border-gray-200">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
+                {/* Search */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Search</label>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
+                    <input
+                      type="text"
+                      placeholder="Search test cases..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                    {searchQuery && (
+                      <button
+                        onClick={() => setSearchQuery('')}
+                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                      >
+                        <X size={16} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Priority Filter */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Priority</label>
+                  <select
+                    value={priorityFilter}
+                    onChange={(e) => setPriorityFilter(e.target.value)}
+                    className="w-full py-2 px-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="All">All Priorities</option>
+                    <option value="High">High Priority</option>
+                    <option value="Medium">Medium Priority</option>
+                    <option value="Low">Low Priority</option>
+                  </select>
+                </div>
+
+                {/* Automation Filter */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Automation</label>
+                  <select
+                    value={automationFilter}
+                    onChange={(e) => setAutomationFilter(e.target.value)}
+                    className="w-full py-2 px-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="All">All Types</option>
+                    <option value="Automated">Automated Only</option>
+                    <option value="Manual">Manual Only</option>
+                    <option value="Semi-Automated">Semi-Automated</option>
+                  </select>
+                </div>
               </div>
-              <button
-                onClick={() => {
-                  setSearchQuery('');
-                  setPriorityFilter('All');
-                  setAutomationFilter('All');
-                  setSelectedTags(new Set());
-                }}
-                className="text-sm text-blue-600 hover:text-blue-800"
-              >
-                Clear all filters
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-        
-    
 
-       
+              {/* Tags Section */}
+              {availableTags.length > 0 && (
+                <div className="mt-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Tags</label>
+                  <div className="flex flex-wrap gap-2">
+                    {availableTags
+                      .map(tag => {
+                        // Count test cases for this tag in current version
+                        const tagCount = versionFilteredTestCases.filter(tc =>
+                          tc.tags && Array.isArray(tc.tags) && tc.tags.includes(tag)
+                        ).length;
+                        return { tag, count: tagCount };
+                      })
+                      .filter(({ count }) => count > 0) // Only show tags with test cases
+                      .slice(0, showAllTags ? availableTags.length : 10)
+                      .map(({ tag, count }) => (
+                        <button
+                          key={tag}
+                          onClick={() => handleTagToggle(tag)}
+                          className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${selectedTags.has(tag)
+                              ? 'bg-blue-500 text-white'
+                              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                            }`}
+                        >
+                          {tag} ({count})
+                          {selectedTags.has(tag) && <X size={12} className="ml-1 inline" />}
+                        </button>
+                      ))}
+
+                    {/* Show "more" button only if there are hidden tags with counts > 0 */}
+                    {availableTags.filter(tag => {
+                      const tagCount = versionFilteredTestCases.filter(tc =>
+                        tc.tags && Array.isArray(tc.tags) && tc.tags.includes(tag)
+                      ).length;
+                      return tagCount > 0;
+                    }).length > 10 && (
+                        <button
+                          onClick={() => setShowAllTags(!showAllTags)}
+                          className="px-3 py-1 rounded-full text-sm text-blue-600 bg-blue-50 hover:bg-blue-100"
+                        >
+                          {showAllTags ? 'Show Less' : `+${availableTags.filter(tag => {
+                            const tagCount = versionFilteredTestCases.filter(tc =>
+                              tc.tags && Array.isArray(tc.tags) && tc.tags.includes(tag)
+                            ).length;
+                            return tagCount > 0;
+                          }).length - 10} more`}
+                        </button>
+                      )}
+                  </div>
+                  {selectedTags.size > 0 && (
+                    <button
+                      onClick={handleClearTags}
+                      className="mt-2 text-sm text-gray-500 hover:text-gray-700"
+                    >
+                      Clear all tags ({selectedTags.size})
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {/* Filter Actions */}
+              <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-200">
+                <div className="text-sm text-gray-500">
+                  Showing {filteredTestCases.length} of {versionFilteredTestCases.length} test cases
+                </div>
+                <button
+                  onClick={() => {
+                    setSearchQuery('');
+                    setPriorityFilter('All');
+                    setAutomationFilter('All');
+                    setSelectedTags(new Set());
+                  }}
+                  className="text-sm text-blue-600 hover:text-blue-800"
+                >
+                  Clear all filters
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+
+
+
 
         {/* Bulk Actions */}
         {/* Enhanced Bulk Actions with Version Assignment */}
 
-        
-{selectedTestCases.size > 0 && (
-  <BulkActionsPanel
-    selectedCount={selectedTestCases.size}
-    automatedCount={selectedAutomatedTestCases.length}  // ✅ ADD THIS LINE
-    availableVersions={availableVersions}
-    availableTags={availableTags}
-    itemType="test case"
-    showExecuteButton={selectedAutomatedTestCases.length > 0}
-    showExportButton={true}
-    onVersionAssign={handleBulkVersionAssignment}
-    onTagsUpdate={handleBulkTagAssignment}
-    onExecuteTests={executeSelectedTests}
-    onBulkDelete={handleBulkDelete}
-    onClearSelection={handleClearSelection}
-    onExport={handleExportSelected}
-  />
-)}
-        
+
+        {selectedTestCases.size > 0 && (
+          <BulkActionsPanel
+            selectedCount={selectedTestCases.size}
+            automatedCount={selectedAutomatedTestCases.length}  // ✅ ADD THIS LINE
+            availableVersions={availableVersions}
+            availableTags={availableTags}
+            itemType="test case"
+            showExecuteButton={selectedAutomatedTestCases.length > 0}
+            showExportButton={true}
+            onVersionAssign={handleBulkVersionAssignment}
+            onTagsUpdate={handleBulkTagAssignment}
+            onExecuteTests={executeSelectedTests}
+            onBulkDelete={handleBulkDelete}
+            onClearSelection={handleClearSelection}
+            onExport={handleExportSelected}
+          />
+        )}
+
 
         {/* Test Cases Table - Grouped by Category */}
         <div className="space-y-4">
@@ -2052,26 +2056,26 @@ const hasAutomatedTests = selectedTestCasesArray.some(
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
                         {categoryTests.map((testCase) => (
-  <TestCaseRow
-  key={testCase.id}
-  testCase={testCase}
-  versions={versions}
-  selectedVersion={selectedVersion}
-  onSelect={handleTestCaseSelection}
-  onView={handleViewTestCase}
-  onEdit={handleEditTestCase}
-  onDelete={handleDeleteTestCase}
-  onExecute={handleExecuteTestCase}
-  onDuplicate={handleDuplicateTestCase}
-  isSelected={selectedTestCases.has(testCase.id)}
-  isExpanded={expandedRows.has(testCase.id)}
-  onToggleExpand={toggleRowExpansion}
-  expandedTests={expandedTests}
-  onToggleFailureExpand={toggleTestExpansion}
-  setModalVersions={setModalVersions} // Add this line
-  setShowVersionModal={setShowVersionModal} // Add this line
-/>
-))}
+                          <TestCaseRow
+                            key={testCase.id}
+                            testCase={testCase}
+                            versions={versions}
+                            selectedVersion={selectedVersion}
+                            onSelect={handleTestCaseSelection}
+                            onView={handleViewTestCase}
+                            onEdit={handleEditTestCase}
+                            onDelete={handleDeleteTestCase}
+                            onExecute={handleExecuteTestCase}
+                            onDuplicate={handleDuplicateTestCase}
+                            isSelected={selectedTestCases.has(testCase.id)}
+                            isExpanded={expandedRows.has(testCase.id)}
+                            onToggleExpand={toggleRowExpansion}
+                            expandedTests={expandedTests}
+                            onToggleFailureExpand={toggleTestExpansion}
+                            setModalVersions={setModalVersions} // Add this line
+                            setShowVersionModal={setShowVersionModal} // Add this line
+                          />
+                        ))}
                       </tbody>
                     </table>
                   </div>
@@ -2137,7 +2141,7 @@ const hasAutomatedTests = selectedTestCasesArray.some(
           />
         )}
 
-      {/* Version Details Modal */}
+        {/* Version Details Modal */}
         {showVersionModal && modalVersions && (
           <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
             <div className="relative bg-white p-6 border w-96 shadow-lg rounded-lg m-4">
@@ -2152,7 +2156,7 @@ const hasAutomatedTests = selectedTestCasesArray.some(
                   <X size={20} />
                 </button>
               </div>
-              
+
               <div className="mb-4">
                 <p className="text-sm text-gray-600 mb-3">
                   <strong>{modalVersions.testCaseId}</strong> applies to {modalVersions.versions.length} version{modalVersions.versions.length !== 1 ? 's' : ''}:
@@ -2162,13 +2166,12 @@ const hasAutomatedTests = selectedTestCasesArray.some(
                     const v = versions.find(ver => ver.id === vId);
                     const isCurrent = vId === selectedVersion;
                     return (
-                      <div 
-                        key={vId} 
-                        className={`px-3 py-2 rounded text-sm font-medium text-center ${
-                          isCurrent 
-                            ? 'bg-green-100 text-green-800 ring-2 ring-green-300' 
+                      <div
+                        key={vId}
+                        className={`px-3 py-2 rounded text-sm font-medium text-center ${isCurrent
+                            ? 'bg-green-100 text-green-800 ring-2 ring-green-300'
                             : 'bg-gray-100 text-gray-700'
-                        }`}
+                          }`}
                       >
                         {isCurrent && '★ '}{v?.name || vId}
                       </div>
@@ -2176,7 +2179,7 @@ const hasAutomatedTests = selectedTestCasesArray.some(
                   })}
                 </div>
               </div>
-              
+
               {modalVersions.versions.includes(selectedVersion) && (
                 <div className="bg-green-50 border border-green-200 rounded p-3">
                   <p className="text-green-800 text-sm font-medium">
@@ -2184,7 +2187,7 @@ const hasAutomatedTests = selectedTestCasesArray.some(
                   </p>
                 </div>
               )}
-              
+
               <div className="flex justify-end mt-4">
                 <button
                   onClick={() => setShowVersionModal(false)}
@@ -2195,65 +2198,64 @@ const hasAutomatedTests = selectedTestCasesArray.some(
               </div>
             </div>
           </div>
-        )} 
-<TagAssignmentModal />
+        )}
+        <TagAssignmentModal />
         {/* Version Assignment Confirmation Modal */}
-{showVersionAssignmentModal && (
-  <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
-    <div className="relative bg-white p-6 border w-96 shadow-lg rounded-lg m-4">
-      <div className="flex justify-between items-center mb-4">
-        <h3 className="text-lg font-medium text-gray-900">
-          Confirm Version Assignment
-        </h3>
-        <button
-          onClick={() => setShowVersionAssignmentModal(false)}
-          className="text-gray-400 hover:text-gray-600"
-        >
-          <X size={20} />
-        </button>
-      </div>
-      
-      <div className="mb-6">
-        <p className="text-sm text-gray-600 mb-2">
-          You are about to <strong>{versionAssignmentAction}</strong> {selectedTestCases.size} test case{selectedTestCases.size !== 1 ? 's' : ''}:
-        </p>
-        
-        <div className="bg-blue-50 border border-blue-200 rounded p-3 mb-4">
-          <div className="text-sm font-medium text-blue-800">
-            {versionAssignmentAction === 'add' ? 'Add to' : 'Remove from'} version: 
-            <span className="ml-1 font-bold">
-              {versions.find(v => v.id === selectedVersionForAssignment)?.name || selectedVersionForAssignment}
-            </span>
-          </div>
-        </div>
+        {showVersionAssignmentModal && (
+          <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
+            <div className="relative bg-white p-6 border w-96 shadow-lg rounded-lg m-4">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-medium text-gray-900">
+                  Confirm Version Assignment
+                </h3>
+                <button
+                  onClick={() => setShowVersionAssignmentModal(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <X size={20} />
+                </button>
+              </div>
 
-        <div className="text-xs text-gray-500">
-          {selectedTestCases.size} test case{selectedTestCases.size !== 1 ? 's' : ''} selected
-        </div>
-      </div>
-      
-      <div className="flex justify-end space-x-3">
-        <button
-          onClick={() => setShowVersionAssignmentModal(false)}
-          className="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
-        >
-          Cancel
-        </button>
-        <button
-          onClick={confirmVersionAssignment}
-          className={`px-4 py-2 text-white rounded hover:opacity-90 ${
-            versionAssignmentAction === 'add' 
-              ? 'bg-green-600 hover:bg-green-700' 
-              : 'bg-red-600 hover:bg-red-700'
-          }`}
-        >
-          {versionAssignmentAction === 'add' ? 'Add to Version' : 'Remove from Version'}
-        </button>
-      </div>
-    </div>
-  </div>
-)}
-        
+              <div className="mb-6">
+                <p className="text-sm text-gray-600 mb-2">
+                  You are about to <strong>{versionAssignmentAction}</strong> {selectedTestCases.size} test case{selectedTestCases.size !== 1 ? 's' : ''}:
+                </p>
+
+                <div className="bg-blue-50 border border-blue-200 rounded p-3 mb-4">
+                  <div className="text-sm font-medium text-blue-800">
+                    {versionAssignmentAction === 'add' ? 'Add to' : 'Remove from'} version:
+                    <span className="ml-1 font-bold">
+                      {versions.find(v => v.id === selectedVersionForAssignment)?.name || selectedVersionForAssignment}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="text-xs text-gray-500">
+                  {selectedTestCases.size} test case{selectedTestCases.size !== 1 ? 's' : ''} selected
+                </div>
+              </div>
+
+              <div className="flex justify-end space-x-3">
+                <button
+                  onClick={() => setShowVersionAssignmentModal(false)}
+                  className="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmVersionAssignment}
+                  className={`px-4 py-2 text-white rounded hover:opacity-90 ${versionAssignmentAction === 'add'
+                      ? 'bg-green-600 hover:bg-green-700'
+                      : 'bg-red-600 hover:bg-red-700'
+                    }`}
+                >
+                  {versionAssignmentAction === 'add' ? 'Add to Version' : 'Remove from Version'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
       </div>
     </MainLayout>
   );
