@@ -1661,7 +1661,7 @@ const TestCases = () => {
     tc => tc.automationStatus === 'Automated' || tc.automationStatus === 'Semi-Automated'
   );
 
-  if (requirements.length === 0) {
+  if (!hasTestCases) {
     return (
       <MainLayout title="Test Cases" hasData={false}>
         <EmptyState
@@ -1683,8 +1683,8 @@ const TestCases = () => {
         {/* Version indicator for unassigned view */}
         {selectedVersion === 'unassigned' && (
           <div className="mb-4 bg-blue-50 p-3 rounded border border-blue-100">
-    <h3 className="text-sm font-medium text-blue-800 mb-2">Showing All Items (Unassigned View)</h3>
-    <p className="text-xs text-blue-700 mt-1">
+            <h3 className="text-sm font-medium text-blue-800 mb-2">Showing All Items (Unassigned View)</h3>
+            <p className="text-xs text-blue-700 mt-1">
               This view shows all test cases, including those that may be assigned to versions that haven't been created yet.
             </p>
           </div>
