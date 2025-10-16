@@ -1,3 +1,4 @@
+// src/pages/ImportData.jsx
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import MainLayout from '../components/Layout/MainLayout';
@@ -72,7 +73,7 @@ const ImportData = () => {
   }, []);
 
   /**
-   * Handle successful import - now with database integration
+   * Handle successful import - with database integration
    */
   const handleImportSuccess = async (importedData) => {
     try {
@@ -120,10 +121,13 @@ const ImportData = () => {
 
       // Scroll to status message
       setTimeout(() => {
-        document.getElementById('import-status')?.scrollIntoView({ 
-          behavior: 'smooth', 
-          block: 'nearest' 
-        });
+        const statusElement = document.getElementById('import-status');
+        if (statusElement) {
+          statusElement.scrollIntoView({ 
+            behavior: 'smooth', 
+            block: 'nearest' 
+          });
+        }
       }, 100);
 
     } catch (error) {
@@ -137,70 +141,78 @@ const ImportData = () => {
       });
 
       setTimeout(() => {
-        document.getElementById('import-status')?.scrollIntoView({ 
-          behavior: 'smooth', 
-          block: 'nearest' 
-        });
+        const statusElement = document.getElementById('import-status');
+        if (statusElement) {
+          statusElement.scrollIntoView({ 
+            behavior: 'smooth', 
+            block: 'nearest' 
+          });
+        }
       }, 100);
     }
+  };
+  
+  // Function to close the preview and reset import status
+  const closePreview = () => {
+    setImportStatus(null);
   };
 
   return (
     <MainLayout>
-      <div className="max-w-7xl mx-auto px-4 py-6">
+      <div className="max-w-6xl mx-auto py-6 px-4">
         {/* Page Header */}
         <div className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">Import Data</h1>
+          <h1 className="text-2xl font-semibold text-gray-800 mb-2">Import Data</h1>
           <p className="text-gray-600">
             Import requirements or test cases from JSON/JSONC files into the database
           </p>
         </div>
-
+        
         {/* Tab Navigation */}
         <div className="mb-6">
-  <div className="border-b border-gray-200">
-    <nav className="-mb-px flex" aria-label="Tabs">
-      <button
-        onClick={() => {
-          setActiveTab('requirements');
-          setImportStatus(null); // Clear previous import status when changing tabs
-        }}
-        className={`w-1/2 py-4 px-1 text-center border-b-2 font-medium text-sm ${
-          activeTab === 'requirements'
-            ? 'border-blue-500 text-blue-600'
-            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-        }`}
-      >
-        <div className="flex items-center justify-center">
-          {/* This is the exact same icon path as in the Sidebar component for Requirements */}
-          <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path>
-          </svg>
-          Import Requirements
+          <div className="border-b border-gray-200">
+            <nav className="-mb-px flex" aria-label="Tabs">
+              <button
+                onClick={() => {
+                  setActiveTab('requirements');
+                  setImportStatus(null); // Clear previous import status when changing tabs
+                  window.location.hash = 'requirements-tab';
+                }}
+                className={`w-1/2 py-4 px-1 text-center border-b-2 font-medium text-sm ${
+                  activeTab === 'requirements'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                <div className="flex items-center justify-center">
+                  <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path>
+                  </svg>
+                  Import Requirements
+                </div>
+              </button>
+              <button
+                onClick={() => {
+                  setActiveTab('testcases');
+                  setImportStatus(null); // Clear previous import status when changing tabs
+                  window.location.hash = 'testcases-tab';
+                }}
+                className={`w-1/2 py-4 px-1 text-center border-b-2 font-medium text-sm ${
+                  activeTab === 'testcases'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                <div className="flex items-center justify-center">
+                  <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>
+                  </svg>
+                  Import Test Cases
+                </div>
+              </button>
+            </nav>
+          </div>
         </div>
-      </button>
-      <button
-        onClick={() => {
-          setActiveTab('testcases');
-          setImportStatus(null); // Clear previous import status when changing tabs
-        }}
-        className={`w-1/2 py-4 px-1 text-center border-b-2 font-medium text-sm ${
-          activeTab === 'testcases'
-            ? 'border-blue-500 text-blue-600'
-            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-        }`}
-      >
-        <div className="flex items-center justify-center">
-          {/* This is the exact same icon path as in the Sidebar component for Test Cases */}
-          <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>
-          </svg>
-          Import Test Cases
-        </div>
-      </button>
-    </nav>
-  </div>
-</div>
 
         {/* Requirements Import Interface */}
         {activeTab === 'requirements' && (
@@ -211,7 +223,7 @@ const ImportData = () => {
             {importStatus && activeTab === 'requirements' && (
               <div 
                 id="import-status"
-                className={`mt-6 p-4 rounded shadow ${
+                className={`mt-6 p-4 rounded shadow relative ${
                   importStatus.loading 
                     ? 'bg-blue-50 border border-blue-200'
                     : importStatus.success 
@@ -223,6 +235,18 @@ const ImportData = () => {
                   scrollMarginTop: '20px'
                 }}
               >
+                {/* Close button */}
+                <button 
+                  onClick={closePreview}
+                  className="absolute right-2 top-2 text-gray-500 hover:text-gray-700"
+                  aria-label="Close"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                  </svg>
+                </button>
+                
                 {/* Loading State */}
                 {importStatus.loading && (
                   <>
@@ -302,31 +326,24 @@ const ImportData = () => {
                     {importStatus.jsonData && (
                       <div className="mt-4">
                         <h4 className="font-medium text-gray-700 mb-2">Imported Data Preview:</h4>
-                        <div className="bg-gray-800 text-green-400 p-4 rounded overflow-auto max-h-96">
-                          <pre className="text-sm">{importStatus.jsonData}</pre>
+                        <div className="bg-gray-800 text-green-400 p-3 rounded overflow-hidden">
+                          <div className="overflow-auto max-h-[350px] scrollbar-thin scrollbar-thumb-gray-500 scrollbar-track-gray-900">
+                            <pre className="text-sm whitespace-pre-wrap">{importStatus.jsonData}</pre>
+                          </div>
                         </div>
                       </div>
                     )}
                     
-                    {/* Navigation Buttons */}
-                    <div className="mt-6 flex gap-4">
+                    {/* Single Navigation Button */}
+                    <div className="mt-6 flex justify-end">
                       <button
                         onClick={() => navigate('/requirements')}
-                        className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                        className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center shadow-sm"
                       >
-                        View Requirements
-                      </button>
-                      <button
-                        onClick={() => navigate('/matrix')}
-                        className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-                      >
-                        Go to Traceability Matrix
-                      </button>
-                      <button
-                        onClick={() => navigate('/')}
-                        className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-                      >
-                        View Dashboard
+                        <span>View Requirements</span>
+                        <svg className="ml-2 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
+                        </svg>
                       </button>
                     </div>
                   </>
@@ -352,7 +369,7 @@ const ImportData = () => {
             )}
           </>
         )}
-        
+
         {/* Test Case Import Interface */}
         {activeTab === 'testcases' && (
           <>
@@ -362,7 +379,7 @@ const ImportData = () => {
             {importStatus && activeTab === 'testcases' && (
               <div 
                 id="import-status"
-                className={`mt-6 p-4 rounded shadow ${
+                className={`mt-6 p-4 rounded shadow relative ${
                   importStatus.loading 
                     ? 'bg-blue-50 border border-blue-200'
                     : importStatus.success 
@@ -374,6 +391,18 @@ const ImportData = () => {
                   scrollMarginTop: '20px'
                 }}
               >
+                {/* Close button */}
+                <button 
+                  onClick={closePreview}
+                  className="absolute right-2 top-2 text-gray-500 hover:text-gray-700"
+                  aria-label="Close"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                  </svg>
+                </button>
+                
                 {/* Loading State */}
                 {importStatus.loading && (
                   <>
@@ -453,31 +482,24 @@ const ImportData = () => {
                     {importStatus.jsonData && (
                       <div className="mt-4">
                         <h4 className="font-medium text-gray-700 mb-2">Imported Data Preview:</h4>
-                        <div className="bg-gray-800 text-green-400 p-4 rounded overflow-auto max-h-96">
-                          <pre className="text-sm">{importStatus.jsonData}</pre>
+                        <div className="bg-gray-800 text-green-400 p-3 rounded overflow-hidden">
+                          <div className="overflow-auto max-h-[350px] scrollbar-thin scrollbar-thumb-gray-500 scrollbar-track-gray-900">
+                            <pre className="text-sm whitespace-pre-wrap">{importStatus.jsonData}</pre>
+                          </div>
                         </div>
                       </div>
                     )}
                     
-                    {/* Navigation Buttons */}
-                    <div className="mt-6 flex gap-4">
+                    {/* Single Navigation Button */}
+                    <div className="mt-6 flex justify-end">
                       <button
                         onClick={() => navigate('/testcases')}
-                        className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                        className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center shadow-sm"
                       >
-                        View Test Cases
-                      </button>
-                      <button
-                        onClick={() => navigate('/matrix')}
-                        className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-                      >
-                        Go to Traceability Matrix
-                      </button>
-                      <button
-                        onClick={() => navigate('/')}
-                        className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-                      >
-                        View Dashboard
+                        <span>View Test Cases</span>
+                        <svg className="ml-2 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
+                        </svg>
                       </button>
                     </div>
                   </>
@@ -505,12 +527,28 @@ const ImportData = () => {
         )}
       </div>
       
-      {/* Add CSS for animations */}
+      {/* CSS for animations and scrollbar styling */}
       <style>
         {`
           @keyframes fadeIn {
             from { opacity: 0; transform: translateY(20px); }
             to { opacity: 1; transform: translateY(0); }
+          }
+          
+          /* Custom scrollbar styling */
+          .scrollbar-thin::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+          }
+          
+          .scrollbar-thumb-gray-500::-webkit-scrollbar-thumb {
+            background: #718096;
+            border-radius: 3px;
+          }
+          
+          .scrollbar-track-gray-900::-webkit-scrollbar-track {
+            background: #1a202c;
+            border-radius: 3px;
           }
         `}
       </style>

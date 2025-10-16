@@ -340,11 +340,12 @@ class DataStoreService {
   // ===== REQUIREMENTS METHODS =====
 
   /**
-   * Get all requirements
-   * @returns {Array} Array of requirement objects
-   */
+ * Get all requirements
+ * @returns {Array} Array of requirement objects
+ */
   getRequirements() {
-    return [...this._requirements];
+    // Return a normalized copy of all requirements
+    return this._normalizeRequirements([...this._requirements]);
   }
 
   /**
@@ -353,7 +354,49 @@ class DataStoreService {
    * @returns {Object|null} Requirement object or null if not found
    */
   getRequirement(id) {
-    return this._requirements.find(req => req.id === id) || null;
+    const req = this._requirements.find(req => req.id === id);
+    return req ? this._normalizeRequirement(req) : null;
+  }
+
+  /**
+   * Set requirements data with persistence
+   * @param {Array} requirementsData - New requirements data to set
+   * @returns {Array} Updated requirements
+   */
+  setRequirements(requirementsData) {
+    if (!Array.isArray(requirementsData)) {
+      throw new Error('Requirements data must be an array');
+    }
+
+    // Normalize the requirements data first
+    const normalizedData = this._normalizeRequirements(requirementsData);
+
+    // Process the data to add calculated fields
+    const processed = this.processRequirements(normalizedData);
+
+    // Update requirements
+    this._requirements = [...processed];
+
+    // Clean up mappings for requirements that no longer exist
+    const existingReqIds = new Set(processed.map(req => req.id));
+
+    Object.keys(this._mapping).forEach(reqId => {
+      if (!existingReqIds.has(reqId)) {
+        delete this._mapping[reqId];
+      }
+    });
+
+    // Mark data as initialized
+    this._hasInitializedData = true;
+
+    // Save to localStorage
+    this._saveToLocalStorage('requirements', this._requirements);
+    this._saveToLocalStorage('mapping', this._mapping);
+
+    // Notify listeners of data change
+    this._notifyListeners();
+
+    return this._requirements;
   }
 
   /**
@@ -468,12 +511,28 @@ class DataStoreService {
    * @param {Array} requirements - Raw requirements data
    * @returns {Array} Processed requirements
    */
-  processRequirements(requirements) {
-    return requirements.map(req => ({
-      ...req,
-      // Add any calculated fields here if needed
-      calculatedTDF: this.calculateTDF(req)
-    }));
+  processRequirements(requirementsData) {
+    return requirementsData.map(req => {
+      // First normalize to ensure versions and tags are arrays
+      const normalized = this._normalizeRequirement(req);
+
+      // Now continue with your normal processing
+      const processedReq = { ...normalized };
+
+      // Calculate business impact if not already set
+      if (!processedReq.businessImpact) {
+        processedReq.businessImpact = 3; // Default medium impact
+      }
+
+      // Calculate technical complexity if not already set
+      if (!processedReq.technicalComplexity) {
+        processedReq.technicalComplexity = 2; // Default medium complexity
+      }
+
+      // Add additional processing as needed...
+
+      return processedReq;
+    });
   }
 
   /**
@@ -1649,7 +1708,84 @@ class DataStoreService {
 
   // ===== UTILITY METHODS =====
 
+  /**
+   * Normalizes a requirement object to ensure all properties have proper types
+   * @private
+   * @param {Object} requirement - The requirement object to normalize
+   * @returns {Object} Normalized requirement object
+   */
+  _normalizeRequirement(requirement) {
+    if (!requirement) return null;
 
+    // Clone to avoid modifying the original
+    const normalized = { ...requirement };
+
+    // Ensure versions is always an array
+    if (normalized.versions !== undefined) {
+      if (!Array.isArray(normalized.versions)) {
+        // If it's a string, convert to array (unless empty)
+        if (typeof normalized.versions === 'string') {
+          if (normalized.versions.trim() === '') {
+            normalized.versions = [];
+          } else {
+            // Handle comma-separated values
+            if (normalized.versions.includes(',')) {
+              normalized.versions = normalized.versions
+                .split(',')
+                .map(v => v.trim())
+                .filter(v => v !== '');
+            } else {
+              normalized.versions = [normalized.versions];
+            }
+          }
+        } else {
+          // If it's neither an array nor a string, set to empty array
+          normalized.versions = [];
+        }
+      }
+    } else {
+      // If undefined, initialize as empty array
+      normalized.versions = [];
+    }
+
+    // Normalize tags if present
+    if (normalized.tags !== undefined) {
+      if (!Array.isArray(normalized.tags)) {
+        if (typeof normalized.tags === 'string') {
+          if (normalized.tags.trim() === '') {
+            normalized.tags = [];
+          } else {
+            // Handle comma-separated tags
+            if (normalized.tags.includes(',')) {
+              normalized.tags = normalized.tags
+                .split(',')
+                .map(t => t.trim())
+                .filter(t => t !== '');
+            } else {
+              normalized.tags = [normalized.tags];
+            }
+          }
+        } else {
+          normalized.tags = [];
+        }
+      }
+    } else {
+      normalized.tags = [];
+    }
+
+    return normalized;
+  }
+
+  /**
+   * Normalizes an array of requirements
+   * @private
+   * @param {Array} requirements - Array of requirement objects
+   * @returns {Array} Array of normalized requirement objects
+   */
+  _normalizeRequirements(requirements) {
+    if (!Array.isArray(requirements)) return [];
+    return requirements.map(req => this._normalizeRequirement(req));
+  }
   /**
  * Create or add a new requirement
  * @param {Object} requirement - Requirement object to add
@@ -1666,6 +1802,9 @@ class DataStoreService {
       throw new Error(`Requirement with ID ${requirement.id} already exists`);
     }
 
+    // Normalize the requirement before adding
+    const normalizedRequirement = this._normalizeRequirement(requirement);
+
     try {
       // Create in database first
       const API_BASE_URL = this._getApiBaseUrl();
@@ -1674,7 +1813,7 @@ class DataStoreService {
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(requirement)
+        body: JSON.stringify(normalizedRequirement)
       });
 
       if (!response.ok) {
@@ -1683,14 +1822,14 @@ class DataStoreService {
       }
 
       const result = await response.json();
-      console.log(`✅ Created requirement ${requirement.id} in database`, result);
+      console.log(`✅ Created requirement ${normalizedRequirement.id} in database`, result);
     } catch (error) {
       console.error('❌ Failed to create in database:', error);
       console.warn('⚠️ Continuing with local create only');
     }
 
     // Add to local array
-    this._requirements.push(requirement);
+    this._requirements.push(normalizedRequirement);
 
     // Save to localStorage
     this._saveToLocalStorage('requirements', this._requirements);
@@ -1698,20 +1837,47 @@ class DataStoreService {
     // Notify listeners
     this._notifyListeners();
 
-    return requirement;
+    return normalizedRequirement;
+  }
+
+  // Optional: You might want to also modify initWithDefaultData to use the normalization
+  initWithDefaultData() {
+    // Normalize default requirements before setting
+    this._requirements = this._normalizeRequirements([...defaultRequirements]);
+
+    // Change 3: Update Default Data Initialization
+    this._testCases = defaultTestCases.map(tc => this._migrateTestCaseVersionFormat(tc));
+    this._mapping = { ...defaultMapping };
+    this._versions = [...defaultVersions];
+    this._hasInitializedData = true;
+
+    // Save to localStorage
+    this._saveToLocalStorage('requirements', this._requirements);
+    this._saveToLocalStorage('testCases', this._testCases);
+    this._saveToLocalStorage('mapping', this._mapping);
+    this._saveToLocalStorage('versions', this._versions);
+
+    this._notifyListeners();
+    return true;
   }
 
   /**
-   * Update an existing requirement
-   * @param {string} requirementId - ID of requirement to update
-   * @param {Object} updates - Fields to update
-   * @returns {Promise<Object>} Updated requirement
-   */
+  * Update an existing requirement
+  * @param {string} requirementId - ID of requirement to update
+  * @param {Object} updates - Fields to update
+  * @returns {Promise<Object>} Updated requirement
+  */
   async updateRequirement(requirementId, updates) {
     const requirement = this._requirements.find(r => r.id === requirementId);
 
     if (!requirement) {
       throw new Error(`Requirement with ID ${requirementId} not found`);
+    }
+
+    // Normalize the versions field if it exists in the updates
+    if ('versions' in updates) {
+      const normalizedReq = this._normalizeRequirement({ versions: updates.versions });
+      updates.versions = normalizedReq.versions;
     }
 
     try {
@@ -1747,6 +1913,7 @@ class DataStoreService {
 
     return requirement;
   }
+
 
   /**
    * Import data from various sources
