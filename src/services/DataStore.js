@@ -18,11 +18,142 @@ class DataStoreService {
     this._listeners = [];
     this._hasInitializedData = false;
 
-    // Load persisted data from localStorage
-    this._loadPersistedData();
+    // Initialize data from database or localStorage
+    this._initializeData();
   }
 
+  /**
+   * Initialize data from database or localStorage
+   * @private
+   */
+  async _initializeData() {
+    console.log('🚀 Initializing DataStore...');
 
+    // Try loading from database first
+    const dbLoaded = await this.loadFromDatabase();
+
+    // If database load failed or returned no data, fallback to localStorage
+    if (!dbLoaded || !this._hasInitializedData) {
+      console.log('📂 Falling back to localStorage...');
+      this._loadPersistedData();
+    }
+
+    console.log('✅ DataStore initialization complete');
+  }
+
+  /**
+   * Load data from database API
+   * @returns {Promise<boolean>} True if successful
+   */
+  async loadFromDatabase() {
+    try {
+      console.log('🔄 Loading data from database API...');
+
+      // Get API base URL
+      const API_BASE_URL = this._getApiBaseUrl();
+      console.log('📡 API URL:', API_BASE_URL);
+
+      // Fetch requirements
+      console.log('📥 Fetching requirements...');
+      const reqResponse = await fetch(`${API_BASE_URL}/api/requirements`);
+      if (reqResponse.ok) {
+        const reqData = await reqResponse.json();
+        if (reqData.success && Array.isArray(reqData.data)) {
+          this._requirements = reqData.data;
+          console.log(`✅ Loaded ${this._requirements.length} requirements from database`);
+        }
+      } else {
+        console.error('❌ Failed to fetch requirements:', reqResponse.status);
+      }
+
+      // Fetch test cases
+      console.log('📥 Fetching test cases...');
+      const tcResponse = await fetch(`${API_BASE_URL}/api/test-cases`);
+      if (tcResponse.ok) {
+        const tcData = await tcResponse.json();
+        if (tcData.success && Array.isArray(tcData.data)) {
+          this._testCases = tcData.data.map(tc => this._migrateTestCaseVersionFormat(tc));
+          console.log(`✅ Loaded ${this._testCases.length} test cases from database`);
+        }
+      } else {
+        console.error('❌ Failed to fetch test cases:', tcResponse.status);
+      }
+
+      // Fetch versions
+      console.log('📥 Fetching versions...');
+      const versionResponse = await fetch(`${API_BASE_URL}/api/versions`);
+      if (versionResponse.ok) {
+        const versionData = await versionResponse.json();
+        if (versionData.success && Array.isArray(versionData.data)) {
+          this._versions = versionData.data;
+          console.log(`✅ Loaded ${this._versions.length} versions from database`);
+        }
+      } else {
+        console.error('❌ Failed to fetch versions:', versionResponse.status);
+      }
+
+      // Fetch mappings
+      console.log('📥 Fetching mappings...');
+      const mappingResponse = await fetch(`${API_BASE_URL}/api/mappings`);
+      if (mappingResponse.ok) {
+        const mappingData = await mappingResponse.json();
+        if (mappingData.success && mappingData.data) {
+          this._mapping = mappingData.data;
+          console.log(`✅ Loaded mappings from database`);
+        }
+      } else {
+        console.error('❌ Failed to fetch mappings:', mappingResponse.status);
+      }
+
+      // Mark as initialized if we have data
+      if (this._requirements.length > 0 || this._testCases.length > 0) {
+        this._hasInitializedData = true;
+        console.log('🎯 DataStore initialized with database data');
+      }
+
+      // Save to localStorage for offline use
+      this._saveToLocalStorage('requirements', this._requirements);
+      this._saveToLocalStorage('testCases', this._testCases);
+      this._saveToLocalStorage('mapping', this._mapping);
+      this._saveToLocalStorage('versions', this._versions);
+
+      // Notify listeners
+      this._notifyListeners();
+
+      return true;
+    } catch (error) {
+      console.error('❌ Failed to load from database:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Get API base URL
+   * @private
+   * @returns {string} API base URL
+   */
+  _getApiBaseUrl() {
+    // Check if we're in production
+    const isProduction = window.location.hostname !== 'localhost' &&
+      window.location.hostname !== '127.0.0.1';
+
+    if (isProduction) {
+      // In production, use nginx proxy (same as apiService.js does)
+      // NO PORT - nginx handles the routing to port 3002 internally
+      return `http://${window.location.hostname}`;
+    }
+
+    // For local development - direct to API server port
+    if (import.meta.env && import.meta.env.VITE_API_URL) {
+      return import.meta.env.VITE_API_URL;
+    }
+
+    if (typeof process !== 'undefined' && process.env && process.env.REACT_APP_API_URL) {
+      return process.env.REACT_APP_API_URL;
+    }
+
+    return 'http://localhost:3002';
+  }
 
   /**
    * Load persisted data from localStorage
@@ -30,7 +161,7 @@ class DataStoreService {
    */
   _loadPersistedData() {
     console.log(`🚀 DataStore initializing - loading persisted data from localStorage...`);
-    
+
     try {
       // Load test cases
       console.log(`📂 Checking for saved test cases...`);
@@ -128,7 +259,7 @@ class DataStoreService {
       console.warn(`Failed to save ${key} to localStorage:`, error);
     }
   }
-  
+
   /**
    * Check if there is any data in the system
    * @returns {boolean} True if there is data, false otherwise
@@ -137,7 +268,7 @@ class DataStoreService {
     const reqCount = this._requirements.length;
     const tcCount = this._testCases.length;
     const result = reqCount > 0 || tcCount > 0;
-    
+
     console.log(`🔍 hasData() check: ${reqCount} requirements, ${tcCount} test cases → ${result}`);
     return result;
   }
@@ -159,7 +290,7 @@ class DataStoreService {
   hasRequirements() {
     return this._requirements.length > 0;
   }
-  
+
   /**
    * Initialize with default data if needed
    * This can be called explicitly when wanting to load sample data
@@ -192,14 +323,14 @@ class DataStoreService {
       localStorage.removeItem('qualityTracker_mapping');
       localStorage.removeItem('qualityTracker_versions');
       console.log('🗑️ Cleared all persisted data from localStorage');
-      
+
       // Reset in-memory data
       this._requirements = [];
       this._testCases = [];
       this._mapping = {};
       this._versions = [];
       this._hasInitializedData = false;
-      
+
       this._notifyListeners();
     } catch (error) {
       console.warn('Failed to clear persisted data:', error);
@@ -234,32 +365,32 @@ class DataStoreService {
     if (!Array.isArray(requirementsData)) {
       throw new Error('Requirements data must be an array');
     }
-    
+
     // Process the data to add calculated fields
     const processed = this.processRequirements(requirementsData);
-    
+
     // Update requirements
     this._requirements = [...processed];
-    
+
     // Clean up mappings for requirements that no longer exist
     const existingReqIds = new Set(processed.map(req => req.id));
-    
+
     Object.keys(this._mapping).forEach(reqId => {
       if (!existingReqIds.has(reqId)) {
         delete this._mapping[reqId];
       }
     });
-    
+
     // Mark data as initialized
     this._hasInitializedData = true;
-    
+
     // Save to localStorage
     this._saveToLocalStorage('requirements', this._requirements);
     this._saveToLocalStorage('mapping', this._mapping);
-    
+
     // Notify listeners of data change
     this._notifyListeners();
-    
+
     return this._requirements;
   }
 
@@ -268,53 +399,69 @@ class DataStoreService {
  * @param {string} requirementId - ID of the requirement to delete
  * @returns {boolean} True if successful
  */
-deleteRequirement(requirementId) {
-  const index = this._requirements.findIndex(req => req.id === requirementId);
-  
-  if (index === -1) {
-    throw new Error(`Requirement with ID ${requirementId} not found`);
-  }
+  async deleteRequirement(requirementId) {
+    const index = this._requirements.findIndex(req => req.id === requirementId);
 
-  const requirement = this._requirements[index];
+    if (index === -1) {
+      throw new Error(`Requirement with ID ${requirementId} not found`);
+    }
 
-  // Remove from requirements array
-  this._requirements.splice(index, 1);
+    try {
+      // Delete from database first
+      const API_BASE_URL = this._getApiBaseUrl();
+      const response = await fetch(`${API_BASE_URL}/api/requirements/${requirementId}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
 
-  // Clean up mappings - remove any test case mappings to this requirement
-  if (this._mapping[requirementId]) {
-    // For each test case that was mapped to this requirement,
-    // remove this requirement from their requirementIds array
-    const mappedTestCaseIds = this._mapping[requirementId];
-    
-    mappedTestCaseIds.forEach(testCaseId => {
-      const testCase = this._testCases.find(tc => tc.id === testCaseId);
-      if (testCase && testCase.requirementIds) {
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `Failed to delete requirement: ${response.status}`);
+      }
+
+      console.log(`✅ Deleted requirement ${requirementId} from database`);
+    } catch (error) {
+      console.error('❌ Failed to delete from database:', error);
+      console.warn('⚠️ Continuing with local delete only');
+    }
+
+    // Remove from local array
+    const requirement = this._requirements[index];
+    this._requirements.splice(index, 1);
+
+    // Clean up mappings
+    if (this._mapping[requirementId]) {
+      const mappedTestCaseIds = this._mapping[requirementId];
+
+      mappedTestCaseIds.forEach(testCaseId => {
+        const testCase = this._testCases.find(tc => tc.id === testCaseId);
+        if (testCase && testCase.requirementIds) {
+          testCase.requirementIds = testCase.requirementIds.filter(reqId => reqId !== requirementId);
+        }
+      });
+
+      delete this._mapping[requirementId];
+    }
+
+    // Defensive cleanup
+    this._testCases.forEach(testCase => {
+      if (testCase.requirementIds && testCase.requirementIds.includes(requirementId)) {
         testCase.requirementIds = testCase.requirementIds.filter(reqId => reqId !== requirementId);
       }
     });
-    
-    // Remove the mapping entry
-    delete this._mapping[reqId]; // Corrected: use reqId here
+
+    // Save to localStorage
+    this._saveToLocalStorage('requirements', this._requirements);
+    this._saveToLocalStorage('testCases', this._testCases);
+    this._saveToLocalStorage('mapping', this._mapping);
+
+    // Notify listeners
+    this._notifyListeners();
+
+    return true;
   }
-
-  // Also check for any test cases that have this requirement in their requirementIds array
-  // and remove it (defensive cleanup)
-  this._testCases.forEach(testCase => {
-    if (testCase.requirementIds && testCase.requirementIds.includes(requirementId)) {
-      testCase.requirementIds = testCase.requirementIds.filter(reqId => reqId !== requirementId);
-    }
-  });
-
-  // Save to localStorage
-  this._saveToLocalStorage('requirements', this._requirements);
-  this._saveToLocalStorage('testCases', this._testCases);
-  this._saveToLocalStorage('mapping', this._mapping);
-
-  // Notify listeners of data change
-  this._notifyListeners();
-
-  return true;
-}
 
   /**
    * Process requirements to add calculated fields
@@ -338,22 +485,22 @@ deleteRequirement(requirementId) {
     if (!requirement.businessImpact || !requirement.priority) {
       return 1; // Default TDF
     }
-    
+
     const impactMultiplier = {
       'High': 3,
       'Medium': 2,
       'Low': 1
     };
-    
+
     const priorityMultiplier = {
       'High': 2,
       'Medium': 1.5,
       'Low': 1
     };
-    
+
     const impact = impactMultiplier[requirement.businessImpact] || 1;
     const priority = priorityMultiplier[requirement.priority] || 1;
-    
+
     return Math.round(impact * priority);
   }
 
@@ -365,7 +512,7 @@ deleteRequirement(requirementId) {
    */
   getTestCases() {
     console.log(`📋 getTestCases() called - returning ${this._testCases.length} test cases`);
-    
+
     // If no test cases in memory, try to reload from localStorage (defensive programming)
     if (this._testCases.length === 0) {
       console.log(`🔍 No test cases in memory, checking localStorage...`);
@@ -382,7 +529,7 @@ deleteRequirement(requirementId) {
         console.warn('⚠️ Failed to reload test cases from localStorage:', error);
       }
     }
-    
+
     console.log(`📤 Returning ${this._testCases.length} test cases`);
     return [...this._testCases];
   }
@@ -403,7 +550,7 @@ deleteRequirement(requirementId) {
    */
   setTestCases(testCases) {
     console.log(`🔄 DataStore.setTestCases() called with ${Array.isArray(testCases) ? testCases.length : 'invalid'} test cases`);
-    
+
     // Validate input
     if (!Array.isArray(testCases)) {
       console.error('❌ setTestCases: Input is not an array:', typeof testCases);
@@ -426,7 +573,7 @@ deleteRequirement(requirementId) {
         console.error(`❌ Test case at index ${index} is missing name:`, tc);
         throw new Error(`Test case at index ${index} is missing required 'name' field`);
       }
-      
+
       // === NEW: Validate field types ===
       this._validateTestCaseFieldTypes(tc, index);
 
@@ -447,7 +594,7 @@ deleteRequirement(requirementId) {
 
       // Log each test case being processed
       console.log(`✅ Validated test case ${index + 1}/${testCases.length}: ${tc.id} - ${tc.name}`);
-      
+
       // Ensure all required fields exist with defaults
       return {
         id: tc.id,
@@ -502,14 +649,14 @@ deleteRequirement(requirementId) {
 
     // Persist to localStorage
     console.log(`💿 Saving to localStorage...`);
-    
+
     try {
       this._saveToLocalStorage('testCases', this._testCases);
       console.log(`✅ Successfully saved ${this._testCases.length} test cases to localStorage`);
-      
+
       this._saveToLocalStorage('mapping', this._mapping);
       console.log(`✅ Successfully saved mappings to localStorage`);
-      
+
       // Verify the save worked
       const savedData = localStorage.getItem('qualityTracker_testCases');
       if (savedData) {
@@ -519,7 +666,7 @@ deleteRequirement(requirementId) {
       } else {
         console.warn('⚠️ localStorage verification failed - no data found');
       }
-      
+
     } catch (error) {
       console.error('❌ Failed to save to localStorage:', error);
       // Don't throw here - we want the operation to continue even if persistence fails
@@ -541,7 +688,7 @@ deleteRequirement(requirementId) {
   _updateMappingsFromTestCases() {
     // Clear existing mappings from test cases
     const newMapping = { ...this._mapping };
-    
+
     // Rebuild mappings from test cases
     this._testCases.forEach(tc => {
       if (tc.requirementIds && Array.isArray(tc.requirementIds)) {
@@ -560,98 +707,54 @@ deleteRequirement(requirementId) {
   }
 
   /**
-   * Add a new test case
-   * @param {Object} testCaseData - Test case data
-   * @returns {Object} Created test case
-   */
-  addTestCase(testCaseData) {
-    if (!testCaseData || typeof testCaseData !== 'object') {
-      throw new Error('Test case data must be an object');
-    }
-
+ * Create or add a new test case
+ * @param {Object} testCase - Test case object to add
+ * @returns {Promise<Object>} Created test case
+ */
+  async addTestCase(testCase) {
     // Validate required fields
-    if (!testCaseData.name) {
-      throw new Error('Test case name is required');
+    if (!testCase.id || !testCase.name) {
+      throw new Error('Test case must have id and name');
     }
 
-    // Change 4: Add Validation for New Format (for applicableVersions)
-    if (testCaseData.applicableVersions !== undefined) {
-      if (!Array.isArray(testCaseData.applicableVersions)) {
-        throw new Error('applicableVersions must be an array');
-      }
-      if (!testCaseData.applicableVersions.every(v => typeof v === 'string')) {
-        throw new Error('All versions in applicableVersions must be strings');
-      }
-    }
-    // Existing version validation (if any)
-    if (testCaseData.version !== undefined && typeof testCaseData.version !== 'string') {
-      throw new Error('Version must be a string');
+    // Check if already exists
+    if (this._testCases.find(tc => tc.id === testCase.id)) {
+      throw new Error(`Test case with ID ${testCase.id} already exists`);
     }
 
-    // Generate ID if not provided
-    let testCaseId = testCaseData.id;
-    if (!testCaseId) {
-      const maxNum = this._testCases
-        .map(tc => tc.id.match(/TC_(\d+)/))
-        .filter(match => match)
-        .map(match => parseInt(match[1]))
-        .reduce((max, num) => Math.max(max, num), 0);
-      testCaseId = `TC_${String(maxNum + 1).padStart(3, '0')}`;
-    }
-
-    // Check for duplicate ID
-    if (this._testCases.find(tc => tc.id === testCaseId)) {
-      throw new Error(`Test case with ID ${testCaseId} already exists`);
-    }
-
-    // Create the test case with defaults
-    const newTestCase = {
-      id: testCaseId,
-      name: testCaseData.name,
-      description: testCaseData.description || '',
-      // === NEW TESTAIL FIELDS ===
-      category: testCaseData.category || '',
-      preconditions: testCaseData.preconditions || '',
-      testData: testCaseData.testData || '',
-      status: testCaseData.status || 'Not Run',
-      automationStatus: testCaseData.automationStatus || 'Manual',
-      priority: testCaseData.priority || 'Medium',
-      requirementIds: testCaseData.requirementIds || [],
-      version: testCaseData.version || '', // Keep legacy 'version' for now for backward compatibility during transition
-      applicableVersions: Array.isArray(testCaseData.applicableVersions) ? testCaseData.applicableVersions : [], // New field
-      tags: Array.isArray(testCaseData.tags) ? testCaseData.tags : (testCaseData.tags ? [testCaseData.tags] : []),
-      assignee: testCaseData.assignee || '',
-      lastExecuted: testCaseData.lastExecuted || null,
-      executionTime: testCaseData.executionTime || null,
-      ...testCaseData // Allow additional fields
-    };
-
-    // Add to test cases
-    this._testCases.push(newTestCase);
-
-    // Update mappings if requirements are linked
-    if (newTestCase.requirementIds && newTestCase.requirementIds.length > 0) {
-      newTestCase.requirementIds.forEach(reqId => {
-        if (!this._mapping[reqId]) {
-          this._mapping[reqId] = [];
-        }
-        if (!this._mapping[reqId].includes(newTestCase.id)) {
-          this._mapping[reqId].push(newTestCase.id);
-        }
+    try {
+      // Create in database first
+      const API_BASE_URL = this._getApiBaseUrl();
+      const response = await fetch(`${API_BASE_URL}/api/test-cases`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(testCase)
       });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `Failed to create test case: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log(`✅ Created test case ${testCase.id} in database`, result);
+    } catch (error) {
+      console.error('❌ Failed to create in database:', error);
+      console.warn('⚠️ Continuing with local create only');
     }
 
-    // Mark data as initialized
-    this._hasInitializedData = true;
+    // Add to local array
+    this._testCases.push(testCase);
 
     // Save to localStorage
     this._saveToLocalStorage('testCases', this._testCases);
-    this._saveToLocalStorage('mapping', this._mapping);
 
-    // Notify listeners of data change
+    // Notify listeners
     this._notifyListeners();
 
-    return newTestCase;
+    return testCase;
   }
 
   /**
@@ -661,505 +764,482 @@ deleteRequirement(requirementId) {
  * @param {string[]} requirementIds - Requirement IDs linked to test case
  * @returns {Object} Validation result
  */
-validateVersionRequirementCompatibility(testCaseId, newVersions, requirementIds = null) {
-  const validation = {
-    valid: true,
-    errors: [],
-    warnings: [],
-    mismatches: []
-  };
+  validateVersionRequirementCompatibility(testCaseId, newVersions, requirementIds = null) {
+    const validation = {
+      valid: true,
+      errors: [],
+      warnings: [],
+      mismatches: []
+    };
 
-  // Get the test case to find current requirement links if not provided
-  const testCase = this.getTestCase(testCaseId);
-  if (!testCase) {
-    validation.errors.push(`Test case ${testCaseId} not found`);
-    validation.valid = false;
+    // Get the test case to find current requirement links if not provided
+    const testCase = this.getTestCase(testCaseId);
+    if (!testCase) {
+      validation.errors.push(`Test case ${testCaseId} not found`);
+      validation.valid = false;
+      return validation;
+    }
+
+    // Use provided requirementIds or get from test case
+    const reqIds = requirementIds || testCase.requirementIds || [];
+
+    if (reqIds.length === 0) {
+      return validation; // No requirements to validate against
+    }
+
+    console.log(`🔍 Validating versions [${newVersions.join(', ')}] for test case ${testCaseId} against requirements [${reqIds.join(', ')}]`);
+
+    reqIds.forEach(reqId => {
+      const requirement = this.getRequirement(reqId);
+
+      if (!requirement) {
+        validation.errors.push(`Requirement ${reqId} not found`);
+        validation.valid = false;
+        return;
+      }
+
+      const reqVersions = requirement.versions || [];
+
+      // Check version compatibility
+      const testHasNoVersions = newVersions.length === 0;
+      const reqHasNoVersions = reqVersions.length === 0;
+      const hasVersionOverlap = newVersions.some(v => reqVersions.includes(v));
+
+      // Compatibility rules:
+      // 1. If test case has no versions = applies to all versions (compatible)
+      // 2. If requirement has no versions = applies to all versions (compatible)  
+      // 3. If there's at least one version overlap = compatible
+      const isCompatible = testHasNoVersions || reqHasNoVersions || hasVersionOverlap;
+
+      console.log(`🔍 Compatibility check: TC versions [${newVersions.join(', ') || 'all'}] vs REQ ${reqId} versions [${reqVersions.join(', ') || 'all'}] = ${isCompatible ? '✅' : '❌'}`);
+
+      if (!isCompatible) {
+        const mismatch = {
+          testCaseId,
+          requirementId: reqId,
+          testVersions: [...newVersions],
+          reqVersions: [...reqVersions]
+        };
+
+        validation.mismatches.push(mismatch);
+        validation.errors.push(
+          `❌ Version Conflict: Test case ${testCaseId} is assigned to "${newVersions.join(', ') || 'all versions'}" but requirement ${reqId} is assigned to "${reqVersions.join(', ') || 'all versions'}". ` +
+          `They must share at least one common version.\n\n` +
+          `💡 To fix: Either add "${reqVersions.join(', ')}" to test case versions, or add "${newVersions.join(', ')}" to requirement versions, or set one to "all versions".`
+        );
+        validation.valid = false;
+      }
+    });
+
     return validation;
   }
-
-  // Use provided requirementIds or get from test case
-  const reqIds = requirementIds || testCase.requirementIds || [];
-  
-  if (reqIds.length === 0) {
-    return validation; // No requirements to validate against
-  }
-
-  console.log(`🔍 Validating versions [${newVersions.join(', ')}] for test case ${testCaseId} against requirements [${reqIds.join(', ')}]`);
-
-  reqIds.forEach(reqId => {
-    const requirement = this.getRequirement(reqId);
-    
-    if (!requirement) {
-      validation.errors.push(`Requirement ${reqId} not found`);
-      validation.valid = false;
-      return;
-    }
-
-    const reqVersions = requirement.versions || [];
-
-    // Check version compatibility
-    const testHasNoVersions = newVersions.length === 0;
-    const reqHasNoVersions = reqVersions.length === 0;
-    const hasVersionOverlap = newVersions.some(v => reqVersions.includes(v));
-
-    // Compatibility rules:
-    // 1. If test case has no versions = applies to all versions (compatible)
-    // 2. If requirement has no versions = applies to all versions (compatible)  
-    // 3. If there's at least one version overlap = compatible
-    const isCompatible = testHasNoVersions || reqHasNoVersions || hasVersionOverlap;
-
-    console.log(`🔍 Compatibility check: TC versions [${newVersions.join(', ') || 'all'}] vs REQ ${reqId} versions [${reqVersions.join(', ') || 'all'}] = ${isCompatible ? '✅' : '❌'}`);
-
-    if (!isCompatible) {
-      const mismatch = {
-        testCaseId,
-        requirementId: reqId,
-        testVersions: [...newVersions],
-        reqVersions: [...reqVersions]
-      };
-
-      validation.mismatches.push(mismatch);
-      validation.errors.push(
-  `❌ Version Conflict: Test case ${testCaseId} is assigned to "${newVersions.join(', ') || 'all versions'}" but requirement ${reqId} is assigned to "${reqVersions.join(', ') || 'all versions'}". ` +
-  `They must share at least one common version.\n\n` +
-  `💡 To fix: Either add "${reqVersions.join(', ')}" to test case versions, or add "${newVersions.join(', ')}" to requirement versions, or set one to "all versions".`
-);
-      validation.valid = false;
-    }
-  });
-
-  return validation;
-}
-
 
   /**
    * Update an existing test case
-   * @param {string} testCaseId - ID of the test case to update
-   * @param {Object} updateData - Data to update
-   * @returns {Object} Updated test case
+   * @param {string} testCaseId - ID of test case to update
+   * @param {Object} updates - Fields to update
+   * @returns {Promise<Object>} Updated test case
    */
-  updateTestCase(testCaseId, updateData) {
-  const index = this._testCases.findIndex(tc => tc.id === testCaseId);
-  
-  if (index === -1) {
-    throw new Error(`Test case with ID ${testCaseId} not found`);
-  }
+  async updateTestCase(testCaseId, updates) {
+    const testCase = this._testCases.find(tc => tc.id === testCaseId);
 
-  const existingTestCase = this._testCases[index];
-  const oldRequirementIds = existingTestCase.requirementIds || [];
-
-  // Change 4: Add Validation for New Format (for applicableVersions)
-  if (updateData.applicableVersions !== undefined) {
-    if (!Array.isArray(updateData.applicableVersions)) {
-      throw new Error('applicableVersions must be an array');
+    if (!testCase) {
+      throw new Error(`Test case with ID ${testCaseId} not found`);
     }
-    if (!updateData.applicableVersions.every(v => typeof v === 'string')) {
-      throw new Error('All versions in applicableVersions must be strings');
-    }
-  }
-  // Existing version validation (if any)
-  if (updateData.version !== undefined && typeof updateData.version !== 'string') {
-    throw new Error('Version must be a string');
-  }
 
-  // NEW: Add centralized version compatibility validation
-  const newVersions = updateData.applicableVersions !== undefined 
-    ? updateData.applicableVersions 
-    : (Array.isArray(existingTestCase.applicableVersions) 
-       ? existingTestCase.applicableVersions 
-       : (existingTestCase.version ? [existingTestCase.version] : []));
-
-  const newRequirementIds = updateData.requirementIds !== undefined 
-    ? updateData.requirementIds 
-    : (existingTestCase.requirementIds || []);
-
-  if (newRequirementIds.length > 0) {
-    const validation = this.validateVersionRequirementCompatibility(testCaseId, newVersions, newRequirementIds);
-    if (!validation.valid) {
-      throw new Error(`Version compatibility errors: ${validation.errors.join('; ')}`);
-    }
-  }
-
-  // Update the test case
-  const updatedTestCase = {
-    ...existingTestCase,
-    ...updateData,
-    id: testCaseId // Ensure ID doesn't change
-  };
-
-  this._testCases[index] = updatedTestCase;
-
-  // Update mappings if requirement links changed
-  const newRequirementIdsArray = updatedTestCase.requirementIds || [];
-  
-  // Remove old mappings
-  oldRequirementIds.forEach(reqId => {
-    if (this._mapping[reqId]) {
-      this._mapping[reqId] = this._mapping[reqId].filter(tcId => tcId !== testCaseId);
-      if (this._mapping[reqId].length === 0) {
-        delete this._mapping[reqId];
-      }
-    }
-  });
-
-  // Add new mappings
-  newRequirementIdsArray.forEach(reqId => {
-    if (!this._mapping[reqId]) {
-      this._mapping[reqId] = [];
-    }
-    if (!this._mapping[reqId].includes(testCaseId)) {
-      this._mapping[reqId].push(testCaseId);
-    }
-  });
-
-  // Save to localStorage
-  this._saveToLocalStorage('testCases', this._testCases);
-  this._saveToLocalStorage('mapping', this._mapping);
-
-  // Notify listeners of data change
-  this._notifyListeners();
-
-  return updatedTestCase;
-}
-
-/**
- * Update versions for multiple test cases (bulk assignment) with validation
- * @param {string[]} testCaseIds - Array of test case IDs to update
- * @param {string} versionId - Version ID to add or remove
- * @param {string} action - 'add' or 'remove'
- * @returns {Object} Summary of the operation
- */
-updateTestCaseVersions(testCaseIds, versionId, action) {
-  if (!Array.isArray(testCaseIds) || testCaseIds.length === 0) {
-    throw new Error('testCaseIds must be a non-empty array');
-  }
-  
-  if (!versionId || typeof versionId !== 'string') {
-    throw new Error('versionId must be a non-empty string');
-  }
-  
-  if (!['add', 'remove'].includes(action)) {
-    throw new Error('action must be either "add" or "remove"');
-  }
-
-  const results = {
-    successful: [],
-    failed: [],
-    skipped: [],
-    validationErrors: [],
-    action,
-    versionId
-  };
-
-  console.log(`🔄 Bulk ${action} version "${versionId}" for ${testCaseIds.length} test cases with validation`);
-
-  // First pass: validate all changes before making any
-  const validationResults = new Map();
-
-  testCaseIds.forEach(testCaseId => {
     try {
+      // Update in database first
+      const API_BASE_URL = this._getApiBaseUrl();
+      const response = await fetch(`${API_BASE_URL}/api/test-cases/${testCaseId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(updates)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `Failed to update test case: ${response.status}`);
+      }
+
+      console.log(`✅ Updated test case ${testCaseId} in database`);
+    } catch (error) {
+      console.error('❌ Failed to update in database:', error);
+      console.warn('⚠️ Continuing with local update only');
+    }
+
+    // Update locally
+    Object.assign(testCase, updates);
+
+    // Save to localStorage
+    this._saveToLocalStorage('testCases', this._testCases);
+
+    // Notify listeners
+    this._notifyListeners();
+
+    return testCase;
+  }
+
+
+  /**
+   * Update versions for multiple test cases (bulk assignment) with validation
+   * @param {string[]} testCaseIds - Array of test case IDs to update
+   * @param {string} versionId - Version ID to add or remove
+   * @param {string} action - 'add' or 'remove'
+   * @returns {Object} Summary of the operation
+   */
+  updateTestCaseVersions(testCaseIds, versionId, action) {
+    if (!Array.isArray(testCaseIds) || testCaseIds.length === 0) {
+      throw new Error('testCaseIds must be a non-empty array');
+    }
+
+    if (!versionId || typeof versionId !== 'string') {
+      throw new Error('versionId must be a non-empty string');
+    }
+
+    if (!['add', 'remove'].includes(action)) {
+      throw new Error('action must be either "add" or "remove"');
+    }
+
+    const results = {
+      successful: [],
+      failed: [],
+      skipped: [],
+      validationErrors: [],
+      action,
+      versionId
+    };
+
+    console.log(`🔄 Bulk ${action} version "${versionId}" for ${testCaseIds.length} test cases with validation`);
+
+    // First pass: validate all changes before making any
+    const validationResults = new Map();
+
+    testCaseIds.forEach(testCaseId => {
+      try {
+        const testCase = this._testCases.find(tc => tc.id === testCaseId);
+
+        if (!testCase) {
+          results.failed.push({ testCaseId, error: 'Test case not found' });
+          return;
+        }
+
+        const currentVersions = Array.isArray(testCase.applicableVersions)
+          ? [...testCase.applicableVersions]
+          : (testCase.version ? [testCase.version] : []);
+
+        let newVersions;
+
+        if (action === 'add') {
+          if (!currentVersions.includes(versionId)) {
+            newVersions = [...currentVersions, versionId];
+          } else {
+            results.skipped.push({ testCaseId, reason: 'Already assigned to version' });
+            return;
+          }
+        } else { // remove
+          if (currentVersions.includes(versionId)) {
+            newVersions = currentVersions.filter(v => v !== versionId);
+          } else {
+            results.skipped.push({ testCaseId, reason: 'Not assigned to version' });
+            return;
+          }
+        }
+
+        // NEW: Validate version compatibility
+        const validation = this.validateVersionRequirementCompatibility(testCaseId, newVersions);
+
+        if (!validation.valid) {
+          results.validationErrors.push({
+            testCaseId,
+            errors: validation.errors,
+            mismatches: validation.mismatches
+          });
+          console.log(`❌ Validation failed for ${testCaseId}:`, validation.errors);
+          return;
+        }
+
+        // Store successful validation for second pass
+        validationResults.set(testCaseId, {
+          currentVersions,
+          newVersions,
+          testCase
+        });
+
+      } catch (error) {
+        results.failed.push({ testCaseId, error: error.message });
+      }
+    });
+
+    // Check if there were any validation errors
+    if (results.validationErrors.length > 0) {
+      const allErrors = results.validationErrors.flatMap(ve => ve.errors);
+      console.log(`❌ Bulk operation cancelled due to ${results.validationErrors.length} validation errors`);
+      throw new Error(`Version compatibility errors:\n${allErrors.join('\n')}`);
+    }
+
+    // Second pass: apply all validated changes
+    validationResults.forEach((changeData, testCaseId) => {
+      try {
+        const index = this._testCases.findIndex(tc => tc.id === testCaseId);
+
+        // Update the test case
+        this._testCases[index] = {
+          ...changeData.testCase,
+          applicableVersions: changeData.newVersions,
+          // Remove legacy version field to prevent confusion
+          version: undefined
+        };
+
+        results.successful.push({
+          testCaseId,
+          previousVersions: changeData.currentVersions,
+          newVersions: changeData.newVersions
+        });
+
+      } catch (error) {
+        results.failed.push({ testCaseId, error: error.message });
+      }
+    });
+
+    // Save to localStorage if any changes were made
+    if (results.successful.length > 0) {
+      this._saveToLocalStorage('testCases', this._testCases);
+      this._notifyListeners();
+
+      console.log(`✅ Bulk version assignment completed: ${results.successful.length} successful, ${results.failed.length} failed, ${results.skipped.length} skipped, ${results.validationErrors.length} validation errors`);
+    }
+
+    return results;
+  }
+
+
+  /**
+   * Validate version assignment before execution
+   * @param {string[]} testCaseIds - Test case IDs to validate
+   * @param {string} versionId - Version ID to validate
+   * @param {string} action - 'add' or 'remove'  
+   * @returns {Object} Validation result with warnings and errors
+   */
+  validateVersionAssignment(testCaseIds, versionId, action) {
+    const validation = {
+      valid: true,
+      errors: [],
+      warnings: [],
+      summary: {
+        total: testCaseIds.length,
+        found: 0,
+        alreadyAssigned: 0,
+        notAssigned: 0,
+        wouldChange: 0
+      }
+    };
+
+    // Validate inputs
+    if (!Array.isArray(testCaseIds) || testCaseIds.length === 0) {
+      validation.errors.push('No test cases selected');
+      validation.valid = false;
+      return validation;
+    }
+
+    if (!versionId) {
+      validation.errors.push('No version selected');
+      validation.valid = false;
+      return validation;
+    }
+
+    // Check each test case
+    testCaseIds.forEach(testCaseId => {
       const testCase = this._testCases.find(tc => tc.id === testCaseId);
-      
+
       if (!testCase) {
-        results.failed.push({ testCaseId, error: 'Test case not found' });
+        validation.errors.push(`Test case ${testCaseId} not found`);
         return;
       }
 
-      const currentVersions = Array.isArray(testCase.applicableVersions) 
-        ? [...testCase.applicableVersions]
+      validation.summary.found++;
+
+      const currentVersions = Array.isArray(testCase.applicableVersions)
+        ? testCase.applicableVersions
         : (testCase.version ? [testCase.version] : []);
 
-      let newVersions;
+      const isAssigned = currentVersions.includes(versionId);
 
       if (action === 'add') {
-        if (!currentVersions.includes(versionId)) {
-          newVersions = [...currentVersions, versionId];
+        if (isAssigned) {
+          validation.summary.alreadyAssigned++;
         } else {
-          results.skipped.push({ testCaseId, reason: 'Already assigned to version' });
-          return;
+          validation.summary.wouldChange++;
         }
       } else { // remove
-        if (currentVersions.includes(versionId)) {
-          newVersions = currentVersions.filter(v => v !== versionId);
+        if (isAssigned) {
+          validation.summary.wouldChange++;
         } else {
-          results.skipped.push({ testCaseId, reason: 'Not assigned to version' });
-          return;
+          validation.summary.notAssigned++;
         }
       }
-
-      // NEW: Validate version compatibility
-      const validation = this.validateVersionRequirementCompatibility(testCaseId, newVersions);
-      
-      if (!validation.valid) {
-        results.validationErrors.push({
-          testCaseId,
-          errors: validation.errors,
-          mismatches: validation.mismatches
-        });
-        console.log(`❌ Validation failed for ${testCaseId}:`, validation.errors);
-        return;
-      }
-
-      // Store successful validation for second pass
-      validationResults.set(testCaseId, {
-        currentVersions,
-        newVersions,
-        testCase
-      });
-
-    } catch (error) {
-      results.failed.push({ testCaseId, error: error.message });
-    }
-  });
-
-  // Check if there were any validation errors
-  if (results.validationErrors.length > 0) {
-    const allErrors = results.validationErrors.flatMap(ve => ve.errors);
-    console.log(`❌ Bulk operation cancelled due to ${results.validationErrors.length} validation errors`);
-    throw new Error(`Version compatibility errors:\n${allErrors.join('\n')}`);
-  }
-
-  // Second pass: apply all validated changes
-  validationResults.forEach((changeData, testCaseId) => {
-    try {
-      const index = this._testCases.findIndex(tc => tc.id === testCaseId);
-      
-      // Update the test case
-      this._testCases[index] = {
-        ...changeData.testCase,
-        applicableVersions: changeData.newVersions,
-        // Remove legacy version field to prevent confusion
-        version: undefined
-      };
-
-      results.successful.push({ 
-        testCaseId, 
-        previousVersions: changeData.currentVersions,
-        newVersions: changeData.newVersions
-      });
-
-    } catch (error) {
-      results.failed.push({ testCaseId, error: error.message });
-    }
-  });
-
-  // Save to localStorage if any changes were made
-  if (results.successful.length > 0) {
-    this._saveToLocalStorage('testCases', this._testCases);
-    this._notifyListeners();
-    
-    console.log(`✅ Bulk version assignment completed: ${results.successful.length} successful, ${results.failed.length} failed, ${results.skipped.length} skipped, ${results.validationErrors.length} validation errors`);
-  }
-
-  return results;
-}
-
-
-/**
- * Validate version assignment before execution
- * @param {string[]} testCaseIds - Test case IDs to validate
- * @param {string} versionId - Version ID to validate
- * @param {string} action - 'add' or 'remove'  
- * @returns {Object} Validation result with warnings and errors
- */
-validateVersionAssignment(testCaseIds, versionId, action) {
-  const validation = {
-    valid: true,
-    errors: [],
-    warnings: [],
-    summary: {
-      total: testCaseIds.length,
-      found: 0,
-      alreadyAssigned: 0,
-      notAssigned: 0,
-      wouldChange: 0
-    }
-  };
-
-  // Validate inputs
-  if (!Array.isArray(testCaseIds) || testCaseIds.length === 0) {
-    validation.errors.push('No test cases selected');
-    validation.valid = false;
-    return validation;
-  }
-
-  if (!versionId) {
-    validation.errors.push('No version selected');
-    validation.valid = false;
-    return validation;
-  }
-
-  // Check each test case
-  testCaseIds.forEach(testCaseId => {
-    const testCase = this._testCases.find(tc => tc.id === testCaseId);
-    
-    if (!testCase) {
-      validation.errors.push(`Test case ${testCaseId} not found`);
-      return;
-    }
-
-    validation.summary.found++;
-
-    const currentVersions = Array.isArray(testCase.applicableVersions) 
-      ? testCase.applicableVersions
-      : (testCase.version ? [testCase.version] : []);
-
-    const isAssigned = currentVersions.includes(versionId);
-
-    if (action === 'add') {
-      if (isAssigned) {
-        validation.summary.alreadyAssigned++;
-      } else {
-        validation.summary.wouldChange++;
-      }
-    } else { // remove
-      if (isAssigned) {
-        validation.summary.wouldChange++;
-      } else {
-        validation.summary.notAssigned++;
-      }
-    }
-  });
-
-  // Generate warnings
-  if (action === 'add' && validation.summary.alreadyAssigned > 0) {
-    validation.warnings.push(`${validation.summary.alreadyAssigned} test cases already assigned to this version`);
-  }
-  
-  if (action === 'remove' && validation.summary.notAssigned > 0) {
-    validation.warnings.push(`${validation.summary.notAssigned} test cases not assigned to this version`);
-  }
-
-  if (validation.summary.wouldChange === 0) {
-    validation.warnings.push('No test cases will be changed by this operation');
-  }
-
-  validation.valid = validation.errors.length === 0;
-  return validation;
-}
-/**
- * Get summary of version assignments across test cases
- * @param {string[]} testCaseIds - Optional filter by test case IDs
- * @returns {Object} Version assignment statistics
- */
-getVersionAssignmentSummary(testCaseIds = null) {
-  const testCasesToAnalyze = testCaseIds 
-    ? this._testCases.filter(tc => testCaseIds.includes(tc.id))
-    : this._testCases;
-
-  const versionCounts = {};
-  const unassignedCount = testCasesToAnalyze.filter(tc => {
-    const versions = Array.isArray(tc.applicableVersions) 
-      ? tc.applicableVersions
-      : (tc.version ? [tc.version] : []);
-    
-    if (versions.length === 0) return true;
-    
-    versions.forEach(versionId => {
-      versionCounts[versionId] = (versionCounts[versionId] || 0) + 1;
     });
-    
-    return false;
-  }).length;
 
-  return {
-    totalTestCases: testCasesToAnalyze.length,
-    unassignedCount,
-    versionCounts,
-    mostUsedVersion: Object.keys(versionCounts).reduce((a, b) => 
-      versionCounts[a] > versionCounts[b] ? a : b, null),
-    assignmentCoverage: testCasesToAnalyze.length > 0 
-      ? Math.round(((testCasesToAnalyze.length - unassignedCount) / testCasesToAnalyze.length) * 100)
-      : 0
-  };
-}
+    // Generate warnings
+    if (action === 'add' && validation.summary.alreadyAssigned > 0) {
+      validation.warnings.push(`${validation.summary.alreadyAssigned} test cases already assigned to this version`);
+    }
 
-/**
- * Get detailed version assignment statistics for reporting
- * @returns {Object} Comprehensive version statistics
- */
-getVersionAssignmentStatistics() {
-  const stats = {
-    overview: {
-      totalTestCases: this._testCases.length,
-      assignedTestCases: 0,
-      unassignedTestCases: 0,
-      averageVersionsPerTestCase: 0
-    },
-    byVersion: {},
-    legacyFormatCount: 0,
-    newFormatCount: 0
-  };
+    if (action === 'remove' && validation.summary.notAssigned > 0) {
+      validation.warnings.push(`${validation.summary.notAssigned} test cases not assigned to this version`);
+    }
 
-  let totalVersionAssignments = 0;
+    if (validation.summary.wouldChange === 0) {
+      validation.warnings.push('No test cases will be changed by this operation');
+    }
 
-  this._testCases.forEach(tc => {
-    // Track format usage
-    if (tc.applicableVersions) {
-      stats.newFormatCount++;
-      
-      if (tc.applicableVersions.length > 0) {
-        stats.overview.assignedTestCases++;
-        totalVersionAssignments += tc.applicableVersions.length;
-        
-        tc.applicableVersions.forEach(versionId => {
-          if (!stats.byVersion[versionId]) {
-            stats.byVersion[versionId] = {
+    validation.valid = validation.errors.length === 0;
+    return validation;
+  }
+  /**
+   * Get summary of version assignments across test cases
+   * @param {string[]} testCaseIds - Optional filter by test case IDs
+   * @returns {Object} Version assignment statistics
+   */
+  getVersionAssignmentSummary(testCaseIds = null) {
+    const testCasesToAnalyze = testCaseIds
+      ? this._testCases.filter(tc => testCaseIds.includes(tc.id))
+      : this._testCases;
+
+    const versionCounts = {};
+    const unassignedCount = testCasesToAnalyze.filter(tc => {
+      const versions = Array.isArray(tc.applicableVersions)
+        ? tc.applicableVersions
+        : (tc.version ? [tc.version] : []);
+
+      if (versions.length === 0) return true;
+
+      versions.forEach(versionId => {
+        versionCounts[versionId] = (versionCounts[versionId] || 0) + 1;
+      });
+
+      return false;
+    }).length;
+
+    return {
+      totalTestCases: testCasesToAnalyze.length,
+      unassignedCount,
+      versionCounts,
+      mostUsedVersion: Object.keys(versionCounts).reduce((a, b) =>
+        versionCounts[a] > versionCounts[b] ? a : b, null),
+      assignmentCoverage: testCasesToAnalyze.length > 0
+        ? Math.round(((testCasesToAnalyze.length - unassignedCount) / testCasesToAnalyze.length) * 100)
+        : 0
+    };
+  }
+
+  /**
+   * Get detailed version assignment statistics for reporting
+   * @returns {Object} Comprehensive version statistics
+   */
+  getVersionAssignmentStatistics() {
+    const stats = {
+      overview: {
+        totalTestCases: this._testCases.length,
+        assignedTestCases: 0,
+        unassignedTestCases: 0,
+        averageVersionsPerTestCase: 0
+      },
+      byVersion: {},
+      legacyFormatCount: 0,
+      newFormatCount: 0
+    };
+
+    let totalVersionAssignments = 0;
+
+    this._testCases.forEach(tc => {
+      // Track format usage
+      if (tc.applicableVersions) {
+        stats.newFormatCount++;
+
+        if (tc.applicableVersions.length > 0) {
+          stats.overview.assignedTestCases++;
+          totalVersionAssignments += tc.applicableVersions.length;
+
+          tc.applicableVersions.forEach(versionId => {
+            if (!stats.byVersion[versionId]) {
+              stats.byVersion[versionId] = {
+                testCaseCount: 0,
+                testCaseIds: []
+              };
+            }
+            stats.byVersion[versionId].testCaseCount++;
+            stats.byVersion[versionId].testCaseIds.push(tc.id);
+          });
+        } else {
+          stats.overview.unassignedTestCases++;
+        }
+      } else if (tc.version) {
+        stats.legacyFormatCount++;
+
+        if (tc.version) {
+          stats.overview.assignedTestCases++;
+          totalVersionAssignments++;
+
+          if (!stats.byVersion[tc.version]) {
+            stats.byVersion[tc.version] = {
               testCaseCount: 0,
               testCaseIds: []
             };
           }
-          stats.byVersion[versionId].testCaseCount++;
-          stats.byVersion[versionId].testCaseIds.push(tc.id);
-        });
-      } else {
-        stats.overview.unassignedTestCases++;
-      }
-    } else if (tc.version) {
-      stats.legacyFormatCount++;
-      
-      if (tc.version) {
-        stats.overview.assignedTestCases++;
-        totalVersionAssignments++;
-        
-        if (!stats.byVersion[tc.version]) {
-          stats.byVersion[tc.version] = {
-            testCaseCount: 0,
-            testCaseIds: []
-          };
+          stats.byVersion[tc.version].testCaseCount++;
+          stats.byVersion[tc.version].testCaseIds.push(tc.id);
+        } else {
+          stats.overview.unassignedTestCases++;
         }
-        stats.byVersion[tc.version].testCaseCount++;
-        stats.byVersion[tc.version].testCaseIds.push(tc.id);
       } else {
         stats.overview.unassignedTestCases++;
       }
-    } else {
-      stats.overview.unassignedTestCases++;
-    }
-  });
+    });
 
-  stats.overview.averageVersionsPerTestCase = stats.overview.assignedTestCases > 0
-    ? Math.round((totalVersionAssignments / stats.overview.assignedTestCases) * 100) / 100
-    : 0;
+    stats.overview.averageVersionsPerTestCase = stats.overview.assignedTestCases > 0
+      ? Math.round((totalVersionAssignments / stats.overview.assignedTestCases) * 100) / 100
+      : 0;
 
-  return stats;
-}
+    return stats;
+  }
 
   /**
    * Delete a test case
    * @param {string} testCaseId - ID of the test case to delete
    * @returns {boolean} True if successful
    */
-  deleteTestCase(testCaseId) {
+  async deleteTestCase(testCaseId) {
     const index = this._testCases.findIndex(tc => tc.id === testCaseId);
-    
+
     if (index === -1) {
       throw new Error(`Test case with ID ${testCaseId} not found`);
     }
 
-    const testCase = this._testCases[index];
+    try {
+      // Delete from database first
+      const API_BASE_URL = this._getApiBaseUrl();
+      const response = await fetch(`${API_BASE_URL}/api/test-cases/${testCaseId}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
 
-    // Remove from test cases array
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `Failed to delete test case: ${response.status}`);
+      }
+
+      console.log(`✅ Deleted test case ${testCaseId} from database`);
+    } catch (error) {
+      console.error('❌ Failed to delete from database:', error);
+      console.warn('⚠️ Continuing with local delete only');
+    }
+
+    // Remove from local array
+    const testCase = this._testCases[index];
     this._testCases.splice(index, 1);
 
     // Remove from mappings
@@ -1178,7 +1258,7 @@ getVersionAssignmentStatistics() {
     this._saveToLocalStorage('testCases', this._testCases);
     this._saveToLocalStorage('mapping', this._mapping);
 
-    // Notify listeners of data change
+    // Notify listeners
     this._notifyListeners();
 
     return true;
@@ -1190,139 +1270,139 @@ getVersionAssignmentStatistics() {
  * @param {string[]} requirementIds - Array of requirement IDs
  * @returns {Object} Validation result with errors and warnings
  */
-validateRequirementTestCaseVersions(testCaseId, requirementIds) {
-  const validation = {
-    valid: true,
-    errors: [],
-    warnings: [],
-    mismatches: []
-  };
+  validateRequirementTestCaseVersions(testCaseId, requirementIds) {
+    const validation = {
+      valid: true,
+      errors: [],
+      warnings: [],
+      mismatches: []
+    };
 
-  if (!requirementIds || requirementIds.length === 0) {
-    return validation; // No requirements to validate
-  }
+    if (!requirementIds || requirementIds.length === 0) {
+      return validation; // No requirements to validate
+    }
 
-  const testCase = this.getTestCase(testCaseId);
-  if (!testCase) {
-    validation.errors.push(`Test case ${testCaseId} not found`);
-    validation.valid = false;
+    const testCase = this.getTestCase(testCaseId);
+    if (!testCase) {
+      validation.errors.push(`Test case ${testCaseId} not found`);
+      validation.valid = false;
+      return validation;
+    }
+
+    // Get test case versions (handle both new and legacy format)
+    const testVersions = Array.isArray(testCase.applicableVersions)
+      ? testCase.applicableVersions
+      : (testCase.version ? [testCase.version] : []);
+
+    requirementIds.forEach(reqId => {
+      const requirement = this.getRequirement(reqId);
+
+      if (!requirement) {
+        validation.errors.push(`Requirement ${reqId} not found`);
+        validation.valid = false;
+        return;
+      }
+
+      const reqVersions = requirement.versions || [];
+
+      // Check version compatibility
+      const testHasNoVersions = testVersions.length === 0;
+      const reqHasNoVersions = reqVersions.length === 0;
+      const hasVersionOverlap = testVersions.some(v => reqVersions.includes(v));
+
+      // Compatibility rules:
+      // 1. If test case has no versions = applies to all versions (compatible)
+      // 2. If requirement has no versions = applies to all versions (compatible)  
+      // 3. If there's at least one version overlap = compatible
+      const isCompatible = testHasNoVersions || reqHasNoVersions || hasVersionOverlap;
+
+      if (!isCompatible) {
+        const mismatch = {
+          testCaseId,
+          requirementId: reqId,
+          testVersions: [...testVersions],
+          reqVersions: [...reqVersions]
+        };
+
+        validation.mismatches.push(mismatch);
+        validation.errors.push(
+          `Version mismatch: Test case ${testCaseId} (versions: ${testVersions.join(', ') || 'all'}) ` +
+          `cannot be linked to requirement ${reqId} (versions: ${reqVersions.join(', ') || 'all'})`
+        );
+        validation.valid = false;
+      }
+    });
+
     return validation;
   }
 
-  // Get test case versions (handle both new and legacy format)
-  const testVersions = Array.isArray(testCase.applicableVersions) 
-    ? testCase.applicableVersions 
-    : (testCase.version ? [testCase.version] : []);
 
-  requirementIds.forEach(reqId => {
-    const requirement = this.getRequirement(reqId);
-    
-    if (!requirement) {
-      validation.errors.push(`Requirement ${reqId} not found`);
-      validation.valid = false;
-      return;
+
+  /**
+   * Get version mismatch warnings for a test case
+   * @param {string} testCaseId - Test case ID
+   * @returns {Array} Array of warning objects
+   */
+  getVersionMismatchWarnings(testCaseId) {
+    const warnings = [];
+    const testCase = this.getTestCase(testCaseId);
+
+    if (!testCase || !testCase.requirementIds || testCase.requirementIds.length === 0) {
+      return warnings;
     }
 
-    const reqVersions = requirement.versions || [];
+    const testVersions = Array.isArray(testCase.applicableVersions)
+      ? testCase.applicableVersions
+      : (testCase.version ? [testCase.version] : []);
 
-    // Check version compatibility
-    const testHasNoVersions = testVersions.length === 0;
-    const reqHasNoVersions = reqVersions.length === 0;
-    const hasVersionOverlap = testVersions.some(v => reqVersions.includes(v));
+    testCase.requirementIds.forEach(reqId => {
+      const requirement = this.getRequirement(reqId);
+      if (!requirement) return;
 
-    // Compatibility rules:
-    // 1. If test case has no versions = applies to all versions (compatible)
-    // 2. If requirement has no versions = applies to all versions (compatible)  
-    // 3. If there's at least one version overlap = compatible
-    const isCompatible = testHasNoVersions || reqHasNoVersions || hasVersionOverlap;
+      const reqVersions = requirement.versions || [];
 
-    if (!isCompatible) {
-      const mismatch = {
-        testCaseId,
-        requirementId: reqId,
-        testVersions: [...testVersions],
-        reqVersions: [...reqVersions]
-      };
+      const testHasNoVersions = testVersions.length === 0;
+      const reqHasNoVersions = reqVersions.length === 0;
+      const hasVersionOverlap = testVersions.some(v => reqVersions.includes(v));
 
-      validation.mismatches.push(mismatch);
-      validation.errors.push(
-        `Version mismatch: Test case ${testCaseId} (versions: ${testVersions.join(', ') || 'all'}) ` +
-        `cannot be linked to requirement ${reqId} (versions: ${reqVersions.join(', ') || 'all'})`
-      );
-      validation.valid = false;
-    }
-  });
+      if (!testHasNoVersions && !reqHasNoVersions && !hasVersionOverlap) {
+        warnings.push({
+          type: 'version-mismatch',
+          severity: 'warning',
+          testCaseId,
+          requirementId: reqId,
+          message: `Version mismatch: Test case assigned to ${testVersions.join(', ')} but requirement ${reqId} is assigned to ${reqVersions.join(', ')}`,
+          testVersions: [...testVersions],
+          reqVersions: [...reqVersions],
+          suggestion: `Consider updating versions to have at least one common version`
+        });
+      }
+    });
 
-  return validation;
-}
-
-
-
-/**
- * Get version mismatch warnings for a test case
- * @param {string} testCaseId - Test case ID
- * @returns {Array} Array of warning objects
- */
-getVersionMismatchWarnings(testCaseId) {
-  const warnings = [];
-  const testCase = this.getTestCase(testCaseId);
-  
-  if (!testCase || !testCase.requirementIds || testCase.requirementIds.length === 0) {
     return warnings;
   }
 
-  const testVersions = Array.isArray(testCase.applicableVersions) 
-    ? testCase.applicableVersions 
-    : (testCase.version ? [testCase.version] : []);
+  /**
+   * Get all version mismatches in the system
+   * @returns {Array} Array of all version mismatches
+   */
+  getAllVersionMismatches() {
+    const allMismatches = [];
 
-  testCase.requirementIds.forEach(reqId => {
-    const requirement = this.getRequirement(reqId);
-    if (!requirement) return;
+    this._testCases.forEach(testCase => {
+      const warnings = this.getVersionMismatchWarnings(testCase.id);
+      allMismatches.push(...warnings);
+    });
 
-    const reqVersions = requirement.versions || [];
-    
-    const testHasNoVersions = testVersions.length === 0;
-    const reqHasNoVersions = reqVersions.length === 0;
-    const hasVersionOverlap = testVersions.some(v => reqVersions.includes(v));
-    
-    if (!testHasNoVersions && !reqHasNoVersions && !hasVersionOverlap) {
-      warnings.push({
-        type: 'version-mismatch',
-        severity: 'warning',
-        testCaseId,
-        requirementId: reqId,
-        message: `Version mismatch: Test case assigned to ${testVersions.join(', ')} but requirement ${reqId} is assigned to ${reqVersions.join(', ')}`,
-        testVersions: [...testVersions],
-        reqVersions: [...reqVersions],
-        suggestion: `Consider updating versions to have at least one common version`
-      });
-    }
-  });
-
-  return warnings;
-}
-
-/**
- * Get all version mismatches in the system
- * @returns {Array} Array of all version mismatches
- */
-getAllVersionMismatches() {
-  const allMismatches = [];
-  
-  this._testCases.forEach(testCase => {
-    const warnings = this.getVersionMismatchWarnings(testCase.id);
-    allMismatches.push(...warnings);
-  });
-  
-  return allMismatches;
-}
+    return allMismatches;
+  }
   /**
    * Update test case statuses
    * @param {Array} testCaseIds - Array of test case IDs
    * @param {string} status - New status
    * @returns {Array} Updated test cases
    */
-  
+
 
   // ===== MAPPING METHODS =====
 
@@ -1340,10 +1420,10 @@ getAllVersionMismatches() {
    */
   updateMappings(newMappings) {
     this._mapping = { ...this._mapping, ...newMappings };
-    
+
     // Save to localStorage
     this._saveToLocalStorage('mapping', this._mapping);
-    
+
     this._notifyListeners();
   }
 
@@ -1394,161 +1474,279 @@ getAllVersionMismatches() {
     if (!Array.isArray(versionsData)) {
       throw new Error('Versions data must be an array');
     }
-    
+
     this._versions = [...versionsData];
-    
+
     // Save to localStorage
     this._saveToLocalStorage('versions', this._versions);
-    
+
     this._notifyListeners();
     return this._versions;
   }
 
-/**
- * Add a new version
- * @param {Object} versionData - Version data to add
- * @returns {Object} Added version
- */
-addVersion(versionData) {
-  // Validate required fields
-  if (!versionData.id || !versionData.name) {
-    throw new Error('Version ID and name are required');
-  }
-
-  // Check if version ID already exists
-  if (this._versions.find(v => v.id === versionData.id)) {
-    throw new Error(`Version with ID ${versionData.id} already exists`);
-  }
-
-  // Create the new version with defaults
-  const newVersion = {
-    id: versionData.id,
-    name: versionData.name,
-    releaseDate: versionData.releaseDate,
-    status: versionData.status || 'Planned',
-    qualityGates: versionData.qualityGates || [],
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    ...versionData
-  };
-
-  // Add to versions array
-  this._versions.push(newVersion);
-
-  // Save to localStorage
-  this._saveToLocalStorage('versions', this._versions);
-
-  // Notify listeners of data change
-  this._notifyListeners();
-
-  return newVersion;
-}
-
-/**
- * Update an existing version
- * @param {string} versionId - ID of the version to update
- * @param {Object} updateData - Data to update
- * @returns {Object} Updated version
- */
-updateVersion(versionId, updateData) {
-  const index = this._versions.findIndex(v => v.id === versionId);
-  
-  if (index === -1) {
-    throw new Error(`Version with ID ${versionId} not found`);
-  }
-
-  // Don't allow changing the ID
-  if (updateData.id && updateData.id !== versionId) {
-    throw new Error('Cannot change version ID');
-  }
-
-  // Update the version
-  const updatedVersion = {
-    ...this._versions[index],
-    ...updateData,
-    updatedAt: new Date().toISOString()
-  };
-
-  this._versions[index] = updatedVersion;
-
-  // Save to localStorage
-  this._saveToLocalStorage('versions', this._versions);
-
-  // Notify listeners of data change
-  this._notifyListeners();
-
-  return updatedVersion;
-}
-
-/**
- * Delete a version
- * @param {string} versionId - ID of the version to delete
- * @returns {boolean} True if successful
- */
-deleteVersion(versionId) {
-  // Add this at the start of the existing deleteVersion method
-console.log(`🗑️ Deleting version "${versionId}" - checking test case assignments`);
-
-const affectedTestCases = this._testCases.filter(tc => {
-  const versions = Array.isArray(tc.applicableVersions) 
-    ? tc.applicableVersions
-    : (tc.version === versionId ? [tc.version] : []);
-  return versions.includes(versionId);
-});
-
-console.log(`📊 Found ${affectedTestCases.length} test cases assigned to version "${versionId}"`);
-  const index = this._versions.findIndex(v => v.id === versionId);
-  
-  if (index === -1) {
-    throw new Error(`Version with ID ${versionId} not found`);
-  }
-
-  const version = this._versions[index];
-
-  // Remove from versions array
-  this._versions.splice(index, 1);
-
-  // Clean up any references to this version in requirements
-  this._requirements.forEach(req => {
-    if (req.versions && Array.isArray(req.versions)) {
-      req.versions = req.versions.filter(v => v !== versionId);
+  /**
+   * Create or add a new version
+   * @param {Object} version - Version object to add
+   * @returns {Promise<Object>} Created version
+   */
+  async addVersion(version) {
+    // Validate required fields
+    if (!version.id || !version.name) {
+      throw new Error('Version must have id and name');
     }
-  });
 
-  // Change 5: Update Version Cleanup Logic
-  this._testCases.forEach(tc => {
-    // Handle new format
-    if (tc.applicableVersions && Array.isArray(tc.applicableVersions)) {
-      tc.applicableVersions = tc.applicableVersions.filter(v => v !== versionId);
+    // Check if already exists
+    if (this._versions.find(v => v.id === version.id)) {
+      throw new Error(`Version with ID ${version.id} already exists`);
     }
-    
-    // Handle legacy format during transition
-    if (tc.version === versionId) {
-      tc.version = '';
+
+    try {
+      // Create in database first
+      const API_BASE_URL = this._getApiBaseUrl();
+      const response = await fetch(`${API_BASE_URL}/api/versions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(version)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `Failed to create version: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log(`✅ Created version ${version.id} in database`, result);
+    } catch (error) {
+      console.error('❌ Failed to create in database:', error);
+      console.warn('⚠️ Continuing with local create only');
     }
-  });
 
-  // Save to localStorage
-  this._saveToLocalStorage('versions', this._versions);
-  this._saveToLocalStorage('requirements', this._requirements);
-  this._saveToLocalStorage('testCases', this._testCases);
+    // Add to local array
+    this._versions.push(version);
 
-  // Notify listeners of data change
-  this._notifyListeners();
+    // Save to localStorage
+    this._saveToLocalStorage('versions', this._versions);
 
-  return true;
-}
+    // Notify listeners
+    this._notifyListeners();
 
-/**
- * Get a specific version by ID
- * @param {string} versionId - ID of the version to get
- * @returns {Object|null} Version object or null if not found
- */
-getVersion(versionId) {
-  return this._versions.find(v => v.id === versionId) || null;
-}
+    return version;
+  }
+
+  /**
+   * Update an existing version
+   * @param {string} versionId - ID of the version to update
+   * @param {Object} updateData - Data to update
+   * @returns {Object} Updated version
+   */
+  updateVersion(versionId, updateData) {
+    const index = this._versions.findIndex(v => v.id === versionId);
+
+    if (index === -1) {
+      throw new Error(`Version with ID ${versionId} not found`);
+    }
+
+    // Don't allow changing the ID
+    if (updateData.id && updateData.id !== versionId) {
+      throw new Error('Cannot change version ID');
+    }
+
+    // Update the version
+    const updatedVersion = {
+      ...this._versions[index],
+      ...updateData,
+      updatedAt: new Date().toISOString()
+    };
+
+    this._versions[index] = updatedVersion;
+
+    // Save to localStorage
+    this._saveToLocalStorage('versions', this._versions);
+
+    // Notify listeners of data change
+    this._notifyListeners();
+
+    return updatedVersion;
+  }
+
+  /**
+   * Delete a version
+   * @param {string} versionId - ID of the version to delete
+   * @returns {boolean} True if successful
+   */
+  async deleteVersion(versionId) {
+    console.log(`🗑️ Deleting version "${versionId}" - checking test case assignments`);
+
+    const index = this._versions.findIndex(v => v.id === versionId);
+
+    if (index === -1) {
+      throw new Error(`Version with ID ${versionId} not found`);
+    }
+
+    try {
+      // Delete from database first
+      const API_BASE_URL = this._getApiBaseUrl();
+      const response = await fetch(`${API_BASE_URL}/api/versions/${versionId}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `Failed to delete version: ${response.status}`);
+      }
+
+      console.log(`✅ Deleted version ${versionId} from database`);
+    } catch (error) {
+      console.error('❌ Failed to delete from database:', error);
+      console.warn('⚠️ Continuing with local delete only');
+    }
+
+    // Remove from versions array
+    const version = this._versions[index];
+    this._versions.splice(index, 1);
+
+    // Clean up any references in requirements
+    this._requirements.forEach(req => {
+      if (req.versions && Array.isArray(req.versions)) {
+        req.versions = req.versions.filter(v => v !== versionId);
+      }
+    });
+
+    // Clean up references in test cases
+    this._testCases.forEach(tc => {
+      if (tc.applicableVersions && Array.isArray(tc.applicableVersions)) {
+        tc.applicableVersions = tc.applicableVersions.filter(v => v !== versionId);
+      }
+      if (tc.version === versionId) {
+        tc.version = '';
+      }
+    });
+
+    // Save to localStorage
+    this._saveToLocalStorage('versions', this._versions);
+    this._saveToLocalStorage('requirements', this._requirements);
+    this._saveToLocalStorage('testCases', this._testCases);
+
+    // Notify listeners
+    this._notifyListeners();
+
+    return true;
+  }
+
+  /**
+   * Get a specific version by ID
+   * @param {string} versionId - ID of the version to get
+   * @returns {Object|null} Version object or null if not found
+   */
+  getVersion(versionId) {
+    return this._versions.find(v => v.id === versionId) || null;
+  }
 
   // ===== UTILITY METHODS =====
+
+
+  /**
+ * Create or add a new requirement
+ * @param {Object} requirement - Requirement object to add
+ * @returns {Promise<Object>} Created requirement
+ */
+  async addRequirement(requirement) {
+    // Validate required fields
+    if (!requirement.id || !requirement.name) {
+      throw new Error('Requirement must have id and name');
+    }
+
+    // Check if already exists
+    if (this._requirements.find(r => r.id === requirement.id)) {
+      throw new Error(`Requirement with ID ${requirement.id} already exists`);
+    }
+
+    try {
+      // Create in database first
+      const API_BASE_URL = this._getApiBaseUrl();
+      const response = await fetch(`${API_BASE_URL}/api/requirements`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(requirement)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `Failed to create requirement: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log(`✅ Created requirement ${requirement.id} in database`, result);
+    } catch (error) {
+      console.error('❌ Failed to create in database:', error);
+      console.warn('⚠️ Continuing with local create only');
+    }
+
+    // Add to local array
+    this._requirements.push(requirement);
+
+    // Save to localStorage
+    this._saveToLocalStorage('requirements', this._requirements);
+
+    // Notify listeners
+    this._notifyListeners();
+
+    return requirement;
+  }
+
+  /**
+   * Update an existing requirement
+   * @param {string} requirementId - ID of requirement to update
+   * @param {Object} updates - Fields to update
+   * @returns {Promise<Object>} Updated requirement
+   */
+  async updateRequirement(requirementId, updates) {
+    const requirement = this._requirements.find(r => r.id === requirementId);
+
+    if (!requirement) {
+      throw new Error(`Requirement with ID ${requirementId} not found`);
+    }
+
+    try {
+      // Update in database first
+      const API_BASE_URL = this._getApiBaseUrl();
+      const response = await fetch(`${API_BASE_URL}/api/requirements/${requirementId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(updates)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `Failed to update requirement: ${response.status}`);
+      }
+
+      console.log(`✅ Updated requirement ${requirementId} in database`);
+    } catch (error) {
+      console.error('❌ Failed to update in database:', error);
+      console.warn('⚠️ Continuing with local update only');
+    }
+
+    // Update locally
+    Object.assign(requirement, updates);
+
+    // Save to localStorage
+    this._saveToLocalStorage('requirements', this._requirements);
+
+    // Notify listeners
+    this._notifyListeners();
+
+    return requirement;
+  }
 
   /**
    * Import data from various sources
@@ -1573,7 +1771,7 @@ getVersion(versionId) {
       // Import test cases
       if (data.testCases && Array.isArray(data.testCases)) {
         this.setTestCases(data.testCases);
-        
+
         // Extract mappings from test cases if no explicit mapping provided
         if (!data.mappings && data.testCases.some(tc => tc.requirementIds)) {
           const extractedMappings = this.extractMappingsFromTestCases(data.testCases);
@@ -1621,7 +1819,7 @@ getVersion(versionId) {
    */
   extractMappingsFromTestCases(testCases) {
     const mappings = {};
-    
+
     testCases.forEach(tc => {
       if (tc.requirementIds && Array.isArray(tc.requirementIds)) {
         tc.requirementIds.forEach(reqId => {
@@ -1634,7 +1832,7 @@ getVersion(versionId) {
         });
       }
     });
-    
+
     return mappings;
   }
 
@@ -1645,7 +1843,7 @@ getVersion(versionId) {
    */
   subscribe(listener) {
     this._listeners.push(listener);
-    
+
     // Return unsubscribe function
     return () => {
       this._listeners = this._listeners.filter(l => l !== listener);
@@ -1658,10 +1856,10 @@ getVersion(versionId) {
    */
   _notifyListeners() {
     console.log(`📢 _notifyListeners() called - notifying ${this._listeners.length} listeners`);
-    
+
     let successCount = 0;
     let errorCount = 0;
-    
+
     this._listeners.forEach((listener, index) => {
       try {
         listener();
@@ -1672,10 +1870,10 @@ getVersion(versionId) {
         console.error(`❌ Error in listener ${index + 1}:`, e);
       }
     });
-    
+
     console.log(`📢 Notification complete: ${successCount} successful, ${errorCount} errors`);
   }
-  
+
   /**
    * Reset all data
    * Useful for testing or clearing the application
@@ -1686,10 +1884,10 @@ getVersion(versionId) {
     this._mapping = {};
     this._versions = [];
     this._hasInitializedData = false;
-    
+
     // Clear localStorage
     this.clearPersistedData();
-    
+
     this._notifyListeners();
   }
 
@@ -1702,7 +1900,7 @@ getVersion(versionId) {
     const testCases = this.getTestCases();
     const mapping = this.getMapping();
 
-    const linkedTestCases = testCases.filter(tc => 
+    const linkedTestCases = testCases.filter(tc =>
       tc.requirementIds && tc.requirementIds.length > 0
     ).length;
 
@@ -1710,11 +1908,11 @@ getVersion(versionId) {
       mapping[req.id] && mapping[req.id].length > 0
     ).length;
 
-    const automatedTestCases = testCases.filter(tc => 
+    const automatedTestCases = testCases.filter(tc =>
       tc.automationStatus === 'Automated'
     ).length;
 
-    const passedTestCases = testCases.filter(tc => 
+    const passedTestCases = testCases.filter(tc =>
       tc.status === 'Passed'
     ).length;
 
@@ -1725,17 +1923,17 @@ getVersion(versionId) {
       linkedTestCases,
       automatedTestCases,
       passedTestCases,
-      coveragePercentage: requirements.length > 0 
-        ? Math.round((coveredRequirements / requirements.length) * 100) 
+      coveragePercentage: requirements.length > 0
+        ? Math.round((coveredRequirements / requirements.length) * 100)
         : 0,
-      linkagePercentage: testCases.length > 0 
-        ? Math.round((linkedTestCases / testCases.length) * 100) 
+      linkagePercentage: testCases.length > 0
+        ? Math.round((linkedTestCases / testCases.length) * 100)
         : 0,
-      automationPercentage: testCases.length > 0 
-        ? Math.round((automatedTestCases / testCases.length) * 100) 
+      automationPercentage: testCases.length > 0
+        ? Math.round((automatedTestCases / testCases.length) * 100)
         : 0,
-      passPercentage: testCases.length > 0 
-        ? Math.round((passedTestCases / testCases.length) * 100) 
+      passPercentage: testCases.length > 0
+        ? Math.round((passedTestCases / testCases.length) * 100)
         : 0
     };
   }
@@ -1785,7 +1983,7 @@ getVersion(versionId) {
 
     // Migrate from legacy format
     const migrated = { ...testCase };
-    
+
     if (migrated.version && migrated.version !== '') { // Use migrated.version
       // Convert single version to array
       migrated.applicableVersions = [migrated.version];
@@ -1817,12 +2015,12 @@ getVersion(versionId) {
       if (testCase.applicableVersions.length === 0) return true;
       return testCase.applicableVersions.includes(versionId);
     }
-    
+
     // Handle legacy format
     if (testCase.version) {
       return testCase.version === versionId || testCase.version === '';
     }
-    
+
     // Default: applies to all versions if no versioning specified
     return true;
   }
@@ -1838,278 +2036,278 @@ getVersion(versionId) {
       // Based on the migration, an empty applicableVersions array means "applies to all versions".
       // If 'unassigned' specifically means test cases that have *no* applicableVersions defined (or empty),
       // then we'd filter for that. For now, assuming 'unassigned' means show all.
-      return this._testCases; 
+      return this._testCases;
     }
-    
+
     return this._testCases.filter(tc => this.testCaseAppliesTo(tc, versionId));
   }
 
 
   // Add these methods to your DataStore.js class
-// Copy and paste each method into your existing DataStore class
+  // Copy and paste each method into your existing DataStore class
 
-/**
- * Update tags for multiple test cases
- * @param {string[]} testCaseIds - Array of test case IDs to update
- * @param {string[]} tags - Array of tags to add or remove
- * @param {string} action - 'add' or 'remove'
- * @returns {Object} Operation result with success/failure counts
- */
-updateTestCaseTags(testCaseIds, tags, action = 'add') {
-  const results = {
-    successful: [],
-    failed: [],
-    skipped: [],
-    summary: {
-      total: testCaseIds.length,
-      tagsAffected: tags.length,
-      action: action
+  /**
+   * Update tags for multiple test cases
+   * @param {string[]} testCaseIds - Array of test case IDs to update
+   * @param {string[]} tags - Array of tags to add or remove
+   * @param {string} action - 'add' or 'remove'
+   * @returns {Object} Operation result with success/failure counts
+   */
+  updateTestCaseTags(testCaseIds, tags, action = 'add') {
+    const results = {
+      successful: [],
+      failed: [],
+      skipped: [],
+      summary: {
+        total: testCaseIds.length,
+        tagsAffected: tags.length,
+        action: action
+      }
+    };
+
+    // Validate inputs
+    if (!Array.isArray(testCaseIds) || testCaseIds.length === 0) {
+      throw new Error('No test cases selected for tag update');
     }
-  };
 
-  // Validate inputs
-  if (!Array.isArray(testCaseIds) || testCaseIds.length === 0) {
-    throw new Error('No test cases selected for tag update');
-  }
+    if (!Array.isArray(tags) || tags.length === 0) {
+      throw new Error('No tags specified for update');
+    }
 
-  if (!Array.isArray(tags) || tags.length === 0) {
-    throw new Error('No tags specified for update');
-  }
+    if (!['add', 'remove'].includes(action)) {
+      throw new Error('Action must be either "add" or "remove"');
+    }
 
-  if (!['add', 'remove'].includes(action)) {
-    throw new Error('Action must be either "add" or "remove"');
-  }
+    // Process each test case
+    testCaseIds.forEach(testCaseId => {
+      try {
+        const testCaseIndex = this._testCases.findIndex(tc => tc.id === testCaseId);
 
-  // Process each test case
-  testCaseIds.forEach(testCaseId => {
-    try {
-      const testCaseIndex = this._testCases.findIndex(tc => tc.id === testCaseId);
-      
-      if (testCaseIndex === -1) {
-        results.failed.push({ 
-          testCaseId, 
-          error: 'Test case not found',
+        if (testCaseIndex === -1) {
+          results.failed.push({
+            testCaseId,
+            error: 'Test case not found',
+            tags: tags
+          });
+          return;
+        }
+
+        const testCase = { ...this._testCases[testCaseIndex] };
+        const currentTags = Array.isArray(testCase.tags) ? [...testCase.tags] : [];
+        let updatedTags = [...currentTags];
+        let hasChanges = false;
+
+        if (action === 'add') {
+          // Add tags that don't already exist
+          tags.forEach(tag => {
+            if (!updatedTags.includes(tag)) {
+              updatedTags.push(tag);
+              hasChanges = true;
+            }
+          });
+        } else if (action === 'remove') {
+          // Remove specified tags
+          const initialLength = updatedTags.length;
+          updatedTags = updatedTags.filter(tag => !tags.includes(tag));
+          hasChanges = updatedTags.length !== initialLength;
+        }
+
+        // Skip if no changes needed
+        if (!hasChanges) {
+          results.skipped.push({
+            testCaseId,
+            reason: action === 'add' ? 'Tags already exist' : 'Tags not found',
+            currentTags,
+            requestedTags: tags
+          });
+          return;
+        }
+
+        // Update the test case
+        this._testCases[testCaseIndex] = {
+          ...testCase,
+          tags: updatedTags.sort(), // Keep tags sorted for consistency
+          lastModified: new Date().toISOString()
+        };
+
+        results.successful.push({
+          testCaseId,
+          previousTags: currentTags,
+          newTags: updatedTags,
+          addedTags: action === 'add' ? tags.filter(tag => !currentTags.includes(tag)) : [],
+          removedTags: action === 'remove' ? tags.filter(tag => currentTags.includes(tag)) : []
+        });
+
+      } catch (error) {
+        results.failed.push({
+          testCaseId,
+          error: error.message,
           tags: tags
         });
+      }
+    });
+
+    // Save to localStorage if any changes were made
+    if (results.successful.length > 0) {
+      this._saveToLocalStorage('testCases', this._testCases);
+      this._notifyListeners();
+
+      console.log(`✅ Bulk tag ${action} completed: ${results.successful.length} successful, ${results.failed.length} failed, ${results.skipped.length} skipped`);
+    }
+
+    return results;
+  }
+
+  /**
+   * Get all unique tags from test cases
+   * @returns {string[]} Array of unique tags sorted alphabetically
+   */
+  getAllTags() {
+    const tags = new Set();
+    this._testCases.forEach(tc => {
+      if (tc.tags && Array.isArray(tc.tags)) {
+        tc.tags.forEach(tag => tags.add(tag));
+      }
+    });
+    return Array.from(tags).sort();
+  }
+
+  /**
+   * Get tag usage statistics
+   * @returns {Array} Array of objects with tag name and usage count
+   */
+  getTagStats() {
+    const tagCounts = {};
+    this._testCases.forEach(tc => {
+      if (tc.tags && Array.isArray(tc.tags)) {
+        tc.tags.forEach(tag => {
+          tagCounts[tag] = (tagCounts[tag] || 0) + 1;
+        });
+      }
+    });
+
+    return Object.entries(tagCounts)
+      .map(([tag, count]) => ({ tag, count, percentage: Math.round((count / this._testCases.length) * 100) }))
+      .sort((a, b) => b.count - a.count);
+  }
+
+  /**
+   * Validate tag operations before execution
+   * @param {string[]} testCaseIds - Test case IDs to validate
+   * @param {string[]} tags - Tags to validate
+   * @param {string} action - 'add' or 'remove'
+   * @returns {Object} Validation result with warnings and errors
+   */
+  validateTagOperation(testCaseIds, tags, action) {
+    const validation = {
+      valid: true,
+      errors: [],
+      warnings: [],
+      summary: {
+        total: testCaseIds.length,
+        found: 0,
+        wouldChange: 0,
+        alreadyHaveTags: 0,
+        missingTags: 0
+      }
+    };
+
+    // Validate inputs
+    if (!Array.isArray(testCaseIds) || testCaseIds.length === 0) {
+      validation.errors.push('No test cases selected');
+      validation.valid = false;
+      return validation;
+    }
+
+    if (!Array.isArray(tags) || tags.length === 0) {
+      validation.errors.push('No tags specified');
+      validation.valid = false;
+      return validation;
+    }
+
+    // Validate tag names
+    const invalidTags = tags.filter(tag => !tag.trim() || tag.length > 50);
+    if (invalidTags.length > 0) {
+      validation.errors.push(`Invalid tag names: ${invalidTags.join(', ')}`);
+      validation.valid = false;
+    }
+
+    // Check each test case
+    testCaseIds.forEach(testCaseId => {
+      const testCase = this._testCases.find(tc => tc.id === testCaseId);
+
+      if (!testCase) {
+        validation.errors.push(`Test case ${testCaseId} not found`);
         return;
       }
 
-      const testCase = { ...this._testCases[testCaseIndex] };
-      const currentTags = Array.isArray(testCase.tags) ? [...testCase.tags] : [];
-      let updatedTags = [...currentTags];
-      let hasChanges = false;
+      validation.summary.found++;
+
+      const currentTags = Array.isArray(testCase.tags) ? testCase.tags : [];
 
       if (action === 'add') {
-        // Add tags that don't already exist
-        tags.forEach(tag => {
-          if (!updatedTags.includes(tag)) {
-            updatedTags.push(tag);
-            hasChanges = true;
-          }
-        });
+        const newTags = tags.filter(tag => !currentTags.includes(tag));
+        if (newTags.length > 0) {
+          validation.summary.wouldChange++;
+        } else {
+          validation.summary.alreadyHaveTags++;
+        }
       } else if (action === 'remove') {
-        // Remove specified tags
-        const initialLength = updatedTags.length;
-        updatedTags = updatedTags.filter(tag => !tags.includes(tag));
-        hasChanges = updatedTags.length !== initialLength;
+        const existingTags = tags.filter(tag => currentTags.includes(tag));
+        if (existingTags.length > 0) {
+          validation.summary.wouldChange++;
+        } else {
+          validation.summary.missingTags++;
+        }
       }
+    });
 
-      // Skip if no changes needed
-      if (!hasChanges) {
-        results.skipped.push({
-          testCaseId,
-          reason: action === 'add' ? 'Tags already exist' : 'Tags not found',
-          currentTags,
-          requestedTags: tags
+    // Generate warnings
+    if (action === 'add' && validation.summary.alreadyHaveTags > 0) {
+      validation.warnings.push(`${validation.summary.alreadyHaveTags} test case(s) already have some of these tags`);
+    }
+
+    if (action === 'remove' && validation.summary.missingTags > 0) {
+      validation.warnings.push(`${validation.summary.missingTags} test case(s) don't have some of these tags`);
+    }
+
+    if (validation.summary.wouldChange === 0) {
+      validation.warnings.push('No test cases will be modified by this operation');
+    }
+
+    return validation;
+  }
+
+  /**
+   * Clean up unused tags (remove tags not used by any test case)
+   * @returns {Object} Cleanup result with removed tags
+   */
+  cleanupUnusedTags() {
+    const usedTags = new Set();
+    const allDefinedTags = new Set();
+
+    // Collect all tags currently in use
+    this._testCases.forEach(tc => {
+      if (tc.tags && Array.isArray(tc.tags)) {
+        tc.tags.forEach(tag => {
+          usedTags.add(tag);
+          allDefinedTags.add(tag);
         });
-        return;
       }
+    });
 
-      // Update the test case
-      this._testCases[testCaseIndex] = {
-        ...testCase,
-        tags: updatedTags.sort(), // Keep tags sorted for consistency
-        lastModified: new Date().toISOString()
-      };
+    // For this implementation, we don't store tags separately from test cases,
+    // so this method primarily serves to validate tag consistency
+    const result = {
+      totalTags: allDefinedTags.size,
+      usedTags: usedTags.size,
+      removedTags: [],
+      message: `All ${usedTags.size} tags are currently in use`
+    };
 
-      results.successful.push({
-        testCaseId,
-        previousTags: currentTags,
-        newTags: updatedTags,
-        addedTags: action === 'add' ? tags.filter(tag => !currentTags.includes(tag)) : [],
-        removedTags: action === 'remove' ? tags.filter(tag => currentTags.includes(tag)) : []
-      });
-
-    } catch (error) {
-      results.failed.push({
-        testCaseId,
-        error: error.message,
-        tags: tags
-      });
-    }
-  });
-
-  // Save to localStorage if any changes were made
-  if (results.successful.length > 0) {
-    this._saveToLocalStorage('testCases', this._testCases);
-    this._notifyListeners();
-    
-    console.log(`✅ Bulk tag ${action} completed: ${results.successful.length} successful, ${results.failed.length} failed, ${results.skipped.length} skipped`);
+    console.log('Tag cleanup completed:', result);
+    return result;
   }
-
-  return results;
-}
-
-/**
- * Get all unique tags from test cases
- * @returns {string[]} Array of unique tags sorted alphabetically
- */
-getAllTags() {
-  const tags = new Set();
-  this._testCases.forEach(tc => {
-    if (tc.tags && Array.isArray(tc.tags)) {
-      tc.tags.forEach(tag => tags.add(tag));
-    }
-  });
-  return Array.from(tags).sort();
-}
-
-/**
- * Get tag usage statistics
- * @returns {Array} Array of objects with tag name and usage count
- */
-getTagStats() {
-  const tagCounts = {};
-  this._testCases.forEach(tc => {
-    if (tc.tags && Array.isArray(tc.tags)) {
-      tc.tags.forEach(tag => {
-        tagCounts[tag] = (tagCounts[tag] || 0) + 1;
-      });
-    }
-  });
-
-  return Object.entries(tagCounts)
-    .map(([tag, count]) => ({ tag, count, percentage: Math.round((count / this._testCases.length) * 100) }))
-    .sort((a, b) => b.count - a.count);
-}
-
-/**
- * Validate tag operations before execution
- * @param {string[]} testCaseIds - Test case IDs to validate
- * @param {string[]} tags - Tags to validate
- * @param {string} action - 'add' or 'remove'
- * @returns {Object} Validation result with warnings and errors
- */
-validateTagOperation(testCaseIds, tags, action) {
-  const validation = {
-    valid: true,
-    errors: [],
-    warnings: [],
-    summary: {
-      total: testCaseIds.length,
-      found: 0,
-      wouldChange: 0,
-      alreadyHaveTags: 0,
-      missingTags: 0
-    }
-  };
-
-  // Validate inputs
-  if (!Array.isArray(testCaseIds) || testCaseIds.length === 0) {
-    validation.errors.push('No test cases selected');
-    validation.valid = false;
-    return validation;
-  }
-
-  if (!Array.isArray(tags) || tags.length === 0) {
-    validation.errors.push('No tags specified');
-    validation.valid = false;
-    return validation;
-  }
-
-  // Validate tag names
-  const invalidTags = tags.filter(tag => !tag.trim() || tag.length > 50);
-  if (invalidTags.length > 0) {
-    validation.errors.push(`Invalid tag names: ${invalidTags.join(', ')}`);
-    validation.valid = false;
-  }
-
-  // Check each test case
-  testCaseIds.forEach(testCaseId => {
-    const testCase = this._testCases.find(tc => tc.id === testCaseId);
-    
-    if (!testCase) {
-      validation.errors.push(`Test case ${testCaseId} not found`);
-      return;
-    }
-
-    validation.summary.found++;
-
-    const currentTags = Array.isArray(testCase.tags) ? testCase.tags : [];
-    
-    if (action === 'add') {
-      const newTags = tags.filter(tag => !currentTags.includes(tag));
-      if (newTags.length > 0) {
-        validation.summary.wouldChange++;
-      } else {
-        validation.summary.alreadyHaveTags++;
-      }
-    } else if (action === 'remove') {
-      const existingTags = tags.filter(tag => currentTags.includes(tag));
-      if (existingTags.length > 0) {
-        validation.summary.wouldChange++;
-      } else {
-        validation.summary.missingTags++;
-      }
-    }
-  });
-
-  // Generate warnings
-  if (action === 'add' && validation.summary.alreadyHaveTags > 0) {
-    validation.warnings.push(`${validation.summary.alreadyHaveTags} test case(s) already have some of these tags`);
-  }
-
-  if (action === 'remove' && validation.summary.missingTags > 0) {
-    validation.warnings.push(`${validation.summary.missingTags} test case(s) don't have some of these tags`);
-  }
-
-  if (validation.summary.wouldChange === 0) {
-    validation.warnings.push('No test cases will be modified by this operation');
-  }
-
-  return validation;
-}
-
-/**
- * Clean up unused tags (remove tags not used by any test case)
- * @returns {Object} Cleanup result with removed tags
- */
-cleanupUnusedTags() {
-  const usedTags = new Set();
-  const allDefinedTags = new Set();
-
-  // Collect all tags currently in use
-  this._testCases.forEach(tc => {
-    if (tc.tags && Array.isArray(tc.tags)) {
-      tc.tags.forEach(tag => {
-        usedTags.add(tag);
-        allDefinedTags.add(tag);
-      });
-    }
-  });
-
-  // For this implementation, we don't store tags separately from test cases,
-  // so this method primarily serves to validate tag consistency
-  const result = {
-    totalTags: allDefinedTags.size,
-    usedTags: usedTags.size,
-    removedTags: [],
-    message: `All ${usedTags.size} tags are currently in use`
-  };
-
-  console.log('Tag cleanup completed:', result);
-  return result;
-}
 }
 
 // Create singleton instance

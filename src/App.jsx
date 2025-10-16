@@ -93,7 +93,7 @@ window.receiveTestResults({
           <Route path="/matrix" element={hasData ? <TraceabilityMatrix /> : <Navigate to="/import" />} />
           <Route path="/requirements" element={hasData ? <Requirements /> : <Navigate to="/import" />} />
           <Route path="/testcases" element={hasData ? <TestCases /> : <Navigate to="/import" />} /> {/* NEW: Test Cases route */}
-          <Route path="/releases" element={hasData ? <Releases /> : <Navigate to="/import" />} />
+          <Route path="/releases" element={<Releases />} />
           
           {/* These routes are always accessible regardless of data */}
           <Route path="/import" element={<ImportData />} />
