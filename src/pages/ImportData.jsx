@@ -7,6 +7,9 @@ import ImportTestCases from '../components/Import/ImportTestCases';
 import { useVersionContext } from '../context/VersionContext';
 import dataStore from '../services/DataStore';
 import apiService from '../services/apiService';
+import ImportStatusDisplay from '../components/Import/ImportStatusDisplay';
+
+
 
 /**
  * Page for importing data into the system with database integration
@@ -23,26 +26,26 @@ const ImportData = () => {
   // Check if the system has data
   useEffect(() => {
     setHasData(dataStore.hasData());
-    
+
     // Setup a listener for data changes
     const unsubscribe = dataStore.subscribe(() => {
       setHasData(dataStore.hasData());
     });
-    
+
     // Expose a function to load sample data
     window.loadSampleData = () => {
       // Load sample requirements and test cases
       dataStore.initWithDefaultData();
-      
+
       // Also populate any open test runner modals with GitHub config
       if (typeof window.loadTestRunnerSampleData === 'function') {
         console.log('Loading sample GitHub configuration in test runner...');
         window.loadTestRunnerSampleData();
       }
-      
+
       navigate('/');
     };
-    
+
     return () => {
       unsubscribe();
       // Clean up the global function
@@ -86,7 +89,7 @@ const ImportData = () => {
 
       // Get current data from dataStore for complete export
       const currentData = dataStore.exportData();
-      
+
       // Prepare data for API import
       const dataToImport = {
         requirements: activeTab === 'requirements' ? importedData : currentData.requirements,
@@ -96,10 +99,10 @@ const ImportData = () => {
       };
 
       console.log('📤 Importing to database via API...');
-      
+
       // Import to database via API
       const result = await apiService.importDataToDatabase(dataToImport);
-      
+
       // Also update localStorage (existing behavior for backward compatibility)
       if (activeTab === 'requirements') {
         dataStore.setRequirements(importedData);
@@ -109,7 +112,7 @@ const ImportData = () => {
 
       // Create formatted JSON string for display
       const jsonString = JSON.stringify(importedData, null, 2);
-      
+
       // Show success with API import summary
       setImportStatus({
         success: true,
@@ -123,16 +126,16 @@ const ImportData = () => {
       setTimeout(() => {
         const statusElement = document.getElementById('import-status');
         if (statusElement) {
-          statusElement.scrollIntoView({ 
-            behavior: 'smooth', 
-            block: 'nearest' 
+          statusElement.scrollIntoView({
+            behavior: 'smooth',
+            block: 'nearest'
           });
         }
       }, 100);
 
     } catch (error) {
       console.error('Import error:', error);
-      
+
       setImportStatus({
         success: false,
         message: `Import failed: ${error.message}`,
@@ -143,15 +146,15 @@ const ImportData = () => {
       setTimeout(() => {
         const statusElement = document.getElementById('import-status');
         if (statusElement) {
-          statusElement.scrollIntoView({ 
-            behavior: 'smooth', 
-            block: 'nearest' 
+          statusElement.scrollIntoView({
+            behavior: 'smooth',
+            block: 'nearest'
           });
         }
       }, 100);
     }
   };
-  
+
   // Function to close the preview and reset import status
   const closePreview = () => {
     setImportStatus(null);
@@ -167,7 +170,7 @@ const ImportData = () => {
             Import requirements or test cases from JSON/JSONC files into the database
           </p>
         </div>
-        
+
         {/* Tab Navigation */}
         <div className="mb-6">
           <div className="border-b border-gray-200">
@@ -178,11 +181,10 @@ const ImportData = () => {
                   setImportStatus(null); // Clear previous import status when changing tabs
                   window.location.hash = 'requirements-tab';
                 }}
-                className={`w-1/2 py-4 px-1 text-center border-b-2 font-medium text-sm ${
-                  activeTab === 'requirements'
+                className={`w-1/2 py-4 px-1 text-center border-b-2 font-medium text-sm ${activeTab === 'requirements'
                     ? 'border-blue-500 text-blue-600'
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
+                  }`}
               >
                 <div className="flex items-center justify-center">
                   <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -197,11 +199,10 @@ const ImportData = () => {
                   setImportStatus(null); // Clear previous import status when changing tabs
                   window.location.hash = 'testcases-tab';
                 }}
-                className={`w-1/2 py-4 px-1 text-center border-b-2 font-medium text-sm ${
-                  activeTab === 'testcases'
+                className={`w-1/2 py-4 px-1 text-center border-b-2 font-medium text-sm ${activeTab === 'testcases'
                     ? 'border-blue-500 text-blue-600'
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
+                  }`}
               >
                 <div className="flex items-center justify-center">
                   <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -218,154 +219,15 @@ const ImportData = () => {
         {activeTab === 'requirements' && (
           <>
             <ImportRequirements onImportSuccess={handleImportSuccess} />
-            
-            {/* Import Status for Requirements */}
+
+            {/* Import Status using the new component */}
             {importStatus && activeTab === 'requirements' && (
-              <div 
-                id="import-status"
-                className={`mt-6 p-4 rounded shadow relative ${
-                  importStatus.loading 
-                    ? 'bg-blue-50 border border-blue-200'
-                    : importStatus.success 
-                      ? 'bg-green-50 border border-green-200' 
-                      : 'bg-red-50 border border-red-200'
-                }`}
-                style={{ 
-                  animation: 'fadeIn 0.5s',
-                  scrollMarginTop: '20px'
-                }}
-              >
-                {/* Close button */}
-                <button 
-                  onClick={closePreview}
-                  className="absolute right-2 top-2 text-gray-500 hover:text-gray-700"
-                  aria-label="Close"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="18" y1="6" x2="6" y2="18"></line>
-                    <line x1="6" y1="6" x2="18" y2="18"></line>
-                  </svg>
-                </button>
-                
-                {/* Loading State */}
-                {importStatus.loading && (
-                  <>
-                    <h3 className="font-semibold text-blue-700 text-lg mb-2 flex items-center gap-2">
-                      <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      Importing to Database...
-                    </h3>
-                    <p className="text-blue-600">{importStatus.message}</p>
-                  </>
-                )}
-
-                {/* Success State */}
-                {!importStatus.loading && importStatus.success && (
-                  <>
-                    <h3 className="font-semibold text-green-700 text-lg mb-2">
-                      ✅ Import Successful!
-                    </h3>
-                    <p className="text-green-600 mb-4">{importStatus.message}</p>
-                    
-                    {/* API Import Summary */}
-                    {importStatus.apiResult && (
-                      <div className="bg-white p-4 rounded border border-green-300 mb-4">
-                        <h4 className="font-medium text-gray-700 mb-2">Database Import Summary:</h4>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                          {importStatus.apiResult.requirements && (
-                            <div className="bg-blue-50 p-3 rounded">
-                              <div className="font-semibold text-blue-700">Requirements</div>
-                              <div className="text-gray-700">
-                                ✅ Imported: {importStatus.apiResult.requirements.imported}<br/>
-                                ⏭️ Skipped: {importStatus.apiResult.requirements.skipped}<br/>
-                                📊 Total: {importStatus.apiResult.requirements.total}
-                              </div>
-                            </div>
-                          )}
-                          
-                          {importStatus.apiResult.testCases && (
-                            <div className="bg-purple-50 p-3 rounded">
-                              <div className="font-semibold text-purple-700">Test Cases</div>
-                              <div className="text-gray-700">
-                                ✅ Imported: {importStatus.apiResult.testCases.imported}<br/>
-                                ⏭️ Skipped: {importStatus.apiResult.testCases.skipped}<br/>
-                                📊 Total: {importStatus.apiResult.testCases.total}
-                              </div>
-                            </div>
-                          )}
-                          
-                          {importStatus.apiResult.mappings && (
-                            <div className="bg-green-50 p-3 rounded">
-                              <div className="font-semibold text-green-700">Mappings</div>
-                              <div className="text-gray-700">
-                                🔗 Created: {importStatus.apiResult.mappings.created}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                        
-                        {/* Show errors if any */}
-                        {importStatus.apiResult.errors && importStatus.apiResult.errors.length > 0 && (
-                          <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded">
-                            <div className="font-semibold text-yellow-700 mb-2">
-                              ⚠️ Warnings ({importStatus.apiResult.errors.length}):
-                            </div>
-                            <div className="text-sm text-gray-700 max-h-40 overflow-y-auto">
-                              {importStatus.apiResult.errors.map((error, idx) => (
-                                <div key={idx} className="mb-1">• {error}</div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                    
-                    {/* Data Preview */}
-                    {importStatus.jsonData && (
-                      <div className="mt-4">
-                        <h4 className="font-medium text-gray-700 mb-2">Imported Data Preview:</h4>
-                        <div className="bg-gray-800 text-green-400 p-3 rounded overflow-hidden">
-                          <div className="overflow-auto max-h-[350px] scrollbar-thin scrollbar-thumb-gray-500 scrollbar-track-gray-900">
-                            <pre className="text-sm whitespace-pre-wrap">{importStatus.jsonData}</pre>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                    
-                    {/* Single Navigation Button */}
-                    <div className="mt-6 flex justify-end">
-                      <button
-                        onClick={() => navigate('/requirements')}
-                        className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center shadow-sm"
-                      >
-                        <span>View Requirements</span>
-                        <svg className="ml-2 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
-                        </svg>
-                      </button>
-                    </div>
-                  </>
-                )}
-
-                {/* Error State */}
-                {!importStatus.loading && importStatus.success === false && (
-                  <>
-                    <h3 className="font-semibold text-red-700 text-lg mb-2">
-                      ❌ Import Failed
-                    </h3>
-                    <p className="text-red-600">{importStatus.message}</p>
-                    
-                    {importStatus.error && (
-                      <div className="mt-4 p-3 bg-red-100 rounded text-sm">
-                        <div className="font-semibold mb-1">Error Details:</div>
-                        <pre className="text-red-800 whitespace-pre-wrap">{importStatus.error.toString()}</pre>
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
+              <ImportStatusDisplay
+                importStatus={importStatus}
+                activeTab={activeTab}
+                closePreview={closePreview}
+                navigate={navigate}
+              />
             )}
           </>
         )}
@@ -374,159 +236,20 @@ const ImportData = () => {
         {activeTab === 'testcases' && (
           <>
             <ImportTestCases onImportSuccess={handleImportSuccess} />
-            
-            {/* Import Status for Test Cases */}
+
+            {/* Import Status using the new component */}
             {importStatus && activeTab === 'testcases' && (
-              <div 
-                id="import-status"
-                className={`mt-6 p-4 rounded shadow relative ${
-                  importStatus.loading 
-                    ? 'bg-blue-50 border border-blue-200'
-                    : importStatus.success 
-                      ? 'bg-green-50 border border-green-200' 
-                      : 'bg-red-50 border border-red-200'
-                }`}
-                style={{ 
-                  animation: 'fadeIn 0.5s',
-                  scrollMarginTop: '20px'
-                }}
-              >
-                {/* Close button */}
-                <button 
-                  onClick={closePreview}
-                  className="absolute right-2 top-2 text-gray-500 hover:text-gray-700"
-                  aria-label="Close"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="18" y1="6" x2="6" y2="18"></line>
-                    <line x1="6" y1="6" x2="18" y2="18"></line>
-                  </svg>
-                </button>
-                
-                {/* Loading State */}
-                {importStatus.loading && (
-                  <>
-                    <h3 className="font-semibold text-blue-700 text-lg mb-2 flex items-center gap-2">
-                      <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      Importing to Database...
-                    </h3>
-                    <p className="text-blue-600">{importStatus.message}</p>
-                  </>
-                )}
-
-                {/* Success State */}
-                {!importStatus.loading && importStatus.success && (
-                  <>
-                    <h3 className="font-semibold text-green-700 text-lg mb-2">
-                      ✅ Import Successful!
-                    </h3>
-                    <p className="text-green-600 mb-4">{importStatus.message}</p>
-                    
-                    {/* API Import Summary */}
-                    {importStatus.apiResult && (
-                      <div className="bg-white p-4 rounded border border-green-300 mb-4">
-                        <h4 className="font-medium text-gray-700 mb-2">Database Import Summary:</h4>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                          {importStatus.apiResult.requirements && (
-                            <div className="bg-blue-50 p-3 rounded">
-                              <div className="font-semibold text-blue-700">Requirements</div>
-                              <div className="text-gray-700">
-                                ✅ Imported: {importStatus.apiResult.requirements.imported}<br/>
-                                ⏭️ Skipped: {importStatus.apiResult.requirements.skipped}<br/>
-                                📊 Total: {importStatus.apiResult.requirements.total}
-                              </div>
-                            </div>
-                          )}
-                          
-                          {importStatus.apiResult.testCases && (
-                            <div className="bg-purple-50 p-3 rounded">
-                              <div className="font-semibold text-purple-700">Test Cases</div>
-                              <div className="text-gray-700">
-                                ✅ Imported: {importStatus.apiResult.testCases.imported}<br/>
-                                ⏭️ Skipped: {importStatus.apiResult.testCases.skipped}<br/>
-                                📊 Total: {importStatus.apiResult.testCases.total}
-                              </div>
-                            </div>
-                          )}
-                          
-                          {importStatus.apiResult.mappings && (
-                            <div className="bg-green-50 p-3 rounded">
-                              <div className="font-semibold text-green-700">Mappings</div>
-                              <div className="text-gray-700">
-                                🔗 Created: {importStatus.apiResult.mappings.created}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                        
-                        {/* Show errors if any */}
-                        {importStatus.apiResult.errors && importStatus.apiResult.errors.length > 0 && (
-                          <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded">
-                            <div className="font-semibold text-yellow-700 mb-2">
-                              ⚠️ Warnings ({importStatus.apiResult.errors.length}):
-                            </div>
-                            <div className="text-sm text-gray-700 max-h-40 overflow-y-auto">
-                              {importStatus.apiResult.errors.map((error, idx) => (
-                                <div key={idx} className="mb-1">• {error}</div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                    
-                    {/* Data Preview */}
-                    {importStatus.jsonData && (
-                      <div className="mt-4">
-                        <h4 className="font-medium text-gray-700 mb-2">Imported Data Preview:</h4>
-                        <div className="bg-gray-800 text-green-400 p-3 rounded overflow-hidden">
-                          <div className="overflow-auto max-h-[350px] scrollbar-thin scrollbar-thumb-gray-500 scrollbar-track-gray-900">
-                            <pre className="text-sm whitespace-pre-wrap">{importStatus.jsonData}</pre>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                    
-                    {/* Single Navigation Button */}
-                    <div className="mt-6 flex justify-end">
-                      <button
-                        onClick={() => navigate('/testcases')}
-                        className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center shadow-sm"
-                      >
-                        <span>View Test Cases</span>
-                        <svg className="ml-2 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
-                        </svg>
-                      </button>
-                    </div>
-                  </>
-                )}
-
-                {/* Error State */}
-                {!importStatus.loading && importStatus.success === false && (
-                  <>
-                    <h3 className="font-semibold text-red-700 text-lg mb-2">
-                      ❌ Import Failed
-                    </h3>
-                    <p className="text-red-600">{importStatus.message}</p>
-                    
-                    {importStatus.error && (
-                      <div className="mt-4 p-3 bg-red-100 rounded text-sm">
-                        <div className="font-semibold mb-1">Error Details:</div>
-                        <pre className="text-red-800 whitespace-pre-wrap">{importStatus.error.toString()}</pre>
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
+              <ImportStatusDisplay
+                importStatus={importStatus}
+                activeTab={activeTab}
+                closePreview={closePreview}
+                navigate={navigate}
+              />
             )}
           </>
         )}
       </div>
-      
+
       {/* CSS for animations and scrollbar styling */}
       <style>
         {`
