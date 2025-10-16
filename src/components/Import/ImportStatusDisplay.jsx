@@ -1,15 +1,18 @@
-{/* Enhanced Import Status Display Component */}
-import React from 'react';
-import { X } from 'lucide-react'; // Only using one icon
+{/* Enhanced Import Status Display Component with Collapsible Preview */}
+import React, { useState } from 'react';
+import { X, ChevronDown, ChevronUp } from 'lucide-react'; // Added chevron icons for expand/collapse
 
 /**
- * Renders an enhanced import status display with clean design
+ * Renders an enhanced import status display with clean design and collapsible JSON preview
  */
 const ImportStatusDisplay = ({ 
   importStatus, 
   activeTab,
   closePreview
 }) => {
+  // State for controlling data preview expansion
+  const [isPreviewExpanded, setIsPreviewExpanded] = useState(false);
+  
   if (!importStatus) return null;
 
   const { success, message, loading, apiResult, jsonData, error } = importStatus;
@@ -33,6 +36,11 @@ const ImportStatusDisplay = ({
   };
 
   const filteredApiResult = getFilteredApiResult();
+
+  // Toggle the expansion state of the data preview
+  const togglePreviewExpansion = () => {
+    setIsPreviewExpanded(!isPreviewExpanded);
+  };
 
   return (
     <div 
@@ -150,32 +158,38 @@ const ImportStatusDisplay = ({
             </div>
           )}
           
-          {/* Data Preview */}
+          {/* Data Preview - Now Collapsible */}
           {jsonData && (
-            <div className="mt-4">
-              <div className="flex justify-between items-center mb-2">
-                <h4 className="font-medium text-gray-700">Imported Data Preview</h4>
-                <div className="text-xs text-gray-500">
-                  Showing imported {activeTab === 'requirements' ? 'requirements' : 'test cases'}
+            <div className="mt-4 bg-white border border-gray-200 rounded">
+              {/* Preview Header with Toggle Button */}
+              <button 
+                onClick={togglePreviewExpansion}
+                className="w-full flex justify-between items-center p-3 text-left focus:outline-none hover:bg-gray-50"
+              >
+                <div className="flex items-center">
+                  <h4 className="font-medium text-gray-700">Imported Data Preview</h4>
+                  <span className="ml-2 text-xs text-gray-500">
+                    ({activeTab === 'requirements' ? 'requirements' : 'test cases'})
+                  </span>
                 </div>
-              </div>
-              <div className="bg-gray-800 p-3 rounded overflow-hidden">
-                <div className="overflow-auto max-h-[350px] scrollbar-thin scrollbar-thumb-gray-500 scrollbar-track-gray-900">
-                  <pre className="text-sm text-green-400 whitespace-pre-wrap">{jsonData}</pre>
+                {isPreviewExpanded 
+                  ? <ChevronUp size={18} className="text-gray-500" /> 
+                  : <ChevronDown size={18} className="text-gray-500" />
+                }
+              </button>
+              
+              {/* Collapsible Preview Content */}
+              {isPreviewExpanded && (
+                <div className="border-t border-gray-200">
+                  <div className="bg-gray-800 p-3 rounded-b overflow-hidden">
+                    <div className="overflow-auto max-h-[250px] scrollbar-thin scrollbar-thumb-gray-500 scrollbar-track-gray-900">
+                      <pre className="text-sm text-green-400 whitespace-pre-wrap">{jsonData}</pre>
+                    </div>
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           )}
-          
-          {/* Navigation Button */}
-          <div className="mt-6 flex justify-end">
-            <button
-              onClick={() => navigate(activeTab === 'requirements' ? '/requirements' : '/testcases')}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-            >
-              View {activeTab === 'requirements' ? 'Requirements' : 'Test Cases'}
-            </button>
-          </div>
         </>
       )}
 
