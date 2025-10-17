@@ -1,68 +1,116 @@
 import React from 'react';
-import NewReleaseModal from '../Releases/NewReleaseModal';
-import VersionSelector from '../Common/VersionSelector';
+import { useNavigate } from 'react-router-dom';
+import { Bell, Search, User, LogOut, Settings, HelpCircle } from 'lucide-react';
+import { WorkspaceSelector } from '../Workspace';
+import { Popover } from '../UI/Common';
+import authService from '../../services/authService';
+import logoImage from '../../assets/logo.svg'; // Replace with your actual logo path
 
-
-const Header = ({
-  title,
-  selectedVersion,
-  setSelectedVersion,
-  versions,
-  hasData = true,
-  onAddVersion = null
-}) => {
-  const [isModalOpen, setIsModalOpen] = React.useState(false);
-
-  const handleAddVersion = (newVersion) => {
-    if (onAddVersion) {
-      onAddVersion(newVersion);
-    }
+const Header = () => {
+  const navigate = useNavigate();
+  const user = authService.getCurrentUser() || { name: 'User', email: 'user@example.com' };
+  
+  const handleLogout = () => {
+    authService.logout();
+    navigate('/login');
   };
-
+  
   return (
-    <header className="sticky top-0 z-50 bg-white shadow h-16 flex items-center justify-between px-6">
-      <div className="flex items-center">
-        <h1 className="text-lg font-semibold">{title}</h1>
-      </div>
-      <div className="flex items-center gap-4">
-        {hasData && (
-          <div className="flex items-center gap-2">
-            {versions && versions.length > 0 && (
-              <VersionSelector
-                selectedVersion={selectedVersion}
-                versions={versions}
-                onVersionChange={setSelectedVersion}
-                className="w-64"
-                showCounts={false}
+    <header className="bg-white border-b border-gray-200 z-10">
+      <div className="px-4 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between h-16">
+          {/* Left: Logo & Workspace Selector */}
+          <div className="flex items-center">
+            <div className="flex-shrink-0 flex items-center">
+              <img
+                src={logoImage}
+                alt="Quality Tracker"
+                className="h-8 w-auto mr-6"
               />
-            )}
-
-            {/* New Release Button */}
-            {onAddVersion && (
-              <button
-                onClick={onAddVersion}
-                className="ml-3 flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
-              >
-                <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
-                </svg>
-                New Release
-              </button>
-            )}
+            </div>
+            
+            <WorkspaceSelector />
           </div>
-        )}
-        <div className="h-8 w-8 rounded-full bg-blue-500 text-white flex items-center justify-center">
-          <span className="text-sm font-medium">JS</span>
+
+          {/* Right: User Menu, Notifications, etc. */}
+          <div className="flex items-center space-x-4">
+            {/* Search */}
+            <button className="p-2 text-gray-400 hover:text-gray-500 rounded-full hover:bg-gray-100">
+              <Search size={20} />
+            </button>
+            
+            {/* Help */}
+            <button className="p-2 text-gray-400 hover:text-gray-500 rounded-full hover:bg-gray-100">
+              <HelpCircle size={20} />
+            </button>
+            
+            {/* Notifications */}
+            <Popover
+              trigger={
+                <button className="p-2 text-gray-400 hover:text-gray-500 rounded-full hover:bg-gray-100">
+                  <Bell size={20} />
+                </button>
+              }
+              content={
+                <div className="w-80 max-h-96 overflow-y-auto py-2">
+                  <div className="px-4 py-2 text-sm font-medium text-gray-700">
+                    Notifications
+                  </div>
+                  
+                  <div className="px-4 py-8 text-center text-gray-500 text-sm">
+                    No new notifications
+                  </div>
+                </div>
+              }
+            />
+            
+            {/* User Menu */}
+            <Popover
+              trigger={
+                <button className="flex items-center text-gray-700 hover:text-gray-900">
+                  <div className="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center text-gray-600">
+                    <User size={16} />
+                  </div>
+                </button>
+              }
+              content={
+                <div className="w-56 py-2">
+                  <div className="px-4 py-3 border-b border-gray-100">
+                    <p className="text-sm font-medium text-gray-900">{user.name}</p>
+                    <p className="text-xs text-gray-500 truncate">{user.email}</p>
+                  </div>
+                  
+                  <div className="py-1">
+                    <button
+                      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
+                      onClick={() => navigate('/profile')}
+                    >
+                      <User size={16} className="mr-2" />
+                      Your Profile
+                    </button>
+                    
+                    <button
+                      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
+                      onClick={() => navigate('/settings')}
+                    >
+                      <Settings size={16} className="mr-2" />
+                      Settings
+                    </button>
+                    
+                    <button
+                      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
+                      onClick={handleLogout}
+                    >
+                      <LogOut size={16} className="mr-2" />
+                      Sign out
+                    </button>
+                  </div>
+                </div>
+              }
+            />
+          </div>
         </div>
       </div>
-
-      {/* New Release Modal */}
-      <NewReleaseModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onSave={handleAddVersion}
-        existingVersions={versions || []}
-      />
     </header>
   );
 };

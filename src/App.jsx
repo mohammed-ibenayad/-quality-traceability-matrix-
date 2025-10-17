@@ -1,113 +1,145 @@
-// src/App.jsx
-import React, { useEffect, useState } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import './App.css';
-import dataStore from './services/DataStore';
-import { VersionProvider } from './context/VersionContext';
+import React, { useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { WorkspaceProvider, useWorkspaceContext } from './contexts/WorkspaceContext';
+import Header from './components/Layout/Header';
+import Sidebar from './components/Layout/Sidebar';
+import Dashboard from './components/Dashboard';
+import RequirementsList from './components/Requirements/RequirementsList';
+import TestCasesList from './components/TestCases/TestCasesList';
+import TraceabilityMatrix from './components/Traceability/TraceabilityMatrix';
+import { WorkspaceSettings } from './components/Workspace';
+import Login from './components/Auth/Login';
+import authService from './services/authService';
 
-// Import API endpoints
-import testResultsApi from './api/testResultsApi';
+// Initialize auth service
+authService.initialize();
 
-// Import pages
-import Dashboard from './pages/Dashboard';
-import TraceabilityMatrix from './pages/TraceabilityMatrix';
-import Requirements from './pages/Requirements';
-import TestCases from './pages/TestCases'; // NEW: Import Test Cases page
-import ImportData from './pages/ImportData';
-import Releases from './pages/Releases';
-import Roadmap from './pages/Roadmap';
-import GitHubSyncDashboard from './components/Sync/GitHubSyncDashboard';
+// Main Layout Component with Workspace Check
+const MainLayout = ({ children }) => {
+  const { currentWorkspace, isLoading } = useWorkspaceContext();
+  const navigate = useNavigate();
 
-
-function App() {
-  const [hasData, setHasData] = useState(false);
-
-  // Check for data presence when app loads
+  // Redirect to workspace selector if no workspace is selected
   useEffect(() => {
-    setHasData(dataStore.hasData());
-
-    // Setup a listener for data changes
-    const unsubscribe = dataStore.subscribe(() => {
-      setHasData(dataStore.hasData());
-    });
-
-    // Improved test results API handling
-    if (!window.qualityTracker) {
-      window.qualityTracker = {
-        apis: {
-          testResults: testResultsApi
-        },
-        // Add a directly callable function to process test results
-        processTestResults: (data) => {
-          console.log("Test results received via window.qualityTracker.processTestResults:", data);
-          return testResultsApi.test(data);
-        }
-      };
-
-      // Also expose window.receiveTestResults for direct script invocation
-      window.receiveTestResults = (data) => {
-        console.log("Test results received via window.receiveTestResults:", data);
-        try {
-          return testResultsApi.test(data);
-        } catch (error) {
-          console.error("Error processing test results:", error);
-          return { success: false, error: error.message };
-        }
-      };
-
-      console.log('Quality Tracker APIs registered:');
-      console.log('- window.qualityTracker.apis.testResults');
-      console.log('- window.qualityTracker.processTestResults(data)');
-      console.log('- window.receiveTestResults(data)');
-      console.log('Test results callback URL:', testResultsApi.baseUrl);
-
-      // Display helper message about how to manually test the API
-      console.log('\nTo manually test the API, run this in the console:');
-      console.log(`
-window.receiveTestResults({
-  requirementId: "REQ-001",
-  timestamp: "${new Date().toISOString()}",
-  results: [
-    {
-      id: "TC_001",
-      name: "test_homepage_loads_TC_001",
-      status: "Failed",
-      duration: 13267
+    if (!isLoading && !currentWorkspace) {
+      navigate('/select-workspace');
     }
-  ]
-}).then(result => console.log("Result:", result));
-      `);
-    }
+  }, [currentWorkspace, isLoading, navigate]);
 
-    return () => {
-      unsubscribe();
-    };
-  }, []);
+  if (isLoading) {
+    return <div className="flex items-center justify-center h-screen">Loading...</div>;
+  }
+
+  if (!currentWorkspace) {
+    return null; // Will redirect via the useEffect
+  }
 
   return (
-    <VersionProvider>
+    <div className="flex h-screen bg-gray-50">
+      <Sidebar />
+      <div className="flex flex-col flex-1 overflow-hidden">
+        <Header />
+        <main className="flex-1 overflow-y-auto">
+          {children}
+        </main>
+      </div>
+    </div>
+  );
+};
+
+// Protected Route Component
+const ProtectedRoute = ({ children }) => {
+  const isAuthenticated = authService.isAuthenticated();
+  
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+  
+  return (
+    <MainLayout>
+      {children}
+    </MainLayout>
+  );
+};
+
+// Workspace Selection Screen
+const SelectWorkspace = () => {
+  const { workspaces, isLoading } = useWorkspaceContext();
+  
+  if (isLoading) {
+    return <div className="flex items-center justify-center h-screen">Loading workspaces...</div>;
+  }
+  
+  return (
+    <div className="flex items-center justify-center min-h-screen bg-gray-100">
+      <div className="max-w-md w-full p-6 bg-white rounded-lg shadow-md">
+        <h1 className="text-2xl font-bold mb-6 text-center">Select a Workspace</h1>
+        
+        {workspaces.length === 0 ? (
+          <div className="text-center">
+            <p className="mb-4 text-gray-600">You don't have any workspaces yet.</p>
+            <button 
+              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+              onClick={() => {/* Open new workspace modal */}}
+            >
+              Create Your First Workspace
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {workspaces.map(workspace => (
+              <div 
+                key={workspace.id}
+                className="p-3 border border-gray-200 rounded-md hover:bg-gray-50 cursor-pointer"
+                onClick={() => {/* Select this workspace */}}
+              >
+                <h3 className="font-medium">{workspace.name}</h3>
+                {workspace.description && (
+                  <p className="text-sm text-gray-500 mt-1">{workspace.description}</p>
+                )}
+              </div>
+            ))}
+            
+            <button 
+              className="w-full mt-4 px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200"
+              onClick={() => {/* Open new workspace modal */}}
+            >
+              Create New Workspace
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// App Component with Router
+const App = () => {
+  return (
+    <WorkspaceProvider>
       <Router>
         <Routes>
-          {/* If no data exists, redirect to import page */}
-          <Route path="/" element={hasData ? <Dashboard /> : <Navigate to="/import" />} />
-          <Route path="/matrix" element={hasData ? <TraceabilityMatrix /> : <Navigate to="/import" />} />
-          <Route path="/requirements" element={<Requirements />} />
-          <Route path="/testcases" element={<TestCases />} />
-          <Route path="/releases" element={<Releases />} />
-
-          {/* These routes are always accessible regardless of data */}
-          <Route path="/import" element={<ImportData />} />
-          <Route path="/roadmap" element={<Roadmap />} />
-
-          {/* Redirect any unknown paths to dashboard or import based on data presence */}
-          <Route path="*" element={<Navigate to={hasData ? "/" : "/import"} />} />
-
-          <Route path="/sync" element={<GitHubSyncDashboard />} />
-
+          <Route path="/login" element={<Login />} />
+          <Route path="/select-workspace" element={<SelectWorkspace />} />
+          
+          {/* Protected Routes */}
+          <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+          <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+          <Route path="/requirements" element={<ProtectedRoute><RequirementsList /></ProtectedRoute>} />
+          <Route path="/test-cases" element={<ProtectedRoute><TestCasesList /></ProtectedRoute>} />
+          <Route path="/traceability" element={<ProtectedRoute><TraceabilityMatrix /></ProtectedRoute>} />
+          
+          {/* Workspace Settings */}
+          <Route path="/workspace-settings/:workspaceId" element={
+            <ProtectedRoute><WorkspaceSettings /></ProtectedRoute>
+          } />
+          
+          {/* Redirect to dashboard for unknown routes */}
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </Router>
-    </VersionProvider>
+    </WorkspaceProvider>
   );
-}
+};
 
 export default App;
