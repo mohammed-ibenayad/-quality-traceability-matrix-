@@ -1,95 +1,118 @@
-import React, { useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
-import { WorkspaceProvider, useWorkspaceContext } from './contexts/WorkspaceContext';
-import Header from './components/Layout/Header';
-import Sidebar from './components/Layout/Sidebar';
-import Dashboard from './components/Dashboard';
-import RequirementsList from './components/Requirements/RequirementsList';
-import TestCasesList from './components/TestCases/TestCasesList';
-import TraceabilityMatrix from './components/Traceability/TraceabilityMatrix';
-import { WorkspaceSettings } from './components/Workspace';
-import SelectWorkspace from './components/Workspace/SelectWorkspace'; // Import the proper component
-import Login from './components/Auth/Login';
-import authService from './services/authService';
+import React, { useEffect, useState } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import './App.css';
+import dataStore from './services/DataStore';
+import { VersionProvider } from './context/VersionContext';
+import { WorkspaceProvider } from './contexts/WorkspaceContext'; // Add workspace context
 
-// Initialize auth service
-authService.initialize();
+// Import API endpoints
+import testResultsApi from './api/testResultsApi';
 
-// Main Layout Component with Workspace Check
-const MainLayout = ({ children }) => {
-  const { currentWorkspace, isLoading } = useWorkspaceContext();
-  const navigate = useNavigate();
+// Import pages
+import Dashboard from './pages/Dashboard';
+import TraceabilityMatrix from './pages/TraceabilityMatrix';
+import Requirements from './pages/Requirements';
+import TestCases from './pages/TestCases';
+import ImportData from './pages/ImportData';
+import Releases from './pages/Releases';
+import Roadmap from './pages/Roadmap';
+import GitHubSyncDashboard from './components/Sync/GitHubSyncDashboard';
 
-  // Redirect to workspace selector if no workspace is selected
+// Import workspace components
+import SelectWorkspace from './components/Workspace/SelectWorkspace';
+import WorkspaceSettings from './components/Workspace/WorkspaceSettings';
+
+function App() {
+  const [hasData, setHasData] = useState(false);
+  
+  // Check for data presence when app loads
   useEffect(() => {
-    if (!isLoading && !currentWorkspace) {
-      navigate('/select-workspace');
+    setHasData(dataStore.hasData());
+    
+    // Setup a listener for data changes
+    const unsubscribe = dataStore.subscribe(() => {
+      setHasData(dataStore.hasData());
+    });
+    
+    // Improved test results API handling
+    if (!window.qualityTracker) {
+      window.qualityTracker = {
+        apis: {
+          testResults: testResultsApi
+        },
+        // Add a directly callable function to process test results
+        processTestResults: (data) => {
+          console.log("Test results received via window.qualityTracker.processTestResults:", data);
+          return testResultsApi.test(data);
+        }
+      };
+      
+      // Also expose window.receiveTestResults for direct script invocation
+      window.receiveTestResults = (data) => {
+        console.log("Test results received via window.receiveTestResults:", data);
+        try {
+          return testResultsApi.test(data);
+        } catch (error) {
+          console.error("Error processing test results:", error);
+          return { success: false, error: error.message };
+        }
+      };
+      
+      console.log('Quality Tracker APIs registered:');
+      console.log('- window.qualityTracker.apis.testResults');
+      console.log('- window.qualityTracker.processTestResults(data)');
+      console.log('- window.receiveTestResults(data)');
+      console.log('Test results callback URL:', testResultsApi.baseUrl);
+      
+      // Display helper message about how to manually test the API
+      console.log('\nTo manually test the API, run this in the console:');
+      console.log(`
+window.receiveTestResults({
+  requirementId: "REQ-001",
+  timestamp: "${new Date().toISOString()}",
+  results: [
+    {
+      id: "TC_001",
+      name: "test_homepage_loads_TC_001",
+      status: "Failed",
+      duration: 13267
     }
-  }, [currentWorkspace, isLoading, navigate]);
-
-  if (isLoading) {
-    return <div className="flex items-center justify-center h-screen">Loading...</div>;
-  }
-
-  if (!currentWorkspace) {
-    return null; // Will redirect via the useEffect
-  }
-
-  return (
-    <div className="flex h-screen bg-gray-50">
-      <Sidebar />
-      <div className="flex flex-col flex-1 overflow-hidden">
-        <Header />
-        <main className="flex-1 overflow-y-auto">
-          {children}
-        </main>
-      </div>
-    </div>
-  );
-};
-
-// Protected Route Component
-const ProtectedRoute = ({ children }) => {
-  const isAuthenticated = authService.isAuthenticated();
+  ]
+}).then(result => console.log("Result:", result));
+      `);
+    }
+    
+    return () => {
+      unsubscribe();
+    };
+  }, []);
   
-  if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
-  }
-  
-  return (
-    <MainLayout>
-      {children}
-    </MainLayout>
-  );
-};
-
-// App Component with Router
-const App = () => {
   return (
     <WorkspaceProvider>
-      <Router>
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route path="/select-workspace" element={<SelectWorkspace />} />
-          
-          {/* Protected Routes */}
-          <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-          <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-          <Route path="/requirements" element={<ProtectedRoute><RequirementsList /></ProtectedRoute>} />
-          <Route path="/test-cases" element={<ProtectedRoute><TestCasesList /></ProtectedRoute>} />
-          <Route path="/traceability" element={<ProtectedRoute><TraceabilityMatrix /></ProtectedRoute>} />
-          
-          {/* Workspace Settings */}
-          <Route path="/workspace-settings/:workspaceId" element={
-            <ProtectedRoute><WorkspaceSettings /></ProtectedRoute>
-          } />
-          
-          {/* Redirect to dashboard for unknown routes */}
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
-        </Routes>
-      </Router>
+      <VersionProvider>
+        <Router>
+          <Routes>
+            {/* Add workspace routes */}
+            <Route path="/select-workspace" element={<SelectWorkspace />} />
+            <Route path="/workspace-settings/:workspaceId" element={<WorkspaceSettings />} />
+            
+            {/* Keep all original routes unchanged */}
+            <Route path="/" element={hasData ? <Dashboard /> : <Navigate to="/import" />} />
+            <Route path="/matrix" element={hasData ? <TraceabilityMatrix /> : <Navigate to="/import" />} />
+            <Route path="/requirements" element={<Requirements />} />
+            <Route path="/testcases" element={<TestCases />} />
+            <Route path="/releases" element={<Releases />} />
+            <Route path="/import" element={<ImportData />} />
+            <Route path="/roadmap" element={<Roadmap />} />
+            <Route path="/sync" element={<GitHubSyncDashboard />} />
+            
+            {/* Redirect any unknown paths to dashboard or import based on data presence */}
+            <Route path="*" element={<Navigate to={hasData ? "/" : "/import"} />} />
+          </Routes>
+        </Router>
+      </VersionProvider>
     </WorkspaceProvider>
   );
-};
+}
 
 export default App;
