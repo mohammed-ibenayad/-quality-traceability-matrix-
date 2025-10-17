@@ -27,10 +27,7 @@ const SelectWorkspace = () => {
   const handleCreateWorkspace = () => {
     console.log("Create workspace button clicked");
     console.log("Before state update - showNewWorkspaceModal:", showNewWorkspaceModal);
-    
-    // Try an alert to verify the function is being called
-    alert("Create workspace button clicked");
-    
+        
     setShowNewWorkspaceModal(true);
     
     // Use setTimeout to log the state after the update
