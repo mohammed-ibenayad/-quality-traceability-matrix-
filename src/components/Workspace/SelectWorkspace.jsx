@@ -9,6 +9,13 @@ const SelectWorkspace = () => {
   const { currentWorkspace, setCurrentWorkspace, workspaces, isLoading } = useWorkspaceContext();
   const [showNewWorkspaceModal, setShowNewWorkspaceModal] = useState(false);
   
+  // Add these console logs at the top of your SelectWorkspace component
+  console.log("Rendering SelectWorkspace");
+  console.log("- workspaces:", workspaces);
+  console.log("- isLoading:", isLoading);
+  console.log("- currentWorkspace:", currentWorkspace);
+  console.log("- showNewWorkspaceModal:", showNewWorkspaceModal);
+
   // If user is already in a workspace, redirect to dashboard
   useEffect(() => {
     if (currentWorkspace) {
@@ -16,8 +23,20 @@ const SelectWorkspace = () => {
     }
   }, [currentWorkspace, navigate]);
   
+  // Modify your handleCreateWorkspace function
   const handleCreateWorkspace = () => {
+    console.log("Create workspace button clicked");
+    console.log("Before state update - showNewWorkspaceModal:", showNewWorkspaceModal);
+    
+    // Try an alert to verify the function is being called
+    alert("Create workspace button clicked");
+    
     setShowNewWorkspaceModal(true);
+    
+    // Use setTimeout to log the state after the update
+    setTimeout(() => {
+      console.log("After state update - showNewWorkspaceModal:", showNewWorkspaceModal);
+    }, 0);
   };
   
   const handleSelectWorkspace = (workspace) => {
@@ -50,9 +69,14 @@ const SelectWorkspace = () => {
         {workspaces.length === 0 ? (
           <div className="text-center">
             <p className="mb-4 text-gray-600">You don't have any workspaces yet.</p>
+            {/* Update your button in the return statement */}
             <button 
               className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-              onClick={handleCreateWorkspace}
+              onClick={(e) => {
+                console.log("Inline click handler");
+                console.log("Event:", e);
+                handleCreateWorkspace();
+              }}
             >
               Create Your First Workspace
             </button>
@@ -88,6 +112,11 @@ const SelectWorkspace = () => {
           onWorkspaceCreated={handleWorkspaceCreated}
         />
       )}
+      
+      {/* Debug information */}
+      <div className="fixed bottom-4 right-4 p-4 bg-gray-800 text-white text-xs rounded opacity-70">
+        showNewWorkspaceModal: {String(showNewWorkspaceModal)}
+      </div>
     </div>
   );
 };
