@@ -1,17 +1,25 @@
 import axios from 'axios';
 
-// Create axios instance with base URL
+// Create axios instance with a relative URL base path
 const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3002',
+  // Use relative URL without explicit host or port
+  // This will use the same host/port as the current page (working through Nginx proxy)
+  baseURL: '/api',
   headers: {
     'Content-Type': 'application/json',
   },
+  // Add a reasonable timeout
+  timeout: 15000, // 15 seconds
 });
 
-// Request interceptor
+// Request interceptor for adding auth token
 apiClient.interceptors.request.use(
   (config) => {
-    // You can modify the request config here (add headers, authentication, etc.)
+    // You can add authorization headers here if needed
+    const token = localStorage.getItem('auth_token');
+    if (token) {
+      config.headers['Authorization'] = `Bearer ${token}`;
+    }
     return config;
   },
   (error) => {
@@ -19,23 +27,28 @@ apiClient.interceptors.request.use(
   }
 );
 
-// Response interceptor
+// Response interceptor for error handling
 apiClient.interceptors.response.use(
   (response) => {
-    // You can modify the response data here
     return response;
   },
   (error) => {
-    // Handle response errors here
+    // Handle common errors
     if (error.response) {
       // Server responded with an error status code
       console.error('API Error:', error.response.status, error.response.data);
       
-      // Handle authentication errors
+      // Handle 401 Unauthorized - redirect to login
       if (error.response.status === 401) {
-        // Redirect to login or refresh token
-        // For example:
-        // window.location.href = '/login';
+        // Redirect to login page or refresh token
+        console.warn('Session expired or unauthorized. Redirecting to login...');
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('auth_user');
+        
+        // Only redirect if not already on the login page
+        if (!window.location.pathname.includes('/login')) {
+          window.location.href = '/login';
+        }
       }
     } else if (error.request) {
       // Request was made but no response was received
