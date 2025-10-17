@@ -4,7 +4,7 @@ import axios from 'axios';
 const apiClient = axios.create({
   // Use relative URL without explicit host or port
   // This will use the same host/port as the current page (working through Nginx proxy)
-  baseURL: '/api',
+  baseURL: '',
   headers: {
     'Content-Type': 'application/json',
   },
