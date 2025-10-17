@@ -1691,13 +1691,26 @@ const TestCases = () => {
         )}
 
         {/* Header */}
-        <div className="bg-white rounded-lg shadow mb-4">
-          {/* Compact Header with Inline Metrics */}
+        {/* TOP SECTION: Title + Quick Actions + Key Metrics */}
+        <div className="bg-white rounded-lg shadow p-6">
+          {/* Header Row */}
+          <div className="flex justify-between items-start mb-6">
+            {/* ... header content ... */}
+          </div>
+
+          {/* KEY METRICS - Large boxes */}
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 mb-6">
+            {/* ... metric boxes ... */}
+          </div>
+        </div>
+
+// REPLACE WITH THIS COMPACT VERSION:
+
+        <div className="bg-white rounded-lg shadow">
+          {/* Header Row - More compact */}
           <div className="flex justify-between items-center px-4 py-3 border-b">
-            {/* Left: Title and Metrics */}
             <div className="flex items-center space-x-6">
-              {/* Title */}
-              <div className="flex-shrink-0">
+              <div>
                 <h1 className="text-xl font-bold text-gray-900">Test Cases</h1>
                 {selectedVersion !== 'unassigned' && (
                   <div className="text-xs text-gray-600">
@@ -1708,125 +1721,64 @@ const TestCases = () => {
                 )}
               </div>
 
-              {/* Inline Metrics Bar */}
-              <div className="hidden lg:flex items-center space-x-4 pl-6 border-l">
-                <div className="flex items-center space-x-1.5">
-                  <span className="text-lg font-bold text-gray-900">{summaryStats.total}</span>
-                  <span className="text-xs text-gray-500">Total</span>
+              {/* COMPACT METRICS BAR - All in one line */}
+              <div className="flex items-center space-x-4 text-sm border-l pl-6">
+                <div className="flex items-center space-x-1">
+                  <span className="font-bold text-gray-900">{summaryStats.total}</span>
+                  <span className="text-gray-500">Total</span>
                 </div>
-                <div className="flex items-center space-x-1.5">
-                  <span className="text-lg font-bold text-green-600">{summaryStats.passed}</span>
-                  <span className="text-xs text-gray-500">Passed</span>
+                <div className="flex items-center space-x-1">
+                  <span className="font-bold text-green-600">{summaryStats.passed}</span>
+                  <span className="text-gray-500">Passed</span>
                 </div>
-                <div className="flex items-center space-x-1.5">
-                  <span className="text-lg font-bold text-red-600">{summaryStats.failed}</span>
-                  <span className="text-xs text-gray-500">Failed</span>
+                <div className="flex items-center space-x-1">
+                  <span className="font-bold text-red-600">{summaryStats.failed}</span>
+                  <span className="text-gray-500">Failed</span>
                 </div>
-                <div className="flex items-center space-x-1.5">
-                  <span className="text-lg font-bold text-gray-600">{summaryStats.notRun}</span>
-                  <span className="text-xs text-gray-500">Not Run</span>
+                <div className="flex items-center space-x-1">
+                  <span className="font-bold text-gray-600">{summaryStats.notRun}</span>
+                  <span className="text-gray-500">Not Run</span>
                 </div>
-                <div className="flex items-center space-x-1.5">
-                  <span className="text-lg font-bold text-yellow-600">{summaryStats.blocked}</span>
-                  <span className="text-xs text-gray-500">Blocked</span>
+                <div className="flex items-center space-x-1">
+                  <span className="font-bold text-yellow-600">{summaryStats.blocked}</span>
+                  <span className="text-gray-500">Blocked</span>
                 </div>
-                <div className="flex items-center space-x-1.5">
-                  <span className="text-lg font-bold text-blue-600">{summaryStats.automated}</span>
-                  <span className="text-xs text-gray-500">Auto</span>
+                <div className="flex items-center space-x-1">
+                  <span className="font-bold text-blue-600">{summaryStats.automated}</span>
+                  <span className="text-gray-500">Auto</span>
                 </div>
-                <div className="flex items-center space-x-1.5">
-                  <span className="text-lg font-bold text-indigo-600">{summaryStats.passRate}%</span>
-                  <span className="text-xs text-gray-500">Pass</span>
+                <div className="flex items-center space-x-1">
+                  <span className="font-bold text-indigo-600">{summaryStats.passRate}%</span>
+                  <span className="text-gray-500">Pass Rate</span>
                 </div>
               </div>
             </div>
 
-            {/* Right: Add Button */}
             <button
               onClick={handleNewTestCase}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center text-sm flex-shrink-0"
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center text-sm"
             >
               <Plus className="mr-2" size={16} />
               Add
             </button>
           </div>
 
-          {/* Compact Filter Tabs */}
-          <div className="px-4 py-2 bg-gray-50 border-b flex items-center justify-between">
-            <div className="flex space-x-2">
-              <button
-                onClick={() => handleFilterChange('all')}
-                className={`px-3 py-1.5 text-sm rounded-md ${activeFilter === 'all'
-                  ? 'bg-white border-2 border-blue-500 text-blue-700 font-medium'
-                  : 'bg-white border border-gray-300 text-gray-700 hover:border-gray-400'
-                  }`}
-              >
-                📊 All ({summaryStats.total})
-              </button>
-              <button
-                onClick={() => handleFilterChange('failed')}
-                className={`px-3 py-1.5 text-sm rounded-md ${activeFilter === 'failed'
-                  ? 'bg-white border-2 border-red-500 text-red-700 font-medium'
-                  : 'text-gray-600 hover:bg-white'
-                  }`}
-              >
-                🔴 Failed ({summaryStats.failed})
-              </button>
-              <button
-                onClick={() => handleFilterChange('passed')}
-                className={`px-3 py-1.5 text-sm rounded-md ${activeFilter === 'passed'
-                  ? 'bg-white border-2 border-green-500 text-green-700 font-medium'
-                  : 'text-gray-600 hover:bg-white'
-                  }`}
-              >
-                ✅ Passed ({summaryStats.passed})
-              </button>
-              <button
-                onClick={() => handleFilterChange('notrun')}
-                className={`px-3 py-1.5 text-sm rounded-md ${activeFilter === 'notrun'
-                  ? 'bg-white border-2 border-blue-500 text-blue-700 font-medium'
-                  : 'text-gray-600 hover:bg-white'
-                  }`}
-              >
-                🔵 Not Run ({summaryStats.notRun})
-              </button>
-            </div>
-
-            {/* Quick Search */}
-            <div className="flex items-center space-x-2">
-              <input
-                type="text"
-                placeholder="Search test cases..."
-                className="px-3 py-1.5 text-sm border rounded-md w-64"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-            </div>
-          </div>
-
-          {/* Mobile Metrics - Show only on small screens */}
-          <div className="lg:hidden px-4 py-3 bg-gray-50 border-b">
-            <div className="grid grid-cols-4 gap-2 text-center">
-              <div>
-                <div className="text-lg font-bold text-gray-900">{summaryStats.total}</div>
-                <div className="text-xs text-gray-600">Total</div>
-              </div>
-              <div>
-                <div className="text-lg font-bold text-green-600">{summaryStats.passed}</div>
-                <div className="text-xs text-gray-600">Passed</div>
-              </div>
-              <div>
-                <div className="text-lg font-bold text-red-600">{summaryStats.failed}</div>
-                <div className="text-xs text-gray-600">Failed</div>
-              </div>
-              <div>
-                <div className="text-lg font-bold text-gray-600">{summaryStats.notRun}</div>
-                <div className="text-xs text-gray-600">Not Run</div>
-              </div>
-            </div>
+          {/* Filter tabs - More compact */}
+          <div className="px-4 py-2 bg-gray-50 border-b flex items-center space-x-2">
+            <button className="px-3 py-1 text-sm rounded-md bg-white border border-gray-300 text-gray-700">
+              📊 All (42)
+            </button>
+            <button className="px-3 py-1 text-sm rounded-md text-gray-600 hover:bg-white">
+              🔴 Failed (0)
+            </button>
+            <button className="px-3 py-1 text-sm rounded-md text-gray-600 hover:bg-white">
+              ✅ Passed (0)
+            </button>
+            <button className="px-3 py-1 text-sm rounded-md text-gray-600 hover:bg-white">
+              🔵 Not Run (42)
+            </button>
           </div>
         </div>
-
 
         {/* MIDDLE SECTION: Advanced Filters (Collapsible) */}
         <div className="bg-white rounded-lg shadow">
@@ -2033,7 +1985,7 @@ const TestCases = () => {
               <div key={category} className="bg-white rounded-lg shadow">
                 {/* Category Header */}
                 <div
-                  className="flex items-center justify-between px-4 py-2 border-b cursor-pointer hover:bg-gray-50"
+                  className="flex items-center justify-between p-4 border-b cursor-pointer hover:bg-gray-50"
                   onClick={() => toggleSection(category)}
                 >
                   <div className="flex items-center space-x-3">
@@ -2041,17 +1993,17 @@ const TestCases = () => {
                       className={`transform transition-transform ${isCollapsed ? '' : 'rotate-90'}`}
                       size={16}
                     />
-<h3 className="text-sm font-semibold text-gray-900">{category}</h3>
+                    <h3 className="text-lg font-medium text-gray-900">{category}</h3>
                     <span className="text-sm text-gray-500">({stats.total} tests)</span>
                   </div>
 
                   {/* Category Stats */}
-                  <div className="flex items-center space-x-3 text-xs">
-  <span className="text-green-600 font-medium">{stats.passed} ✓</span>
-  <span className="text-red-600 font-medium">{stats.failed} ✗</span>
-  <span className="text-blue-600 font-medium">{stats.automated} 🤖</span>
-  <span className="font-semibold text-gray-700">{stats.passRate}%</span>
-</div>
+                  <div className="flex items-center space-x-4 text-sm">
+                    <span className="text-green-600">{stats.passed} passed</span>
+                    <span className="text-red-600">{stats.failed} failed</span>
+                    <span className="text-blue-600">{stats.automated} automated</span>
+                    <span className="font-medium">{stats.passRate}% pass rate</span>
+                  </div>
                 </div>
 
                 {/* Category Tests */}
@@ -2060,7 +2012,7 @@ const TestCases = () => {
                     <table className="min-w-full divide-y divide-gray-200">
                       <thead className="bg-gray-50">
                         <tr className="flex w-full">
-                          <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-10 flex-shrink-0">
+                          <th className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-10 flex-shrink-0">
                             <input
                               type="checkbox"
                               checked={categoryTests.length > 0 && categoryTests.every(tc => selectedTestCases.has(tc.id))}
