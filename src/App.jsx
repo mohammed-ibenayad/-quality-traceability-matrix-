@@ -1,9 +1,9 @@
-// src/App.jsx
 import React, { useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import './App.css';
 import dataStore from './services/DataStore';
 import { VersionProvider } from './context/VersionContext';
+import { WorkspaceProvider } from './contexts/WorkspaceContext'; // Add workspace context
 
 // Import API endpoints
 import testResultsApi from './api/testResultsApi';
@@ -12,25 +12,28 @@ import testResultsApi from './api/testResultsApi';
 import Dashboard from './pages/Dashboard';
 import TraceabilityMatrix from './pages/TraceabilityMatrix';
 import Requirements from './pages/Requirements';
-import TestCases from './pages/TestCases'; // NEW: Import Test Cases page
+import TestCases from './pages/TestCases';
 import ImportData from './pages/ImportData';
 import Releases from './pages/Releases';
 import Roadmap from './pages/Roadmap';
 import GitHubSyncDashboard from './components/Sync/GitHubSyncDashboard';
 
+// Import workspace components
+import SelectWorkspace from './components/Workspace/SelectWorkspace';
+import WorkspaceSettings from './components/Workspace/WorkspaceSettings';
 
 function App() {
   const [hasData, setHasData] = useState(false);
-
+  
   // Check for data presence when app loads
   useEffect(() => {
     setHasData(dataStore.hasData());
-
+    
     // Setup a listener for data changes
     const unsubscribe = dataStore.subscribe(() => {
       setHasData(dataStore.hasData());
     });
-
+    
     // Improved test results API handling
     if (!window.qualityTracker) {
       window.qualityTracker = {
@@ -43,7 +46,7 @@ function App() {
           return testResultsApi.test(data);
         }
       };
-
+      
       // Also expose window.receiveTestResults for direct script invocation
       window.receiveTestResults = (data) => {
         console.log("Test results received via window.receiveTestResults:", data);
@@ -54,13 +57,13 @@ function App() {
           return { success: false, error: error.message };
         }
       };
-
+      
       console.log('Quality Tracker APIs registered:');
       console.log('- window.qualityTracker.apis.testResults');
       console.log('- window.qualityTracker.processTestResults(data)');
       console.log('- window.receiveTestResults(data)');
       console.log('Test results callback URL:', testResultsApi.baseUrl);
-
+      
       // Display helper message about how to manually test the API
       console.log('\nTo manually test the API, run this in the console:');
       console.log(`
@@ -78,35 +81,37 @@ window.receiveTestResults({
 }).then(result => console.log("Result:", result));
       `);
     }
-
+    
     return () => {
       unsubscribe();
     };
   }, []);
-
+  
   return (
-    <VersionProvider>
-      <Router>
-        <Routes>
-          {/* If no data exists, redirect to import page */}
-          <Route path="/" element={hasData ? <Dashboard /> : <Navigate to="/import" />} />
-          <Route path="/matrix" element={hasData ? <TraceabilityMatrix /> : <Navigate to="/import" />} />
-          <Route path="/requirements" element={<Requirements />} />
-          <Route path="/testcases" element={<TestCases />} />
-          <Route path="/releases" element={<Releases />} />
-
-          {/* These routes are always accessible regardless of data */}
-          <Route path="/import" element={<ImportData />} />
-          <Route path="/roadmap" element={<Roadmap />} />
-
-          {/* Redirect any unknown paths to dashboard or import based on data presence */}
-          <Route path="*" element={<Navigate to={hasData ? "/" : "/import"} />} />
-
-          <Route path="/sync" element={<GitHubSyncDashboard />} />
-
-        </Routes>
-      </Router>
-    </VersionProvider>
+    <WorkspaceProvider>
+      <VersionProvider>
+        <Router>
+          <Routes>
+            {/* Add workspace routes */}
+            <Route path="/select-workspace" element={<SelectWorkspace />} />
+            <Route path="/workspace-settings/:workspaceId" element={<WorkspaceSettings />} />
+            
+            {/* Keep all original routes unchanged */}
+            <Route path="/" element={hasData ? <Dashboard /> : <Navigate to="/import" />} />
+            <Route path="/matrix" element={hasData ? <TraceabilityMatrix /> : <Navigate to="/import" />} />
+            <Route path="/requirements" element={<Requirements />} />
+            <Route path="/testcases" element={<TestCases />} />
+            <Route path="/releases" element={<Releases />} />
+            <Route path="/import" element={<ImportData />} />
+            <Route path="/roadmap" element={<Roadmap />} />
+            <Route path="/sync" element={<GitHubSyncDashboard />} />
+            
+            {/* Redirect any unknown paths to dashboard or import based on data presence */}
+            <Route path="*" element={<Navigate to={hasData ? "/" : "/import"} />} />
+          </Routes>
+        </Router>
+      </VersionProvider>
+    </WorkspaceProvider>
   );
 }
 
