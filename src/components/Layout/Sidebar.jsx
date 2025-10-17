@@ -23,11 +23,8 @@ const Sidebar = () => {
     { name: 'Dashboard', path: '/', icon: Home },
     { name: 'Requirements', path: '/requirements', icon: FileText },
     { name: 'Test Cases', path: '/testcases', icon: CheckSquare },
-    { name: 'Traceability', path: '/matrix', icon: GitBranch },
     { name: 'Releases', path: '/releases', icon: Calendar },
     { name: 'Import', path: '/import', icon: Upload },
-    { name: 'GitHub Sync', path: '/sync', icon: GitMerge },
-    { name: 'Roadmap', path: '/roadmap', icon: BarChart }
   ];
 
   return (
