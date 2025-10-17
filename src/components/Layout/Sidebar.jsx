@@ -31,26 +31,26 @@ const Sidebar = () => {
   ];
 
   return (
-    <div className="bg-gray-900 text-gray-300 w-64 flex-shrink-0 h-full flex flex-col">
+    <div className="bg-[#131a2b] text-gray-300 w-64 flex-shrink-0 h-full flex flex-col">
       {/* App Name and Workspace Selector */}
-      <div className="px-4 py-5 border-b border-gray-800">
+      <div className="p-4 border-b border-gray-800">
         {/* Workspace Selector */}
         <Popover
           isOpen={isWorkspaceMenuOpen}
           onOpenChange={setIsWorkspaceMenuOpen}
           trigger={
-            <button className="w-full flex items-center justify-between text-left px-2 py-2 rounded-md bg-gray-800 hover:bg-gray-700">
+            <button className="w-full flex items-center justify-between text-left p-2 rounded-md bg-[#1e293b] hover:bg-[#283548] transition-colors">
               <div className="flex items-center space-x-2">
-                <div className="w-4 h-4 rounded-sm bg-blue-500"></div>
-                <span className="font-medium truncate">
+                <div className="w-4 h-4 rounded-sm bg-blue-500 flex-shrink-0"></div>
+                <span className="font-medium truncate text-white">
                   {currentWorkspace?.name || "Select Workspace"}
                 </span>
               </div>
-              <ChevronsUpDown size={16} />
+              <ChevronsUpDown size={16} className="text-gray-400 flex-shrink-0 ml-2" />
             </button>
           }
           content={
-            <div className="py-2 w-full bg-gray-800 rounded-md border border-gray-700">
+            <div className="py-2 w-full bg-[#1e293b] rounded-md border border-[#2a3a50] shadow-xl">
               <div className="px-3 py-1 text-xs font-semibold text-gray-400 uppercase">
                 Workspaces
               </div>
@@ -61,38 +61,38 @@ const Sidebar = () => {
                     key={workspace.id}
                     className={`w-full text-left px-3 py-2 text-sm flex items-center space-x-2 ${
                       workspace.id === currentWorkspace?.id 
-                        ? 'bg-gray-700 text-white' 
-                        : 'text-gray-300 hover:bg-gray-700'
+                        ? 'bg-[#283548] text-white' 
+                        : 'text-gray-300 hover:bg-[#283548]'
                     }`}
                     onClick={() => handleWorkspaceChange(workspace)}
                   >
-                    <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                    <div className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0"></div>
                     <span className="truncate">{workspace.name}</span>
                   </button>
                 ))}
               </div>
               
-              <div className="border-t border-gray-700 mt-1 pt-1 px-2">
+              <div className="border-t border-[#2a3a50] mt-2 pt-2 px-2">
                 <button
-                  className="w-full text-left px-2 py-2 text-sm text-gray-300 hover:bg-gray-700 rounded-md flex items-center space-x-2"
+                  className="w-full text-left px-2 py-2 text-sm text-gray-300 hover:bg-[#283548] rounded-md flex items-center space-x-2"
                   onClick={() => {
                     setIsWorkspaceMenuOpen(false);
                     navigate('/select-workspace');
                   }}
                 >
-                  <Plus size={16} />
+                  <Plus size={16} className="flex-shrink-0" />
                   <span>Manage Workspaces</span>
                 </button>
                 
                 {currentWorkspace && (
                   <button
-                    className="w-full text-left px-2 py-2 text-sm text-gray-300 hover:bg-gray-700 rounded-md flex items-center space-x-2"
+                    className="w-full text-left px-2 py-2 text-sm text-gray-300 hover:bg-[#283548] rounded-md flex items-center space-x-2"
                     onClick={() => {
                       setIsWorkspaceMenuOpen(false);
                       navigate(`/workspace-settings/${currentWorkspace.id}`);
                     }}
                   >
-                    <Settings size={16} />
+                    <Settings size={16} className="flex-shrink-0" />
                     <span>Workspace Settings</span>
                   </button>
                 )}
@@ -118,12 +118,12 @@ const Sidebar = () => {
                   className={({ isActive }) => `
                     flex items-center px-3 py-2 rounded-md text-sm font-medium
                     ${isActive
-                      ? 'bg-gray-700 text-white'
-                      : 'text-gray-300 hover:bg-gray-700 hover:text-white'
+                      ? 'bg-[#283548] text-white'
+                      : 'text-gray-300 hover:bg-[#283548] hover:text-white'
                     }
                   `}
                 >
-                  <Icon size={18} className="mr-3" />
+                  <Icon size={18} className="mr-3 flex-shrink-0" />
                   {item.name}
                 </NavLink>
               </li>
@@ -133,14 +133,14 @@ const Sidebar = () => {
       </div>
       
       {/* User Section */}
-      <div className="px-4 py-3 border-t border-gray-800">
+      <div className="p-4 border-t border-gray-800">
         <div className="flex items-center">
-          <div className="h-8 w-8 rounded-full bg-blue-500 text-white flex items-center justify-center">
+          <div className="h-8 w-8 rounded-full bg-blue-500 text-white flex items-center justify-center flex-shrink-0">
             <span className="text-sm font-medium">JS</span>
           </div>
-          <div className="ml-3">
-            <p className="text-sm font-medium text-white">Admin User</p>
-            <p className="text-xs text-gray-400">admin@qualitytracker.local</p>
+          <div className="ml-3 overflow-hidden">
+            <p className="text-sm font-medium text-white truncate">Admin User</p>
+            <p className="text-xs text-gray-400 truncate">admin@qualitytracker.local</p>
           </div>
         </div>
       </div>
