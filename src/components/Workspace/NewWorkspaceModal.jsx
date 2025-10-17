@@ -65,17 +65,31 @@ const NewWorkspaceModal = ({ onClose, onWorkspaceCreated }) => {
     try {
       setIsSubmitting(true);
       
+      console.log('Creating workspace with data:', formData);
       const response = await apiClient.post('/api/workspaces', formData);
+      
+      console.log('Workspace creation response:', response.data);
       
       if (response.data.success) {
         // Fetch the newly created workspace details
-        const workspaceResponse = await apiClient.get(`/api/workspaces/${response.data.data.id}`);
-        
-        if (workspaceResponse.data.success) {
-          onWorkspaceCreated(workspaceResponse.data.data);
-        } else {
+        try {
+          const workspaceResponse = await apiClient.get(`/api/workspaces/${response.data.data.id}`);
+          
+          if (workspaceResponse.data.success) {
+            console.log('Created workspace details:', workspaceResponse.data.data);
+            onWorkspaceCreated(workspaceResponse.data.data);
+          } else {
+            console.error('Failed to fetch workspace details:', workspaceResponse.data);
+            // Use the data from the creation response as fallback
+            onWorkspaceCreated({ id: response.data.data.id, ...formData });
+          }
+        } catch (fetchError) {
+          console.error('Error fetching workspace details:', fetchError);
+          // Use the data from the creation response as fallback
           onWorkspaceCreated({ id: response.data.data.id, ...formData });
         }
+      } else {
+        setServerError(response.data.error || 'Failed to create workspace');
       }
     } catch (error) {
       console.error('Error creating workspace:', error);
@@ -97,6 +111,7 @@ const NewWorkspaceModal = ({ onClose, onWorkspaceCreated }) => {
           <button
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600"
+            type="button"
           >
             <X size={20} />
           </button>
@@ -123,9 +138,6 @@ const NewWorkspaceModal = ({ onClose, onWorkspaceCreated }) => {
                 error={errors.name}
                 required
               />
-              {errors.name && (
-                <p className="mt-1 text-sm text-red-600">{errors.name}</p>
-              )}
             </div>
 
             <div>
