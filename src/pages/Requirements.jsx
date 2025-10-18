@@ -146,116 +146,7 @@ const Requirements = () => {
       return calculateCoverage(requirements, mapping, filteredTests);
     }
   }, [requirements, mapping, testCases, selectedVersion]);
-
-
-
-  const nonPriorityFilteredRequirements = useMemo(() => {
-    return versionFilteredRequirements.filter(req => {
-      // Search filter
-      const matchesSearch = !searchQuery || (() => {
-        const searchTerms = searchQuery.toLowerCase().trim().split(/\s+/);
-        return searchTerms.some(term =>
-          req.name.toLowerCase().includes(term) ||
-          req.id.toLowerCase().includes(term) ||
-          req.description.toLowerCase().includes(term)
-        );
-      })();
-
-      // Status filter
-      const matchesStatus = statusFilter === 'All' || req.status === statusFilter;
-
-      // Type filter
-      const matchesType = typeFilter === 'All' || req.type === typeFilter;
-
-      // Coverage filter
-      const matchesCoverage = (() => {
-        if (coverageFilter === 'All') return true;
-        const coverage = versionCoverage.find(c => c.reqId === req.id);
-        const hasTests = coverage && coverage.totalTests > 0;
-        if (coverageFilter === 'With Tests') return hasTests;
-        if (coverageFilter === 'No Coverage') return !hasTests;
-        return true;
-      })();
-
-      // Tags filter
-      const matchesTags = selectedTagsFilter.length === 0 ||
-        (req.tags && req.tags.some(tag => selectedTagsFilter.includes(tag)));
-
-      // Apply all filters EXCEPT priorityFilterTab
-      // Note: We still apply priorityFilter (dropdown) if it exists
-      const matchesPriorityDropdown = priorityFilter === 'All' || req.priority === priorityFilter;
-
-      return matchesSearch && matchesStatus && matchesType &&
-        matchesCoverage && matchesTags && matchesPriorityDropdown;
-    });
-  }, [
-    versionFilteredRequirements,
-    searchQuery,
-    statusFilter,
-    typeFilter,
-    coverageFilter,
-    selectedTagsFilter,
-    versionCoverage,
-    priorityFilter  // Include dropdown filter but NOT priorityFilterTab
-  ]);
-
-  // THEN UPDATE the Filter Tabs section to use nonPriorityFilteredRequirements:
-
-  {/* Filter Tabs */ }
-  <div className="px-4 py-2 bg-gray-50 border-b flex items-center justify-between">
-    <div className="flex space-x-2">
-      <button
-        onClick={() => setPriorityFilterTab('All')}
-        className={`px-3 py-1.5 text-sm rounded-md transition-colors ${priorityFilterTab === 'All'
-            ? 'bg-blue-600 text-white font-medium'
-            : 'bg-white border border-gray-300 text-gray-700 hover:border-gray-400'
-          }`}
-      >
-        📊 All ({nonPriorityFilteredRequirements.length})
-      </button>
-
-      <button
-        onClick={() => setPriorityFilterTab('High')}
-        className={`px-3 py-1.5 text-sm rounded-md transition-colors ${priorityFilterTab === 'High'
-            ? 'bg-blue-600 text-white font-medium'
-            : 'bg-white border border-gray-300 text-gray-700 hover:border-gray-400'
-          }`}
-      >
-        🔴 High ({nonPriorityFilteredRequirements.filter(r => r.priority === 'High').length})
-      </button>
-
-      <button
-        onClick={() => setPriorityFilterTab('Medium')}
-        className={`px-3 py-1.5 text-sm rounded-md transition-colors ${priorityFilterTab === 'Medium'
-            ? 'bg-blue-600 text-white font-medium'
-            : 'bg-white border border-gray-300 text-gray-700 hover:border-gray-400'
-          }`}
-      >
-        🟡 Medium ({nonPriorityFilteredRequirements.filter(r => r.priority === 'Medium').length})
-      </button>
-
-      <button
-        onClick={() => setPriorityFilterTab('Low')}
-        className={`px-3 py-1.5 text-sm rounded-md transition-colors ${priorityFilterTab === 'Low'
-            ? 'bg-blue-600 text-white font-medium'
-            : 'bg-white border border-gray-300 text-gray-700 hover:border-gray-400'
-          }`}
-      >
-        🟢 Low ({nonPriorityFilteredRequirements.filter(r => r.priority === 'Low').length})
-      </button>
-    </div>
-
-    {/* Quick Search */}
-    <div className="flex items-center space-x-2">
-      <input
-        type="text"
-        placeholder="Search requirements..."
-        className="px-3 py-1.5 text-sm border rounded-md w-64"
-        value={searchQuery}
-        onChange={(e) => setSearchQuery(e.target.value)}
-      />
-    </div>
-  </div>
+  
 
   // Filter requirements by selected version
   const versionFilteredRequirements = selectedVersion === 'unassigned'
@@ -962,8 +853,8 @@ const Requirements = () => {
                                   );
                                 }}
                                 className={`px-3 py-1.5 text-sm rounded-md transition-colors ${isSelected
-                                  ? 'bg-blue-600 text-white font-medium'
-                                  : 'bg-white border border-gray-300 text-gray-700 hover:border-gray-400'
+                                    ? 'bg-blue-600 text-white font-medium'
+                                    : 'bg-white border border-gray-300 text-gray-700 hover:border-gray-400'
                                   }`}
                               >
                                 {tag} ({count})
