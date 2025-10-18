@@ -820,10 +820,10 @@ class DataStoreService {
   }
 
   /**
- * Create or add a new test case
- * @param {Object} testCase - Test case object to add
- * @returns {Promise<Object>} Created test case
- */
+  * Create or add a new test case
+  * @param {Object} testCase - Test case object to add
+  * @returns {Promise<Object>} Created test case
+  */
   async addTestCase(testCase) {
     // Validate required fields
     if (!testCase.id || !testCase.name) {
@@ -838,12 +838,19 @@ class DataStoreService {
     try {
       // Create in database first
       const API_BASE_URL = this._getApiBaseUrl();
+
+      // ✅ CHANGED: Include workspace_id in the request body
+      const testCaseWithWorkspace = {
+        ...testCase,
+        workspace_id: this._currentWorkspaceId
+      };
+
       const response = await fetch(`${API_BASE_URL}/api/test-cases`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(testCase)
+        body: JSON.stringify(testCaseWithWorkspace)
       });
 
       if (!response.ok) {
@@ -1598,10 +1605,10 @@ class DataStoreService {
   }
 
   /**
-   * Create or add a new version
-   * @param {Object} version - Version object to add
-   * @returns {Promise<Object>} Created version
-   */
+ * Create or add a new version
+ * @param {Object} version - Version object to add
+ * @returns {Promise<Object>} Created version
+ */
   async addVersion(version) {
     // Validate required fields
     if (!version.id || !version.name) {
@@ -1616,12 +1623,19 @@ class DataStoreService {
     try {
       // Create in database first
       const API_BASE_URL = this._getApiBaseUrl();
+
+      // ✅ CHANGED: Include workspace_id in the request body
+      const versionWithWorkspace = {
+        ...version,
+        workspace_id: this._currentWorkspaceId
+      };
+
       const response = await fetch(`${API_BASE_URL}/api/versions`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(version)
+        body: JSON.stringify(versionWithWorkspace)
       });
 
       if (!response.ok) {
@@ -1862,12 +1876,19 @@ class DataStoreService {
     try {
       // Create in database first
       const API_BASE_URL = this._getApiBaseUrl();
+
+      // ✅ CHANGED: Include workspace_id in the request body
+      const requirementWithWorkspace = {
+        ...normalizedRequirement,
+        workspace_id: this._currentWorkspaceId
+      };
+
       const response = await fetch(`${API_BASE_URL}/api/requirements`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(normalizedRequirement)
+        body: JSON.stringify(requirementWithWorkspace)
       });
 
       if (!response.ok) {
