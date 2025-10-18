@@ -5,6 +5,8 @@ import { useWorkspaceContext } from '../../contexts/WorkspaceContext';
 import NewWorkspaceModal from './NewWorkspaceModal';
 import apiClient from '../../utils/apiClient';
 import { Popover } from '../UI/Popover';
+import dataStore from '../../services/DataStore';
+
 
 const WorkspaceSelector = () => {
   const navigate = useNavigate();
@@ -24,7 +26,7 @@ const WorkspaceSelector = () => {
       const response = await apiClient.get('/api/workspaces');
       if (response.data.success) {
         setWorkspaces(response.data.data);
-        
+
         // If no current workspace is selected, select the first one
         if (!currentWorkspace && response.data.data.length > 0) {
           setCurrentWorkspace(response.data.data[0]);
@@ -41,8 +43,11 @@ const WorkspaceSelector = () => {
   const handleWorkspaceChange = (workspace) => {
     setCurrentWorkspace(workspace);
     localStorage.setItem('currentWorkspace', JSON.stringify(workspace));
+
+    // Notify DataStore of workspace change
+    dataStore.setCurrentWorkspace(workspace.id);
+
     setIsOpen(false);
-    // Redirect to the dashboard of the selected workspace
     navigate('/dashboard');
   };
 
@@ -77,9 +82,8 @@ const WorkspaceSelector = () => {
                 {workspaces.map((workspace) => (
                   <button
                     key={workspace.id}
-                    className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-100 flex items-center justify-between ${
-                      workspace.id === currentWorkspace?.id ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-700'
-                    }`}
+                    className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-100 flex items-center justify-between ${workspace.id === currentWorkspace?.id ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-700'
+                      }`}
                     onClick={() => handleWorkspaceChange(workspace)}
                   >
                     <span className="truncate">{workspace.name}</span>
@@ -91,7 +95,7 @@ const WorkspaceSelector = () => {
                   </button>
                 ))}
               </div>
-              
+
               {/* Actions */}
               <div className="border-t border-gray-100 mt-2 pt-2">
                 <button
@@ -121,8 +125,8 @@ const WorkspaceSelector = () => {
       </div>
 
       {showNewModal && (
-        <NewWorkspaceModal 
-          onClose={() => setShowNewModal(false)} 
+        <NewWorkspaceModal
+          onClose={() => setShowNewModal(false)}
           onWorkspaceCreated={(workspace) => {
             fetchWorkspaces();
             handleWorkspaceChange(workspace);

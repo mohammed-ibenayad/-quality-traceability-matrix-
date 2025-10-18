@@ -18,9 +18,55 @@ class DataStoreService {
     this._listeners = [];
     this._hasInitializedData = false;
 
-    // Initialize data from database or localStorage
+    this._currentWorkspaceId = null;
+
+    // Initialize and setup workspace listener
     this._initializeData();
+    this._setupWorkspaceListener();
   }
+
+  /**
+   * Setup listener for workspace changes
+   * @private
+   */
+  _setupWorkspaceListener() {
+    // Listen for workspace changes from localStorage
+    window.addEventListener('storage', (e) => {
+      if (e.key === 'currentWorkspace' && e.newValue) {
+        const workspace = JSON.parse(e.newValue);
+        if (workspace.id !== this._currentWorkspaceId) {
+          console.log('🔄 Workspace changed, reloading data...');
+          this.setCurrentWorkspace(workspace.id);
+        }
+      }
+    });
+
+    // Also check localStorage on initialization
+    const savedWorkspace = localStorage.getItem('currentWorkspace');
+    if (savedWorkspace) {
+      const workspace = JSON.parse(savedWorkspace);
+      this._currentWorkspaceId = workspace.id;
+    }
+  }
+
+  /**
+   * Set current workspace and reload data
+   * @param {string} workspaceId - Workspace ID to switch to
+   * @returns {Promise<boolean>} Success status
+   */
+  async setCurrentWorkspace(workspaceId) {
+    if (this._currentWorkspaceId === workspaceId) {
+      console.log('⏭️ Already in workspace:', workspaceId);
+      return true;
+    }
+
+    console.log('🔄 Switching to workspace:', workspaceId);
+    this._currentWorkspaceId = workspaceId;
+
+    // Reload data for new workspace
+    return await this.loadFromDatabase(workspaceId);
+  }
+
 
   /**
    * Initialize data from database or localStorage
@@ -43,19 +89,27 @@ class DataStoreService {
 
   /**
    * Load data from database API
+   * @param {string} workspaceId - Optional workspace ID (uses current if not provided)
    * @returns {Promise<boolean>} True if successful
    */
-  async loadFromDatabase() {
+  async loadFromDatabase(workspaceId = null) {
     try {
+      // Use provided workspace ID or current one
+      const targetWorkspaceId = workspaceId || this._currentWorkspaceId;
+
       console.log('🔄 Loading data from database API...');
+      console.log('🏢 Target workspace:', targetWorkspaceId);
 
       // Get API base URL
       const API_BASE_URL = this._getApiBaseUrl();
       console.log('📡 API URL:', API_BASE_URL);
 
+      // Build workspace query parameter
+      const workspaceParam = targetWorkspaceId ? `?workspace_id=${targetWorkspaceId}` : '';
+
       // Fetch requirements
       console.log('📥 Fetching requirements...');
-      const reqResponse = await fetch(`${API_BASE_URL}/api/requirements`);
+      const reqResponse = await fetch(`${API_BASE_URL}/api/requirements${workspaceParam}`);
       if (reqResponse.ok) {
         const reqData = await reqResponse.json();
         if (reqData.success && Array.isArray(reqData.data)) {
@@ -68,7 +122,7 @@ class DataStoreService {
 
       // Fetch test cases
       console.log('📥 Fetching test cases...');
-      const tcResponse = await fetch(`${API_BASE_URL}/api/test-cases`);
+      const tcResponse = await fetch(`${API_BASE_URL}/api/test-cases${workspaceParam}`);
       if (tcResponse.ok) {
         const tcData = await tcResponse.json();
         if (tcData.success && Array.isArray(tcData.data)) {
@@ -81,7 +135,7 @@ class DataStoreService {
 
       // Fetch versions
       console.log('📥 Fetching versions...');
-      const versionResponse = await fetch(`${API_BASE_URL}/api/versions`);
+      const versionResponse = await fetch(`${API_BASE_URL}/api/versions${workspaceParam}`);
       if (versionResponse.ok) {
         const versionData = await versionResponse.json();
         if (versionData.success && Array.isArray(versionData.data)) {
@@ -94,7 +148,7 @@ class DataStoreService {
 
       // Fetch mappings
       console.log('📥 Fetching mappings...');
-      const mappingResponse = await fetch(`${API_BASE_URL}/api/mappings`);
+      const mappingResponse = await fetch(`${API_BASE_URL}/api/mappings${workspaceParam}`);
       if (mappingResponse.ok) {
         const mappingData = await mappingResponse.json();
         if (mappingData.success && mappingData.data) {

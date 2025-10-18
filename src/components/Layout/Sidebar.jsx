@@ -7,6 +7,8 @@ import {
 } from 'lucide-react';
 import { useWorkspaceContext } from '../../contexts/WorkspaceContext';
 import { Popover } from '../UI/Popover';
+import dataStore from '../../services/DataStore';
+
 
 const Sidebar = () => {
   const navigate = useNavigate();
@@ -16,6 +18,7 @@ const Sidebar = () => {
   const handleWorkspaceChange = (workspace) => {
     setCurrentWorkspace(workspace);
     localStorage.setItem('currentWorkspace', JSON.stringify(workspace));
+    dataStore.setCurrentWorkspace(workspace.id);
     setIsWorkspaceMenuOpen(false);
   };
 
