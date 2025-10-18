@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { 
-  Edit, 
-  Trash2, 
-  Search, 
-  Filter, 
-  Plus, 
+import {
+  Edit,
+  Trash2,
+  Search,
+  Filter,
+  Plus,
   ChevronDown,
   ChevronRight,
   Eye,
@@ -34,14 +34,14 @@ import { useLocation } from 'react-router-dom';
  */
 const testCaseAppliesTo = (testCase, selectedVersion) => {
   if (selectedVersion === 'unassigned') return true;
-  
+
   // Handle new format
   if (testCase.applicableVersions) {
     // Empty array means applies to all versions
     if (testCase.applicableVersions.length === 0) return true;
     return testCase.applicableVersions.includes(selectedVersion);
   }
-  
+
   // Handle legacy format during transition
   return !testCase.version || testCase.version === selectedVersion || testCase.version === '';
 };
@@ -54,11 +54,11 @@ const testCaseAppliesTo = (testCase, selectedVersion) => {
 const getVersionTags = (testCase) => {
   // Handle new format
   if (testCase.applicableVersions) {
-    return testCase.applicableVersions.length > 0 
-      ? testCase.applicableVersions 
+    return testCase.applicableVersions.length > 0
+      ? testCase.applicableVersions
       : ['All Versions'];
   }
-  
+
   // Handle legacy format
   return testCase.version ? [testCase.version] : ['All Versions'];
 };
@@ -87,15 +87,16 @@ const Requirements = () => {
   const [hasData, setHasData] = useState(false);
   const location = useLocation();
 
-  
+
   // UI State
   const [searchQuery, setSearchQuery] = useState('');
+  const [filterPriority, setFilterPriority] = useState('All');
   const [priorityFilter, setPriorityFilter] = useState('All');
   const [statusFilter, setStatusFilter] = useState('All');
   const [typeFilter, setTypeFilter] = useState('All');
   const [selectedRequirements, setSelectedRequirements] = useState(new Set());
   const [expandedRows, setExpandedRows] = useState(new Set());
-  
+
   // Add the modal state hooks here, before any conditional logic
   const [showVersionAssignmentModal, setShowVersionAssignmentModal] = useState(false);
   const [versionAssignmentAction, setVersionAssignmentAction] = useState(null);
@@ -106,7 +107,7 @@ const Requirements = () => {
 
   // Get version context
   const { selectedVersion, versions } = useVersionContext();
-  
+
   // Load data from DataStore
   useEffect(() => {
     const updateData = () => {
@@ -115,18 +116,18 @@ const Requirements = () => {
       setMapping(dataStore.getMapping());
       setHasData(dataStore.hasData());
     };
-    
+
     updateData();
 
     if (location.state?.searchQuery) {
-    setSearchQuery(location.state.searchQuery);
-    // Clear the state after using it
-    window.history.replaceState({}, document.title);
-  }
-    
+      setSearchQuery(location.state.searchQuery);
+      // Clear the state after using it
+      window.history.replaceState({}, document.title);
+    }
+
     // Subscribe to DataStore changes
     const unsubscribe = dataStore.subscribe(updateData);
-    
+
     // Clean up subscription
     return () => unsubscribe();
   }, [location]);
@@ -148,26 +149,25 @@ const Requirements = () => {
     : requirements.filter(req => req.versions && req.versions.includes(selectedVersion));
 
   // Apply search and filters
-  // Apply search and filters
-const filteredRequirements = useMemo(() => {
+  const filteredRequirements = useMemo(() => {
   return versionFilteredRequirements.filter(req => {
     // Enhanced search to handle multiple requirement IDs separated by spaces
     const matchesSearch = !searchQuery || (() => {
       // Split search query by spaces to get individual search terms
       const searchTerms = searchQuery.toLowerCase().trim().split(/\s+/);
-      
+
       // Check if ANY search term matches the requirement
-      return searchTerms.some(term => 
+      return searchTerms.some(term =>
         req.name.toLowerCase().includes(term) ||
         req.id.toLowerCase().includes(term) ||
         req.description.toLowerCase().includes(term)
       );
     })();
-    
+
     const matchesPriority = priorityFilter === 'All' || req.priority === priorityFilter;
     const matchesStatus = statusFilter === 'All' || req.status === statusFilter;
     const matchesType = typeFilter === 'All' || req.type === typeFilter;
-    
+
     return matchesSearch && matchesPriority && matchesStatus && matchesType;
   });
 }, [versionFilteredRequirements, searchQuery, priorityFilter, statusFilter, typeFilter]);
@@ -177,10 +177,10 @@ const filteredRequirements = useMemo(() => {
     const highPriority = filteredRequirements.filter(req => req.priority === 'High').length;
     const withTests = versionCoverage.filter(stat => stat.totalTests > 0).length;
     const fullyTested = versionCoverage.filter(stat => stat.meetsMinimum).length;
-    const fullyAutomated = versionCoverage.filter(stat => 
+    const fullyAutomated = versionCoverage.filter(stat =>
       stat.automationPercentage === 100 && stat.totalTests > 0
     ).length;
-    const avgTDF = total > 0 ? 
+    const avgTDF = total > 0 ?
       (filteredRequirements.reduce((sum, req) => sum + req.testDepthFactor, 0) / total).toFixed(1) : 0;
     const testCoverage = total > 0 ? Math.round((withTests / total) * 100) : 0;
 
@@ -227,86 +227,86 @@ const filteredRequirements = useMemo(() => {
 
   // Handle saving the edited requirement
   const handleSaveRequirement = async (updatedRequirement) => {
-  try {
-    console.log('Saving requirement:', updatedRequirement);
-    
-    if (updatedRequirement.id) {
-      // UPDATE EXISTING
-      console.log('Updating existing requirement:', updatedRequirement.id);
-      await dataStore.updateRequirement(updatedRequirement.id, {
-        ...updatedRequirement,
-        updatedAt: new Date().toISOString()
-      });
-      console.log('✅ Requirement updated successfully');
-    } else {
-      // CREATE NEW
-      const newRequirement = {
-        ...updatedRequirement,
-        id: `REQ-${Date.now()}`, // Generate unique ID
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      };
-      console.log('Creating new requirement:', newRequirement.id);
-      await dataStore.addRequirement(newRequirement);
-      console.log('✅ Requirement created successfully');
+    try {
+      console.log('Saving requirement:', updatedRequirement);
+
+      if (updatedRequirement.id) {
+        // UPDATE EXISTING
+        console.log('Updating existing requirement:', updatedRequirement.id);
+        await dataStore.updateRequirement(updatedRequirement.id, {
+          ...updatedRequirement,
+          updatedAt: new Date().toISOString()
+        });
+        console.log('✅ Requirement updated successfully');
+      } else {
+        // CREATE NEW
+        const newRequirement = {
+          ...updatedRequirement,
+          id: `REQ-${Date.now()}`, // Generate unique ID
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        };
+        console.log('Creating new requirement:', newRequirement.id);
+        await dataStore.addRequirement(newRequirement);
+        console.log('✅ Requirement created successfully');
+      }
+
+      // Close the modal
+      setEditingRequirement(null);
+
+    } catch (error) {
+      console.error("❌ Error saving requirement:", error);
+      alert('Error saving requirement: ' + error.message);
     }
-    
-    // Close the modal
-    setEditingRequirement(null);
-    
-  } catch (error) {
-    console.error("❌ Error saving requirement:", error);
-    alert('Error saving requirement: ' + error.message);
-  }
-};
+  };
 
   // Handle requirement deletion
   const handleDeleteRequirement = async (reqId) => {
-  if (window.confirm('Are you sure you want to delete this requirement?')) {
-    try {
-      console.log('Deleting requirement:', reqId);
-      
-      // Delete from database (this will also update localStorage)
-      await dataStore.deleteRequirement(reqId);
-      
-      // Clear from selection if selected
-      setSelectedRequirements(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(reqId);
-        return newSet;
-      });
+    if (window.confirm('Are you sure you want to delete this requirement?')) {
+      try {
+        console.log('Deleting requirement:', reqId);
 
-      console.log('✅ Requirement deleted successfully');
-    } catch (error) {
-      console.error('❌ Error deleting requirement:', error);
-      alert('Error deleting requirement: ' + error.message);
+        // Delete from database (this will also update localStorage)
+        await dataStore.deleteRequirement(reqId);
+
+        // Clear from selection if selected
+        setSelectedRequirements(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(reqId);
+          return newSet;
+        });
+
+        console.log('✅ Requirement deleted successfully');
+      } catch (error) {
+        console.error('❌ Error deleting requirement:', error);
+        alert('Error deleting requirement: ' + error.message);
+      }
     }
-  }
-};
+  };
 
   // Handle bulk delete
   const handleBulkDelete = async () => {
-  if (selectedRequirements.size === 0) return;
-  
-  if (window.confirm(`Are you sure you want to delete ${selectedRequirements.size} requirement(s)?`)) {
-    try {
-      console.log(`Deleting ${selectedRequirements.size} requirements...`);
-      
-      // Delete each requirement (this will update database and localStorage)
-      for (const reqId of selectedRequirements) {
-        await dataStore.deleteRequirement(reqId);
-      }
-      
-      // Clear selection
-      setSelectedRequirements(new Set());
+    if (selectedRequirements.size === 0) return;
 
-      console.log(`✅ ${selectedRequirements.size} requirements deleted successfully`);
-    } catch (error) {
-      console.error('❌ Error deleting requirements:', error);
-      alert('Error deleting requirements: ' + error.message);
+    if (window.confirm(`Are you sure you want to delete ${selectedRequirements.size} requirement(s)?`)) {
+      try {
+        console.log(`Deleting ${selectedRequirements.size} requirements...`);
+
+        // Delete each requirement (this will update database and localStorage)
+        for (const reqId of selectedRequirements) {
+          await dataStore.deleteRequirement(reqId);
+        }
+
+        // Clear selection
+        setSelectedRequirements(new Set());
+
+        console.log(`✅ ${selectedRequirements.size} requirements deleted successfully`);
+      } catch (error) {
+        console.error('❌ Error deleting requirements:', error);
+        alert('Error deleting requirements: ' + error.message);
+      }
     }
-  }
-};
+  };
 
   // Handle new requirement creation
   const handleNewRequirement = () => {
@@ -326,25 +326,25 @@ const filteredRequirements = useMemo(() => {
     });
   };
 
-if (requirements.length === 0) {
-  return (
-    <MainLayout title="Requirements" hasData={hasData}>
-      <EmptyState 
-        title="No Requirements Found" 
-        message="Get started by importing your requirements to begin tracking your quality metrics."
-        actionText="Create Requirements" 
-        actionPath="/import#requirements-tab"  // Using actionPath for navigation
-        icon="requirements" 
-        className="mt-8"
-      />
-    </MainLayout>
-  );
-}
+  if (requirements.length === 0) {
+    return (
+      <MainLayout title="Requirements" hasData={hasData}>
+        <EmptyState
+          title="No Requirements Found"
+          message="Get started by importing your requirements to begin tracking your quality metrics."
+          actionText="Create Requirements"
+          actionPath="/import#requirements-tab"  // Using actionPath for navigation
+          icon="requirements"
+          className="mt-8"
+        />
+      </MainLayout>
+    );
+  }
 
   // Bulk action handlers
   const handleBulkVersionAssignment = (versionId, action) => {
     if (selectedRequirements.size === 0) return;
-    
+
     setSelectedVersionForAssignment(versionId);
     setVersionAssignmentAction(action);
     setShowVersionAssignmentModal(true);
@@ -352,7 +352,7 @@ if (requirements.length === 0) {
 
   const handleBulkTagsUpdate = (tags, action) => {
     if (selectedRequirements.size === 0) return;
-    
+
     setSelectedTagsForAssignment(tags);
     setTagAssignmentAction(action);
     setShowTagAssignmentModal(true);
@@ -363,7 +363,7 @@ if (requirements.length === 0) {
 
     const selectedIds = Array.from(selectedRequirements);
     const selectedReqs = requirements.filter(req => selectedIds.includes(req.id));
-    
+
     const exportData = selectedReqs.map(req => ({
       id: req.id,
       name: req.name,
@@ -384,7 +384,7 @@ if (requirements.length === 0) {
     const headers = Object.keys(exportData[0]);
     const csvContent = [
       headers.join(','),
-      ...exportData.map(row => 
+      ...exportData.map(row =>
         headers.map(header => {
           const value = row[header]?.toString() || '';
           return value.includes(',') ? `"${value}"` : value;
@@ -408,24 +408,24 @@ if (requirements.length === 0) {
       const updatedRequirements = requirements.map(req =>
         selectedRequirements.has(req.id)
           ? {
-              ...req,
-              versions: versionAssignmentAction === 'add'
-                ? [...new Set([...(req.versions || []), selectedVersionForAssignment])]
-                : (req.versions || []).filter(v => v !== selectedVersionForAssignment),
-              updatedAt: new Date().toISOString()
-            }
+            ...req,
+            versions: versionAssignmentAction === 'add'
+              ? [...new Set([...(req.versions || []), selectedVersionForAssignment])]
+              : (req.versions || []).filter(v => v !== selectedVersionForAssignment),
+            updatedAt: new Date().toISOString()
+          }
           : req
       );
-      
+
       dataStore.setRequirements(updatedRequirements);
       setSelectedRequirements(new Set());
       setShowVersionAssignmentModal(false);
-      
+
       // Show success message
       const versionName = versions.find(v => v.id === selectedVersionForAssignment)?.name;
       const actionText = versionAssignmentAction === 'add' ? 'added to' : 'removed from';
       alert(`✅ ${selectedRequirements.size} requirements ${actionText} ${versionName}`);
-      
+
     } catch (error) {
       console.error('Version assignment failed:', error);
       alert('❌ Version assignment failed: ' + error.message);
@@ -438,26 +438,26 @@ if (requirements.length === 0) {
       const updatedRequirements = requirements.map(req =>
         selectedRequirements.has(req.id)
           ? {
-              ...req,
-              tags: tagAssignmentAction === 'add'
-                ? [...new Set([...(req.tags || []), ...selectedTagsForAssignment])]
-                : (req.tags || []).filter(t => !selectedTagsForAssignment.includes(t)),
-              updatedAt: new Date().toISOString()
-            }
+            ...req,
+            tags: tagAssignmentAction === 'add'
+              ? [...new Set([...(req.tags || []), ...selectedTagsForAssignment])]
+              : (req.tags || []).filter(t => !selectedTagsForAssignment.includes(t)),
+            updatedAt: new Date().toISOString()
+          }
           : req
       );
-      
+
       dataStore.setRequirements(updatedRequirements);
       setSelectedRequirements(new Set());
       setShowTagAssignmentModal(false);
-      
+
       // Show success message
       const actionText = tagAssignmentAction === 'add' ? 'added to' : 'removed from';
-      const tagText = selectedTagsForAssignment.length === 1 
-        ? `"${selectedTagsForAssignment[0]}"` 
+      const tagText = selectedTagsForAssignment.length === 1
+        ? `"${selectedTagsForAssignment[0]}"`
         : `${selectedTagsForAssignment.length} tags`;
       alert(`✅ Tag ${tagText} ${actionText} ${selectedRequirements.size} requirements`);
-      
+
     } catch (error) {
       console.error('Tag assignment failed:', error);
       alert('❌ Tag assignment failed: ' + error.message);
@@ -465,14 +465,14 @@ if (requirements.length === 0) {
   };
 
   // Define modal components outside the main component
-  const VersionAssignmentModal = ({ 
-    show, 
-    onClose, 
-    onConfirm, 
-    action, 
-    version, 
-    selectedCount, 
-    versions 
+  const VersionAssignmentModal = ({
+    show,
+    onClose,
+    onConfirm,
+    action,
+    version,
+    selectedCount,
+    versions
   }) => {
     if (!show) return null;
     return (
@@ -481,7 +481,7 @@ if (requirements.length === 0) {
           <h3 className="text-lg font-semibold mb-4">
             Confirm Version {action === 'add' ? 'Addition' : 'Removal'}
           </h3>
-          
+
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
             <p className="text-sm mb-2">
               You are about to <strong>{action}</strong> {selectedCount} requirement(s) {action === 'add' ? 'to' : 'from'}:
@@ -494,11 +494,10 @@ if (requirements.length === 0) {
           <div className="flex space-x-3">
             <button
               onClick={onConfirm}
-              className={`flex-1 py-2 px-4 rounded font-medium ${
-                action === 'add'
+              className={`flex-1 py-2 px-4 rounded font-medium ${action === 'add'
                   ? 'bg-blue-600 text-white hover:bg-blue-700'
                   : 'bg-red-600 text-white hover:bg-red-700'
-              }`}
+                }`}
             >
               Confirm {action === 'add' ? 'Addition' : 'Removal'}
             </button>
@@ -514,13 +513,13 @@ if (requirements.length === 0) {
     );
   };
 
-  const TagAssignmentModal = ({ 
-    show, 
-    onClose, 
-    onConfirm, 
-    action, 
-    tags, 
-    selectedCount 
+  const TagAssignmentModal = ({
+    show,
+    onClose,
+    onConfirm,
+    action,
+    tags,
+    selectedCount
   }) => {
     if (!show) return null;
 
@@ -530,7 +529,7 @@ if (requirements.length === 0) {
           <h3 className="text-lg font-semibold mb-4">
             Confirm Tag {action === 'add' ? 'Addition' : 'Removal'}
           </h3>
-          
+
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
             <p className="text-sm mb-2">
               You are about to <strong>{action}</strong> the following tags {action === 'add' ? 'to' : 'from'} {selectedCount} requirement(s):
@@ -547,11 +546,10 @@ if (requirements.length === 0) {
           <div className="flex space-x-3">
             <button
               onClick={onConfirm}
-              className={`flex-1 py-2 px-4 rounded font-medium ${
-                action === 'add'
+              className={`flex-1 py-2 px-4 rounded font-medium ${action === 'add'
                   ? 'bg-blue-600 text-white hover:bg-blue-700'
                   : 'bg-red-600 text-white hover:bg-red-700'
-              }`}
+                }`}
             >
               Confirm {action === 'add' ? 'Addition' : 'Removal'}
             </button>
@@ -574,7 +572,7 @@ if (requirements.length === 0) {
         <div className="flex justify-between items-center">
           <h1 className="text-2xl font-bold text-gray-900">Requirements</h1>
           <div className="flex items-center space-x-3">
-            <button 
+            <button
               onClick={handleNewRequirement}
               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center"
             >
@@ -585,30 +583,130 @@ if (requirements.length === 0) {
         </div>
 
         {/* Summary Cards - Removed Avg Test Depth card */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-          <div className="bg-white p-4 rounded-lg shadow">
-            <div className="text-2xl font-bold text-gray-900">{stats.total}</div>
-            <div className="text-sm text-gray-500">Total Requirements</div>
+        <div className="bg-white rounded-lg shadow mb-4">
+          {/* Header Row */}
+          <div className="flex justify-between items-center px-4 py-3 border-b">
+            <div className="flex items-center space-x-6">
+              {/* Title */}
+              <div className="flex-shrink-0">
+                <h1 className="text-xl font-bold text-gray-900">Requirements</h1>
+                {selectedVersion !== 'unassigned' && (
+                  <div className="text-xs text-gray-600">
+                    Version: <span className="font-medium text-blue-600">
+                      {versions.find(v => v.id === selectedVersion)?.name || selectedVersion}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Inline Metrics Bar */}
+              <div className="hidden lg:flex items-center space-x-4 pl-6 border-l">
+                <div className="flex items-center space-x-1.5">
+                  <span className="text-lg font-bold text-gray-900">{stats.total}</span>
+                  <span className="text-xs text-gray-500">Total</span>
+                </div>
+                <div className="flex items-center space-x-1.5">
+                  <span className="text-lg font-bold text-red-600">{stats.highPriority}</span>
+                  <span className="text-xs text-gray-500">High</span>
+                </div>
+                <div className="flex items-center space-x-1.5">
+                  <span className="text-lg font-bold text-blue-600">{stats.withTests}</span>
+                  <span className="text-xs text-gray-500">With Tests</span>
+                </div>
+                <div className="flex items-center space-x-1.5">
+                  <span className="text-lg font-bold text-green-600">{stats.fullyTested}</span>
+                  <span className="text-xs text-gray-500">Fully Tested</span>
+                </div>
+                <div className="flex items-center space-x-1.5">
+                  <span className="text-lg font-bold text-purple-600">{stats.fullyAutomated}</span>
+                  <span className="text-xs text-gray-500">Automated</span>
+                </div>
+                <div className="flex items-center space-x-1.5">
+                  <span className="text-lg font-bold text-indigo-600">{stats.linked}</span>
+                  <span className="text-xs text-gray-500">Linked</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Right: Add Button */}
+            <button
+              onClick={handleNewRequirement}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center text-sm flex-shrink-0"
+            >
+              <Plus className="mr-2" size={16} />
+              Add
+            </button>
           </div>
-          <div className="bg-white p-4 rounded-lg shadow">
-            <div className="text-2xl font-bold text-red-600">{stats.highPriority}</div>
-            <div className="text-sm text-gray-500">High Priority</div>
+
+          {/* Filter Tabs */}
+          <div className="px-4 py-2 bg-gray-50 border-b flex items-center justify-between">
+            <div className="flex space-x-2">
+              <button
+                onClick={() => setFilterPriority('all')}
+                className={`px-3 py-1.5 text-sm rounded-md ${filterPriority === 'All'
+                    ? 'bg-white border-2 border-blue-500 text-blue-700 font-medium'
+                    : 'bg-white border border-gray-300 text-gray-700 hover:border-gray-400'
+                  }`}
+              >
+                📊 All ({stats.total})
+              </button>
+              <button
+                onClick={() => setFilterPriority('High')}
+                className={`px-3 py-1.5 text-sm rounded-md ${filterPriority === 'High'
+                    ? 'bg-white border-2 border-red-500 text-red-700 font-medium'
+                    : 'text-gray-600 hover:bg-white'
+                  }`}
+              >
+                🔴 High ({stats.highPriority})
+              </button>
+              <button
+                onClick={() => setFilterPriority('Medium')}
+                className={`px-3 py-1.5 text-sm rounded-md ${filterPriority === 'Medium'
+                    ? 'bg-white border-2 border-yellow-500 text-yellow-700 font-medium'
+                    : 'text-gray-600 hover:bg-white'
+                  }`}
+              >
+                🟡 Medium
+              </button>
+              <button
+                onClick={() => setFilterPriority('Low')}
+                className={`px-3 py-1.5 text-sm rounded-md ${filterPriority === 'Low'
+                    ? 'bg-white border-2 border-green-500 text-green-700 font-medium'
+                    : 'text-gray-600 hover:bg-white'
+                  }`}
+              >
+                🟢 Low
+              </button>
+            </div>
+
+            {/* Quick Search */}
+            <div className="flex items-center space-x-2">
+              <input
+                type="text"
+                placeholder="Search requirements..."
+                className="px-3 py-1.5 text-sm border rounded-md w-64"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
           </div>
-          <div className="bg-white p-4 rounded-lg shadow">
-            <div className="text-2xl font-bold text-blue-600">{stats.withTests}</div>
-            <div className="text-sm text-gray-500">With Tests</div>
-          </div>
-          <div className="bg-white p-4 rounded-lg shadow">
-            <div className="text-2xl font-bold text-green-600">{stats.fullyTested}</div>
-            <div className="text-sm text-gray-500">Fully Tested</div>
-          </div>
-          <div className="bg-white p-4 rounded-lg shadow">
-            <div className="text-2xl font-bold text-purple-600">{stats.fullyAutomated}</div>
-            <div className="text-sm text-gray-500">Fully Automated</div>
-          </div>
-          <div className="bg-white p-4 rounded-lg shadow">
-            <div className="text-2xl font-bold text-indigo-600">{stats.testCoverage}%</div>
-            <div className="text-sm text-gray-500">Test Coverage</div>
+
+          {/* Mobile Metrics - Show only on small screens */}
+          <div className="lg:hidden px-4 py-3 bg-gray-50 border-b">
+            <div className="grid grid-cols-3 gap-2 text-center">
+              <div>
+                <div className="text-lg font-bold text-gray-900">{stats.total}</div>
+                <div className="text-xs text-gray-600">Total</div>
+              </div>
+              <div>
+                <div className="text-lg font-bold text-red-600">{stats.highPriority}</div>
+                <div className="text-xs text-gray-600">High</div>
+              </div>
+              <div>
+                <div className="text-lg font-bold text-green-600">{stats.fullyTested}</div>
+                <div className="text-xs text-gray-600">Tested</div>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -627,7 +725,7 @@ if (requirements.length === 0) {
                 />
               </div>
             </div>
-            
+
             <select
               value={priorityFilter}
               onChange={(e) => setPriorityFilter(e.target.value)}
@@ -727,7 +825,7 @@ if (requirements.length === 0) {
                 {filteredRequirements.map((req) => {
                   // Find corresponding coverage data
                   const coverage = versionCoverage.find(c => c.reqId === req.id);
-                  
+
                   // Change 2: Get linked test cases for this requirement using new format
                   const linkedTests = (mapping[req.id] || [])
                     .map(tcId => testCases.find(tc => tc.id === tcId))
@@ -737,7 +835,7 @@ if (requirements.length === 0) {
                   const linkedTestCount = linkedTests.length;
 
                   const isExpanded = expandedRows.has(req.id);
-                  
+
                   return (
                     <React.Fragment key={req.id}>
                       <tr className={`hover:bg-gray-50 ${selectedRequirements.has(req.id) ? 'bg-blue-50' : ''}`}>
@@ -766,47 +864,42 @@ if (requirements.length === 0) {
                           </div>
                         </td>
                         <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                          <span className={`px-2 py-1 rounded text-xs ${
-                            req.type === 'Security' ? 'bg-red-100 text-red-800' :
-                            req.type === 'Performance' ? 'bg-orange-100 text-orange-800' :
-                            req.type === 'Functional' ? 'bg-blue-100 text-blue-800' :
-                            'bg-gray-100 text-gray-800'
-                          }`}>
+                          <span className={`px-2 py-1 rounded text-xs ${req.type === 'Security' ? 'bg-red-100 text-red-800' :
+                              req.type === 'Performance' ? 'bg-orange-100 text-orange-800' :
+                                req.type === 'Functional' ? 'bg-blue-100 text-blue-800' :
+                                  'bg-gray-100 text-gray-800'
+                            }`}>
                             {req.type}
                           </span>
                         </td>
                         <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                          <span className={`px-2 py-1 rounded text-xs ${
-                            req.priority === 'High' ? 'bg-red-100 text-red-800' : 
-                            req.priority === 'Medium' ? 'bg-yellow-100 text-yellow-800' : 
-                            'bg-green-100 text-green-800'
-                          }`}>
+                          <span className={`px-2 py-1 rounded text-xs ${req.priority === 'High' ? 'bg-red-100 text-red-800' :
+                              req.priority === 'Medium' ? 'bg-yellow-100 text-yellow-800' :
+                                'bg-green-100 text-green-800'
+                            }`}>
                             {req.priority}
                           </span>
                         </td>
                         <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                          <span className={`px-2 py-1 rounded text-xs ${
-                            req.status === 'Active' ? 'bg-green-100 text-green-800' :
-                            req.status === 'Proposed' ? 'bg-yellow-100 text-yellow-800' :
-                            req.status === 'Implemented' ? 'bg-blue-100 text-blue-800' :
-                            'bg-gray-100 text-gray-800'
-                          }`}>
+                          <span className={`px-2 py-1 rounded text-xs ${req.status === 'Active' ? 'bg-green-100 text-green-800' :
+                              req.status === 'Proposed' ? 'bg-yellow-100 text-yellow-800' :
+                                req.status === 'Implemented' ? 'bg-blue-100 text-blue-800' :
+                                  'bg-gray-100 text-gray-800'
+                            }`}>
                             {req.status}
                           </span>
                         </td>
                         <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
                           <div className="flex items-center">
                             <div className="flex-1 min-w-24">
-                              <div className={`text-sm font-medium ${
-                                coverage && coverage.meetsMinimum ? 'text-green-600' : 'text-red-600'
-                              }`}>
+                              <div className={`text-sm font-medium ${coverage && coverage.meetsMinimum ? 'text-green-600' : 'text-red-600'
+                                }`}>
                                 {linkedTestCount} / {req.minTestCases}
                               </div>
                               <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
-                                <div 
-                                  className={`h-2 rounded-full ${
-                                    coverage && coverage.meetsMinimum ? 'bg-green-500' : 'bg-red-500'
-                                  }`}
+                                <div
+                                  className={`h-2 rounded-full ${coverage && coverage.meetsMinimum ? 'bg-green-500' : 'bg-red-500'
+                                    }`}
                                   style={{
                                     width: `${Math.min(100, (linkedTestCount / req.minTestCases) * 100)}%`
                                   }}
@@ -820,13 +913,12 @@ if (requirements.length === 0) {
                             {req.versions && req.versions.length > 0 ? req.versions.slice(0, 2).map(vId => {
                               const versionExists = versions.some(v => v.id === vId);
                               return (
-                                <span 
+                                <span
                                   key={vId}
-                                  className={`px-2 py-1 rounded text-xs ${
-                                    versionExists 
-                                      ? 'bg-blue-100 text-blue-800' 
+                                  className={`px-2 py-1 rounded text-xs ${versionExists
+                                      ? 'bg-blue-100 text-blue-800'
                                       : 'bg-yellow-100 text-yellow-800'
-                                  }`}
+                                    }`}
                                   title={versionExists ? 'Existing version' : 'Version not created yet'}
                                 >
                                   {vId}
@@ -859,9 +951,9 @@ if (requirements.length === 0) {
                           </div>
                         </td>
                       </tr>
-                      
+
                       {/* Expanded Row Details */}
-                       {isExpanded && (
+                      {isExpanded && (
                         <tr>
                           <td colSpan="8" className="p-0">
                             <div className="bg-gradient-to-r from-green-50 to-gray-50 border-l-4 border-green-400">
@@ -933,9 +1025,9 @@ if (requirements.length === 0) {
                                             <span className="text-lg font-bold text-gray-600">{req.businessImpact}/5</span>
                                           </div>
                                           <div className="w-full bg-gray-200 rounded-full h-2">
-                                            <div 
-                                              className="bg-gray-500 h-2 rounded-full" 
-                                              style={{width: `${(req.businessImpact / 5) * 100}%`}}
+                                            <div
+                                              className="bg-gray-500 h-2 rounded-full"
+                                              style={{ width: `${(req.businessImpact / 5) * 100}%` }}
                                             ></div>
                                           </div>
                                         </div>
@@ -945,9 +1037,9 @@ if (requirements.length === 0) {
                                             <span className="text-lg font-bold text-gray-600">{req.technicalComplexity}/5</span>
                                           </div>
                                           <div className="w-full bg-gray-200 rounded-full h-2">
-                                            <div 
-                                              className="bg-gray-500 h-2 rounded-full" 
-                                              style={{width: `${(req.technicalComplexity / 5) * 100}%`}}
+                                            <div
+                                              className="bg-gray-500 h-2 rounded-full"
+                                              style={{ width: `${(req.technicalComplexity / 5) * 100}%` }}
                                             ></div>
                                           </div>
                                         </div>
@@ -957,9 +1049,9 @@ if (requirements.length === 0) {
                                             <span className="text-lg font-bold text-gray-600">{req.regulatoryFactor}/5</span>
                                           </div>
                                           <div className="w-full bg-gray-200 rounded-full h-2">
-                                            <div 
-                                              className="bg-gray-500 h-2 rounded-full" 
-                                              style={{width: `${(req.regulatoryFactor / 5) * 100}%`}}
+                                            <div
+                                              className="bg-gray-500 h-2 rounded-full"
+                                              style={{ width: `${(req.regulatoryFactor / 5) * 100}%` }}
                                             ></div>
                                           </div>
                                         </div>
@@ -969,9 +1061,9 @@ if (requirements.length === 0) {
                                             <span className="text-lg font-bold text-green-600">{req.usageFrequency}/5</span>
                                           </div>
                                           <div className="w-full bg-gray-200 rounded-full h-2">
-                                            <div 
-                                              className="bg-gray-500 h-2 rounded-full" 
-                                              style={{width: `${(req.usageFrequency / 5) * 100}%`}}
+                                            <div
+                                              className="bg-gray-500 h-2 rounded-full"
+                                              style={{ width: `${(req.usageFrequency / 5) * 100}%` }}
                                             ></div>
                                           </div>
                                         </div>
@@ -987,33 +1079,30 @@ if (requirements.length === 0) {
                                       <div className="space-y-3">
                                         <div className="flex justify-between items-center py-2 border-b border-gray-100">
                                           <span className="text-sm text-gray-600">Type</span>
-                                          <span className={`text-xs px-2 py-1 rounded-full font-medium ${
-                                            req.type === 'Security' ? 'bg-red-100 text-red-800' :
-                                            req.type === 'Performance' ? 'bg-orange-100 text-orange-800' :
-                                            req.type === 'Functional' ? 'bg-blue-100 text-blue-800' :
-                                            'bg-gray-100 text-gray-800'
-                                          }`}>
+                                          <span className={`text-xs px-2 py-1 rounded-full font-medium ${req.type === 'Security' ? 'bg-red-100 text-red-800' :
+                                              req.type === 'Performance' ? 'bg-orange-100 text-orange-800' :
+                                                req.type === 'Functional' ? 'bg-blue-100 text-blue-800' :
+                                                  'bg-gray-100 text-gray-800'
+                                            }`}>
                                             {req.type}
                                           </span>
                                         </div>
                                         <div className="flex justify-between items-center py-2 border-b border-gray-100">
                                           <span className="text-sm text-gray-600">Priority</span>
-                                          <span className={`text-xs px-2 py-1 rounded-full font-medium ${
-                                            req.priority === 'High' ? 'bg-red-100 text-red-800' :
-                                            req.priority === 'Medium' ? 'bg-yellow-100 text-yellow-800' :
-                                            'bg-green-100 text-green-800'
-                                          }`}>
+                                          <span className={`text-xs px-2 py-1 rounded-full font-medium ${req.priority === 'High' ? 'bg-red-100 text-red-800' :
+                                              req.priority === 'Medium' ? 'bg-yellow-100 text-yellow-800' :
+                                                'bg-green-100 text-green-800'
+                                            }`}>
                                             {req.priority}
                                           </span>
                                         </div>
                                         <div className="flex justify-between items-center py-2 border-b border-gray-100">
                                           <span className="text-sm text-gray-600">Status</span>
-                                          <span className={`text-xs px-2 py-1 rounded-full font-medium ${
-                                            req.status === 'Active' ? 'bg-green-100 text-green-800' :
-                                            req.status === 'Proposed' ? 'bg-yellow-100 text-yellow-800' :
-                                            req.status === 'Implemented' ? 'bg-blue-100 text-blue-800' :
-                                            'bg-gray-100 text-gray-800'
-                                          }`}>
+                                          <span className={`text-xs px-2 py-1 rounded-full font-medium ${req.status === 'Active' ? 'bg-green-100 text-green-800' :
+                                              req.status === 'Proposed' ? 'bg-yellow-100 text-yellow-800' :
+                                                req.status === 'Implemented' ? 'bg-blue-100 text-blue-800' :
+                                                  'bg-gray-100 text-gray-800'
+                                            }`}>
                                             {req.status}
                                           </span>
                                         </div>
@@ -1075,9 +1164,8 @@ if (requirements.length === 0) {
                                             const versionExists = versions.some(v => v.id === vId);
                                             return (
                                               <div key={vId} className="flex items-center space-x-2">
-                                                <div className={`w-2 h-2 rounded-full ${
-                                                  versionExists ? 'bg-blue-400' : 'bg-yellow-400'
-                                                }`}></div>
+                                                <div className={`w-2 h-2 rounded-full ${versionExists ? 'bg-blue-400' : 'bg-yellow-400'
+                                                  }`}></div>
                                                 <span className="text-sm text-gray-700 font-mono">{vId}</span>
                                                 {!versionExists && (
                                                   <span className="text-xs text-yellow-600">(Pending)</span>
@@ -1103,7 +1191,7 @@ if (requirements.length === 0) {
                                       </div>
                                     )}
 
-                                    
+
                                   </div>
                                 </div>
                               </div>
@@ -1126,7 +1214,7 @@ if (requirements.length === 0) {
             <span> for version {versions.find(v => v.id === selectedVersion)?.name || selectedVersion}</span>
           )}
         </div>
-        
+
         {/* Edit Requirement Modal */}
         {editingRequirement && (
           <EditRequirementModal
@@ -1146,7 +1234,7 @@ if (requirements.length === 0) {
           selectedCount={selectedRequirements.size}
           versions={versions}
         />
-        
+
         <TagAssignmentModal
           show={showTagAssignmentModal}
           onClose={() => setShowTagAssignmentModal(false)}
