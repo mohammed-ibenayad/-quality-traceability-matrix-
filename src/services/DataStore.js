@@ -17,36 +17,50 @@ class DataStoreService {
     this._versions = [];
     this._listeners = [];
     this._hasInitializedData = false;
-
     this._currentWorkspaceId = null;
+    this._isInitializing = false;
 
-    // Initialize and setup workspace listener
-    this._initializeData();
     this._setupWorkspaceListener();
   }
 
   /**
-   * Setup listener for workspace changes
+   * Setup listener for workspace changes from localStorage
    * @private
    */
   _setupWorkspaceListener() {
-    // Listen for workspace changes from localStorage
+    // Check localStorage immediately on construction
+    const savedWorkspace = localStorage.getItem('currentWorkspace');
+    if (savedWorkspace) {
+      try {
+        const workspace = JSON.parse(savedWorkspace);
+        this._currentWorkspaceId = workspace.id;
+        console.log('📍 DataStore found saved workspace:', workspace.name);
+
+        // Initialize with this workspace
+        this._initializeData();
+      } catch (error) {
+        console.error('Error parsing saved workspace:', error);
+        // Fallback to default initialization
+        this._initializeData();
+      }
+    } else {
+      console.log('📍 No saved workspace found, will initialize when workspace is set');
+    }
+
+    // Listen for workspace changes (from other tabs/windows)
     window.addEventListener('storage', (e) => {
       if (e.key === 'currentWorkspace' && e.newValue) {
-        const workspace = JSON.parse(e.newValue);
-        if (workspace.id !== this._currentWorkspaceId) {
-          console.log('🔄 Workspace changed, reloading data...');
-          this.setCurrentWorkspace(workspace.id);
+        try {
+          const workspace = JSON.parse(e.newValue);
+          if (workspace.id !== this._currentWorkspaceId) {
+            console.log('🔄 Workspace changed in another tab, reloading data...');
+            this.setCurrentWorkspace(workspace.id);
+          }
+        } catch (error) {
+          console.error('Error handling workspace change:', error);
         }
       }
     });
-
-    // Also check localStorage on initialization
-    const savedWorkspace = localStorage.getItem('currentWorkspace');
-    if (savedWorkspace) {
-      const workspace = JSON.parse(savedWorkspace);
-      this._currentWorkspaceId = workspace.id;
-    }
   }
 
   /**
@@ -69,14 +83,20 @@ class DataStoreService {
 
 
   /**
-   * Initialize data from database or localStorage
-   * @private
-   */
+     * Initialize data from database or localStorage
+     * @private
+     */
   async _initializeData() {
+    if (this._isInitializing) {
+      console.log('⏸️ Already initializing, skipping...');
+      return;
+    }
+
+    this._isInitializing = true;
     console.log('🚀 Initializing DataStore...');
 
     // Try loading from database first
-    const dbLoaded = await this.loadFromDatabase();
+    const dbLoaded = await this.loadFromDatabase(this._currentWorkspaceId);
 
     // If database load failed or returned no data, fallback to localStorage
     if (!dbLoaded || !this._hasInitializedData) {
@@ -84,21 +104,22 @@ class DataStoreService {
       this._loadPersistedData();
     }
 
+    this._isInitializing = false;
     console.log('✅ DataStore initialization complete');
   }
 
   /**
-   * Load data from database API
-   * @param {string} workspaceId - Optional workspace ID (uses current if not provided)
-   * @returns {Promise<boolean>} True if successful
-   */
+    * Load data from database API
+    * @param {string} workspaceId - Optional workspace ID (uses current if not provided)
+    * @returns {Promise<boolean>} True if successful
+    */
   async loadFromDatabase(workspaceId = null) {
     try {
       // Use provided workspace ID or current one
       const targetWorkspaceId = workspaceId || this._currentWorkspaceId;
 
       console.log('🔄 Loading data from database API...');
-      console.log('🏢 Target workspace:', targetWorkspaceId);
+      console.log('🏢 Target workspace:', targetWorkspaceId || 'DEFAULT');
 
       // Get API base URL
       const API_BASE_URL = this._getApiBaseUrl();
@@ -180,6 +201,7 @@ class DataStoreService {
       return false;
     }
   }
+
 
   /**
    * Get API base URL
