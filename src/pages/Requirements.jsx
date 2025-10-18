@@ -174,12 +174,18 @@ const Requirements = () => {
   const stats = useMemo(() => {
     const total = filteredRequirements.length;
     const highPriority = filteredRequirements.filter(req => req.priority === 'High').length;
-    const withTests = versionCoverage.filter(stat => stat.totalTests > 0).length;
-    const noCoverage = total - withTests; // NEW: Calculate no coverage
-    const fullyTested = versionCoverage.filter(stat => stat.meetsMinimum).length;
-    const fullyAutomated = versionCoverage.filter(stat =>
+
+    // FIXED: Calculate stats based on FILTERED requirements only
+    const filteredRequirementIds = new Set(filteredRequirements.map(req => req.id));
+    const filteredCoverage = versionCoverage.filter(stat => filteredRequirementIds.has(stat.reqId));
+
+    const withTests = filteredCoverage.filter(stat => stat.totalTests > 0).length;
+    const noCoverage = total - withTests; // NOW CORRECT: Uses filtered count
+    const fullyTested = filteredCoverage.filter(stat => stat.meetsMinimum).length;
+    const fullyAutomated = filteredCoverage.filter(stat =>
       stat.automationPercentage === 100 && stat.totalTests > 0
     ).length;
+
     const avgTDF = total > 0 ?
       (filteredRequirements.reduce((sum, req) => sum + req.testDepthFactor, 0) / total).toFixed(1) : 0;
     const testCoverage = total > 0 ? Math.round((withTests / total) * 100) : 0;
@@ -188,7 +194,7 @@ const Requirements = () => {
       total,
       highPriority,
       withTests,
-      noCoverage,    // NEW
+      noCoverage,
       fullyTested,
       fullyAutomated,
       avgTDF,
@@ -637,8 +643,8 @@ const Requirements = () => {
               <button
                 onClick={() => setPriorityFilterTab('All')}
                 className={`px-3 py-1.5 text-sm rounded-md transition-colors ${priorityFilterTab === 'All'
-                    ? 'bg-blue-600 text-white font-medium'
-                    : 'bg-white border border-gray-300 text-gray-700 hover:border-gray-400'
+                  ? 'bg-blue-600 text-white font-medium'
+                  : 'bg-white border border-gray-300 text-gray-700 hover:border-gray-400'
                   }`}
               >
                 📊 All ({stats.total})
@@ -646,8 +652,8 @@ const Requirements = () => {
               <button
                 onClick={() => setPriorityFilterTab('High')}
                 className={`px-3 py-1.5 text-sm rounded-md transition-colors ${priorityFilterTab === 'High'
-                    ? 'bg-blue-600 text-white font-medium'
-                    : 'bg-white border border-gray-300 text-gray-700 hover:border-gray-400'
+                  ? 'bg-blue-600 text-white font-medium'
+                  : 'bg-white border border-gray-300 text-gray-700 hover:border-gray-400'
                   }`}
               >
                 🔴 High ({versionFilteredRequirements.filter(r => r.priority === 'High' && (
@@ -660,8 +666,8 @@ const Requirements = () => {
               <button
                 onClick={() => setPriorityFilterTab('Medium')}
                 className={`px-3 py-1.5 text-sm rounded-md transition-colors ${priorityFilterTab === 'Medium'
-                    ? 'bg-blue-600 text-white font-medium'
-                    : 'bg-white border border-gray-300 text-gray-700 hover:border-gray-400'
+                  ? 'bg-blue-600 text-white font-medium'
+                  : 'bg-white border border-gray-300 text-gray-700 hover:border-gray-400'
                   }`}
               >
                 🟡 Medium ({versionFilteredRequirements.filter(r => r.priority === 'Medium' && (
@@ -674,8 +680,8 @@ const Requirements = () => {
               <button
                 onClick={() => setPriorityFilterTab('Low')}
                 className={`px-3 py-1.5 text-sm rounded-md transition-colors ${priorityFilterTab === 'Low'
-                    ? 'bg-blue-600 text-white font-medium'
-                    : 'bg-white border border-gray-300 text-gray-700 hover:border-gray-400'
+                  ? 'bg-blue-600 text-white font-medium'
+                  : 'bg-white border border-gray-300 text-gray-700 hover:border-gray-400'
                   }`}
               >
                 🟢 Low ({versionFilteredRequirements.filter(r => r.priority === 'Low' && (
