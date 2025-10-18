@@ -36,19 +36,6 @@ const Header = ({
                 showCounts={false}
               />
             )}
-
-            {/* New Release Button */}
-            {onAddVersion && (
-              <button
-                onClick={onAddVersion}
-                className="ml-3 flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
-              >
-                <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
-                </svg>
-                New Release
-              </button>
-            )}
           </div>
         )}
         <div className="h-8 w-8 rounded-full bg-blue-500 text-white flex items-center justify-center">
