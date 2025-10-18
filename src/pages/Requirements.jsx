@@ -771,83 +771,107 @@ const Requirements = () => {
           {/* Advanced Filters Content - Collapsible */}
           {showAdvancedFilters && (
             <div className="px-4 py-4 border-t border-gray-200 bg-gray-50">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="space-y-4">
+                {/* First Row: Status, Type, Coverage */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
 
-                {/* Status Filter */}
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Status</label>
-                  <select
-                    value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value)}
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  >
-                    <option value="All">All Status</option>
-                    <option value="Active">Active</option>
-                    <option value="Proposed">Proposed</option>
-                    <option value="Implemented">Implemented</option>
-                    <option value="Deprecated">Deprecated</option>
-                  </select>
+                  {/* Status Filter */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Status</label>
+                    <select
+                      value={statusFilter}
+                      onChange={(e) => setStatusFilter(e.target.value)}
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    >
+                      <option value="All">All Status</option>
+                      <option value="Active">Active</option>
+                      <option value="Proposed">Proposed</option>
+                      <option value="Implemented">Implemented</option>
+                      <option value="Deprecated">Deprecated</option>
+                    </select>
+                  </div>
+
+                  {/* Type Filter */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Type</label>
+                    <select
+                      value={typeFilter}
+                      onChange={(e) => setTypeFilter(e.target.value)}
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    >
+                      <option value="All">All Types</option>
+                      <option value="Functional">Functional</option>
+                      <option value="Security">Security</option>
+                      <option value="Performance">Performance</option>
+                      <option value="Usability">Usability</option>
+                      <option value="Compatibility">Compatibility</option>
+                    </select>
+                  </div>
+
+                  {/* Coverage Filter */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Coverage</label>
+                    <select
+                      value={coverageFilter}
+                      onChange={(e) => setCoverageFilter(e.target.value)}
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    >
+                      <option value="All">All Coverage</option>
+                      <option value="With Tests">With Tests</option>
+                      <option value="No Coverage">No Coverage</option>
+                    </select>
+                  </div>
                 </div>
 
-                {/* Type Filter */}
+                {/* Second Row: Tags - Full Width */}
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Type</label>
-                  <select
-                    value={typeFilter}
-                    onChange={(e) => setTypeFilter(e.target.value)}
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  >
-                    <option value="All">All Types</option>
-                    <option value="Functional">Functional</option>
-                    <option value="Security">Security</option>
-                    <option value="Performance">Performance</option>
-                    <option value="Usability">Usability</option>
-                    <option value="Compatibility">Compatibility</option>
-                  </select>
-                </div>
+                  <label className="block text-xs font-medium text-gray-700 mb-2">Tags</label>
+                  <div className="flex flex-wrap gap-2">
+                    {getAllTags(requirements).map(tag => {
+                      const count = versionFilteredRequirements.filter(req =>
+                        req.tags && req.tags.includes(tag)
+                      ).length;
+                      const isSelected = selectedTagsFilter.includes(tag);
 
-                {/* Coverage Filter - NEW */}
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Coverage</label>
-                  <select
-                    value={coverageFilter}
-                    onChange={(e) => setCoverageFilter(e.target.value)}
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  >
-                    <option value="All">All Coverage</option>
-                    <option value="With Tests">With Tests</option>
-                    <option value="No Coverage">No Coverage</option>
-                  </select>
-                </div>
-
-                {/* Tags Filter - NEW */}
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Tags</label>
-                  <select
-                    multiple
-                    value={selectedTagsFilter}
-                    onChange={(e) => {
-                      const selected = Array.from(e.target.selectedOptions, option => option.value);
-                      setSelectedTagsFilter(selected);
-                    }}
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 h-[38px]"
-                    title={selectedTagsFilter.length > 0 ? `Selected: ${selectedTagsFilter.join(', ')}` : 'Select tags'}
-                  >
-                    <option value="" disabled={selectedTagsFilter.length === 0}>
-                      {selectedTagsFilter.length === 0 ? 'All Tags' : `${selectedTagsFilter.length} selected`}
-                    </option>
-                    {getAllTags(requirements).map(tag => (
-                      <option key={tag} value={tag}>
-                        {tag}
-                      </option>
-                    ))}
-                  </select>
+                      return (
+                        <button
+                          key={tag}
+                          onClick={() => {
+                            setSelectedTagsFilter(prev =>
+                              prev.includes(tag)
+                                ? prev.filter(t => t !== tag)
+                                : [...prev, tag]
+                            );
+                          }}
+                          className={`px-3 py-1.5 text-sm rounded-md transition-colors ${isSelected
+                              ? 'bg-blue-600 text-white font-medium'
+                              : 'bg-white border border-gray-300 text-gray-700 hover:border-gray-400'
+                            }`}
+                        >
+                          {tag} ({count})
+                        </button>
+                      );
+                    })}
+                    {getAllTags(requirements).length === 0 && (
+                      <span className="text-sm text-gray-500">No tags available</span>
+                    )}
+                  </div>
                 </div>
               </div>
 
-              {/* Clear Filters Button */}
+              {/* Clear Filters Section */}
               {(statusFilter !== 'All' || typeFilter !== 'All' || coverageFilter !== 'All' || selectedTagsFilter.length > 0) && (
-                <div className="mt-4 flex justify-end">
+                <div className="mt-4 pt-4 border-t border-gray-200 flex justify-between items-center">
+                  <div className="text-sm text-gray-600">
+                    {(() => {
+                      const activeFilters = [];
+                      if (statusFilter !== 'All') activeFilters.push(`Status: ${statusFilter}`);
+                      if (typeFilter !== 'All') activeFilters.push(`Type: ${typeFilter}`);
+                      if (coverageFilter !== 'All') activeFilters.push(`Coverage: ${coverageFilter}`);
+                      if (selectedTagsFilter.length > 0) activeFilters.push(`${selectedTagsFilter.length} tag(s)`);
+                      return `Active filters: ${activeFilters.join(', ')}`;
+                    })()}
+                  </div>
                   <button
                     onClick={() => {
                       setStatusFilter('All');
@@ -855,9 +879,9 @@ const Requirements = () => {
                       setCoverageFilter('All');
                       setSelectedTagsFilter([]);
                     }}
-                    className="px-4 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+                    className="px-4 py-2 text-sm text-blue-600 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 font-medium transition-colors"
                   >
-                    Clear Advanced Filters
+                    Clear all filters
                   </button>
                 </div>
               )}
