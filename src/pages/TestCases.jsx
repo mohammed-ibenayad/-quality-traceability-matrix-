@@ -1695,88 +1695,112 @@ const TestCases = () => {
         <div className="bg-white rounded-lg shadow p-6">
           {/* Header Row */}
           <div className="flex justify-between items-start mb-6">
-            {/* ... header content ... */}
-          </div>
-
-          {/* KEY METRICS - Large boxes */}
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 mb-6">
-            {/* ... metric boxes ... */}
-          </div>
-        </div>
-
-// REPLACE WITH THIS COMPACT VERSION:
-
-        <div className="bg-white rounded-lg shadow">
-          {/* Header Row - More compact */}
-          <div className="flex justify-between items-center px-4 py-3 border-b">
-            <div className="flex items-center space-x-6">
-              <div>
-                <h1 className="text-xl font-bold text-gray-900">Test Cases</h1>
-                {selectedVersion !== 'unassigned' && (
-                  <div className="text-xs text-gray-600">
-                    Version: <span className="font-medium text-blue-600">
-                      {versions.find(v => v.id === selectedVersion)?.name || selectedVersion}
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              {/* COMPACT METRICS BAR - All in one line */}
-              <div className="flex items-center space-x-4 text-sm border-l pl-6">
-                <div className="flex items-center space-x-1">
-                  <span className="font-bold text-gray-900">{summaryStats.total}</span>
-                  <span className="text-gray-500">Total</span>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900 mb-2">Test Cases</h1>
+              {selectedVersion !== 'unassigned' && (
+                <div className="text-sm text-gray-600">
+                  Version: <span className="font-medium text-blue-600">
+                    {versions.find(v => v.id === selectedVersion)?.name || selectedVersion}
+                  </span>
                 </div>
-                <div className="flex items-center space-x-1">
-                  <span className="font-bold text-green-600">{summaryStats.passed}</span>
-                  <span className="text-gray-500">Passed</span>
-                </div>
-                <div className="flex items-center space-x-1">
-                  <span className="font-bold text-red-600">{summaryStats.failed}</span>
-                  <span className="text-gray-500">Failed</span>
-                </div>
-                <div className="flex items-center space-x-1">
-                  <span className="font-bold text-gray-600">{summaryStats.notRun}</span>
-                  <span className="text-gray-500">Not Run</span>
-                </div>
-                <div className="flex items-center space-x-1">
-                  <span className="font-bold text-yellow-600">{summaryStats.blocked}</span>
-                  <span className="text-gray-500">Blocked</span>
-                </div>
-                <div className="flex items-center space-x-1">
-                  <span className="font-bold text-blue-600">{summaryStats.automated}</span>
-                  <span className="text-gray-500">Auto</span>
-                </div>
-                <div className="flex items-center space-x-1">
-                  <span className="font-bold text-indigo-600">{summaryStats.passRate}%</span>
-                  <span className="text-gray-500">Pass Rate</span>
-                </div>
-              </div>
+              )}
             </div>
-
             <button
               onClick={handleNewTestCase}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center text-sm"
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center"
             >
               <Plus className="mr-2" size={16} />
               Add
             </button>
           </div>
 
-          {/* Filter tabs - More compact */}
-          <div className="px-4 py-2 bg-gray-50 border-b flex items-center space-x-2">
-            <button className="px-3 py-1 text-sm rounded-md bg-white border border-gray-300 text-gray-700">
-              📊 All (42)
-            </button>
-            <button className="px-3 py-1 text-sm rounded-md text-gray-600 hover:bg-white">
-              🔴 Failed (0)
-            </button>
-            <button className="px-3 py-1 text-sm rounded-md text-gray-600 hover:bg-white">
-              ✅ Passed (0)
-            </button>
-            <button className="px-3 py-1 text-sm rounded-md text-gray-600 hover:bg-white">
-              🔵 Not Run (42)
-            </button>
+          {/* KEY METRICS - Condensed Dashboard */}
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 mb-6">
+            <div className="bg-gray-50 p-3 rounded-lg border">
+              <div className="text-xl font-bold text-gray-900">{summaryStats.total}</div>
+              <div className="text-xs text-gray-600">Total</div>
+            </div>
+            <div className="bg-green-50 p-3 rounded-lg border">
+              <div className="text-xl font-bold text-green-600">{summaryStats.passed}</div>
+              <div className="text-xs text-gray-600">Passed</div>
+            </div>
+            <div className="bg-red-50 p-3 rounded-lg border">
+              <div className="text-xl font-bold text-red-600">{summaryStats.failed}</div>
+              <div className="text-xs text-gray-600">Failed</div>
+            </div>
+            <div className="bg-gray-50 p-3 rounded-lg border">
+              <div className="text-xl font-bold text-gray-600">{summaryStats.notRun}</div>
+              <div className="text-xs text-gray-600">Not Run</div>
+            </div>
+            <div className="bg-yellow-50 p-3 rounded-lg border">
+              <div className="text-xl font-bold text-yellow-600">{summaryStats.blocked}</div>
+              <div className="text-xs text-gray-600">Blocked</div>
+            </div>
+            <div className="bg-blue-50 p-3 rounded-lg border">
+              <div className="text-xl font-bold text-blue-600">{summaryStats.automationRate}%</div>
+              <div className="text-xs text-gray-600">Automated</div>
+            </div>
+            <div className="bg-purple-50 p-3 rounded-lg border">
+              <div className="text-xl font-bold text-purple-600">{summaryStats.linkageRate}%</div>
+              <div className="text-xs text-gray-600">Linked</div>
+            </div>
+          </div>
+
+          {/* QUICK FILTERS - Status Pills */}
+          {/* QUICK FILTERS - Status Pills */}
+          {/* QUICK FILTERS - Status Pills */}
+          <div className="flex items-center justify-between">
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => setStatusFilter('All')}
+                className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${statusFilter === 'All'
+                  ? 'bg-gray-200 text-gray-800 ring-2 ring-gray-400'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+              >
+                📊 All ({summaryStats.totalBase})
+              </button>
+              <button
+                onClick={() => setStatusFilter('Failed')}
+                className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${statusFilter === 'Failed'
+                  ? 'bg-red-200 text-red-800 ring-2 ring-red-400'
+                  : 'bg-red-100 text-red-700 hover:bg-red-200'
+                  }`}
+              >
+                🔴 Failed ({summaryStats.failedBase})
+              </button>
+              {summaryStats.notFoundBase > 0 && (
+                <button
+                  onClick={() => setStatusFilter('Not Found')}
+                  className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${statusFilter === 'Not Found'
+                    ? 'bg-orange-200 text-orange-800 ring-2 ring-orange-400'
+                    : 'bg-orange-100 text-orange-700 hover:bg-orange-200'
+                    }`}
+                >
+                  ⚠️ Issues ({summaryStats.notFoundBase})
+                </button>
+              )}
+              <button
+                onClick={() => setStatusFilter('Passed')}
+                className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${statusFilter === 'Passed'
+                  ? 'bg-green-200 text-green-800 ring-2 ring-green-400'
+                  : 'bg-green-100 text-green-700 hover:bg-green-200'
+                  }`}
+              >
+                ✅ Passed ({summaryStats.passedBase})
+              </button>
+              <button
+                onClick={() => setStatusFilter('Not Run')}
+                className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${statusFilter === 'Not Run'
+                  ? 'bg-blue-200 text-blue-800 ring-2 ring-blue-400'
+                  : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                  }`}
+              >
+                ⏸️ Not Run ({summaryStats.notRunBase})
+              </button>
+            </div>
+
+            {/* Your expand/collapse button stays the same */}
           </div>
         </div>
 
