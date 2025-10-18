@@ -1810,19 +1810,43 @@ const TestCases = () => {
             onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
             className="w-full px-6 py-4 flex items-center justify-between text-left hover:bg-gray-50 transition-colors"
           >
+            ... existing content ...
+          </button>
+
+          {showAdvancedFilters && (
+            <div className="px-6 pb-6 border-t border-gray-200">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
+                {/* Search */}
+                ...
+                {/* Priority Filter */}
+                ...
+                {/* Automation Filter */}
+                ...
+              </div>
+
+              {/* Tags section - OLD VERSION */}
+              ...
+            </div>
+          )}
+        </div>
+
+// REPLACE THE ENTIRE ADVANCED FILTERS SECTION WITH THIS:
+
+        {/* MIDDLE SECTION: Advanced Filters (Collapsible) */}
+        <div className="bg-white rounded-lg shadow">
+          <button
+            onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+            className="w-full px-6 py-4 flex items-center justify-between text-left hover:bg-gray-50 transition-colors"
+          >
             <div className="flex items-center space-x-3">
               <Filter size={20} className="text-gray-400" />
               <div>
                 <div className="font-medium text-gray-900">Advanced Filters</div>
                 <div className="text-sm text-gray-500">
                   Search, priority, automation, tags, and more
-                  {(searchQuery || priorityFilter !== 'All' || selectedTags.size > 0) && (
+                  {(searchQuery || priorityFilter !== 'All' || automationFilter !== 'All' || selectedTags.size > 0) && (
                     <span className="ml-2 px-2 py-0.5 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">
-                      {[
-                        searchQuery && 'search',
-                        priorityFilter !== 'All' && 'priority',
-                        selectedTags.size > 0 && `${selectedTags.size} tags`
-                      ].filter(Boolean).join(', ')} active
+                      Active
                     </span>
                   )}
                 </div>
@@ -1836,138 +1860,156 @@ const TestCases = () => {
 
           {showAdvancedFilters && (
             <div className="px-6 pb-6 border-t border-gray-200">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
-                {/* Search */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Search</label>
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
-                    <input
-                      type="text"
-                      placeholder="Search test cases..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    />
-                    {searchQuery && (
-                      <button
-                        onClick={() => setSearchQuery('')}
-                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                      >
-                        <X size={16} />
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {/* Priority Filter */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Priority</label>
-                  <select
-                    value={priorityFilter}
-                    onChange={(e) => setPriorityFilter(e.target.value)}
-                    className="w-full py-2 px-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  >
-                    <option value="All">All Priorities</option>
-                    <option value="High">High Priority</option>
-                    <option value="Medium">Medium Priority</option>
-                    <option value="Low">Low Priority</option>
-                  </select>
-                </div>
-
-                {/* Automation Filter */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Automation</label>
-                  <select
-                    value={automationFilter}
-                    onChange={(e) => setAutomationFilter(e.target.value)}
-                    className="w-full py-2 px-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  >
-                    <option value="All">All Types</option>
-                    <option value="Automated">Automated Only</option>
-                    <option value="Manual">Manual Only</option>
-                    <option value="Semi-Automated">Semi-Automated</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Tags Section */}
-              {availableTags.length > 0 && (
-                <div className="mt-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Tags</label>
-                  <div className="flex flex-wrap gap-2">
-                    {availableTags
-                      .map(tag => {
-                        // Count test cases for this tag in current version
-                        const tagCount = versionFilteredTestCases.filter(tc =>
-                          tc.tags && Array.isArray(tc.tags) && tc.tags.includes(tag)
-                        ).length;
-                        return { tag, count: tagCount };
-                      })
-                      .filter(({ count }) => count > 0) // Only show tags with test cases
-                      .slice(0, showAllTags ? availableTags.length : 10)
-                      .map(({ tag, count }) => (
+              <div className="space-y-4 mt-4">
+                {/* First Row: Search, Priority, Automation */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* Search */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Search</label>
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
+                      <input
+                        type="text"
+                        placeholder="Search test cases..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="pl-10 pr-4 py-2 w-full text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      />
+                      {searchQuery && (
                         <button
-                          key={tag}
-                          onClick={() => handleTagToggle(tag)}
-                          className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${selectedTags.has(tag)
-                            ? 'bg-blue-500 text-white'
-                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                            }`}
+                          onClick={() => setSearchQuery('')}
+                          className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
                         >
-                          {tag} ({count})
-                          {selectedTags.has(tag) && <X size={12} className="ml-1 inline" />}
-                        </button>
-                      ))}
-
-                    {/* Show "more" button only if there are hidden tags with counts > 0 */}
-                    {availableTags.filter(tag => {
-                      const tagCount = versionFilteredTestCases.filter(tc =>
-                        tc.tags && Array.isArray(tc.tags) && tc.tags.includes(tag)
-                      ).length;
-                      return tagCount > 0;
-                    }).length > 10 && (
-                        <button
-                          onClick={() => setShowAllTags(!showAllTags)}
-                          className="px-3 py-1 rounded-full text-sm text-blue-600 bg-blue-50 hover:bg-blue-100"
-                        >
-                          {showAllTags ? 'Show Less' : `+${availableTags.filter(tag => {
-                            const tagCount = versionFilteredTestCases.filter(tc =>
-                              tc.tags && Array.isArray(tc.tags) && tc.tags.includes(tag)
-                            ).length;
-                            return tagCount > 0;
-                          }).length - 10} more`}
+                          <X size={16} />
                         </button>
                       )}
+                    </div>
                   </div>
-                  {selectedTags.size > 0 && (
-                    <button
-                      onClick={handleClearTags}
-                      className="mt-2 text-sm text-gray-500 hover:text-gray-700"
+
+                  {/* Priority Filter */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Priority</label>
+                    <select
+                      value={priorityFilter}
+                      onChange={(e) => setPriorityFilter(e.target.value)}
+                      className="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     >
-                      Clear all tags ({selectedTags.size})
-                    </button>
-                  )}
+                      <option value="All">All Priorities</option>
+                      <option value="High">High Priority</option>
+                      <option value="Medium">Medium Priority</option>
+                      <option value="Low">Low Priority</option>
+                    </select>
+                  </div>
+
+                  {/* Automation Filter */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Automation</label>
+                    <select
+                      value={automationFilter}
+                      onChange={(e) => setAutomationFilter(e.target.value)}
+                      className="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    >
+                      <option value="All">All</option>
+                      <option value="Automated">Automated</option>
+                      <option value="Manual">Manual</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Second Row: Tags - Full Width with Show More/Less */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-2">Tags</label>
+                  <div className="flex flex-wrap gap-2">
+                    {(() => {
+                      // Get all unique tags from version-filtered test cases
+                      const allTags = [...new Set(
+                        versionFilteredTestCases
+                          .flatMap(tc => tc.tags || [])
+                          .filter(Boolean)
+                      )].sort();
+
+                      const INITIAL_TAGS_COUNT = 10;
+                      const tagsToShow = showAllTags ? allTags : allTags.slice(0, INITIAL_TAGS_COUNT);
+                      const remainingCount = allTags.length - INITIAL_TAGS_COUNT;
+
+                      return (
+                        <>
+                          {tagsToShow.map(tag => {
+                            const count = versionFilteredTestCases.filter(tc =>
+                              tc.tags && tc.tags.includes(tag)
+                            ).length;
+                            const isSelected = selectedTags.has(tag);
+
+                            return (
+                              <button
+                                key={tag}
+                                onClick={() => {
+                                  setSelectedTags(prev => {
+                                    const newTags = new Set(prev);
+                                    if (newTags.has(tag)) {
+                                      newTags.delete(tag);
+                                    } else {
+                                      newTags.add(tag);
+                                    }
+                                    return newTags;
+                                  });
+                                }}
+                                className={`px-3 py-1.5 text-sm rounded-md transition-colors ${isSelected
+                                    ? 'bg-blue-600 text-white font-medium'
+                                    : 'bg-white border border-gray-300 text-gray-700 hover:border-gray-400'
+                                  }`}
+                              >
+                                {tag} ({count})
+                              </button>
+                            );
+                          })}
+
+                          {/* Show More / Show Less button */}
+                          {allTags.length > INITIAL_TAGS_COUNT && (
+                            <button
+                              onClick={() => setShowAllTags(!showAllTags)}
+                              className="px-3 py-1.5 text-sm text-blue-600 hover:text-blue-800 font-medium transition-colors"
+                            >
+                              {showAllTags ? 'Show Less' : `+${remainingCount} more`}
+                            </button>
+                          )}
+
+                          {allTags.length === 0 && (
+                            <span className="text-sm text-gray-500">No tags available</span>
+                          )}
+                        </>
+                      );
+                    })()}
+                  </div>
+                </div>
+              </div>
+
+              {/* Clear Filters Section */}
+              {(searchQuery || priorityFilter !== 'All' || automationFilter !== 'All' || selectedTags.size > 0) && (
+                <div className="mt-4 pt-4 border-t border-gray-200 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+                  <div className="text-sm text-gray-600">
+                    {(() => {
+                      const activeFilters = [];
+                      if (searchQuery) activeFilters.push('Search');
+                      if (priorityFilter !== 'All') activeFilters.push(`Priority: ${priorityFilter}`);
+                      if (automationFilter !== 'All') activeFilters.push(`Automation: ${automationFilter}`);
+                      if (selectedTags.size > 0) activeFilters.push(`${selectedTags.size} tag(s)`);
+                      return `Active filters: ${activeFilters.join(', ')}`;
+                    })()}
+                  </div>
+                  <button
+                    onClick={() => {
+                      setSearchQuery('');
+                      setPriorityFilter('All');
+                      setAutomationFilter('All');
+                      setSelectedTags(new Set());
+                    }}
+                    className="px-4 py-2 text-sm text-blue-600 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 font-medium transition-colors whitespace-nowrap"
+                  >
+                    Clear all filters
+                  </button>
                 </div>
               )}
-
-              {/* Filter Actions */}
-              <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-200">
-                <div className="text-sm text-gray-500">
-                  Showing {filteredTestCases.length} of {versionFilteredTestCases.length} test cases
-                </div>
-                <button
-                  onClick={() => {
-                    setSearchQuery('');
-                    setPriorityFilter('All');
-                    setAutomationFilter('All');
-                    setSelectedTags(new Set());
-                  }}
-                  className="text-sm text-blue-600 hover:text-blue-800"
-                >
-                  Clear all filters
-                </button>
-              </div>
             </div>
           )}
         </div>
