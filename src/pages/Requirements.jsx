@@ -92,6 +92,7 @@ const Requirements = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterPriority, setFilterPriority] = useState('All');
   const [priorityFilter, setPriorityFilter] = useState('All');
+  const [priorityFilterTab, setPriorityFilterTab] = useState('All');
   const [statusFilter, setStatusFilter] = useState('All');
   const [typeFilter, setTypeFilter] = useState('All');
   const [selectedRequirements, setSelectedRequirements] = useState(new Set());
@@ -150,32 +151,31 @@ const Requirements = () => {
 
   // Apply search and filters
   const filteredRequirements = useMemo(() => {
-  return versionFilteredRequirements.filter(req => {
-    // Enhanced search to handle multiple requirement IDs separated by spaces
-    const matchesSearch = !searchQuery || (() => {
-      // Split search query by spaces to get individual search terms
-      const searchTerms = searchQuery.toLowerCase().trim().split(/\s+/);
+    return versionFilteredRequirements.filter(req => {
+      const matchesSearch = !searchQuery || (() => {
+        const searchTerms = searchQuery.toLowerCase().trim().split(/\s+/);
+        return searchTerms.some(term =>
+          req.name.toLowerCase().includes(term) ||
+          req.id.toLowerCase().includes(term) ||
+          req.description.toLowerCase().includes(term)
+        );
+      })();
 
-      // Check if ANY search term matches the requirement
-      return searchTerms.some(term =>
-        req.name.toLowerCase().includes(term) ||
-        req.id.toLowerCase().includes(term) ||
-        req.description.toLowerCase().includes(term)
-      );
-    })();
+      const matchesPriority = priorityFilter === 'All' || req.priority === priorityFilter;
+      const matchesStatus = statusFilter === 'All' || req.status === statusFilter;
+      const matchesType = typeFilter === 'All' || req.type === typeFilter;
+      const matchesTabFilter = priorityFilterTab === 'All' || req.priority === priorityFilterTab; // NEW
 
-    const matchesPriority = priorityFilter === 'All' || req.priority === priorityFilter;
-    const matchesStatus = statusFilter === 'All' || req.status === statusFilter;
-    const matchesType = typeFilter === 'All' || req.type === typeFilter;
+      return matchesSearch && matchesPriority && matchesStatus && matchesType && matchesTabFilter; // Add matchesTabFilter
+    });
+  }, [versionFilteredRequirements, searchQuery, priorityFilter, statusFilter, typeFilter, priorityFilterTab]); // Add priorityFilterTab
 
-    return matchesSearch && matchesPriority && matchesStatus && matchesType;
-  });
-}, [versionFilteredRequirements, searchQuery, priorityFilter, statusFilter, typeFilter]);
   // Calculate summary statistics
   const stats = useMemo(() => {
     const total = filteredRequirements.length;
     const highPriority = filteredRequirements.filter(req => req.priority === 'High').length;
     const withTests = versionCoverage.filter(stat => stat.totalTests > 0).length;
+    const noCoverage = total - withTests; // NEW: Calculate no coverage
     const fullyTested = versionCoverage.filter(stat => stat.meetsMinimum).length;
     const fullyAutomated = versionCoverage.filter(stat =>
       stat.automationPercentage === 100 && stat.totalTests > 0
@@ -188,6 +188,7 @@ const Requirements = () => {
       total,
       highPriority,
       withTests,
+      noCoverage,    // NEW
       fullyTested,
       fullyAutomated,
       avgTDF,
@@ -495,8 +496,8 @@ const Requirements = () => {
             <button
               onClick={onConfirm}
               className={`flex-1 py-2 px-4 rounded font-medium ${action === 'add'
-                  ? 'bg-blue-600 text-white hover:bg-blue-700'
-                  : 'bg-red-600 text-white hover:bg-red-700'
+                ? 'bg-blue-600 text-white hover:bg-blue-700'
+                : 'bg-red-600 text-white hover:bg-red-700'
                 }`}
             >
               Confirm {action === 'add' ? 'Addition' : 'Removal'}
@@ -547,8 +548,8 @@ const Requirements = () => {
             <button
               onClick={onConfirm}
               className={`flex-1 py-2 px-4 rounded font-medium ${action === 'add'
-                  ? 'bg-blue-600 text-white hover:bg-blue-700'
-                  : 'bg-red-600 text-white hover:bg-red-700'
+                ? 'bg-blue-600 text-white hover:bg-blue-700'
+                : 'bg-red-600 text-white hover:bg-red-700'
                 }`}
             >
               Confirm {action === 'add' ? 'Addition' : 'Removal'}
@@ -599,31 +600,23 @@ const Requirements = () => {
                 )}
               </div>
 
-              {/* Inline Metrics Bar */}
-              <div className="hidden lg:flex items-center space-x-4 pl-6 border-l">
-                <div className="flex items-center space-x-1.5">
+              {/* Inline Metrics Bar with Borders */}
+              <div className="hidden lg:flex items-center divide-x divide-gray-300">
+                <div className="flex items-center space-x-1.5 px-4">
                   <span className="text-lg font-bold text-gray-900">{stats.total}</span>
                   <span className="text-xs text-gray-500">Total</span>
                 </div>
-                <div className="flex items-center space-x-1.5">
+                <div className="flex items-center space-x-1.5 px-4">
                   <span className="text-lg font-bold text-red-600">{stats.highPriority}</span>
                   <span className="text-xs text-gray-500">High</span>
                 </div>
-                <div className="flex items-center space-x-1.5">
+                <div className="flex items-center space-x-1.5 px-4">
                   <span className="text-lg font-bold text-blue-600">{stats.withTests}</span>
                   <span className="text-xs text-gray-500">With Tests</span>
                 </div>
-                <div className="flex items-center space-x-1.5">
-                  <span className="text-lg font-bold text-green-600">{stats.fullyTested}</span>
-                  <span className="text-xs text-gray-500">Fully Tested</span>
-                </div>
-                <div className="flex items-center space-x-1.5">
-                  <span className="text-lg font-bold text-purple-600">{stats.fullyAutomated}</span>
-                  <span className="text-xs text-gray-500">Automated</span>
-                </div>
-                <div className="flex items-center space-x-1.5">
-                  <span className="text-lg font-bold text-indigo-600">{stats.linked}</span>
-                  <span className="text-xs text-gray-500">Linked</span>
+                <div className="flex items-center space-x-1.5 px-4">
+                  <span className="text-lg font-bold text-orange-600">{stats.noCoverage}</span>
+                  <span className="text-xs text-gray-500">No Coverage</span>
                 </div>
               </div>
             </div>
@@ -642,40 +635,55 @@ const Requirements = () => {
           <div className="px-4 py-2 bg-gray-50 border-b flex items-center justify-between">
             <div className="flex space-x-2">
               <button
-                onClick={() => setFilterPriority('all')}
-                className={`px-3 py-1.5 text-sm rounded-md ${filterPriority === 'All'
-                    ? 'bg-white border-2 border-blue-500 text-blue-700 font-medium'
+                onClick={() => setPriorityFilterTab('All')}
+                className={`px-3 py-1.5 text-sm rounded-md transition-colors ${priorityFilterTab === 'All'
+                    ? 'bg-blue-600 text-white font-medium'
                     : 'bg-white border border-gray-300 text-gray-700 hover:border-gray-400'
                   }`}
               >
                 📊 All ({stats.total})
               </button>
               <button
-                onClick={() => setFilterPriority('High')}
-                className={`px-3 py-1.5 text-sm rounded-md ${filterPriority === 'High'
-                    ? 'bg-white border-2 border-red-500 text-red-700 font-medium'
-                    : 'text-gray-600 hover:bg-white'
+                onClick={() => setPriorityFilterTab('High')}
+                className={`px-3 py-1.5 text-sm rounded-md transition-colors ${priorityFilterTab === 'High'
+                    ? 'bg-blue-600 text-white font-medium'
+                    : 'bg-white border border-gray-300 text-gray-700 hover:border-gray-400'
                   }`}
               >
-                🔴 High ({stats.highPriority})
+                🔴 High ({versionFilteredRequirements.filter(r => r.priority === 'High' && (
+                  !searchQuery ||
+                  r.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                  r.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                  (r.description && r.description.toLowerCase().includes(searchQuery.toLowerCase()))
+                )).length})
               </button>
               <button
-                onClick={() => setFilterPriority('Medium')}
-                className={`px-3 py-1.5 text-sm rounded-md ${filterPriority === 'Medium'
-                    ? 'bg-white border-2 border-yellow-500 text-yellow-700 font-medium'
-                    : 'text-gray-600 hover:bg-white'
+                onClick={() => setPriorityFilterTab('Medium')}
+                className={`px-3 py-1.5 text-sm rounded-md transition-colors ${priorityFilterTab === 'Medium'
+                    ? 'bg-blue-600 text-white font-medium'
+                    : 'bg-white border border-gray-300 text-gray-700 hover:border-gray-400'
                   }`}
               >
-                🟡 Medium
+                🟡 Medium ({versionFilteredRequirements.filter(r => r.priority === 'Medium' && (
+                  !searchQuery ||
+                  r.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                  r.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                  (r.description && r.description.toLowerCase().includes(searchQuery.toLowerCase()))
+                )).length})
               </button>
               <button
-                onClick={() => setFilterPriority('Low')}
-                className={`px-3 py-1.5 text-sm rounded-md ${filterPriority === 'Low'
-                    ? 'bg-white border-2 border-green-500 text-green-700 font-medium'
-                    : 'text-gray-600 hover:bg-white'
+                onClick={() => setPriorityFilterTab('Low')}
+                className={`px-3 py-1.5 text-sm rounded-md transition-colors ${priorityFilterTab === 'Low'
+                    ? 'bg-blue-600 text-white font-medium'
+                    : 'bg-white border border-gray-300 text-gray-700 hover:border-gray-400'
                   }`}
               >
-                🟢 Low
+                🟢 Low ({versionFilteredRequirements.filter(r => r.priority === 'Low' && (
+                  !searchQuery ||
+                  r.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                  r.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                  (r.description && r.description.toLowerCase().includes(searchQuery.toLowerCase()))
+                )).length})
               </button>
             </div>
 
@@ -691,9 +699,9 @@ const Requirements = () => {
             </div>
           </div>
 
-          {/* Mobile Metrics - Show only on small screens */}
-          <div className="lg:hidden px-4 py-3 bg-gray-50 border-b">
-            <div className="grid grid-cols-3 gap-2 text-center">
+          {/* Mobile Metrics */}
+          <div className="lg:hidden px-4 py-3 border-t bg-gray-50">
+            <div className="grid grid-cols-3 gap-3 text-center">
               <div>
                 <div className="text-lg font-bold text-gray-900">{stats.total}</div>
                 <div className="text-xs text-gray-600">Total</div>
@@ -703,8 +711,8 @@ const Requirements = () => {
                 <div className="text-xs text-gray-600">High</div>
               </div>
               <div>
-                <div className="text-lg font-bold text-green-600">{stats.fullyTested}</div>
-                <div className="text-xs text-gray-600">Tested</div>
+                <div className="text-lg font-bold text-orange-600">{stats.noCoverage}</div>
+                <div className="text-xs text-gray-600">No Coverage</div>
               </div>
             </div>
           </div>
@@ -865,26 +873,26 @@ const Requirements = () => {
                         </td>
                         <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
                           <span className={`px-2 py-1 rounded text-xs ${req.type === 'Security' ? 'bg-red-100 text-red-800' :
-                              req.type === 'Performance' ? 'bg-orange-100 text-orange-800' :
-                                req.type === 'Functional' ? 'bg-blue-100 text-blue-800' :
-                                  'bg-gray-100 text-gray-800'
+                            req.type === 'Performance' ? 'bg-orange-100 text-orange-800' :
+                              req.type === 'Functional' ? 'bg-blue-100 text-blue-800' :
+                                'bg-gray-100 text-gray-800'
                             }`}>
                             {req.type}
                           </span>
                         </td>
                         <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
                           <span className={`px-2 py-1 rounded text-xs ${req.priority === 'High' ? 'bg-red-100 text-red-800' :
-                              req.priority === 'Medium' ? 'bg-yellow-100 text-yellow-800' :
-                                'bg-green-100 text-green-800'
+                            req.priority === 'Medium' ? 'bg-yellow-100 text-yellow-800' :
+                              'bg-green-100 text-green-800'
                             }`}>
                             {req.priority}
                           </span>
                         </td>
                         <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
                           <span className={`px-2 py-1 rounded text-xs ${req.status === 'Active' ? 'bg-green-100 text-green-800' :
-                              req.status === 'Proposed' ? 'bg-yellow-100 text-yellow-800' :
-                                req.status === 'Implemented' ? 'bg-blue-100 text-blue-800' :
-                                  'bg-gray-100 text-gray-800'
+                            req.status === 'Proposed' ? 'bg-yellow-100 text-yellow-800' :
+                              req.status === 'Implemented' ? 'bg-blue-100 text-blue-800' :
+                                'bg-gray-100 text-gray-800'
                             }`}>
                             {req.status}
                           </span>
@@ -916,8 +924,8 @@ const Requirements = () => {
                                 <span
                                   key={vId}
                                   className={`px-2 py-1 rounded text-xs ${versionExists
-                                      ? 'bg-blue-100 text-blue-800'
-                                      : 'bg-yellow-100 text-yellow-800'
+                                    ? 'bg-blue-100 text-blue-800'
+                                    : 'bg-yellow-100 text-yellow-800'
                                     }`}
                                   title={versionExists ? 'Existing version' : 'Version not created yet'}
                                 >
@@ -1080,9 +1088,9 @@ const Requirements = () => {
                                         <div className="flex justify-between items-center py-2 border-b border-gray-100">
                                           <span className="text-sm text-gray-600">Type</span>
                                           <span className={`text-xs px-2 py-1 rounded-full font-medium ${req.type === 'Security' ? 'bg-red-100 text-red-800' :
-                                              req.type === 'Performance' ? 'bg-orange-100 text-orange-800' :
-                                                req.type === 'Functional' ? 'bg-blue-100 text-blue-800' :
-                                                  'bg-gray-100 text-gray-800'
+                                            req.type === 'Performance' ? 'bg-orange-100 text-orange-800' :
+                                              req.type === 'Functional' ? 'bg-blue-100 text-blue-800' :
+                                                'bg-gray-100 text-gray-800'
                                             }`}>
                                             {req.type}
                                           </span>
@@ -1090,8 +1098,8 @@ const Requirements = () => {
                                         <div className="flex justify-between items-center py-2 border-b border-gray-100">
                                           <span className="text-sm text-gray-600">Priority</span>
                                           <span className={`text-xs px-2 py-1 rounded-full font-medium ${req.priority === 'High' ? 'bg-red-100 text-red-800' :
-                                              req.priority === 'Medium' ? 'bg-yellow-100 text-yellow-800' :
-                                                'bg-green-100 text-green-800'
+                                            req.priority === 'Medium' ? 'bg-yellow-100 text-yellow-800' :
+                                              'bg-green-100 text-green-800'
                                             }`}>
                                             {req.priority}
                                           </span>
@@ -1099,9 +1107,9 @@ const Requirements = () => {
                                         <div className="flex justify-between items-center py-2 border-b border-gray-100">
                                           <span className="text-sm text-gray-600">Status</span>
                                           <span className={`text-xs px-2 py-1 rounded-full font-medium ${req.status === 'Active' ? 'bg-green-100 text-green-800' :
-                                              req.status === 'Proposed' ? 'bg-yellow-100 text-yellow-800' :
-                                                req.status === 'Implemented' ? 'bg-blue-100 text-blue-800' :
-                                                  'bg-gray-100 text-gray-800'
+                                            req.status === 'Proposed' ? 'bg-yellow-100 text-yellow-800' :
+                                              req.status === 'Implemented' ? 'bg-blue-100 text-blue-800' :
+                                                'bg-gray-100 text-gray-800'
                                             }`}>
                                             {req.status}
                                           </span>
