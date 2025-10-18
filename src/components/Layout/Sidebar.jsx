@@ -31,10 +31,9 @@ const Sidebar = () => {
   ];
 
   return (
-    <div className="bg-[#131a2b] text-gray-300 w-64 flex-shrink-0 h-full flex flex-col">
-      {/* App Name and Workspace Selector */}
-      <div className="p-4 border-b border-gray-800">
-        {/* Workspace Selector */}
+    <div className="w-64 h-full bg-[#131a2b] text-gray-300 flex flex-col">
+      {/* TOP SECTION: Workspace Selector - Fixed at top */}
+      <div className="flex-shrink-0 p-4 border-b border-gray-800">
         <Popover
           isOpen={isWorkspaceMenuOpen}
           onOpenChange={setIsWorkspaceMenuOpen}
@@ -106,7 +105,7 @@ const Sidebar = () => {
         </div>
       </div>
       
-      {/* Navigation Links */}
+      {/* MIDDLE SECTION: Navigation Links - Scrollable */}
       <div className="flex-1 overflow-y-auto py-4">
         <ul className="space-y-1 px-2">
           {navItems.map((item) => {
@@ -132,8 +131,8 @@ const Sidebar = () => {
         </ul>
       </div>
       
-      {/* User Section */}
-      <div className="p-4 border-t border-gray-800">
+      {/* BOTTOM SECTION: User Section - Fixed at bottom */}
+      <div className="flex-shrink-0 p-4 border-t border-gray-800">
         <div className="flex items-center">
           <div className="h-8 w-8 rounded-full bg-blue-500 text-white flex items-center justify-center flex-shrink-0">
             <span className="text-sm font-medium">JS</span>
