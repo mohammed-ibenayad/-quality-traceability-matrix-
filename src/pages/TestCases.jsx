@@ -1810,34 +1810,6 @@ const TestCases = () => {
             onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
             className="w-full px-6 py-4 flex items-center justify-between text-left hover:bg-gray-50 transition-colors"
           >
-            ... existing content ...
-          </button>
-
-          {showAdvancedFilters && (
-            <div className="px-6 pb-6 border-t border-gray-200">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
-                {/* Search */}
-                ...
-                {/* Priority Filter */}
-                ...
-                {/* Automation Filter */}
-                ...
-              </div>
-
-              {/* Tags section - OLD VERSION */}
-              ...
-            </div>
-          )}
-        </div>
-
-// REPLACE THE ENTIRE ADVANCED FILTERS SECTION WITH THIS:
-
-        {/* MIDDLE SECTION: Advanced Filters (Collapsible) */}
-        <div className="bg-white rounded-lg shadow">
-          <button
-            onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-            className="w-full px-6 py-4 flex items-center justify-between text-left hover:bg-gray-50 transition-colors"
-          >
             <div className="flex items-center space-x-3">
               <Filter size={20} className="text-gray-400" />
               <div>
@@ -2013,10 +1985,6 @@ const TestCases = () => {
             </div>
           )}
         </div>
-
-
-
-
 
         {/* Bulk Actions */}
         {/* Enhanced Bulk Actions with Version Assignment */}
