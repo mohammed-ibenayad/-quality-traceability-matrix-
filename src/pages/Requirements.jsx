@@ -147,10 +147,60 @@ const Requirements = () => {
     }
   }, [requirements, mapping, testCases, selectedVersion]);
 
+
   // Filter requirements by selected version
   const versionFilteredRequirements = selectedVersion === 'unassigned'
-    ? requirements // Show all requirements for "unassigned"
+    ? requirements
     : requirements.filter(req => req.versions && req.versions.includes(selectedVersion));
+
+  const nonPriorityFilteredRequirements = useMemo(() => {
+    return versionFilteredRequirements.filter(req => {
+      // Search filter
+      const matchesSearch = !searchQuery || (() => {
+        const searchTerms = searchQuery.toLowerCase().trim().split(/\s+/);
+        return searchTerms.some(term =>
+          req.name.toLowerCase().includes(term) ||
+          req.id.toLowerCase().includes(term) ||
+          req.description.toLowerCase().includes(term)
+        );
+      })();
+
+      // Status filter
+      const matchesStatus = statusFilter === 'All' || req.status === statusFilter;
+
+      // Type filter
+      const matchesType = typeFilter === 'All' || req.type === typeFilter;
+
+      // Coverage filter
+      const matchesCoverage = (() => {
+        if (coverageFilter === 'All') return true;
+        const coverage = versionCoverage.find(c => c.reqId === req.id);
+        const hasTests = coverage && coverage.totalTests > 0;
+        if (coverageFilter === 'With Tests') return hasTests;
+        if (coverageFilter === 'No Coverage') return !hasTests;
+        return true;
+      })();
+
+      // Tags filter
+      const matchesTags = selectedTagsFilter.length === 0 ||
+        (req.tags && req.tags.some(tag => selectedTagsFilter.includes(tag)));
+
+      // Apply all filters EXCEPT priorityFilterTab
+      const matchesPriorityDropdown = priorityFilter === 'All' || req.priority === priorityFilter;
+
+      return matchesSearch && matchesStatus && matchesType &&
+        matchesCoverage && matchesTags && matchesPriorityDropdown;
+    });
+  }, [
+    versionFilteredRequirements,
+    searchQuery,
+    statusFilter,
+    typeFilter,
+    coverageFilter,
+    selectedTagsFilter,
+    versionCoverage,
+    priorityFilter
+  ]);
 
   // Apply search and filters
   const filteredRequirements = useMemo(() => {
@@ -611,12 +661,12 @@ const Requirements = () => {
   return (
     <MainLayout title="Requirements" hasData={hasData}>
       <div className="space-y-6">
-        {/* Summary Cards - Removed Avg Test Depth card */}
+        {/* Unified Filter Card — Merged Main + Advanced Filters */}
         <div className="bg-white rounded-lg shadow mb-4">
-          {/* Header Row */}
+          {/* Header Row: Title, Version, Metrics, Add Button */}
           <div className="flex justify-between items-center px-4 py-3 border-b">
             <div className="flex items-center space-x-6">
-              {/* Title */}
+              {/* Title & Version */}
               <div className="flex-shrink-0">
                 <h1 className="text-xl font-bold text-gray-900">Requirements</h1>
                 {selectedVersion !== 'unassigned' && (
@@ -628,7 +678,7 @@ const Requirements = () => {
                 )}
               </div>
 
-              {/* Inline Metrics Bar with Borders */}
+              {/* Inline Metrics Bar (Desktop) */}
               <div className="hidden lg:flex items-center divide-x divide-gray-300">
                 <div className="flex items-center space-x-1.5 px-4">
                   <span className="text-lg font-bold text-gray-900">{stats.total}</span>
@@ -649,7 +699,7 @@ const Requirements = () => {
               </div>
             </div>
 
-            {/* Right: Add Button */}
+            {/* Add Button */}
             <button
               onClick={handleNewRequirement}
               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center text-sm flex-shrink-0"
@@ -659,59 +709,47 @@ const Requirements = () => {
             </button>
           </div>
 
-          {/* Filter Tabs */}
+          {/* Priority Filter Tabs Row */}
           <div className="px-4 py-2 bg-gray-50 border-b flex items-center justify-between">
             <div className="flex space-x-2">
               <button
                 onClick={() => setPriorityFilterTab('All')}
                 className={`px-3 py-1.5 text-sm rounded-md transition-colors ${priorityFilterTab === 'All'
-                  ? 'bg-blue-600 text-white font-medium'
-                  : 'bg-white border border-gray-300 text-gray-700 hover:border-gray-400'
+                    ? 'bg-blue-600 text-white font-medium'
+                    : 'bg-white border border-gray-300 text-gray-700 hover:border-gray-400'
                   }`}
               >
-                📊 All ({stats.total})
+                📊 All ({nonPriorityFilteredRequirements.length})
               </button>
+
               <button
                 onClick={() => setPriorityFilterTab('High')}
                 className={`px-3 py-1.5 text-sm rounded-md transition-colors ${priorityFilterTab === 'High'
-                  ? 'bg-blue-600 text-white font-medium'
-                  : 'bg-white border border-gray-300 text-gray-700 hover:border-gray-400'
+                    ? 'bg-blue-600 text-white font-medium'
+                    : 'bg-white border border-gray-300 text-gray-700 hover:border-gray-400'
                   }`}
               >
-                🔴 High ({versionFilteredRequirements.filter(r => r.priority === 'High' && (
-                  !searchQuery ||
-                  r.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                  r.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                  (r.description && r.description.toLowerCase().includes(searchQuery.toLowerCase()))
-                )).length})
+                🔴 High ({nonPriorityFilteredRequirements.filter(r => r.priority === 'High').length})
               </button>
+
               <button
                 onClick={() => setPriorityFilterTab('Medium')}
                 className={`px-3 py-1.5 text-sm rounded-md transition-colors ${priorityFilterTab === 'Medium'
-                  ? 'bg-blue-600 text-white font-medium'
-                  : 'bg-white border border-gray-300 text-gray-700 hover:border-gray-400'
+                    ? 'bg-blue-600 text-white font-medium'
+                    : 'bg-white border border-gray-300 text-gray-700 hover:border-gray-400'
                   }`}
               >
-                🟡 Medium ({versionFilteredRequirements.filter(r => r.priority === 'Medium' && (
-                  !searchQuery ||
-                  r.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                  r.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                  (r.description && r.description.toLowerCase().includes(searchQuery.toLowerCase()))
-                )).length})
+                🟡 Medium ({nonPriorityFilteredRequirements.filter(r => r.priority === 'Medium').length})
               </button>
+
               <button
                 onClick={() => setPriorityFilterTab('Low')}
                 className={`px-3 py-1.5 text-sm rounded-md transition-colors ${priorityFilterTab === 'Low'
-                  ? 'bg-blue-600 text-white font-medium'
-                  : 'bg-white border border-gray-300 text-gray-700 hover:border-gray-400'
+                    ? 'bg-blue-600 text-white font-medium'
+                    : 'bg-white border border-gray-300 text-gray-700 hover:border-gray-400'
                   }`}
               >
-                🟢 Low ({versionFilteredRequirements.filter(r => r.priority === 'Low' && (
-                  !searchQuery ||
-                  r.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                  r.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                  (r.description && r.description.toLowerCase().includes(searchQuery.toLowerCase()))
-                )).length})
+                🟢 Low ({nonPriorityFilteredRequirements.filter(r => r.priority === 'Low').length})
               </button>
             </div>
 
@@ -727,7 +765,7 @@ const Requirements = () => {
             </div>
           </div>
 
-          {/* Mobile Metrics */}
+          {/* Mobile Metrics (shown on mobile only) */}
           <div className="lg:hidden px-4 py-3 border-t bg-gray-50">
             <div className="grid grid-cols-3 gap-3 text-center">
               <div>
@@ -744,171 +782,159 @@ const Requirements = () => {
               </div>
             </div>
           </div>
-        </div>
 
-        {/* Advanced Filters - Expandable */}
-        <div className="bg-white rounded-lg shadow">
-          {/* Advanced Filters Header - Clickable */}
-          <button
-            onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-            className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-50 transition-colors"
-          >
-            <div className="flex items-center space-x-2">
-              <Filter size={16} className="text-gray-600" />
-              <span className="font-medium text-gray-700">Advanced Filters</span>
-              {(statusFilter !== 'All' || typeFilter !== 'All' || coverageFilter !== 'All' || selectedTagsFilter.length > 0) && (
-                <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded-full font-medium">
-                  Active
-                </span>
-              )}
-            </div>
-            <ChevronDown
-              size={16}
-              className={`text-gray-600 transition-transform ${showAdvancedFilters ? 'rotate-180' : ''}`}
-            />
-          </button>
+          {/* Advanced Filters - Expandable Section */}
+          <div className="border-t">
+            <button
+              onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+              className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-50 transition-colors"
+            >
+              <div className="flex items-center space-x-2">
+                <Filter size={16} className="text-gray-600" />
+                <span className="font-medium text-gray-700">Advanced Filters</span>
+                {(statusFilter !== 'All' || typeFilter !== 'All' || coverageFilter !== 'All' || selectedTagsFilter.length > 0) && (
+                  <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded-full font-medium">
+                    Active
+                  </span>
+                )}
+              </div>
+              <ChevronDown
+                size={16}
+                className={`text-gray-600 transition-transform ${showAdvancedFilters ? 'rotate-180' : ''}`}
+              />
+            </button>
 
-          {/* Advanced Filters Content - Collapsible */}
-          {showAdvancedFilters && (
-            <div className="px-4 py-4 border-t border-gray-200 bg-gray-50">
-              <div className="space-y-4">
-                {/* First Row: Status, Type, Coverage */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Advanced Filters Content */}
+            {showAdvancedFilters && (
+              <div className="px-4 py-4 bg-gray-50">
+                <div className="space-y-4">
+                  {/* First Row: Status, Type, Coverage */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {/* Status Filter */}
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Status</label>
+                      <select
+                        value={statusFilter}
+                        onChange={(e) => setStatusFilter(e.target.value)}
+                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="All">All Status</option>
+                        <option value="Active">Active</option>
+                        <option value="Proposed">Proposed</option>
+                        <option value="Implemented">Implemented</option>
+                        <option value="Deprecated">Deprecated</option>
+                      </select>
+                    </div>
 
-                  {/* Status Filter */}
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Status</label>
-                    <select
-                      value={statusFilter}
-                      onChange={(e) => setStatusFilter(e.target.value)}
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    >
-                      <option value="All">All Status</option>
-                      <option value="Active">Active</option>
-                      <option value="Proposed">Proposed</option>
-                      <option value="Implemented">Implemented</option>
-                      <option value="Deprecated">Deprecated</option>
-                    </select>
+                    {/* Type Filter */}
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Type</label>
+                      <select
+                        value={typeFilter}
+                        onChange={(e) => setTypeFilter(e.target.value)}
+                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="All">All Types</option>
+                        <option value="Functional">Functional</option>
+                        <option value="Security">Security</option>
+                        <option value="Performance">Performance</option>
+                        <option value="Usability">Usability</option>
+                        <option value="Compatibility">Compatibility</option>
+                      </select>
+                    </div>
+
+                    {/* Coverage Filter */}
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Coverage</label>
+                      <select
+                        value={coverageFilter}
+                        onChange={(e) => setCoverageFilter(e.target.value)}
+                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="All">All Coverage</option>
+                        <option value="With Tests">With Tests</option>
+                        <option value="No Coverage">No Coverage</option>
+                      </select>
+                    </div>
                   </div>
 
-                  {/* Type Filter */}
+                  {/* Second Row: Tags - Full Width with Show More/Less */}
                   <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Type</label>
-                    <select
-                      value={typeFilter}
-                      onChange={(e) => setTypeFilter(e.target.value)}
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    >
-                      <option value="All">All Types</option>
-                      <option value="Functional">Functional</option>
-                      <option value="Security">Security</option>
-                      <option value="Performance">Performance</option>
-                      <option value="Usability">Usability</option>
-                      <option value="Compatibility">Compatibility</option>
-                    </select>
-                  </div>
+                    <label className="block text-xs font-medium text-gray-700 mb-2">Tags</label>
+                    <div className="flex flex-wrap gap-2">
+                      {(() => {
+                        const allTags = getAllTags(requirements);
+                        const INITIAL_TAGS_COUNT = 10;
+                        const tagsToShow = showAllTags ? allTags : allTags.slice(0, INITIAL_TAGS_COUNT);
+                        const remainingCount = allTags.length - INITIAL_TAGS_COUNT;
 
-                  {/* Coverage Filter */}
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Coverage</label>
-                    <select
-                      value={coverageFilter}
-                      onChange={(e) => setCoverageFilter(e.target.value)}
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    >
-                      <option value="All">All Coverage</option>
-                      <option value="With Tests">With Tests</option>
-                      <option value="No Coverage">No Coverage</option>
-                    </select>
-                  </div>
-                </div>
+                        return (
+                          <>
+                            {tagsToShow.map(tag => {
+                              const count = versionFilteredRequirements.filter(req =>
+                                req.tags && req.tags.includes(tag)
+                              ).length;
+                              const isSelected = selectedTagsFilter.includes(tag);
 
-                {/* Second Row: Tags - Full Width with Show More/Less */}
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-2">Tags</label>
-                  <div className="flex flex-wrap gap-2">
-                    {(() => {
-                      const allTags = getAllTags(requirements);
-                      const INITIAL_TAGS_COUNT = 10; // Show first 10 tags
-                      const tagsToShow = showAllTags ? allTags : allTags.slice(0, INITIAL_TAGS_COUNT);
-                      const remainingCount = allTags.length - INITIAL_TAGS_COUNT;
+                              return (
+                                <button
+                                  key={tag}
+                                  onClick={() => {
+                                    setSelectedTagsFilter(prev =>
+                                      prev.includes(tag)
+                                        ? prev.filter(t => t !== tag)
+                                        : [...prev, tag]
+                                    );
+                                  }}
+                                  className={`px-3 py-1.5 text-sm rounded-md transition-colors ${isSelected
+                                      ? 'bg-blue-600 text-white font-medium'
+                                      : 'bg-white border border-gray-300 text-gray-700 hover:border-gray-400'
+                                    }`}
+                                >
+                                  {tag} ({count})
+                                </button>
+                              );
+                            })}
 
-                      return (
-                        <>
-                          {tagsToShow.map(tag => {
-                            const count = versionFilteredRequirements.filter(req =>
-                              req.tags && req.tags.includes(tag)
-                            ).length;
-                            const isSelected = selectedTagsFilter.includes(tag);
-
-                            return (
+                            {/* Show More / Show Less button */}
+                            {allTags.length > INITIAL_TAGS_COUNT && (
                               <button
-                                key={tag}
-                                onClick={() => {
-                                  setSelectedTagsFilter(prev =>
-                                    prev.includes(tag)
-                                      ? prev.filter(t => t !== tag)
-                                      : [...prev, tag]
-                                  );
-                                }}
-                                className={`px-3 py-1.5 text-sm rounded-md transition-colors ${isSelected
-                                    ? 'bg-blue-600 text-white font-medium'
-                                    : 'bg-white border border-gray-300 text-gray-700 hover:border-gray-400'
-                                  }`}
+                                onClick={() => setShowAllTags(!showAllTags)}
+                                className="px-3 py-1.5 text-sm text-blue-600 hover:text-blue-800 font-medium transition-colors"
                               >
-                                {tag} ({count})
+                                {showAllTags ? 'Show Less' : `+${remainingCount} more`}
                               </button>
-                            );
-                          })}
+                            )}
 
-                          {/* Show More / Show Less button */}
-                          {allTags.length > INITIAL_TAGS_COUNT && (
-                            <button
-                              onClick={() => setShowAllTags(!showAllTags)}
-                              className="px-3 py-1.5 text-sm text-blue-600 hover:text-blue-800 font-medium transition-colors"
-                            >
-                              {showAllTags ? 'Show Less' : `+${remainingCount} more`}
-                            </button>
-                          )}
-
-                          {allTags.length === 0 && (
-                            <span className="text-sm text-gray-500">No tags available</span>
-                          )}
-                        </>
-                      );
-                    })()}
+                            {allTags.length === 0 && (
+                              <span className="text-sm text-gray-500">No tags available</span>
+                            )}
+                          </>
+                        );
+                      })()}
+                    </div>
                   </div>
+
+                  {/* Clear Filters Section */}
+                  {(statusFilter !== 'All' || typeFilter !== 'All' || coverageFilter !== 'All' || selectedTagsFilter.length > 0) && (
+                    <div className="pt-4 border-t flex justify-end">
+                      <button
+                        onClick={() => {
+                          setStatusFilter('All');
+                          setTypeFilter('All');
+                          setCoverageFilter('All');
+                          setSelectedTagsFilter([]);
+                        }}
+                        className="px-4 py-2 text-sm text-blue-600 bg-blue-50 rounded-lg font-medium"
+                      >
+                        Clear all filters
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
-
-              {/* Clear Filters Section */}
-              {(statusFilter !== 'All' || typeFilter !== 'All' || coverageFilter !== 'All' || selectedTagsFilter.length > 0) && (
-                <div className="mt-4 pt-4 border-t border-gray-200 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
-                  <div className="text-sm text-gray-600">
-                    {(() => {
-                      const activeFilters = [];
-                      if (statusFilter !== 'All') activeFilters.push(`Status: ${statusFilter}`);
-                      if (typeFilter !== 'All') activeFilters.push(`Type: ${typeFilter}`);
-                      if (coverageFilter !== 'All') activeFilters.push(`Coverage: ${coverageFilter}`);
-                      if (selectedTagsFilter.length > 0) activeFilters.push(`${selectedTagsFilter.length} tag(s)`);
-                      return `Active filters: ${activeFilters.join(', ')}`;
-                    })()}
-                  </div>
-                  <button
-                    onClick={() => {
-                      setStatusFilter('All');
-                      setTypeFilter('All');
-                      setCoverageFilter('All');
-                      setSelectedTagsFilter([]);
-                    }}
-                    className="px-4 py-2 text-sm text-blue-600 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 font-medium transition-colors whitespace-nowrap"
-                  >
-                    Clear all filters
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
         {/* Bulk Actions */}
