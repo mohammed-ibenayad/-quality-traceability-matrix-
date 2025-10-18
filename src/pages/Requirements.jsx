@@ -90,8 +90,8 @@ const Requirements = () => {
 
   // UI State
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterPriority, setFilterPriority] = useState('All');
   const [priorityFilter, setPriorityFilter] = useState('All');
+  const [showAllTags, setShowAllTags] = useState(false);
   const [priorityFilterTab, setPriorityFilterTab] = useState('All');
   const [statusFilter, setStatusFilter] = useState('All');
   const [typeFilter, setTypeFilter] = useState('All');
@@ -823,45 +823,67 @@ const Requirements = () => {
                   </div>
                 </div>
 
-                {/* Second Row: Tags - Full Width */}
+                {/* Second Row: Tags - Full Width with Show More/Less */}
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-2">Tags</label>
                   <div className="flex flex-wrap gap-2">
-                    {getAllTags(requirements).map(tag => {
-                      const count = versionFilteredRequirements.filter(req =>
-                        req.tags && req.tags.includes(tag)
-                      ).length;
-                      const isSelected = selectedTagsFilter.includes(tag);
+                    {(() => {
+                      const allTags = getAllTags(requirements);
+                      const INITIAL_TAGS_COUNT = 10; // Show first 10 tags
+                      const tagsToShow = showAllTags ? allTags : allTags.slice(0, INITIAL_TAGS_COUNT);
+                      const remainingCount = allTags.length - INITIAL_TAGS_COUNT;
 
                       return (
-                        <button
-                          key={tag}
-                          onClick={() => {
-                            setSelectedTagsFilter(prev =>
-                              prev.includes(tag)
-                                ? prev.filter(t => t !== tag)
-                                : [...prev, tag]
+                        <>
+                          {tagsToShow.map(tag => {
+                            const count = versionFilteredRequirements.filter(req =>
+                              req.tags && req.tags.includes(tag)
+                            ).length;
+                            const isSelected = selectedTagsFilter.includes(tag);
+
+                            return (
+                              <button
+                                key={tag}
+                                onClick={() => {
+                                  setSelectedTagsFilter(prev =>
+                                    prev.includes(tag)
+                                      ? prev.filter(t => t !== tag)
+                                      : [...prev, tag]
+                                  );
+                                }}
+                                className={`px-3 py-1.5 text-sm rounded-md transition-colors ${isSelected
+                                    ? 'bg-blue-600 text-white font-medium'
+                                    : 'bg-white border border-gray-300 text-gray-700 hover:border-gray-400'
+                                  }`}
+                              >
+                                {tag} ({count})
+                              </button>
                             );
-                          }}
-                          className={`px-3 py-1.5 text-sm rounded-md transition-colors ${isSelected
-                              ? 'bg-blue-600 text-white font-medium'
-                              : 'bg-white border border-gray-300 text-gray-700 hover:border-gray-400'
-                            }`}
-                        >
-                          {tag} ({count})
-                        </button>
+                          })}
+
+                          {/* Show More / Show Less button */}
+                          {allTags.length > INITIAL_TAGS_COUNT && (
+                            <button
+                              onClick={() => setShowAllTags(!showAllTags)}
+                              className="px-3 py-1.5 text-sm text-blue-600 hover:text-blue-800 font-medium transition-colors"
+                            >
+                              {showAllTags ? 'Show Less' : `+${remainingCount} more`}
+                            </button>
+                          )}
+
+                          {allTags.length === 0 && (
+                            <span className="text-sm text-gray-500">No tags available</span>
+                          )}
+                        </>
                       );
-                    })}
-                    {getAllTags(requirements).length === 0 && (
-                      <span className="text-sm text-gray-500">No tags available</span>
-                    )}
+                    })()}
                   </div>
                 </div>
               </div>
 
               {/* Clear Filters Section */}
               {(statusFilter !== 'All' || typeFilter !== 'All' || coverageFilter !== 'All' || selectedTagsFilter.length > 0) && (
-                <div className="mt-4 pt-4 border-t border-gray-200 flex justify-between items-center">
+                <div className="mt-4 pt-4 border-t border-gray-200 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
                   <div className="text-sm text-gray-600">
                     {(() => {
                       const activeFilters = [];
@@ -879,7 +901,7 @@ const Requirements = () => {
                       setCoverageFilter('All');
                       setSelectedTagsFilter([]);
                     }}
-                    className="px-4 py-2 text-sm text-blue-600 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 font-medium transition-colors"
+                    className="px-4 py-2 text-sm text-blue-600 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 font-medium transition-colors whitespace-nowrap"
                   >
                     Clear all filters
                   </button>
