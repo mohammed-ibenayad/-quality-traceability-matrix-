@@ -32,7 +32,7 @@ const Sidebar = () => {
     localStorage.removeItem('currentWorkspace');
     
     // Clear data store
-    dataStore.clearAll();
+    dataStore.resetAll();
     
     // Redirect to login
     navigate('/login');
