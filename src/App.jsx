@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import Layout from './components/Layout/Layout';
+import MainLayout from './components/Layout/MainLayout';
 import Dashboard from './pages/Dashboard';
 import Requirements from './pages/Requirements';
 import TestCases from './pages/TestCases';
@@ -26,7 +26,7 @@ function ProtectedRoute({ children }) {
     return <Navigate to="/login" replace />;
   }
   
-  return <Layout>{children}</Layout>;
+  return <MainLayout>{children}</MainLayout>;
 }
 
 function App() {
@@ -80,7 +80,7 @@ function App() {
             {/* Public Route - Login */}
             <Route path="/login" element={<Login />} />
             
-            {/* Protected Routes - Wrapped in Layout */}
+            {/* Protected Routes - Wrapped in MainLayout */}
             <Route path="/" element={
               <ProtectedRoute>
                 {hasData ? <Dashboard /> : <Navigate to="/import" />}
