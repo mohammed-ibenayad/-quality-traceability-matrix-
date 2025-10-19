@@ -15,14 +15,7 @@ const SelectWorkspace = () => {
   console.log("- workspaces:", workspaces);
   console.log("- isLoading:", isLoading);
   console.log("- currentWorkspace:", currentWorkspace);
-  console.log("- showNewWorkspaceModal:", showNewWorkspaceModal);
-
-  // If user is already in a workspace, redirect to dashboard
-  useEffect(() => {
-    if (currentWorkspace) {
-      navigate('/dashboard');
-    }
-  }, [currentWorkspace, navigate]);
+  console.log("- showNewWorkspaceModal:", showNewWorkspaceModal);  
   
   // Modify your handleCreateWorkspace function
   const handleCreateWorkspace = () => {

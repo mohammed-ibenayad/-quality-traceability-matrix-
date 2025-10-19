@@ -3,11 +3,12 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import { 
   Home, FileText, CheckSquare, GitBranch, BarChart,
   Upload, Calendar, GitMerge, ChevronDown, Settings,
-  Plus, ChevronsUpDown
+  Plus, ChevronsUpDown, LogOut
 } from 'lucide-react';
 import { useWorkspaceContext } from '../../contexts/WorkspaceContext';
 import { Popover } from '../UI/Popover';
 import dataStore from '../../services/DataStore';
+import authService from '../../services/authService';
 
 
 const Sidebar = () => {
@@ -22,14 +23,27 @@ const Sidebar = () => {
     setIsWorkspaceMenuOpen(false);
   };
 
+  const handleLogout = () => {
+    // Clear auth data
+    authService.logout();
+    
+    // Clear workspace data
+    setCurrentWorkspace(null);
+    localStorage.removeItem('currentWorkspace');
+    
+    // Clear data store
+    dataStore.clearPersistedData();
+    
+    // Redirect to login
+    navigate('/login');
+  };
+
   const navItems = [
     { name: 'Dashboard', path: '/', icon: Home },
     { name: 'Releases', path: '/releases', icon: Calendar },
     { name: 'Requirements', path: '/requirements', icon: FileText },
     { name: 'Test Cases', path: '/testcases', icon: CheckSquare },
-    //{ name: 'Traceability', path: '/matrix', icon: GitBranch },    
     { name: 'Import', path: '/import', icon: Upload },
-    //{ name: 'GitHub Sync', path: '/sync', icon: GitMerge },
     { name: 'Roadmap', path: '/roadmap', icon: BarChart }
   ];
 
@@ -136,14 +150,29 @@ const Sidebar = () => {
       
       {/* BOTTOM SECTION: User Section - Fixed at bottom */}
       <div className="flex-shrink-0 p-4 border-t border-gray-800">
-        <div className="flex items-center">
-          <div className="h-8 w-8 rounded-full bg-blue-500 text-white flex items-center justify-center flex-shrink-0">
-            <span className="text-sm font-medium">JS</span>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center overflow-hidden flex-1">
+            <div className="h-8 w-8 rounded-full bg-blue-500 text-white flex items-center justify-center flex-shrink-0">
+              <span className="text-sm font-medium">
+                {authService.getCurrentUser()?.name?.split(' ').map(n => n[0]).join('').toUpperCase() || 'AU'}
+              </span>
+            </div>
+            <div className="ml-3 overflow-hidden">
+              <p className="text-sm font-medium text-white truncate">
+                {authService.getCurrentUser()?.name || 'Admin User'}
+              </p>
+              <p className="text-xs text-gray-400 truncate">
+                {authService.getCurrentUser()?.email || 'admin@qualitytracker.local'}
+              </p>
+            </div>
           </div>
-          <div className="ml-3 overflow-hidden">
-            <p className="text-sm font-medium text-white truncate">Admin User</p>
-            <p className="text-xs text-gray-400 truncate">admin@qualitytracker.local</p>
-          </div>
+          <button
+            onClick={handleLogout}
+            className="ml-2 p-2 text-gray-400 hover:text-white hover:bg-[#283548] rounded-md transition-colors"
+            title="Logout"
+          >
+            <LogOut size={18} />
+          </button>
         </div>
       </div>
     </div>
