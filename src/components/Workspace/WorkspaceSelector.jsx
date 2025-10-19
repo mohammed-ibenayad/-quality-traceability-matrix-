@@ -23,18 +23,53 @@ const WorkspaceSelector = () => {
   const fetchWorkspaces = async () => {
     try {
       setIsLoading(true);
-      const response = await apiClient.get('/api/workspaces');
-      if (response.data.success) {
-        setWorkspaces(response.data.data);
 
-        // If no current workspace is selected, select the first one
-        if (!currentWorkspace && response.data.data.length > 0) {
-          setCurrentWorkspace(response.data.data[0]);
-          localStorage.setItem('currentWorkspace', JSON.stringify(response.data.data[0]));
+      const response = await apiClient.get('/api/workspaces');
+
+      if (response.data.success) {
+        const fetchedWorkspaces = response.data.data;
+        setWorkspaces(fetchedWorkspaces);
+
+        // Check if we need to auto-select a workspace
+        const savedWorkspace = localStorage.getItem('currentWorkspace');
+        let shouldAutoSelect = false;
+
+        if (!currentWorkspace && fetchedWorkspaces.length > 0) {
+          // No workspace selected and we have workspaces
+          shouldAutoSelect = true;
+        } else if (currentWorkspace && !fetchedWorkspaces.find(w => w.id === currentWorkspace.id)) {
+          // Current workspace doesn't exist anymore
+          shouldAutoSelect = true;
+        } else if (savedWorkspace && !currentWorkspace && fetchedWorkspaces.length > 0) {
+          // We have saved workspace in localStorage but not in state
+          try {
+            const parsed = JSON.parse(savedWorkspace);
+            const exists = fetchedWorkspaces.find(w => w.id === parsed.id);
+            if (exists) {
+              setCurrentWorkspace(exists);
+              return fetchedWorkspaces;
+            } else {
+              shouldAutoSelect = true;
+            }
+          } catch (e) {
+            shouldAutoSelect = true;
+          }
         }
+
+        if (shouldAutoSelect) {
+          const defaultWorkspace = fetchedWorkspaces[0];
+          setCurrentWorkspace(defaultWorkspace);
+          localStorage.setItem('currentWorkspace', JSON.stringify(defaultWorkspace));
+          console.log('✅ Auto-selected workspace:', defaultWorkspace.name);
+        }
+
+        return fetchedWorkspaces;
       }
+
+      return [];
     } catch (error) {
       console.error('Error fetching workspaces:', error);
+      return [];
     } finally {
       setIsLoading(false);
     }
