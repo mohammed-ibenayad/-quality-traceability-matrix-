@@ -305,8 +305,11 @@ const ImportRequirements = ({ onImportSuccess }) => {
     if (!processedData || !validationSuccess) return;
 
     try {
-      console.log(`📥 Importing ${processedData.length} requirements...`);
+      console.log('🔍 Current workspace ID in DataStore:', dataStore._currentWorkspaceId);
+      const savedWorkspace = localStorage.getItem('currentWorkspace');
+      console.log('🔍 Saved workspace in localStorage:', savedWorkspace);
 
+      console.log(`📥 Importing ${processedData.length} requirements...`);
       // ✅ CHANGED: Loop through and add each requirement individually
       // This ensures each one gets sent to the API with workspace_id
       const importedRequirements = [];
@@ -532,9 +535,9 @@ ${JSON.stringify(sampleTemplate, null, 2)}`;
       {/* File Upload Area */}
       <div
         className={`mb-4 border-2 border-dashed rounded-lg p-6 text-center ${file ?
-            (validationErrors.length > 0 ? 'border-red-300 bg-red-50' :
-              validationSuccess ? 'border-green-300 bg-green-50' : 'border-blue-300 bg-blue-50')
-            : 'border-gray-300 hover:border-blue-400 hover:bg-blue-50'
+          (validationErrors.length > 0 ? 'border-red-300 bg-red-50' :
+            validationSuccess ? 'border-green-300 bg-green-50' : 'border-blue-300 bg-blue-50')
+          : 'border-gray-300 hover:border-blue-400 hover:bg-blue-50'
           }`}
         onDrop={handleDrop}
         onDragOver={handleDragOver}

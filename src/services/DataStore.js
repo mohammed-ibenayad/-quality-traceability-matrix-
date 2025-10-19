@@ -842,10 +842,10 @@ class DataStoreService {
   }
 
   /**
-  * Create or add a new test case
-  * @param {Object} testCase - Test case object to add
-  * @returns {Promise<Object>} Created test case
-  */
+ * Create or add a new test case
+ * @param {Object} testCase - Test case object to add
+ * @returns {Promise<Object>} Created test case
+ */
   async addTestCase(testCase) {
     // Validate required fields
     if (!testCase.id || !testCase.name) {
@@ -857,15 +857,30 @@ class DataStoreService {
       throw new Error(`Test case with ID ${testCase.id} already exists`);
     }
 
+    // ✅ NEW: Ensure workspace is set
+    if (!this._currentWorkspaceId) {
+      console.warn('⚠️ No workspace selected, attempting to get from localStorage...');
+      const savedWorkspace = localStorage.getItem('currentWorkspace');
+      if (savedWorkspace) {
+        const workspace = JSON.parse(savedWorkspace);
+        this._currentWorkspaceId = workspace.id;
+        console.log('✅ Set workspace from localStorage:', workspace.name);
+      } else {
+        console.error('❌ No workspace available!');
+        throw new Error('No workspace selected. Please select a workspace before importing.');
+      }
+    }
+
     try {
       // Create in database first
       const API_BASE_URL = this._getApiBaseUrl();
 
-      // ✅ CHANGED: Include workspace_id in the request body
       const testCaseWithWorkspace = {
         ...testCase,
         workspace_id: this._currentWorkspaceId
       };
+
+      console.log(`📤 Creating test case ${testCase.id} in workspace:`, this._currentWorkspaceId);
 
       const response = await fetch(`${API_BASE_URL}/api/test-cases`, {
         method: 'POST',
@@ -1627,10 +1642,10 @@ class DataStoreService {
   }
 
   /**
- * Create or add a new version
- * @param {Object} version - Version object to add
- * @returns {Promise<Object>} Created version
- */
+  * Create or add a new version
+  * @param {Object} version - Version object to add
+  * @returns {Promise<Object>} Created version
+  */
   async addVersion(version) {
     // Validate required fields
     if (!version.id || !version.name) {
@@ -1642,15 +1657,30 @@ class DataStoreService {
       throw new Error(`Version with ID ${version.id} already exists`);
     }
 
+    // ✅ NEW: Ensure workspace is set
+    if (!this._currentWorkspaceId) {
+      console.warn('⚠️ No workspace selected, attempting to get from localStorage...');
+      const savedWorkspace = localStorage.getItem('currentWorkspace');
+      if (savedWorkspace) {
+        const workspace = JSON.parse(savedWorkspace);
+        this._currentWorkspaceId = workspace.id;
+        console.log('✅ Set workspace from localStorage:', workspace.name);
+      } else {
+        console.error('❌ No workspace available!');
+        throw new Error('No workspace selected. Please select a workspace before creating versions.');
+      }
+    }
+
     try {
       // Create in database first
       const API_BASE_URL = this._getApiBaseUrl();
 
-      // ✅ CHANGED: Include workspace_id in the request body
       const versionWithWorkspace = {
         ...version,
         workspace_id: this._currentWorkspaceId
       };
+
+      console.log(`📤 Creating version ${version.id} in workspace:`, this._currentWorkspaceId);
 
       const response = await fetch(`${API_BASE_URL}/api/versions`, {
         method: 'POST',
@@ -1892,6 +1922,20 @@ class DataStoreService {
       throw new Error(`Requirement with ID ${requirement.id} already exists`);
     }
 
+    // ✅ NEW: Ensure workspace is set
+    if (!this._currentWorkspaceId) {
+      console.warn('⚠️ No workspace selected, attempting to get from localStorage...');
+      const savedWorkspace = localStorage.getItem('currentWorkspace');
+      if (savedWorkspace) {
+        const workspace = JSON.parse(savedWorkspace);
+        this._currentWorkspaceId = workspace.id;
+        console.log('✅ Set workspace from localStorage:', workspace.name);
+      } else {
+        console.error('❌ No workspace available!');
+        throw new Error('No workspace selected. Please select a workspace before importing.');
+      }
+    }
+
     // Normalize the requirement before adding
     const normalizedRequirement = this._normalizeRequirement(requirement);
 
@@ -1899,11 +1943,12 @@ class DataStoreService {
       // Create in database first
       const API_BASE_URL = this._getApiBaseUrl();
 
-      // ✅ CHANGED: Include workspace_id in the request body
       const requirementWithWorkspace = {
         ...normalizedRequirement,
         workspace_id: this._currentWorkspaceId
       };
+
+      console.log(`📤 Creating requirement ${normalizedRequirement.id} in workspace:`, this._currentWorkspaceId);
 
       const response = await fetch(`${API_BASE_URL}/api/requirements`, {
         method: 'POST',
