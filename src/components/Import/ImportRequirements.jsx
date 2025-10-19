@@ -67,26 +67,26 @@ const ImportRequirements = ({ onImportSuccess }) => {
   // Parse JSON/JSONC files
   const parseJSONFile = (selectedFile) => {
     const reader = new FileReader();
-    
+
     reader.onload = (event) => {
       try {
         const fileContent = event.target.result;
         // Parse JSONC (remove comments first)
         const jsonContent = fileContent.replace(/\/\*[\s\S]*?\*\/|([^\\:]|^)\/\/.*$/gm, '');
         const data = JSON.parse(jsonContent);
-        
+
         // Ensure it's an array
         const requirementsArray = Array.isArray(data) ? data : [data];
-        
+
         // Validate the requirements data
         const validationErrors = validateRequirements(requirementsArray);
-        
+
         if (validationErrors.length > 0) {
           setValidationErrors(validationErrors);
           setIsValidating(false);
           return;
         }
-        
+
         // Set processed data and validation success
         setProcessedData(requirementsArray);
         setValidationSuccess(true);
@@ -97,12 +97,12 @@ const ImportRequirements = ({ onImportSuccess }) => {
         setIsValidating(false);
       }
     };
-    
+
     reader.onerror = () => {
       setValidationErrors(['Error reading file']);
       setIsValidating(false);
     };
-    
+
     reader.readAsText(selectedFile);
   };
 
@@ -115,7 +115,7 @@ const ImportRequirements = ({ onImportSuccess }) => {
       transformHeader: header => header.trim(), // Trim whitespace from headers
       complete: (results) => {
         console.log("Papa parse results:", results); // Debug logging
-        
+
         if (results.errors && results.errors.length > 0) {
           console.error("CSV parsing errors:", results.errors); // Debug logging
           setValidationErrors(results.errors.map(err => `CSV Error: ${err.message}`));
@@ -126,23 +126,23 @@ const ImportRequirements = ({ onImportSuccess }) => {
         try {
           // Transform CSV data to match requirements structure
           const transformedData = transformCSVToRequirements(results.data);
-          
+
           // Check if we have any valid rows
           if (transformedData.length === 0) {
             setValidationErrors(['No valid requirements found in the file. Please ensure your CSV has at least one row with ID and Name/Title columns.']);
             setIsValidating(false);
             return;
           }
-          
+
           // Validate the requirements data
           const validationErrors = validateRequirements(transformedData);
-          
+
           if (validationErrors.length > 0) {
             setValidationErrors(validationErrors);
             setIsValidating(false);
             return;
           }
-          
+
           // Set processed data and validation success
           setProcessedData(transformedData);
           setValidationSuccess(true);
@@ -164,16 +164,16 @@ const ImportRequirements = ({ onImportSuccess }) => {
   // Transform CSV data to match requirements structure
   const transformCSVToRequirements = (csvData) => {
     console.log("CSV data:", csvData); // Debug logging
-    
+
     // Check if we have actual data
     if (!csvData || csvData.length === 0) {
       throw new Error("CSV file appears to be empty");
     }
-    
+
     // Check the column names in the CSV
     const firstRow = csvData[0];
     console.log("CSV columns:", Object.keys(firstRow)); // Debug logging
-    
+
     return csvData.map((row, index) => {
       // Create a new requirement object with case-insensitive field mapping
       // This handles variations in column names regardless of case
@@ -181,7 +181,7 @@ const ImportRequirements = ({ onImportSuccess }) => {
         acc[key.toLowerCase()] = key;
         return acc;
       }, {});
-      
+
       // Function to get value regardless of case
       const getValue = (possibleNames) => {
         for (const name of possibleNames) {
@@ -195,7 +195,7 @@ const ImportRequirements = ({ onImportSuccess }) => {
         }
         return undefined;
       };
-      
+
       // Extract values with flexible column name matching
       const requirement = {
         id: getValue(['id', 'ID', 'requirement_id', 'requirement id', 'requirementid']) || `REQ-${index + 1}`,
@@ -217,7 +217,7 @@ const ImportRequirements = ({ onImportSuccess }) => {
 
       // Log the created requirement for debugging
       console.log(`Created requirement ${index}:`, requirement);
-      
+
       return requirement;
     }).filter(req => req.id && req.name); // Filter out any rows without ID or name
   };
@@ -225,36 +225,36 @@ const ImportRequirements = ({ onImportSuccess }) => {
   // Helper to map priority values
   const mapPriority = (priority) => {
     if (!priority) return 'Medium';
-    
+
     const val = String(priority).toLowerCase();
     if (['high', '1', 'critical'].includes(val)) return 'High';
     if (['medium', '2', 'major'].includes(val)) return 'Medium';
     if (['low', '3', 'minor'].includes(val)) return 'Low';
-    
+
     return 'Medium';
   };
 
   // Helper to parse rating values (1-5)
   const parseRating = (value) => {
     if (value === undefined || value === null || value === '') return 3; // Default to middle value
-    
+
     const parsed = parseInt(value, 10);
     if (isNaN(parsed)) return 3;
-    
+
     return Math.min(Math.max(parsed, 1), 5); // Clamp between 1-5
   };
 
   // Validate requirements data
   const validateRequirements = (requirements) => {
     const errors = [];
-    
+
     if (!requirements || requirements.length === 0) {
       errors.push('No requirements found in the file');
       return errors;
     }
-    
+
     console.log(`Validating ${requirements.length} requirements`); // Debug logging
-    
+
     // Check for required fields and format validation
     requirements.forEach((req, index) => {
       // If this is an empty object or missing crucial fields, skip detailed validation
@@ -262,9 +262,9 @@ const ImportRequirements = ({ onImportSuccess }) => {
         errors.push(`Empty requirement object at index ${index}`);
         return;
       }
-      
+
       console.log(`Validating requirement ${index}:`, req.id); // Debug logging
-      
+
       // Validate ID format and uniqueness
       if (!req.id) {
         errors.push(`Missing ID for requirement at index ${index}`);
@@ -275,12 +275,12 @@ const ImportRequirements = ({ onImportSuccess }) => {
           errors.push(`Invalid ID format: ${req.id}. Expected format: REQ-XXX where XXX is a number`);
         }
       }
-      
+
       // Validate name is present
       if (!req.name || (typeof req.name === 'string' && req.name.trim() === '')) {
         errors.push(`Missing Name/Title for requirement with ID ${req.id || `at index ${index}`}`);
       }
-      
+
       // Validate rating fields (1-5 range) if they exist
       ['businessImpact', 'technicalComplexity', 'regulatoryFactor', 'usageFrequency'].forEach(field => {
         if (req[field] !== undefined && req[field] !== null) {
@@ -290,33 +290,55 @@ const ImportRequirements = ({ onImportSuccess }) => {
           }
         }
       });
-      
+
       // Validate priority if present
       if (req.priority && !['High', 'Medium', 'Low'].includes(req.priority)) {
         errors.push(`Invalid priority '${req.priority}' for ${req.id || `requirement at index ${index}`}. Must be 'High', 'Medium', or 'Low'`);
       }
     });
-    
+
     return errors;
   };
 
   // Process the import
-  const handleImport = () => {
+  const handleImport = async () => {  // ✅ CHANGED: Make it async
     if (!processedData || !validationSuccess) return;
-    
+
     try {
-      // Update the DataStore
-      const updatedRequirements = dataStore.setRequirements(processedData);
-      
+      console.log(`📥 Importing ${processedData.length} requirements...`);
+
+      // ✅ CHANGED: Loop through and add each requirement individually
+      // This ensures each one gets sent to the API with workspace_id
+      const importedRequirements = [];
+      const errors = [];
+
+      for (const requirement of processedData) {
+        try {
+          await dataStore.addRequirement(requirement);
+          importedRequirements.push(requirement);
+          console.log(`✅ Imported requirement: ${requirement.id}`);
+        } catch (error) {
+          console.error(`❌ Failed to import ${requirement.id}:`, error.message);
+          errors.push(`${requirement.id}: ${error.message}`);
+        }
+      }
+
+      // Show results
+      if (errors.length > 0) {
+        console.warn(`⚠️ ${errors.length} requirements failed to import:`, errors);
+        alert(`Imported ${importedRequirements.length} requirements, ${errors.length} failed:\n${errors.join('\n')}`);
+      } else {
+        console.log(`🎉 Successfully imported all ${importedRequirements.length} requirements`);
+      }
+
       // Notify parent component of successful import
       if (onImportSuccess) {
-        onImportSuccess(updatedRequirements);
+        onImportSuccess(importedRequirements);
       }
-      
+
       // Reset the form
       resetForm();
 
-      console.log("Requirements imported successfully:", updatedRequirements);
     } catch (error) {
       console.error("Error importing requirements:", error);
       setValidationErrors([`Error importing data: ${error.message}`]);
@@ -404,10 +426,10 @@ const ImportRequirements = ({ onImportSuccess }) => {
     ];
 
     const allData = [...instructionRows, ...csvData];
-    
+
     // Convert to CSV
     const headers = Object.keys(allData[0]);
-    const csvRows = allData.map(row => 
+    const csvRows = allData.map(row =>
       headers.map(header => {
         const value = row[header] || '';
         if (typeof value === 'string' && (value.includes(',') || value.includes('\n') || value.includes('"'))) {
@@ -416,9 +438,9 @@ const ImportRequirements = ({ onImportSuccess }) => {
         return value;
       }).join(',')
     );
-    
+
     const csvContent = [headers.join(','), ...csvRows].join('\n');
-    
+
     // Download file
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
@@ -436,7 +458,7 @@ const ImportRequirements = ({ onImportSuccess }) => {
     const sampleTemplate = [
       {
         id: "SAMPLE-REQ-001",
-        name: "[SAMPLE] User Authentication", 
+        name: "[SAMPLE] User Authentication",
         description: "[DEMO] Users should be able to log in to their account using valid credentials.",
         priority: "High",
         type: "Functional",
@@ -451,7 +473,7 @@ const ImportRequirements = ({ onImportSuccess }) => {
       },
       {
         id: "SAMPLE-REQ-002",
-        name: "[SAMPLE] Dashboard Content", 
+        name: "[SAMPLE] Dashboard Content",
         description: "[DEMO] The homepage dashboard should display all essential e-commerce elements.",
         priority: "Medium",
         type: "Functional",
@@ -467,8 +489,8 @@ const ImportRequirements = ({ onImportSuccess }) => {
     ];
 
     // Create JSONC with comments
-    const jsonContent = 
-`// Requirements Sample Template
+    const jsonContent =
+      `// Requirements Sample Template
 // Delete these comments before importing
 /* 
   Required fields:
@@ -490,7 +512,7 @@ const ImportRequirements = ({ onImportSuccess }) => {
 */
 
 ${JSON.stringify(sampleTemplate, null, 2)}`;
-    
+
     // Download file
     const blob = new Blob([jsonContent], { type: 'application/jsonc;charset=utf-8;' });
     const link = document.createElement('a');
@@ -506,15 +528,14 @@ ${JSON.stringify(sampleTemplate, null, 2)}`;
   return (
     <div className="bg-white p-6 rounded shadow">
       <h2 className="text-xl font-semibold mb-4">Import Requirements</h2>
-      
+
       {/* File Upload Area */}
-      <div 
-        className={`mb-4 border-2 border-dashed rounded-lg p-6 text-center ${
-          file ? 
-            (validationErrors.length > 0 ? 'border-red-300 bg-red-50' : 
-             validationSuccess ? 'border-green-300 bg-green-50' : 'border-blue-300 bg-blue-50') 
+      <div
+        className={`mb-4 border-2 border-dashed rounded-lg p-6 text-center ${file ?
+            (validationErrors.length > 0 ? 'border-red-300 bg-red-50' :
+              validationSuccess ? 'border-green-300 bg-green-50' : 'border-blue-300 bg-blue-50')
             : 'border-gray-300 hover:border-blue-400 hover:bg-blue-50'
-        }`}
+          }`}
         onDrop={handleDrop}
         onDragOver={handleDragOver}
       >
@@ -526,7 +547,7 @@ ${JSON.stringify(sampleTemplate, null, 2)}`;
           className="hidden"
           id="requirement-file-input"
         />
-        
+
         {!file && (
           <div>
             <svg className="w-12 h-12 mx-auto text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -558,13 +579,13 @@ ${JSON.stringify(sampleTemplate, null, 2)}`;
             </div>
           </div>
         )}
-        
+
         {file && (
           <div>
             <p className="text-lg mb-2">
               <span className="font-medium">{file.name}</span> ({Math.round(file.size / 1024)} KB)
             </p>
-            
+
             {isValidating && (
               <div className="my-4 flex items-center justify-center">
                 <svg className="w-6 h-6 animate-spin text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -576,7 +597,7 @@ ${JSON.stringify(sampleTemplate, null, 2)}`;
           </div>
         )}
       </div>
-      
+
       {/* Validation Errors */}
       {validationErrors.length > 0 && (
         <div className="mb-4 p-4 bg-red-50 border border-red-300 rounded-md">
@@ -588,7 +609,7 @@ ${JSON.stringify(sampleTemplate, null, 2)}`;
           </ul>
         </div>
       )}
-      
+
       {/* Validation Success */}
       {validationSuccess && (
         <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-md">
@@ -596,7 +617,7 @@ ${JSON.stringify(sampleTemplate, null, 2)}`;
           <p className="text-green-600">
             Ready to import.
           </p>
-          
+
           {processedData && (
             <div className="mt-3 text-sm text-green-700">
               <p>Found {processedData.length} requirements</p>
@@ -624,7 +645,7 @@ ${JSON.stringify(sampleTemplate, null, 2)}`;
               </svg>
               Confirm and Import
             </button>
-            
+
             <button
               onClick={resetForm}
               className="flex items-center px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-md shadow-sm hover:bg-gray-50 focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
@@ -637,7 +658,7 @@ ${JSON.stringify(sampleTemplate, null, 2)}`;
           </div>
         </div>
       )}
-          {/* Show Reset button only if a file is selected but validation failed */}
+      {/* Show Reset button only if a file is selected but validation failed */}
       {file && validationErrors.length > 0 && (
         <div className="flex justify-end mt-4">
           <button
