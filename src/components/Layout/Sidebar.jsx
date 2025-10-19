@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { 
+import {
   Home, FileText, CheckSquare, GitBranch, BarChart,
   Upload, Calendar, GitMerge, ChevronDown, Settings,
-  Plus, ChevronsUpDown
+  Plus, ChevronsUpDown, LogOut
 } from 'lucide-react';
 import { useWorkspaceContext } from '../../contexts/WorkspaceContext';
 import { Popover } from '../UI/Popover';
@@ -20,6 +20,21 @@ const Sidebar = () => {
     localStorage.setItem('currentWorkspace', JSON.stringify(workspace));
     dataStore.setCurrentWorkspace(workspace.id);
     setIsWorkspaceMenuOpen(false);
+  };
+
+  const handleLogout = () => {
+    // Clear auth data
+    authService.logout();
+
+    // Clear workspace data
+    setCurrentWorkspace(null);
+    localStorage.removeItem('currentWorkspace');
+
+    // Clear data store
+    dataStore.clearAll();
+
+    // Redirect to login
+    navigate('/login');
   };
 
   const navItems = [
@@ -56,16 +71,15 @@ const Sidebar = () => {
               <div className="px-3 py-1 text-xs font-semibold text-gray-400 uppercase">
                 Workspaces
               </div>
-              
+
               <div className="max-h-64 overflow-y-auto">
                 {workspaces.map((workspace) => (
                   <button
                     key={workspace.id}
-                    className={`w-full text-left px-3 py-2 text-sm flex items-center space-x-2 ${
-                      workspace.id === currentWorkspace?.id 
-                        ? 'bg-[#283548] text-white' 
+                    className={`w-full text-left px-3 py-2 text-sm flex items-center space-x-2 ${workspace.id === currentWorkspace?.id
+                        ? 'bg-[#283548] text-white'
                         : 'text-gray-300 hover:bg-[#283548]'
-                    }`}
+                      }`}
                     onClick={() => handleWorkspaceChange(workspace)}
                   >
                     <div className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0"></div>
@@ -73,7 +87,7 @@ const Sidebar = () => {
                   </button>
                 ))}
               </div>
-              
+
               <div className="border-t border-[#2a3a50] mt-2 pt-2 px-2">
                 <button
                   className="w-full text-left px-2 py-2 text-sm text-gray-300 hover:bg-[#283548] rounded-md flex items-center space-x-2"
@@ -85,7 +99,7 @@ const Sidebar = () => {
                   <Plus size={16} className="flex-shrink-0" />
                   <span>Manage Workspaces</span>
                 </button>
-                
+
                 {currentWorkspace && (
                   <button
                     className="w-full text-left px-2 py-2 text-sm text-gray-300 hover:bg-[#283548] rounded-md flex items-center space-x-2"
@@ -102,12 +116,12 @@ const Sidebar = () => {
             </div>
           }
         />
-        
+
         <div className="mt-2 text-xs text-gray-500 px-2">
           Quality Tracker
         </div>
       </div>
-      
+
       {/* MIDDLE SECTION: Navigation Links - Scrollable */}
       <div className="flex-1 overflow-y-auto py-4">
         <ul className="space-y-1 px-2">
@@ -133,17 +147,33 @@ const Sidebar = () => {
           })}
         </ul>
       </div>
-      
+
+      {/* BOTTOM SECTION: User Section - Fixed at bottom */}
       {/* BOTTOM SECTION: User Section - Fixed at bottom */}
       <div className="flex-shrink-0 p-4 border-t border-gray-800">
-        <div className="flex items-center">
-          <div className="h-8 w-8 rounded-full bg-blue-500 text-white flex items-center justify-center flex-shrink-0">
-            <span className="text-sm font-medium">JS</span>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center overflow-hidden flex-1">
+            <div className="h-8 w-8 rounded-full bg-blue-500 text-white flex items-center justify-center flex-shrink-0">
+              <span className="text-sm font-medium">
+                {authService.getCurrentUser()?.name?.split(' ').map(n => n[0]).join('').toUpperCase() || 'AU'}
+              </span>
+            </div>
+            <div className="ml-3 overflow-hidden">
+              <p className="text-sm font-medium text-white truncate">
+                {authService.getCurrentUser()?.name || 'Admin User'}
+              </p>
+              <p className="text-xs text-gray-400 truncate">
+                {authService.getCurrentUser()?.email || 'admin@qualitytracker.local'}
+              </p>
+            </div>
           </div>
-          <div className="ml-3 overflow-hidden">
-            <p className="text-sm font-medium text-white truncate">Admin User</p>
-            <p className="text-xs text-gray-400 truncate">admin@qualitytracker.local</p>
-          </div>
+          <button
+            onClick={handleLogout}
+            className="ml-2 p-2 text-gray-400 hover:text-white hover:bg-[#283548] rounded-md transition-colors"
+            title="Logout"
+          >
+            <LogOut size={18} />
+          </button>
         </div>
       </div>
     </div>
