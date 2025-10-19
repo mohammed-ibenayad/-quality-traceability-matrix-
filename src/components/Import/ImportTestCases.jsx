@@ -10,7 +10,7 @@ import GitHubImportTestCases from './GitHubImportTestCases';
 const ImportTestCases = ({ onImportSuccess }) => {
   // Check if this is being used in a tabbed interface
   const [showGitHubImport, setShowGitHubImport] = useState(false);
-  
+
   // File import state
   const [file, setFile] = useState(null);
   const [isValidating, setIsValidating] = useState(false);
@@ -73,26 +73,26 @@ const ImportTestCases = ({ onImportSuccess }) => {
   // Parse JSON/JSONC files
   const parseJSONFile = (selectedFile) => {
     const reader = new FileReader();
-      
+
     reader.onload = (event) => {
       try {
         const fileContent = event.target.result;
         // Parse JSONC (remove comments first)
         const jsonContent = fileContent.replace(/\/\*[\s\S]*?\*\/|([^\\:]|^)\/\/.*$/gm, '');
         const data = JSON.parse(jsonContent);
-        
+
         // Ensure it's an array
         const testCasesArray = Array.isArray(data) ? data : [data];
-        
+
         // Validate the test case data
         const validationErrors = validateTestCases(testCasesArray);
-        
+
         if (validationErrors.length > 0) {
           setValidationErrors(validationErrors);
           setIsValidating(false);
           return;
         }
-        
+
         // Set processed data and validation success
         setProcessedData(testCasesArray);
         setValidationSuccess(true);
@@ -103,12 +103,12 @@ const ImportTestCases = ({ onImportSuccess }) => {
         setIsValidating(false);
       }
     };
-    
+
     reader.onerror = () => {
       setValidationErrors(['Error reading file']);
       setIsValidating(false);
     };
-    
+
     reader.readAsText(selectedFile);
   };
 
@@ -121,7 +121,7 @@ const ImportTestCases = ({ onImportSuccess }) => {
       transformHeader: header => header.trim(), // Trim whitespace from headers
       complete: (results) => {
         console.log("Papa parse results:", results); // Debug logging
-        
+
         if (results.errors && results.errors.length > 0) {
           console.error("CSV parsing errors:", results.errors); // Debug logging
           setValidationErrors(results.errors.map(err => `CSV Error: ${err.message}`));
@@ -132,23 +132,23 @@ const ImportTestCases = ({ onImportSuccess }) => {
         try {
           // Transform CSV data to match test cases structure
           const transformedData = transformCSVToTestCases(results.data);
-          
+
           // Check if we have any valid rows
           if (transformedData.length === 0) {
             setValidationErrors(['No valid test cases found in the file. Please ensure your CSV has at least one row with ID and Name/Title columns.']);
             setIsValidating(false);
             return;
           }
-          
+
           // Validate the test cases data
           const validationErrors = validateTestCases(transformedData);
-          
+
           if (validationErrors.length > 0) {
             setValidationErrors(validationErrors);
             setIsValidating(false);
             return;
           }
-          
+
           // Set processed data and validation success
           setProcessedData(transformedData);
           setValidationSuccess(true);
@@ -170,16 +170,16 @@ const ImportTestCases = ({ onImportSuccess }) => {
   // Transform CSV data to match test cases structure
   const transformCSVToTestCases = (csvData) => {
     console.log("CSV data:", csvData); // Debug logging
-    
+
     // Check if we have actual data
     if (!csvData || csvData.length === 0) {
       throw new Error("CSV file appears to be empty");
     }
-    
+
     // Check the column names in the CSV
     const firstRow = csvData[0];
     console.log("CSV columns:", Object.keys(firstRow)); // Debug logging
-    
+
     return csvData.map((row, index) => {
       // Create a new test case object with case-insensitive field mapping
       // This handles variations in column names regardless of case
@@ -187,7 +187,7 @@ const ImportTestCases = ({ onImportSuccess }) => {
         acc[key.toLowerCase()] = key;
         return acc;
       }, {});
-      
+
       // Function to get value regardless of case
       const getValue = (possibleNames) => {
         for (const name of possibleNames) {
@@ -201,7 +201,7 @@ const ImportTestCases = ({ onImportSuccess }) => {
         }
         return undefined;
       };
-      
+
       // Extract steps as array
       let steps = [];
       const stepsValue = getValue(['Test steps', 'Steps', 'Steps (Text)', 'test_steps']);
@@ -213,7 +213,7 @@ const ImportTestCases = ({ onImportSuccess }) => {
           steps = stepsValue;
         }
       }
-      
+
       // Extract requirement IDs as array
       let requirementIds = [];
       const reqIdsValue = getValue(['Requirement IDs', 'RequirementIDs', 'Requirements', 'Req IDs', 'requirement_ids']);
@@ -225,7 +225,7 @@ const ImportTestCases = ({ onImportSuccess }) => {
           requirementIds = reqIdsValue;
         }
       }
-      
+
       // Extract applicable versions as array
       let applicableVersions = [];
       const versionsValue = getValue(['Applicable Versions', 'Version', 'Versions', 'applicable_versions']);
@@ -237,7 +237,7 @@ const ImportTestCases = ({ onImportSuccess }) => {
           applicableVersions = versionsValue;
         }
       }
-      
+
       // Extract tags as array
       let tags = [];
       const tagsValue = getValue(['Tags', 'tags']);
@@ -249,7 +249,7 @@ const ImportTestCases = ({ onImportSuccess }) => {
           tags = tagsValue;
         }
       }
-      
+
       // Extract values with flexible column name matching
       const testCase = {
         id: getValue(['id', 'ID', 'TC ID', 'Test Case ID', 'TestCase ID', 'Case ID']) || `TC-${index + 1}`,
@@ -271,7 +271,7 @@ const ImportTestCases = ({ onImportSuccess }) => {
       };
 
       console.log(`Created test case ${index}:`, testCase); // Debug logging
-      
+
       return testCase;
     }).filter(tc => tc.id && tc.name); // Filter out any rows without ID or name
   };
@@ -279,53 +279,53 @@ const ImportTestCases = ({ onImportSuccess }) => {
   // Helper to map priority values
   const mapPriority = (priority) => {
     if (!priority) return 'Medium';
-    
+
     const val = String(priority).toLowerCase();
     if (['high', '1', 'critical'].includes(val)) return 'High';
     if (['medium', '2', 'major'].includes(val)) return 'Medium';
     if (['low', '3', 'minor'].includes(val)) return 'Low';
-    
+
     return 'Medium';
   };
 
   // Helper to map automation status values
   const mapAutomationStatus = (status) => {
     if (!status) return 'Manual';
-    
+
     const val = String(status).toLowerCase();
     if (['yes', 'true', 'automated', 'automation'].includes(val)) return 'Automated';
     if (['planned', 'in progress', 'candidate', 'automating'].includes(val)) return 'Candidate';
     if (['no', 'false', 'manual', 'none'].includes(val)) return 'Manual';
-    
+
     return 'Manual';
   };
 
   // Helper to parse estimated duration
   const parseEstimatedDuration = (value) => {
     if (!value) return 5; // Default 5 minutes
-    
+
     if (typeof value === 'number') return value;
-    
+
     // Try to parse string like "2m", "30s", "1h"
     const str = String(value).toLowerCase();
     if (str.endsWith('s')) return parseInt(str) / 60 || 1; // seconds to minutes
     if (str.endsWith('m')) return parseInt(str) || 5; // minutes
     if (str.endsWith('h')) return parseInt(str) * 60 || 60; // hours to minutes
-    
+
     return parseInt(str) || 5; // Just try to parse as number, default 5 minutes
   };
 
   // Validate test cases data
   const validateTestCases = (testCases) => {
     const errors = [];
-    
+
     if (!testCases || testCases.length === 0) {
       errors.push('No test cases found in the file');
       return errors;
     }
-    
+
     console.log(`Validating ${testCases.length} test cases`); // Debug logging
-    
+
     // Check for required fields and format validation
     testCases.forEach((tc, index) => {
       // If this is an empty object or missing crucial fields, skip detailed validation
@@ -333,47 +333,47 @@ const ImportTestCases = ({ onImportSuccess }) => {
         errors.push(`Empty test case object at index ${index}`);
         return;
       }
-      
+
       console.log(`Validating test case ${index}:`, tc.id); // Debug logging
-      
+
       // Validate ID is present
       if (!tc.id) {
         errors.push(`Missing ID for test case at index ${index}`);
       }
-      
+
       // Validate name is present
       if (!tc.name || (typeof tc.name === 'string' && tc.name.trim() === '')) {
         errors.push(`Missing Name/Title for test case with ID ${tc.id || `at index ${index}`}`);
       }
-      
+
       // Validate steps is an array
       if (tc.steps && !Array.isArray(tc.steps)) {
         errors.push(`Steps for ${tc.id || `test case at index ${index}`} should be an array of strings`);
       }
-      
+
       // Validate requirementIds is an array
       if (tc.requirementIds && !Array.isArray(tc.requirementIds)) {
         errors.push(`Requirement IDs for ${tc.id || `test case at index ${index}`} should be an array of strings`);
       }
-      
+
       // Validate applicableVersions is an array
       if (tc.applicableVersions && !Array.isArray(tc.applicableVersions)) {
         errors.push(`Applicable Versions for ${tc.id || `test case at index ${index}`} should be an array of strings`);
       }
-      
+
       // Validate tags is an array
       if (tc.tags && !Array.isArray(tc.tags)) {
         errors.push(`Tags for ${tc.id || `test case at index ${index}`} should be an array of strings`);
       }
     });
-    
+
     return errors;
   };
 
   // Extract requirement mappings from test cases
   const extractMappings = (testCases) => {
     const mappings = {};
-    
+
     testCases.forEach(tc => {
       if (tc.requirementIds && Array.isArray(tc.requirementIds) && tc.requirementIds.length > 0) {
         tc.requirementIds.forEach(reqId => {
@@ -386,54 +386,73 @@ const ImportTestCases = ({ onImportSuccess }) => {
         });
       }
     });
-    
+
     return mappings;
   };
 
   // Process the import
-  const handleImport = () => {
+  const handleImport = async () => {  // ✅ Make it async
     if (!processedData || processedData.length === 0) {
       return;
     }
 
     try {
-      // Get existing test cases and append new ones instead of replacing
+      // Get existing test cases to check for duplicates
       const existingTestCases = dataStore.getTestCases();
       const existingIds = new Set(existingTestCases.map(tc => tc.id));
-      
-      // Filter out duplicates (if any exist)
+
+      // Filter out duplicates
       const newTestCases = processedData.filter(tc => !existingIds.has(tc.id));
-      
+
       // Show warning if there are duplicates being skipped
       const duplicateCount = processedData.length - newTestCases.length;
       if (duplicateCount > 0) {
         const proceed = window.confirm(
-          `${duplicateCount} test case(s) with duplicate IDs will be skipped. ` +
+          `${duplicateCount} test case(s) with duplicate IDs will be skipped.\n` +
           `Continue importing ${newTestCases.length} new test cases?`
         );
         if (!proceed) return;
       }
 
-      // Combine existing + new test cases
-      const allTestCases = [...existingTestCases, ...newTestCases];
-      
-      // Update the data store with combined data
-      dataStore.setTestCases(allTestCases);
+      console.log(`📥 Importing ${newTestCases.length} test cases...`);
+
+      // ✅ CHANGED: Loop through and add each test case individually
+      const importedTestCases = [];
+      const errors = [];
+
+      for (const testCase of newTestCases) {
+        try {
+          await dataStore.addTestCase(testCase);
+          importedTestCases.push(testCase);
+          console.log(`✅ Imported test case: ${testCase.id}`);
+        } catch (error) {
+          console.error(`❌ Failed to import ${testCase.id}:`, error.message);
+          errors.push(`${testCase.id}: ${error.message}`);
+        }
+      }
+
+      // Show results
+      if (errors.length > 0) {
+        console.warn(`⚠️ ${errors.length} test cases failed to import:`, errors);
+        alert(`Imported ${importedTestCases.length} test cases, ${errors.length} failed:\n${errors.join('\n')}`);
+      } else {
+        console.log(`🎉 Successfully imported all ${importedTestCases.length} test cases`);
+      }
 
       // Process requirement mappings if option is selected
       if (importOption === 'withMapping') {
-        const mappings = extractMappings(newTestCases);
+        const mappings = extractMappings(importedTestCases);
         if (Object.keys(mappings).length > 0) {
           dataStore.updateMappings(mappings);
           console.log('✅ Updated requirement mappings:', mappings);
         }
       }
 
-      // Call success handler with only the NEW test cases for reporting
+      // Call success handler with imported test cases
       if (onImportSuccess) {
-        onImportSuccess(newTestCases);
+        onImportSuccess(importedTestCases);
       }
-      
+
       // Reset the form
       setFile(null);
       setProcessedData(null);
@@ -499,7 +518,7 @@ const ImportTestCases = ({ onImportSuccess }) => {
         'Estimate': '2m'
       },
       {
-        'ID': 'SAMPLE-TC-002', 
+        'ID': 'SAMPLE-TC-002',
         'Title': '[SAMPLE] Login with invalid credentials',
         'Description': '[DEMO] Verify appropriate error message when using invalid credentials',
         'Section': 'Authentication',
@@ -556,10 +575,10 @@ const ImportTestCases = ({ onImportSuccess }) => {
     ];
 
     const allData = [...instructionRows, ...csvData];
-    
+
     // Convert to CSV
     const headers = Object.keys(allData[0]);
-    const csvRows = allData.map(row => 
+    const csvRows = allData.map(row =>
       headers.map(header => {
         const value = row[header] || '';
         if (typeof value === 'string' && (value.includes(',') || value.includes('\n') || value.includes('"'))) {
@@ -568,9 +587,9 @@ const ImportTestCases = ({ onImportSuccess }) => {
         return value;
       }).join(',')
     );
-    
+
     const csvContent = [headers.join(','), ...csvRows].join('\n');
-    
+
     // Download file
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
@@ -593,48 +612,48 @@ const ImportTestCases = ({ onImportSuccess }) => {
         'Test Case ID': '',  // Alternative ID column name
         'TestCase ID': '',   // Alternative ID column name  
         'Case ID': '',       // Alternative ID column name
-        
+
         // Name/Title variations
         'Title': '[SAMPLE] Comprehensive Test Case Example',
         'Test Case': '',     // Alternative name column
-        
+
         // Description
         'Description': '[DEMO] This is a comprehensive example showing all possible fields',
-        
+
         // Steps variations  
         'Test steps': 'Step 1: Do something\nStep 2: Do something else\nStep 3: Verify result',
         'Steps': '',         // Alternative steps column
         'Steps (Text)': '',  // Alternative steps column
-        
+
         // Expected Result variations
         'Expected Result': 'The expected outcome after executing all steps',
         'Expected': '',      // Alternative expected result column
-        
+
         // Section/Category variations
         'Section': 'Main Module > Sub Module > Feature',
         'Module': '',        // Alternative section column
         'Suite': '',         // Alternative section column
         'Category': '',      // Alternative section column
-        
+
         // Priority
         'Priority': 'High',  // High/Medium/Low or 1/2/3 or Critical/Major/Minor
-        
+
         // Status
         'Status': 'Not Run', // Not Run, Passed, Failed, Blocked, etc.
-        
+
         // Automation variations
         'Automation Candidate': 'Yes',
         'Is Automated': '',  // Alternative automation column
         'Automation Type': '',// Alternative automation column
-        
+
         // Versions
         'Applicable Versions': 'v1.0,v1.1,v2.0',
         'Version': '',       // Alternative version column (single)
-        
+
         // Tags and Type
         'Type': 'Functional',
         'Tags': 'Sample,Comprehensive,Template',
-        
+
         // Other common fields
         'Preconditions': 'System must be in a specific state before test execution',
         'Test Level': 'System',     // Test level classification
@@ -642,7 +661,7 @@ const ImportTestCases = ({ onImportSuccess }) => {
         'Estimate': '5m',           // Time estimate
         'Created By': 'QA Team',    // Test case author
         'Assigned To': 'Tester',    // Test case assignee
-        
+
         // Requirement Mapping columns
         'Requirement IDs': 'REQ-001,REQ-002,REQ-003',  // Comma-separated requirement IDs
         'RequirementIDs': '',                          // Alternative column name
@@ -672,13 +691,13 @@ const ImportTestCases = ({ onImportSuccess }) => {
       {
         'ID': '# COLUMN ALTERNATIVES - DELETE THIS ROW',
         'Title': 'Alternative names: Test Case',
-        'Description': 'Alternative names: Details',  
+        'Description': 'Alternative names: Details',
         'Test steps': 'Alternative names: Steps, Steps (Text)',
         'Expected Result': 'Alternative names: Expected',
         'Section': 'Alternative names: Module, Suite, Category',
         'Priority': 'Same values work for all priority columns',
         'Status': 'Standard test execution statuses',
-        'Automation Candidate': 'Alternative names: Is Automated, Automation Type',  
+        'Automation Candidate': 'Alternative names: Is Automated, Automation Type',
         'Applicable Versions': 'Alternative names: Version (for single version)',
         'Type': 'Test Level, Environment also become tags',
         'Estimate': 'Duration estimates in human readable format',
@@ -688,10 +707,10 @@ const ImportTestCases = ({ onImportSuccess }) => {
     ];
 
     const allData = [...instructionRows, ...comprehensiveTemplate];
-    
+
     // Convert to CSV
     const headers = Object.keys(allData[0]);
-    const csvRows = allData.map(row => 
+    const csvRows = allData.map(row =>
       headers.map(header => {
         const value = row[header] || '';
         if (typeof value === 'string' && (value.includes(',') || value.includes('\n') || value.includes('"'))) {
@@ -700,9 +719,9 @@ const ImportTestCases = ({ onImportSuccess }) => {
         return value;
       }).join(',')
     );
-    
+
     const csvContent = [headers.join(','), ...csvRows].join('\n');
-    
+
     // Download file
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
@@ -745,15 +764,14 @@ const ImportTestCases = ({ onImportSuccess }) => {
           Import from GitHub
         </button>
       </div>
-      
+
       {/* File Upload Area */}
-      <div 
-        className={`mb-4 border-2 border-dashed rounded-lg p-6 text-center ${
-          file ? 
-            (validationErrors.length > 0 ? 'border-red-300 bg-red-50' : 
-             validationSuccess ? 'border-green-300 bg-green-50' : 'border-blue-300 bg-blue-50') 
-            : 'border-gray-300 hover:border-blue-400 hover:bg-blue-50'
-        }`}
+      <div
+        className={`mb-4 border-2 border-dashed rounded-lg p-6 text-center ${file ?
+          (validationErrors.length > 0 ? 'border-red-300 bg-red-50' :
+            validationSuccess ? 'border-green-300 bg-green-50' : 'border-blue-300 bg-blue-50')
+          : 'border-gray-300 hover:border-blue-400 hover:bg-blue-50'
+          }`}
         onDrop={handleDrop}
         onDragOver={handleDragOver}
       >
@@ -765,7 +783,7 @@ const ImportTestCases = ({ onImportSuccess }) => {
           className="hidden"
           id="test-case-file-input"
         />
-        
+
         {!file && (
           <div>
             <svg className="w-12 h-12 mx-auto text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -780,12 +798,12 @@ const ImportTestCases = ({ onImportSuccess }) => {
             <p className="mt-2 text-sm text-gray-500">
               Supported file types: .json, .jsonc, .csv
             </p>
-            
+
             {/* Add download template links */}
             <div className="mt-4 flex justify-center space-x-4">
-              <a 
-                href="/sample-testcases.jsonc" 
-                download 
+              <a
+                href="/sample-testcases.jsonc"
+                download
                 className="text-sm text-blue-600 hover:text-blue-800"
               >
                 Download JSON Template
@@ -832,13 +850,13 @@ const ImportTestCases = ({ onImportSuccess }) => {
             </div>
           </div>
         )}
-        
+
         {file && (
           <div>
             <p className="text-lg mb-2">
               <span className="font-medium">{file.name}</span> ({Math.round(file.size / 1024)} KB)
             </p>
-            
+
             {isValidating && (
               <div className="my-4 flex items-center justify-center">
                 <svg className="w-6 h-6 animate-spin text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -850,9 +868,9 @@ const ImportTestCases = ({ onImportSuccess }) => {
           </div>
         )}
       </div>
-      
 
-      
+
+
       {/* Import Options */}
       <div className="mb-4 bg-blue-50 p-3 rounded border border-blue-100">
         <h3 className="text-sm font-medium text-blue-800 mb-2">Import Options:</h3>
@@ -884,7 +902,7 @@ const ImportTestCases = ({ onImportSuccess }) => {
           When importing with mappings, test cases that include requirement IDs will be automatically linked to those requirements.
         </p>
       </div>
-      
+
       {/* Validation Errors */}
       {validationErrors.length > 0 && (
         <div className="mb-4 p-4 bg-red-50 border border-red-300 rounded-md">
@@ -894,7 +912,7 @@ const ImportTestCases = ({ onImportSuccess }) => {
               <li key={index}>{error}</li>
             ))}
           </ul>
-          
+
           {/* Show Reset button when validation fails */}
           <div className="flex justify-end mt-4">
             <button
@@ -909,7 +927,7 @@ const ImportTestCases = ({ onImportSuccess }) => {
           </div>
         </div>
       )}
-      
+
       {/* Validation Success */}
       {validationSuccess && (
         <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-md">
@@ -917,14 +935,14 @@ const ImportTestCases = ({ onImportSuccess }) => {
           <p className="text-green-600">
             Ready to import.
           </p>
-          
+
           {processedData && (
             <div className="mb-3 text-sm text-green-700">
               <p>Found {processedData.length} test cases</p>
               {importOption === 'withMapping' && (
                 <p className="mt-1">
                   {Object.keys(extractMappings(processedData)).length} requirements will be mapped
-                  {Object.keys(extractMappings(processedData)).length === 0 && 
+                  {Object.keys(extractMappings(processedData)).length === 0 &&
                     <span className="text-yellow-600"> (No requirement IDs found in test cases)</span>
                   }
                 </p>
@@ -959,7 +977,7 @@ const ImportTestCases = ({ onImportSuccess }) => {
               </svg>
               Confirm and Import
             </button>
-            
+
             <button
               onClick={resetForm}
               className="flex items-center px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-md shadow-sm hover:bg-gray-50 focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"

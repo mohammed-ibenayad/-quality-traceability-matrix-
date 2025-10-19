@@ -7,6 +7,8 @@ import {
 } from 'lucide-react';
 import { useWorkspaceContext } from '../../contexts/WorkspaceContext';
 import { Popover } from '../UI/Popover';
+import dataStore from '../../services/DataStore';
+
 
 const Sidebar = () => {
   const navigate = useNavigate();
@@ -16,17 +18,18 @@ const Sidebar = () => {
   const handleWorkspaceChange = (workspace) => {
     setCurrentWorkspace(workspace);
     localStorage.setItem('currentWorkspace', JSON.stringify(workspace));
+    dataStore.setCurrentWorkspace(workspace.id);
     setIsWorkspaceMenuOpen(false);
   };
 
   const navItems = [
     { name: 'Dashboard', path: '/', icon: Home },
+    { name: 'Releases', path: '/releases', icon: Calendar },
     { name: 'Requirements', path: '/requirements', icon: FileText },
     { name: 'Test Cases', path: '/testcases', icon: CheckSquare },
-    { name: 'Traceability', path: '/matrix', icon: GitBranch },
-    { name: 'Releases', path: '/releases', icon: Calendar },
+    //{ name: 'Traceability', path: '/matrix', icon: GitBranch },    
     { name: 'Import', path: '/import', icon: Upload },
-    { name: 'GitHub Sync', path: '/sync', icon: GitMerge },
+    //{ name: 'GitHub Sync', path: '/sync', icon: GitMerge },
     { name: 'Roadmap', path: '/roadmap', icon: BarChart }
   ];
 

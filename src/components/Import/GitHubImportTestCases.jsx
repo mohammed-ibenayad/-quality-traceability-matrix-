@@ -11,23 +11,23 @@ const GitHubImportTestCases = ({ onImportSuccess }) => {
     ghToken: '',
     testPaths: ['tests/', 'test/', '__tests__/', 'src/test/', 'spec/']
   });
-  
+
   // UI state
   const [isConnecting, setIsConnecting] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [connectionError, setConnectionError] = useState(null);
   const [repoData, setRepoData] = useState(null);
-  
+
   // Test discovery state
   const [discoveredTests, setDiscoveredTests] = useState([]);
   const [isDiscovering, setIsDiscovering] = useState(false);
   const [selectedTests, setSelectedTests] = useState(new Set());
-  
+
   // Import state
   const [isImporting, setIsImporting] = useState(false);
   const [importProgress, setImportProgress] = useState(0);
   const [importResults, setImportResults] = useState(null);
-  
+
   // Sync configuration
   const [syncConfig, setSyncConfig] = useState({
     enabled: false,
@@ -76,7 +76,7 @@ const GitHubImportTestCases = ({ onImportSuccess }) => {
       }
 
       const [owner, repo] = urlParts;
-      
+
       // Test GitHub connection and get repository info
       const response = await fetch(`https://api.github.com/repos/${owner}/${repo}`, {
         headers: {
@@ -106,10 +106,10 @@ const GitHubImportTestCases = ({ onImportSuccess }) => {
 
       setIsConnected(true);
       saveConfiguration();
-      
+
       // Auto-discover tests after connection
       await discoverTests(owner, repo.replace('.git', ''));
-      
+
     } catch (error) {
       setConnectionError(error.message);
       setIsConnected(false);
@@ -177,7 +177,7 @@ const GitHubImportTestCases = ({ onImportSuccess }) => {
       // Remove duplicates by ID (just in case)
       const uniqueTests = [];
       const seenIds = new Set();
-      
+
       foundTests.forEach(test => {
         if (!seenIds.has(test.id)) {
           seenIds.add(test.id);
@@ -189,7 +189,7 @@ const GitHubImportTestCases = ({ onImportSuccess }) => {
 
       console.log(`🎯 Discovery complete: ${uniqueTests.length} unique tests found`);
       setDiscoveredTests(uniqueTests);
-      
+
     } catch (error) {
       console.error('❌ Error discovering tests:', error);
       setConnectionError(`Failed to discover tests: ${error.message}`);
@@ -221,7 +221,7 @@ const GitHubImportTestCases = ({ onImportSuccess }) => {
                 'Accept': 'application/vnd.github.v3+json'
               }
             });
-            
+
             if (dirResponse.ok) {
               const dirContents = await dirResponse.json();
               await processDirectoryContents(dirContents, owner, repo, item.path, foundTests);
@@ -241,93 +241,93 @@ const GitHubImportTestCases = ({ onImportSuccess }) => {
   };
 
   // Extract test cases from file content
-const extractTestCases = (content, filePath, filename) => {
-  const tests = [];
-  const lines = content.split('\n');
-  
-  // Generate unique IDs across all files by using file path in hash
-  const fileHash = filePath.split('').reduce((a, b) => {
-    a = ((a << 5) - a) + b.charCodeAt(0);
-    return a & a;
-  }, 0);
-  
-  const baseId = Math.abs(fileHash) % 9000 + 1000; // Generate base between 1000-9999
-  let currentTestId = baseId;
+  const extractTestCases = (content, filePath, filename) => {
+    const tests = [];
+    const lines = content.split('\n');
 
-  console.log(`🔍 Processing ${filename}: Base ID = ${baseId}`);
+    // Generate unique IDs across all files by using file path in hash
+    const fileHash = filePath.split('').reduce((a, b) => {
+      a = ((a << 5) - a) + b.charCodeAt(0);
+      return a & a;
+    }, 0);
 
-  // Different patterns for different test frameworks
-  const testPatterns = [
-    // JavaScript/TypeScript (Jest, Mocha, etc.)
-    /(?:it|test|describe)\s*\(\s*['"`]([^'"`]+)['"`]/g,
-    // Python (pytest, unittest)
-    /def\s+(test_[a-zA-Z0-9_]+)/g,
-    // Java (JUnit)
-    /@Test\s*\n\s*(?:public\s+)?(?:void\s+)?([a-zA-Z0-9_]+)/g,
-    // C# (MSTest, NUnit)
-    /\[Test(?:Method)?\]\s*\n\s*(?:public\s+)?(?:void\s+)?([a-zA-Z0-9_]+)/g,
-    // Go
-    /func\s+(Test[a-zA-Z0-9_]+)/g,
-    // Ruby (RSpec)
-    /(?:it|describe|context)\s+['"`]([^'"`]+)['"`]/g
-  ];
+    const baseId = Math.abs(fileHash) % 9000 + 1000; // Generate base between 1000-9999
+    let currentTestId = baseId;
 
-  const processedTests = new Set(); // Track processed test names per file
+    console.log(`🔍 Processing ${filename}: Base ID = ${baseId}`);
 
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].trim();
-    
-    for (const pattern of testPatterns) {
-      let match;
-      const globalPattern = new RegExp(pattern.source, 'g');
-      
-      while ((match = globalPattern.exec(line)) !== null) {
-        const testName = match[1];
-        if (testName && testName.length > 0) {
-          
-          // Skip if we already processed this test name in this file
-          const testKey = `${testName}_${i}`;
-          if (processedTests.has(testKey)) {
-            continue;
-          }
-          processedTests.add(testKey);
+    // Different patterns for different test frameworks
+    const testPatterns = [
+      // JavaScript/TypeScript (Jest, Mocha, etc.)
+      /(?:it|test|describe)\s*\(\s*['"`]([^'"`]+)['"`]/g,
+      // Python (pytest, unittest)
+      /def\s+(test_[a-zA-Z0-9_]+)/g,
+      // Java (JUnit)
+      /@Test\s*\n\s*(?:public\s+)?(?:void\s+)?([a-zA-Z0-9_]+)/g,
+      // C# (MSTest, NUnit)
+      /\[Test(?:Method)?\]\s*\n\s*(?:public\s+)?(?:void\s+)?([a-zA-Z0-9_]+)/g,
+      // Go
+      /func\s+(Test[a-zA-Z0-9_]+)/g,
+      // Ruby (RSpec)
+      /(?:it|describe|context)\s+['"`]([^'"`]+)['"`]/g
+    ];
 
-          // Extract description from comments or test name
-          let description = testName;
-          if (i > 0) {
-            const prevLine = lines[i - 1].trim();
-            if (prevLine.startsWith('//') || prevLine.startsWith('#') || prevLine.startsWith('/*')) {
-              description = prevLine.replace(/^\/\/|^#|^\/\*|\*\/$/g, '').trim();
+    const processedTests = new Set(); // Track processed test names per file
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+
+      for (const pattern of testPatterns) {
+        let match;
+        const globalPattern = new RegExp(pattern.source, 'g');
+
+        while ((match = globalPattern.exec(line)) !== null) {
+          const testName = match[1];
+          if (testName && testName.length > 0) {
+
+            // Skip if we already processed this test name in this file
+            const testKey = `${testName}_${i}`;
+            if (processedTests.has(testKey)) {
+              continue;
             }
+            processedTests.add(testKey);
+
+            // Extract description from comments or test name
+            let description = testName;
+            if (i > 0) {
+              const prevLine = lines[i - 1].trim();
+              if (prevLine.startsWith('//') || prevLine.startsWith('#') || prevLine.startsWith('/*')) {
+                description = prevLine.replace(/^\/\/|^#|^\/\*|\*\/$/g, '').trim();
+              }
+            }
+
+            // CHANGED: Use the test name as both ID and name
+            const uniqueTestName = `${testName} (${filename})`; // Keep for reference
+
+            tests.push({
+              id: testName, // CHANGED: Use test name as the ID
+              name: testName, // Use clean test name without filename
+              originalName: testName, // Keep original name for reference
+              uniqueDisplayName: uniqueTestName, // Add this for display if needed
+              description: description || testName,
+              filePath: filePath,
+              fileName: filename,
+              lineNumber: i + 1,
+              automationStatus: 'Automated',
+              status: 'Not Run',
+              framework: detectTestFramework(content, filename),
+              lastSyncDate: new Date().toISOString()
+            });
+
+            console.log(`📝 Extracted: ${testName} from ${filename}:${i + 1}`);
           }
-
-          // CHANGED: Use the test name as both ID and name
-          const uniqueTestName = `${testName} (${filename})`; // Keep for reference
-
-          tests.push({
-            id: testName, // CHANGED: Use test name as the ID
-            name: testName, // Use clean test name without filename
-            originalName: testName, // Keep original name for reference
-            uniqueDisplayName: uniqueTestName, // Add this for display if needed
-            description: description || testName,
-            filePath: filePath,
-            fileName: filename,
-            lineNumber: i + 1,
-            automationStatus: 'Automated',
-            status: 'Not Run',
-            framework: detectTestFramework(content, filename),
-            lastSyncDate: new Date().toISOString()
-          });
-
-          console.log(`📝 Extracted: ${testName} from ${filename}:${i + 1}`);
         }
       }
     }
-  }
 
-  console.log(`✅ Extracted ${tests.length} tests from ${filename}`);
-  return tests;
-};
+    console.log(`✅ Extracted ${tests.length} tests from ${filename}`);
+    return tests;
+  };
   // Detect test framework based on file content and name
   const detectTestFramework = (content, filename) => {
     if (filename.includes('.test.js') || filename.includes('.spec.js')) {
@@ -350,7 +350,7 @@ const extractTestCases = (content, filePath, filename) => {
     if (filename.includes('.rb')) {
       if (content.includes('RSpec')) return 'RSpec';
     }
-    
+
     return 'Unknown';
   };
 
@@ -423,7 +423,7 @@ const extractTestCases = (content, filePath, filename) => {
         // Generate unique ID if duplicate exists
         let testId = test.id;
         let originalId = test.id;
-        
+
         // Check for ID duplicates
         while (existingIds.has(testId) || formattedTests.some(ft => ft.id === testId)) {
           // Find the highest existing TC number and increment
@@ -436,10 +436,10 @@ const extractTestCases = (content, filePath, filename) => {
               .map(ft => parseInt(ft.id.replace('TC_', '')) || 0),
             999 // Start from TC_1000 if no existing tests
           );
-          
+
           testId = `TC_${String(maxId + idCounter).padStart(3, '0')}`;
           idCounter++;
-          
+
           duplicates.push({
             type: 'id',
             original: originalId,
@@ -450,9 +450,9 @@ const extractTestCases = (content, filePath, filename) => {
 
         // Check for name duplicates (less strict - just warn)
         const testNameLower = test.name.toLowerCase();
-        const nameExists = existingNames.has(testNameLower) || 
-                          formattedTests.some(ft => ft.name.toLowerCase() === testNameLower);
-        
+        const nameExists = existingNames.has(testNameLower) ||
+          formattedTests.some(ft => ft.name.toLowerCase() === testNameLower);
+
         if (nameExists && testId === originalId) {
           duplicates.push({
             type: 'name',
@@ -494,9 +494,9 @@ const extractTestCases = (content, filePath, filename) => {
       if (duplicates.length > 0) {
         const idDuplicates = duplicates.filter(d => d.type === 'id');
         const nameDuplicates = duplicates.filter(d => d.type === 'name');
-        
+
         let message = 'Duplicate detection results:\n\n';
-        
+
         if (idDuplicates.length > 0) {
           message += `📝 ${idDuplicates.length} test case ID(s) were automatically renamed:\n`;
           idDuplicates.forEach(d => {
@@ -504,7 +504,7 @@ const extractTestCases = (content, filePath, filename) => {
           });
           message += '\n';
         }
-        
+
         if (nameDuplicates.length > 0) {
           message += `⚠️ ${nameDuplicates.length} test case(s) have similar names to existing tests:\n`;
           nameDuplicates.slice(0, 5).forEach(d => {
@@ -515,9 +515,9 @@ const extractTestCases = (content, filePath, filename) => {
           }
           message += '\n';
         }
-        
+
         message += 'Continue with import?';
-        
+
         const confirmed = window.confirm(message);
         if (!confirmed) {
           setIsImporting(false);
@@ -536,27 +536,61 @@ const extractTestCases = (content, filePath, filename) => {
           //errors.push(`Invalid ID format for test case: ${tc.id}`);
         }
       });
-      
+
       if (errors.length > 0) {
         throw new Error(`Validation failed: ${errors.join(', ')}`);
       }
 
-      // Import through the existing system - append to existing tests
-      const allTestCases = [...existingTestCases, ...formattedTests];
-      const updatedTestCases = dataStore.setTestCases(allTestCases);
+      // Import through the existing system - use addTestCase for each one
+      console.log(`📥 Importing ${formattedTests.length} test cases from GitHub...`);
 
-      setImportResults({
-        success: true,
-        imported: formattedTests.length,
-        total: total,
-        duplicatesHandled: duplicates.length,
-        duplicateDetails: duplicates,
-        timestamp: new Date().toISOString()
-      });
+      const importedTestCases = [];
+      const importErrors = [];
+
+      for (const testCase of formattedTests) {
+        try {
+          await dataStore.addTestCase(testCase);
+          importedTestCases.push(testCase);
+          console.log(`✅ Imported test case from GitHub: ${testCase.id}`);
+
+          // Update progress
+          setImportProgress(Math.round((importedTestCases.length / formattedTests.length) * 100));
+        } catch (error) {
+          console.error(`❌ Failed to import ${testCase.id}:`, error.message);
+          importErrors.push(`${testCase.id}: ${error.message}`);
+        }
+      }
+
+      // Show results
+      if (importErrors.length > 0) {
+        console.warn(`⚠️ ${importErrors.length} test cases from GitHub failed to import:`, importErrors);
+        setImportResults({
+          success: false,
+          imported: importedTestCases.length,
+          total: total,
+          failed: importErrors.length,
+          errors: importErrors,
+          duplicatesHandled: duplicates.length,
+          duplicateDetails: duplicates,
+          timestamp: new Date().toISOString()
+        });
+
+        alert(`Imported ${importedTestCases.length} test cases from GitHub, ${importErrors.length} failed:\n${importErrors.slice(0, 5).join('\n')}${importErrors.length > 5 ? `\n... and ${importErrors.length - 5} more` : ''}`);
+      } else {
+        console.log(`🎉 Successfully imported all ${importedTestCases.length} test cases from GitHub`);
+        setImportResults({
+          success: true,
+          imported: importedTestCases.length,
+          total: total,
+          duplicatesHandled: duplicates.length,
+          duplicateDetails: duplicates,
+          timestamp: new Date().toISOString()
+        });
+      }
 
       // Notify parent component
       if (onImportSuccess) {
-        onImportSuccess(formattedTests);
+        onImportSuccess(importedTestCases);
       }
 
       // Reset selections
@@ -599,30 +633,30 @@ const extractTestCases = (content, filePath, filename) => {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-  <div>
-    <BranchSelector
-      repoUrl={config.repoUrl}
-      ghToken={config.ghToken}
-      selectedBranch={config.branch}
-      onBranchChange={(branch) => setConfig(prev => ({ ...prev, branch }))}
-      disabled={isConnecting}
-    />
-  </div>
+            <div>
+              <BranchSelector
+                repoUrl={config.repoUrl}
+                ghToken={config.ghToken}
+                selectedBranch={config.branch}
+                onBranchChange={(branch) => setConfig(prev => ({ ...prev, branch }))}
+                disabled={isConnecting}
+              />
+            </div>
 
-  <div>
-    <label className="block text-sm font-medium text-gray-700 mb-1">
-      GitHub Token
-    </label>
-    <input
-      type="password"
-      value={config.ghToken}
-      onChange={(e) => setConfig(prev => ({ ...prev, ghToken: e.target.value }))}
-      placeholder="ghp_..."
-      className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-      disabled={isConnecting}
-    />
-  </div>
-</div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                GitHub Token
+              </label>
+              <input
+                type="password"
+                value={config.ghToken}
+                onChange={(e) => setConfig(prev => ({ ...prev, ghToken: e.target.value }))}
+                placeholder="ghp_..."
+                className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                disabled={isConnecting}
+              />
+            </div>
+          </div>
 
           {connectionError && (
             <div className="flex items-center p-3 bg-red-50 border border-red-200 rounded-md">
@@ -713,22 +747,20 @@ const extractTestCases = (content, filePath, filename) => {
                   <button
                     onClick={selectAllTests}
                     disabled={selectedTests.size === discoveredTests.length}
-                    className={`text-sm underline ${
-                      selectedTests.size === discoveredTests.length 
-                        ? 'text-gray-400 cursor-not-allowed' 
-                        : 'text-blue-600 hover:text-blue-800'
-                    }`}
+                    className={`text-sm underline ${selectedTests.size === discoveredTests.length
+                      ? 'text-gray-400 cursor-not-allowed'
+                      : 'text-blue-600 hover:text-blue-800'
+                      }`}
                   >
                     Select All
                   </button>
                   <button
                     onClick={deselectAllTests}
                     disabled={selectedTests.size === 0}
-                    className={`text-sm underline ${
-                      selectedTests.size === 0 
-                        ? 'text-gray-400 cursor-not-allowed' 
-                        : 'text-blue-600 hover:text-blue-800'
-                    }`}
+                    className={`text-sm underline ${selectedTests.size === 0
+                      ? 'text-gray-400 cursor-not-allowed'
+                      : 'text-blue-600 hover:text-blue-800'
+                      }`}
                   >
                     Deselect All
                   </button>
@@ -761,9 +793,8 @@ const extractTestCases = (content, filePath, filename) => {
                 {discoveredTests.map((test, index) => (
                   <div
                     key={`${test.id}-${test.filePath}-${index}`} // Unique key combining ID, file path, and index
-                    className={`p-3 border-b border-gray-100 last:border-b-0 hover:bg-gray-50 ${
-                      selectedTests.has(test.id) ? 'bg-blue-50' : ''
-                    }`}
+                    className={`p-3 border-b border-gray-100 last:border-b-0 hover:bg-gray-50 ${selectedTests.has(test.id) ? 'bg-blue-50' : ''
+                      }`}
                   >
                     <div className="flex items-start">
                       <input
@@ -816,24 +847,21 @@ const extractTestCases = (content, filePath, filename) => {
 
       {/* Import Results */}
       {importResults && (
-        <div className={`p-4 rounded-md mb-4 ${
-          importResults.success ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'
-        }`}>
+        <div className={`p-4 rounded-md mb-4 ${importResults.success ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'
+          }`}>
           <div className="flex items-center">
             {importResults.success ? (
               <CheckCircle className="h-5 w-5 text-green-500 mr-2" />
             ) : (
               <AlertCircle className="h-5 w-5 text-red-500 mr-2" />
             )}
-            <span className={`font-medium ${
-              importResults.success ? 'text-green-800' : 'text-red-800'
-            }`}>
+            <span className={`font-medium ${importResults.success ? 'text-green-800' : 'text-red-800'
+              }`}>
               {importResults.success ? 'Import Successful!' : 'Import Failed'}
             </span>
           </div>
-          <div className={`text-sm mt-1 ${
-            importResults.success ? 'text-green-700' : 'text-red-700'
-          }`}>
+          <div className={`text-sm mt-1 ${importResults.success ? 'text-green-700' : 'text-red-700'
+            }`}>
             {importResults.success ? (
               <div>
                 <p>Successfully imported {importResults.imported} test cases from GitHub repository.</p>
@@ -877,7 +905,7 @@ const extractTestCases = (content, filePath, filename) => {
               />
               <span className="ml-2 text-sm text-gray-700">Enable automatic sync</span>
             </label>
-            
+
             {syncConfig.enabled && (
               <>
                 <div>
@@ -894,7 +922,7 @@ const extractTestCases = (content, filePath, filename) => {
                     <option value="weekly">Weekly</option>
                   </select>
                 </div>
-                
+
                 <label className="flex items-center">
                   <input
                     type="checkbox"

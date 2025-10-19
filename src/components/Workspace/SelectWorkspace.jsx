@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useWorkspaceContext } from '../../contexts/WorkspaceContext';
 import NewWorkspaceModal from './NewWorkspaceModal';
 import { Loader } from 'lucide-react';
+import dataStore from '../../services/DataStore';
 
 const SelectWorkspace = () => {
   const navigate = useNavigate();
@@ -39,6 +40,7 @@ const SelectWorkspace = () => {
   const handleSelectWorkspace = (workspace) => {
     setCurrentWorkspace(workspace);
     localStorage.setItem('currentWorkspace', JSON.stringify(workspace));
+    dataStore.setCurrentWorkspace(workspace.id); 
     navigate('/dashboard');
   };
   
