@@ -24,16 +24,16 @@ import WorkspaceSettings from './components/Workspace/WorkspaceSettings';
 
 function App() {
   const [hasData, setHasData] = useState(false);
-  
+
   // Check for data presence when app loads
   useEffect(() => {
     setHasData(dataStore.hasData());
-    
+
     // Setup a listener for data changes
     const unsubscribe = dataStore.subscribe(() => {
       setHasData(dataStore.hasData());
     });
-    
+
     // Improved test results API handling
     if (!window.qualityTracker) {
       window.qualityTracker = {
@@ -46,7 +46,7 @@ function App() {
           return testResultsApi.test(data);
         }
       };
-      
+
       // Also expose window.receiveTestResults for direct script invocation
       window.receiveTestResults = (data) => {
         console.log("Test results received via window.receiveTestResults:", data);
@@ -57,13 +57,13 @@ function App() {
           return { success: false, error: error.message };
         }
       };
-      
+
       console.log('Quality Tracker APIs registered:');
       console.log('- window.qualityTracker.apis.testResults');
       console.log('- window.qualityTracker.processTestResults(data)');
       console.log('- window.receiveTestResults(data)');
       console.log('Test results callback URL:', testResultsApi.baseUrl);
-      
+
       // Display helper message about how to manually test the API
       console.log('\nTo manually test the API, run this in the console:');
       console.log(`
@@ -81,22 +81,25 @@ window.receiveTestResults({
 }).then(result => console.log("Result:", result));
       `);
     }
-    
+
     return () => {
       unsubscribe();
     };
   }, []);
-  
+
   return (
     <WorkspaceProvider>
       <VersionProvider>
         <Router>
           <Routes>
-            {/* Add workspace routes */}
+            {/* Authentication route - should come first */}
+            <Route path="/login" element={<Login />} />
+
+            {/* Workspace routes */}
             <Route path="/select-workspace" element={<SelectWorkspace />} />
             <Route path="/workspace-settings/:workspaceId" element={<WorkspaceSettings />} />
-            
-            {/* Keep all original routes unchanged */}
+
+            {/* Main application routes */}
             <Route path="/" element={hasData ? <Dashboard /> : <Navigate to="/import" replace />} />
             <Route path="/matrix" element={hasData ? <TraceabilityMatrix /> : <Navigate to="/import" />} />
             <Route path="/requirements" element={<Requirements />} />
@@ -105,8 +108,8 @@ window.receiveTestResults({
             <Route path="/import" element={<ImportData />} />
             <Route path="/roadmap" element={<Roadmap />} />
             <Route path="/sync" element={<GitHubSyncDashboard />} />
-            
-            {/* Redirect any unknown paths to dashboard or import based on data presence */}
+
+            {/* Redirect unknown paths */}
             <Route path="*" element={<Navigate to={hasData ? "/" : "/import"} />} />
           </Routes>
         </Router>
