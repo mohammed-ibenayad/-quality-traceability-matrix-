@@ -391,7 +391,7 @@ const ImportTestCases = ({ onImportSuccess }) => {
   };
 
   // Process the import
-  const handleImport = async () => {  // ✅ CHANGED: Make it async
+  const handleImport = async () => {  // ✅ Make it async
     if (!processedData || processedData.length === 0) {
       return;
     }
@@ -417,7 +417,6 @@ const ImportTestCases = ({ onImportSuccess }) => {
       console.log(`📥 Importing ${newTestCases.length} test cases...`);
 
       // ✅ CHANGED: Loop through and add each test case individually
-      // This ensures each one gets sent to the API with workspace_id
       const importedTestCases = [];
       const errors = [];
 
@@ -769,9 +768,9 @@ const ImportTestCases = ({ onImportSuccess }) => {
       {/* File Upload Area */}
       <div
         className={`mb-4 border-2 border-dashed rounded-lg p-6 text-center ${file ?
-            (validationErrors.length > 0 ? 'border-red-300 bg-red-50' :
-              validationSuccess ? 'border-green-300 bg-green-50' : 'border-blue-300 bg-blue-50')
-            : 'border-gray-300 hover:border-blue-400 hover:bg-blue-50'
+          (validationErrors.length > 0 ? 'border-red-300 bg-red-50' :
+            validationSuccess ? 'border-green-300 bg-green-50' : 'border-blue-300 bg-blue-50')
+          : 'border-gray-300 hover:border-blue-400 hover:bg-blue-50'
           }`}
         onDrop={handleDrop}
         onDragOver={handleDragOver}
