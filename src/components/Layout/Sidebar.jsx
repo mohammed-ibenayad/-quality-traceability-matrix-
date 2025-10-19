@@ -24,12 +24,12 @@ const Sidebar = () => {
 
   const navItems = [
     { name: 'Dashboard', path: '/', icon: Home },
+    { name: 'Releases', path: '/releases', icon: Calendar },
     { name: 'Requirements', path: '/requirements', icon: FileText },
     { name: 'Test Cases', path: '/testcases', icon: CheckSquare },
-    { name: 'Traceability', path: '/matrix', icon: GitBranch },
-    { name: 'Releases', path: '/releases', icon: Calendar },
+    //{ name: 'Traceability', path: '/matrix', icon: GitBranch },    
     { name: 'Import', path: '/import', icon: Upload },
-    { name: 'GitHub Sync', path: '/sync', icon: GitMerge },
+    //{ name: 'GitHub Sync', path: '/sync', icon: GitMerge },
     { name: 'Roadmap', path: '/roadmap', icon: BarChart }
   ];
 
