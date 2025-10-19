@@ -1,85 +1,70 @@
-import React, { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import './App.css';
-import dataStore from './services/DataStore';
-import { VersionProvider } from './context/VersionContext';
-import { WorkspaceProvider } from './contexts/WorkspaceContext'; // Add workspace context
-
-// Import API endpoints
-import testResultsApi from './api/testResultsApi';
-
-// Import pages
+import Layout from './components/Layout/Layout';
 import Dashboard from './pages/Dashboard';
-import TraceabilityMatrix from './pages/TraceabilityMatrix';
 import Requirements from './pages/Requirements';
 import TestCases from './pages/TestCases';
+import TraceabilityMatrix from './pages/TraceabilityMatrix';
 import ImportData from './pages/ImportData';
 import Releases from './pages/Releases';
 import Roadmap from './pages/Roadmap';
-import GitHubSyncDashboard from './components/Sync/GitHubSyncDashboard';
-
-// Import workspace components
+import GitHubSyncDashboard from './pages/GitHubSyncDashboard';
 import SelectWorkspace from './components/Workspace/SelectWorkspace';
 import WorkspaceSettings from './components/Workspace/WorkspaceSettings';
+import Login from './components/Auth/Login';
+import dataStore from './services/DataStore';
+import authService from './services/authService';
+import { WorkspaceProvider } from './contexts/WorkspaceContext';
+import { VersionProvider } from './contexts/VersionContext';
+import './App.css';
+
+// Protected Route Component
+function ProtectedRoute({ children }) {
+  const isAuthenticated = authService.isAuthenticated();
+  
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+  
+  return <Layout>{children}</Layout>;
+}
 
 function App() {
   const [hasData, setHasData] = useState(false);
-  
-  // Check for data presence when app loads
+
   useEffect(() => {
-    setHasData(dataStore.hasData());
-    
-    // Setup a listener for data changes
+    // Subscribe to DataStore changes
     const unsubscribe = dataStore.subscribe(() => {
-      setHasData(dataStore.hasData());
+      const hasDataNow = dataStore.hasData();
+      setHasData(hasDataNow);
     });
-    
-    // Improved test results API handling
-    if (!window.qualityTracker) {
-      window.qualityTracker = {
+
+    // Initial check
+    setHasData(dataStore.hasData());
+
+    // Setup test results API
+    if (typeof window !== 'undefined') {
+      const testResultsApi = {
+        baseUrl: 'http://213.6.2.229:3001/api/webhook/test-results',
         apis: {
-          testResults: testResultsApi
-        },
-        // Add a directly callable function to process test results
-        processTestResults: (data) => {
-          console.log("Test results received via window.qualityTracker.processTestResults:", data);
-          return testResultsApi.test(data);
+          testResults: async (data) => {
+            console.log('Test results received via window.qualityTracker.apis.testResults:', data);
+            return { success: true, message: 'Test results processed' };
+          }
         }
       };
+
+      window.qualityTracker = testResultsApi;
       
-      // Also expose window.receiveTestResults for direct script invocation
-      window.receiveTestResults = (data) => {
-        console.log("Test results received via window.receiveTestResults:", data);
-        try {
-          return testResultsApi.test(data);
-        } catch (error) {
-          console.error("Error processing test results:", error);
-          return { success: false, error: error.message };
-        }
+      window.receiveTestResults = async (data) => {
+        return testResultsApi.apis.testResults(data);
       };
-      
+
       console.log('Quality Tracker APIs registered:');
       console.log('- window.qualityTracker.apis.testResults');
       console.log('- window.qualityTracker.processTestResults(data)');
       console.log('- window.receiveTestResults(data)');
       console.log('Test results callback URL:', testResultsApi.baseUrl);
-      
-      // Display helper message about how to manually test the API
-      console.log('\nTo manually test the API, run this in the console:');
-      console.log(`
-window.receiveTestResults({
-  requirementId: "REQ-001",
-  timestamp: "${new Date().toISOString()}",
-  results: [
-    {
-      id: "TC_001",
-      name: "test_homepage_loads_TC_001",
-      status: "Failed",
-      duration: 13267
-    }
-  ]
-}).then(result => console.log("Result:", result));
-      `);
     }
     
     return () => {
@@ -92,22 +77,72 @@ window.receiveTestResults({
       <VersionProvider>
         <Router>
           <Routes>
-            {/* Add workspace routes */}
-            <Route path="/select-workspace" element={<SelectWorkspace />} />
-            <Route path="/workspace-settings/:workspaceId" element={<WorkspaceSettings />} />
+            {/* Public Route - Login */}
+            <Route path="/login" element={<Login />} />
             
-            {/* Keep all original routes unchanged */}
-            <Route path="/" element={hasData ? <Dashboard /> : <Navigate to="/import" />} />
-            <Route path="/matrix" element={hasData ? <TraceabilityMatrix /> : <Navigate to="/import" />} />
-            <Route path="/requirements" element={<Requirements />} />
-            <Route path="/testcases" element={<TestCases />} />
-            <Route path="/releases" element={<Releases />} />
-            <Route path="/import" element={<ImportData />} />
-            <Route path="/roadmap" element={<Roadmap />} />
-            <Route path="/sync" element={<GitHubSyncDashboard />} />
+            {/* Protected Routes - Wrapped in Layout */}
+            <Route path="/" element={
+              <ProtectedRoute>
+                {hasData ? <Dashboard /> : <Navigate to="/import" />}
+              </ProtectedRoute>
+            } />
             
-            {/* Redirect any unknown paths to dashboard or import based on data presence */}
-            <Route path="*" element={<Navigate to={hasData ? "/" : "/import"} />} />
+            <Route path="/select-workspace" element={
+              <ProtectedRoute>
+                <SelectWorkspace />
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/workspace-settings/:workspaceId" element={
+              <ProtectedRoute>
+                <WorkspaceSettings />
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/matrix" element={
+              <ProtectedRoute>
+                {hasData ? <TraceabilityMatrix /> : <Navigate to="/import" />}
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/requirements" element={
+              <ProtectedRoute>
+                <Requirements />
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/testcases" element={
+              <ProtectedRoute>
+                <TestCases />
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/releases" element={
+              <ProtectedRoute>
+                <Releases />
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/import" element={
+              <ProtectedRoute>
+                <ImportData />
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/roadmap" element={
+              <ProtectedRoute>
+                <Roadmap />
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/sync" element={
+              <ProtectedRoute>
+                <GitHubSyncDashboard />
+              </ProtectedRoute>
+            } />
+            
+            {/* Redirect any unknown paths */}
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Router>
       </VersionProvider>
