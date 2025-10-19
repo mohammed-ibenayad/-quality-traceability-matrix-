@@ -7,7 +7,7 @@ export const Tabs = ({ children, value, onValueChange, className = '' }) => {
         if (!React.isValidElement(child)) return null;
         
         return React.cloneElement(child, {
-          value,
+          currentValue: value,
           onValueChange,
         });
       })}
