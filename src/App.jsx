@@ -17,6 +17,7 @@ import ImportData from './pages/ImportData';
 import Releases from './pages/Releases';
 import Roadmap from './pages/Roadmap';
 import GitHubSyncDashboard from './components/Sync/GitHubSyncDashboard';
+import Login from './components/Auth/Login'; 
 
 // Import workspace components
 import SelectWorkspace from './components/Workspace/SelectWorkspace';
