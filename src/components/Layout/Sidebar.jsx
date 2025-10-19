@@ -35,7 +35,7 @@ const Sidebar = () => {
     dataStore.clearPersistedData();
     
     // Redirect to login
-    navigate('/login');
+    navigate('/login', { replace: true });
   };
 
   const navItems = [
