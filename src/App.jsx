@@ -97,7 +97,7 @@ window.receiveTestResults({
             <Route path="/workspace-settings/:workspaceId" element={<WorkspaceSettings />} />
             
             {/* Keep all original routes unchanged */}
-            <Route path="/" element={hasData ? <Dashboard /> : <Navigate to="/import" />} />
+            <Route path="/" element={hasData ? <Dashboard /> : <Navigate to="/import" replace />} />
             <Route path="/matrix" element={hasData ? <TraceabilityMatrix /> : <Navigate to="/import" />} />
             <Route path="/requirements" element={<Requirements />} />
             <Route path="/testcases" element={<TestCases />} />
