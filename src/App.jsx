@@ -8,7 +8,6 @@ import TraceabilityMatrix from './pages/TraceabilityMatrix';
 import ImportData from './pages/ImportData';
 import Releases from './pages/Releases';
 import Roadmap from './pages/Roadmap';
-import GitHubSyncDashboard from './pages/GitHubSyncDashboard';
 import SelectWorkspace from './components/Workspace/SelectWorkspace';
 import WorkspaceSettings from './components/Workspace/WorkspaceSettings';
 import Login from './components/Auth/Login';
@@ -41,31 +40,6 @@ function App() {
 
     // Initial check
     setHasData(dataStore.hasData());
-
-    // Setup test results API
-    if (typeof window !== 'undefined') {
-      const testResultsApi = {
-        baseUrl: 'http://213.6.2.229:3001/api/webhook/test-results',
-        apis: {
-          testResults: async (data) => {
-            console.log('Test results received via window.qualityTracker.apis.testResults:', data);
-            return { success: true, message: 'Test results processed' };
-          }
-        }
-      };
-
-      window.qualityTracker = testResultsApi;
-      
-      window.receiveTestResults = async (data) => {
-        return testResultsApi.apis.testResults(data);
-      };
-
-      console.log('Quality Tracker APIs registered:');
-      console.log('- window.qualityTracker.apis.testResults');
-      console.log('- window.qualityTracker.processTestResults(data)');
-      console.log('- window.receiveTestResults(data)');
-      console.log('Test results callback URL:', testResultsApi.baseUrl);
-    }
     
     return () => {
       unsubscribe();
@@ -132,12 +106,6 @@ function App() {
             <Route path="/roadmap" element={
               <ProtectedRoute>
                 <Roadmap />
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/sync" element={
-              <ProtectedRoute>
-                <GitHubSyncDashboard />
               </ProtectedRoute>
             } />
             
