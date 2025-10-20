@@ -1630,11 +1630,13 @@ class DataStoreService {
       throw new Error(`Version with ID ${versionId} not found`);
     }
 
+    const workspaceId = this.getCurrentWorkspaceId();
+
     try {
       // Delete from database first
-      const API_BASE_URL = this._getApiBaseUrl();
-      const response = await apiClient.delete(`/api/versions/${versionId}`);
+      const response = await apiClient.delete(`/api/versions/${versionId}?workspace_id=${workspaceId}`);
       console.log(`✅ Deleted version ${versionId} from database`, response.data);
+
 
     } catch (error) {
       console.error('❌ Failed to delete from database:', error);
