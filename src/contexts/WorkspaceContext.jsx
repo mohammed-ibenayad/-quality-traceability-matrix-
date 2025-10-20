@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import apiClient from '../utils/apiClient';
+import dataStore from '../services/DataStore';
 
 const WorkspaceContext = createContext({
   currentWorkspace: null,
@@ -21,6 +22,13 @@ export const WorkspaceProvider = ({ children }) => {
     initializeWorkspace();
   }, []);
 
+  // ✅ ADD THIS: Notify DataStore when workspace changes
+  useEffect(() => {
+    if (currentWorkspace) {
+      console.log('🔄 WorkspaceContext: Setting workspace in DataStore:', currentWorkspace.id);
+      dataStore.setCurrentWorkspace(currentWorkspace.id);
+    }
+  }, [currentWorkspace]);
 
   const initializeWorkspace = async () => {
     try {
@@ -36,13 +44,16 @@ export const WorkspaceProvider = ({ children }) => {
           const parsed = JSON.parse(savedWorkspace);
           const exists = fetchedWorkspaces.find(w => w.id === parsed.id);
           if (exists) {
+            console.log('✅ Restored workspace from localStorage:', exists.name);
             setCurrentWorkspace(exists);
           } else {
             // Saved workspace no longer accessible - clear it and select first available
+            console.log('⚠️ Saved workspace not found, selecting first available');
             localStorage.removeItem('currentWorkspace');
             if (fetchedWorkspaces.length > 0) {
-              setCurrentWorkspace(fetchedWorkspaces[0]);
-              localStorage.setItem('currentWorkspace', JSON.stringify(fetchedWorkspaces[0]));
+              const defaultWorkspace = fetchedWorkspaces[0];
+              setCurrentWorkspace(defaultWorkspace);
+              localStorage.setItem('currentWorkspace', JSON.stringify(defaultWorkspace));
             }
           }
         } catch (e) {
@@ -51,8 +62,10 @@ export const WorkspaceProvider = ({ children }) => {
         }
       } else if (fetchedWorkspaces.length > 0) {
         // No saved workspace - select first one
-        setCurrentWorkspace(fetchedWorkspaces[0]);
-        localStorage.setItem('currentWorkspace', JSON.stringify(fetchedWorkspaces[0]));
+        console.log('✅ No saved workspace, selecting first available');
+        const defaultWorkspace = fetchedWorkspaces[0];
+        setCurrentWorkspace(defaultWorkspace);
+        localStorage.setItem('currentWorkspace', JSON.stringify(defaultWorkspace));
       }
     } catch (error) {
       console.error('Error initializing workspace context:', error);
