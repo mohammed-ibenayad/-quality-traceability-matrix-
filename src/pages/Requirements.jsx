@@ -715,8 +715,8 @@ const Requirements = () => {
               <button
                 onClick={() => setPriorityFilterTab('All')}
                 className={`px-3 py-1.5 text-sm rounded-md transition-colors ${priorityFilterTab === 'All'
-                    ? 'bg-blue-600 text-white font-medium'
-                    : 'bg-white border border-gray-300 text-gray-700 hover:border-gray-400'
+                  ? 'bg-blue-600 text-white font-medium'
+                  : 'bg-white border border-gray-300 text-gray-700 hover:border-gray-400'
                   }`}
               >
                 📊 All ({nonPriorityFilteredRequirements.length})
@@ -725,8 +725,8 @@ const Requirements = () => {
               <button
                 onClick={() => setPriorityFilterTab('High')}
                 className={`px-3 py-1.5 text-sm rounded-md transition-colors ${priorityFilterTab === 'High'
-                    ? 'bg-blue-600 text-white font-medium'
-                    : 'bg-white border border-gray-300 text-gray-700 hover:border-gray-400'
+                  ? 'bg-blue-600 text-white font-medium'
+                  : 'bg-white border border-gray-300 text-gray-700 hover:border-gray-400'
                   }`}
               >
                 🔴 High ({nonPriorityFilteredRequirements.filter(r => r.priority === 'High').length})
@@ -735,8 +735,8 @@ const Requirements = () => {
               <button
                 onClick={() => setPriorityFilterTab('Medium')}
                 className={`px-3 py-1.5 text-sm rounded-md transition-colors ${priorityFilterTab === 'Medium'
-                    ? 'bg-blue-600 text-white font-medium'
-                    : 'bg-white border border-gray-300 text-gray-700 hover:border-gray-400'
+                  ? 'bg-blue-600 text-white font-medium'
+                  : 'bg-white border border-gray-300 text-gray-700 hover:border-gray-400'
                   }`}
               >
                 🟡 Medium ({nonPriorityFilteredRequirements.filter(r => r.priority === 'Medium').length})
@@ -745,8 +745,8 @@ const Requirements = () => {
               <button
                 onClick={() => setPriorityFilterTab('Low')}
                 className={`px-3 py-1.5 text-sm rounded-md transition-colors ${priorityFilterTab === 'Low'
-                    ? 'bg-blue-600 text-white font-medium'
-                    : 'bg-white border border-gray-300 text-gray-700 hover:border-gray-400'
+                  ? 'bg-blue-600 text-white font-medium'
+                  : 'bg-white border border-gray-300 text-gray-700 hover:border-gray-400'
                   }`}
               >
                 🟢 Low ({nonPriorityFilteredRequirements.filter(r => r.priority === 'Low').length})
@@ -819,10 +819,11 @@ const Requirements = () => {
                         className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                       >
                         <option value="All">All Status</option>
-                        <option value="Active">Active</option>
-                        <option value="Proposed">Proposed</option>
-                        <option value="Implemented">Implemented</option>
+                        <option value="Draft">Draft</option>
+                        <option value="In Review">In Review</option>
+                        <option value="Approved">Approved</option>
                         <option value="Deprecated">Deprecated</option>
+                        <option value="Archived">Archived</option>
                       </select>
                     </div>
 
@@ -836,10 +837,11 @@ const Requirements = () => {
                       >
                         <option value="All">All Types</option>
                         <option value="Functional">Functional</option>
+                        <option value="Non-Functional">Non-Functional</option>
                         <option value="Security">Security</option>
                         <option value="Performance">Performance</option>
                         <option value="Usability">Usability</option>
-                        <option value="Compatibility">Compatibility</option>
+                        <option value="Compliance">Compliance</option>
                       </select>
                     </div>
 
@@ -887,8 +889,8 @@ const Requirements = () => {
                                     );
                                   }}
                                   className={`px-3 py-1.5 text-sm rounded-md transition-colors ${isSelected
-                                      ? 'bg-blue-600 text-white font-medium'
-                                      : 'bg-white border border-gray-300 text-gray-700 hover:border-gray-400'
+                                    ? 'bg-blue-600 text-white font-medium'
+                                    : 'bg-white border border-gray-300 text-gray-700 hover:border-gray-400'
                                     }`}
                                 >
                                   {tag} ({count})
