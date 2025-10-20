@@ -37,10 +37,7 @@ const Header = ({
               />
             )}
           </div>
-        )}
-        <div className="h-8 w-8 rounded-full bg-blue-500 text-white flex items-center justify-center">
-          <span className="text-sm font-medium">JS</span>
-        </div>
+        )}        
       </div>
 
       {/* New Release Modal */}

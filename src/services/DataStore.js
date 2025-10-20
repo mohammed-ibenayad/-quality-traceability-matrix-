@@ -110,92 +110,105 @@ class DataStoreService {
   }
 
   /**
+ * Get current workspace ID - throws error if not set
+ * @returns {string} Current workspace ID
+ */
+
+  getCurrentWorkspaceId() {
+    if (this._currentWorkspaceId) {
+      return this._currentWorkspaceId;
+    }
+
+    // Try to get from localStorage
+    const savedWorkspace = localStorage.getItem('currentWorkspace');
+    if (savedWorkspace) {
+      try {
+        const workspace = JSON.parse(savedWorkspace);
+        this._currentWorkspaceId = workspace.id;
+        return workspace.id;
+      } catch (error) {
+        console.error('Error parsing saved workspace:', error);
+      }
+    }
+
+    throw new Error('No workspace selected. Please select a workspace first.');
+  }
+
+  /**
     * Load data from database API
     * @param {string} workspaceId - Optional workspace ID (uses current if not provided)
     * @returns {Promise<boolean>} True if successful
     */
   async loadFromDatabase(workspaceId = null) {
     try {
-      // Use provided workspace ID or current one
-      const targetWorkspaceId = workspaceId || this._currentWorkspaceId;
+      // Get workspace ID - REQUIRED
+      const targetWorkspaceId = workspaceId || this.getCurrentWorkspaceId();
 
       console.log('🔄 Loading data from database API...');
-      console.log('🏢 Target workspace:', targetWorkspaceId || 'DEFAULT');
+      console.log('🏢 Target workspace:', targetWorkspaceId);
 
-      // Get API base URL
-      const API_BASE_URL = this._getApiBaseUrl();
-      console.log('📡 API URL:', API_BASE_URL);
-
-      // Build workspace query parameter
-      const workspaceParam = targetWorkspaceId ? `?workspace_id=${targetWorkspaceId}` : '';
-
-      // Fetch requirements
-      console.log('📥 Fetching requirements...');
+      // ✅ ALWAYS include workspace_id - never make it optional
+      if (!targetWorkspaceId) {
+        throw new Error('workspace_id is required');
+      }
+      const workspaceParam = `?workspace_id=${targetWorkspaceId}`;
+      // Fetch requirements with workspace_id
       try {
         const reqResponse = await apiClient.get(`/api/requirements${workspaceParam}`);
         if (reqResponse.data.success && Array.isArray(reqResponse.data.data)) {
           this._requirements = reqResponse.data.data;
-          console.log(`✅ Loaded ${this._requirements.length} requirements from database`);
+          console.log(`✅ Loaded ${this._requirements.length} requirements`);
         }
       } catch (error) {
         console.error('❌ Failed to fetch requirements:', error.message);
+        if (error.response?.status === 400) {
+          throw new Error('workspace_id is required. Please select a workspace.');
+        }
       }
 
-      // Fetch test cases
-      console.log('📥 Fetching test cases...');
+      // Fetch test cases with workspace_id
       try {
         const tcResponse = await apiClient.get(`/api/test-cases${workspaceParam}`);
         if (tcResponse.data.success && Array.isArray(tcResponse.data.data)) {
-          this._testCases = tcResponse.data.data.map(tc => this._migrateTestCaseVersionFormat(tc));
-          console.log(`✅ Loaded ${this._testCases.length} test cases from database`);
+          this._testCases = tcResponse.data.data;
+          console.log(`✅ Loaded ${this._testCases.length} test cases`);
         }
       } catch (error) {
         console.error('❌ Failed to fetch test cases:', error.message);
+        if (error.response?.status === 400) {
+          throw new Error('workspace_id is required. Please select a workspace.');
+        }
       }
 
-      // Fetch versions
-      console.log('📥 Fetching versions...');
+      // Fetch versions with workspace_id
       try {
         const versionResponse = await apiClient.get(`/api/versions${workspaceParam}`);
         if (versionResponse.data.success && Array.isArray(versionResponse.data.data)) {
           this._versions = versionResponse.data.data;
-          console.log(`✅ Loaded ${this._versions.length} versions from database`);
+          console.log(`✅ Loaded ${this._versions.length} versions`);
         }
       } catch (error) {
         console.error('❌ Failed to fetch versions:', error.message);
       }
 
-      // Fetch mappings
-      console.log('📥 Fetching mappings...');
+      // Fetch mappings with workspace_id
       try {
         const mappingResponse = await apiClient.get(`/api/mappings${workspaceParam}`);
         if (mappingResponse.data.success && mappingResponse.data.data) {
           this._mapping = mappingResponse.data.data;
-          console.log(`✅ Loaded mappings from database`);
+          console.log(`✅ Loaded mappings`);
         }
       } catch (error) {
         console.error('❌ Failed to fetch mappings:', error.message);
       }
 
-      // Mark as initialized if we have data
-      if (this._requirements.length > 0 || this._testCases.length > 0) {
-        this._hasInitializedData = true;
-        console.log('🎯 DataStore initialized with database data');
-      }
-
-      // Save to localStorage for offline use
-      this._saveToLocalStorage('requirements', this._requirements);
-      this._saveToLocalStorage('testCases', this._testCases);
-      this._saveToLocalStorage('mapping', this._mapping);
-      this._saveToLocalStorage('versions', this._versions);
-
-      // Notify listeners
+      this._hasInitializedData = true;
       this._notifyListeners();
 
       return true;
     } catch (error) {
       console.error('❌ Failed to load from database:', error);
-      return false;
+      throw error;
     }
   }
 
@@ -515,68 +528,20 @@ class DataStoreService {
  * @param {string} requirementId - ID of the requirement to delete
  * @returns {boolean} True if successful
  */
-  async deleteRequirement(requirementId) {
-    const index = this._requirements.findIndex(req => req.id === requirementId);
-
-    if (index === -1) {
-      throw new Error(`Requirement with ID ${requirementId} not found`);
-    }
+  async deleteRequirement(id) {
+    const workspaceId = this.getCurrentWorkspaceId();
 
     try {
-      // Delete from database first
-      const API_BASE_URL = this._getApiBaseUrl();
-      const response = await fetch(`${API_BASE_URL}/api/requirements/${requirementId}`, {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      });
+      const response = await apiClient.delete(`/api/requirements/${id}?workspace_id=${workspaceId}`);
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || `Failed to delete requirement: ${response.status}`);
+      if (response.data.success) {
+        this._requirements = this._requirements.filter(r => r.id !== id);
+        this._notifyListeners();
       }
-
-      console.log(`✅ Deleted requirement ${requirementId} from database`);
     } catch (error) {
-      console.error('❌ Failed to delete from database:', error);
-      console.warn('⚠️ Continuing with local delete only');
+      console.error('Error deleting requirement:', error);
+      throw error;
     }
-
-    // Remove from local array
-    const requirement = this._requirements[index];
-    this._requirements.splice(index, 1);
-
-    // Clean up mappings
-    if (this._mapping[requirementId]) {
-      const mappedTestCaseIds = this._mapping[requirementId];
-
-      mappedTestCaseIds.forEach(testCaseId => {
-        const testCase = this._testCases.find(tc => tc.id === testCaseId);
-        if (testCase && testCase.requirementIds) {
-          testCase.requirementIds = testCase.requirementIds.filter(reqId => reqId !== requirementId);
-        }
-      });
-
-      delete this._mapping[requirementId];
-    }
-
-    // Defensive cleanup
-    this._testCases.forEach(testCase => {
-      if (testCase.requirementIds && testCase.requirementIds.includes(requirementId)) {
-        testCase.requirementIds = testCase.requirementIds.filter(reqId => reqId !== requirementId);
-      }
-    });
-
-    // Save to localStorage
-    this._saveToLocalStorage('requirements', this._requirements);
-    this._saveToLocalStorage('testCases', this._testCases);
-    this._saveToLocalStorage('mapping', this._mapping);
-
-    // Notify listeners
-    this._notifyListeners();
-
-    return true;
   }
 
   /**
@@ -843,6 +808,7 @@ class DataStoreService {
  * @param {Object} testCase - Test case object to add
  * @returns {Promise<Object>} Created test case
  */
+
   async addTestCase(testCase) {
     // Validate required fields
     if (!testCase.id || !testCase.name) {
@@ -854,49 +820,27 @@ class DataStoreService {
       throw new Error(`Test case with ID ${testCase.id} already exists`);
     }
 
-    // ✅ NEW: Ensure workspace is set
-    if (!this._currentWorkspaceId) {
-      console.warn('⚠️ No workspace selected, attempting to get from localStorage...');
-      const savedWorkspace = localStorage.getItem('currentWorkspace');
-      if (savedWorkspace) {
-        const workspace = JSON.parse(savedWorkspace);
-        this._currentWorkspaceId = workspace.id;
-        console.log('✅ Set workspace from localStorage:', workspace.name);
-      } else {
-        console.error('❌ No workspace available!');
-        throw new Error('No workspace selected. Please select a workspace before importing.');
-      }
-    }
+    // ✅ NEW: Get workspace ID (will throw if not set)
+    const workspaceId = this.getCurrentWorkspaceId();
 
     try {
-      // Create in database first
-      const API_BASE_URL = this._getApiBaseUrl();
+      console.log(`📤 Creating test case ${testCase.id} in workspace:`, workspaceId);
 
-      const testCaseWithWorkspace = {
+      // ✅ NEW: Use the workspaceId we just got
+      const response = await apiClient.post('/api/test-cases', {
         ...testCase,
-        workspace_id: this._currentWorkspaceId
-      };
+        workspace_id: workspaceId
+      });
 
-      console.log(`📤 Creating test case ${testCase.id} in workspace:`, this._currentWorkspaceId);
-
-      const response = await apiClient.post('/api/test-cases', testCaseWithWorkspace);
-      console.log(`✅ Created test case ${testCase.id} in database`, response.data);
-
+      if (response.data.success) {
+        this._testCases.push(response.data.data);
+        this._notifyListeners();
+        return response.data.data;
+      }
     } catch (error) {
-      console.error('❌ Failed to create in database:', error);
-      console.warn('⚠️ Continuing with local create only');
+      console.error('Error creating test case:', error);
+      throw error;
     }
-
-    // Add to local array
-    this._testCases.push(testCase);
-
-    // Save to localStorage
-    this._saveToLocalStorage('testCases', this._testCases);
-
-    // Notify listeners
-    this._notifyListeners();
-
-    return testCase;
   }
 
   /**
@@ -982,37 +926,28 @@ class DataStoreService {
    * @param {Object} updates - Fields to update
    * @returns {Promise<Object>} Updated test case
    */
-  async updateTestCase(testCaseId, updates) {
-    const testCase = this._testCases.find(tc => tc.id === testCaseId);
 
-    if (!testCase) {
-      throw new Error(`Test case with ID ${testCaseId} not found`);
-    }
+  async updateTestCase(id, updates) {
+    const workspaceId = this.getCurrentWorkspaceId();
 
     try {
-      // Update in database first
-      const API_BASE_URL = this._getApiBaseUrl();
+      const response = await apiClient.put(`/api/test-cases/${id}`, {
+        ...updates,
+        workspace_id: workspaceId
+      });
 
-      const response = await apiClient.put(`/api/test-cases/${testCaseId}`, updates);
-
-      console.log(`✅ Updated test case ${testCaseId} in database`);
+      if (response.data.success) {
+        const index = this._testCases.findIndex(tc => tc.id === id);
+        if (index !== -1) {
+          this._testCases[index] = { ...this._testCases[index], ...updates };
+          this._notifyListeners();
+        }
+      }
     } catch (error) {
-      console.error('❌ Failed to update in database:', error);
-      console.warn('⚠️ Continuing with local update only');
+      console.error('Error updating test case:', error);
+      throw error;
     }
-
-    // Update locally
-    Object.assign(testCase, updates);
-
-    // Save to localStorage
-    this._saveToLocalStorage('testCases', this._testCases);
-
-    // Notify listeners
-    this._notifyListeners();
-
-    return testCase;
   }
-
 
   /**
    * Update versions for multiple test cases (bulk assignment) with validation
@@ -1342,48 +1277,24 @@ class DataStoreService {
    * @param {string} testCaseId - ID of the test case to delete
    * @returns {boolean} True if successful
    */
-  async deleteTestCase(testCaseId) {
-    const index = this._testCases.findIndex(tc => tc.id === testCaseId);
 
-    if (index === -1) {
-      throw new Error(`Test case with ID ${testCaseId} not found`);
-    }
+  async deleteTestCase(id) {
+    const workspaceId = this.getCurrentWorkspaceId();  // ✅ Add this
 
     try {
-      // Delete from database first
+      // ✅ Add workspace_id to URL
+      const response = await apiClient.delete(
+        `/api/test-cases/${id}?workspace_id=${workspaceId}`
+      );
 
-      const response = await apiClient.delete(`/api/test-cases/${testCaseId}`);
-      console.log(`✅ Deleted test case ${testCaseId} from database`, response.data);
-
+      if (response.data.success) {
+        this._testCases = this._testCases.filter(tc => tc.id !== id);
+        this._notifyListeners();
+      }
     } catch (error) {
-      console.error('❌ Failed to delete from database:', error);
-      console.warn('⚠️ Continuing with local delete only');
+      console.error('Error deleting test case:', error);
+      throw error;
     }
-
-    // Remove from local array
-    const testCase = this._testCases[index];
-    this._testCases.splice(index, 1);
-
-    // Remove from mappings
-    if (testCase.requirementIds) {
-      testCase.requirementIds.forEach(reqId => {
-        if (this._mapping[reqId]) {
-          this._mapping[reqId] = this._mapping[reqId].filter(tcId => tcId !== testCaseId);
-          if (this._mapping[reqId].length === 0) {
-            delete this._mapping[reqId];
-          }
-        }
-      });
-    }
-
-    // Save to localStorage
-    this._saveToLocalStorage('testCases', this._testCases);
-    this._saveToLocalStorage('mapping', this._mapping);
-
-    // Notify listeners
-    this._notifyListeners();
-
-    return true;
   }
 
   /**
@@ -1729,11 +1640,13 @@ class DataStoreService {
       throw new Error(`Version with ID ${versionId} not found`);
     }
 
+    const workspaceId = this.getCurrentWorkspaceId();
+
     try {
       // Delete from database first
-      const API_BASE_URL = this._getApiBaseUrl();
-      const response = await apiClient.delete(`/api/versions/${versionId}`);
+      const response = await apiClient.delete(`/api/versions/${versionId}?workspace_id=${workspaceId}`);
       console.log(`✅ Deleted version ${versionId} from database`, response.data);
+
 
     } catch (error) {
       console.error('❌ Failed to delete from database:', error);
@@ -1867,62 +1780,29 @@ class DataStoreService {
  * @returns {Promise<Object>} Created requirement
  */
   async addRequirement(requirement) {
-    // Validate required fields
     if (!requirement.id || !requirement.name) {
       throw new Error('Requirement must have id and name');
     }
 
-    // Check if already exists
-    if (this._requirements.find(r => r.id === requirement.id)) {
-      throw new Error(`Requirement with ID ${requirement.id} already exists`);
-    }
-
-    // ✅ NEW: Ensure workspace is set
-    if (!this._currentWorkspaceId) {
-      console.warn('⚠️ No workspace selected, attempting to get from localStorage...');
-      const savedWorkspace = localStorage.getItem('currentWorkspace');
-      if (savedWorkspace) {
-        const workspace = JSON.parse(savedWorkspace);
-        this._currentWorkspaceId = workspace.id;
-        console.log('✅ Set workspace from localStorage:', workspace.name);
-      } else {
-        console.error('❌ No workspace available!');
-        throw new Error('No workspace selected. Please select a workspace before importing.');
-      }
-    }
-
-    // Normalize the requirement before adding
-    const normalizedRequirement = this._normalizeRequirement(requirement);
+    // Get current workspace ID
+    const workspaceId = this.getCurrentWorkspaceId();
 
     try {
-      // Create in database first
-      const API_BASE_URL = this._getApiBaseUrl();
+      // ✅ Send workspace_id in the body
+      const response = await apiClient.post('/api/requirements', {
+        ...requirement,
+        workspace_id: workspaceId
+      });
 
-      const requirementWithWorkspace = {
-        ...normalizedRequirement,
-        workspace_id: this._currentWorkspaceId
-      };
-
-      console.log(`📤 Creating requirement ${normalizedRequirement.id} in workspace:`, this._currentWorkspaceId);
-
-      const response = await apiClient.post('/api/requirements', requirementWithWorkspace);
-      console.log(`✅ Created requirement ${normalizedRequirement.id} in database`, response.data);
-
+      if (response.data.success) {
+        this._requirements.push(response.data.data);
+        this._notifyListeners();
+        return response.data.data;
+      }
     } catch (error) {
-      console.error('❌ Failed to create in database:', error);
-      console.warn('⚠️ Continuing with local create only');
+      console.error('Error creating requirement:', error);
+      throw error;
     }
-
-    // Add to local array
-    this._requirements.push(normalizedRequirement);
-
-    // Save to localStorage
-    this._saveToLocalStorage('requirements', this._requirements);
-
-    // Notify listeners
-    this._notifyListeners();
-
-    return normalizedRequirement;
   }
 
   // Optional: You might want to also modify initWithDefaultData to use the normalization
@@ -1952,53 +1832,28 @@ class DataStoreService {
   * @param {Object} updates - Fields to update
   * @returns {Promise<Object>} Updated requirement
   */
-  async updateRequirement(requirementId, updates) {
-    const requirement = this._requirements.find(r => r.id === requirementId);
 
-    if (!requirement) {
-      throw new Error(`Requirement with ID ${requirementId} not found`);
-    }
-
-    // Normalize the versions field if it exists in the updates
-    if ('versions' in updates) {
-      const normalizedReq = this._normalizeRequirement({ versions: updates.versions });
-      updates.versions = normalizedReq.versions;
-    }
+  async updateRequirement(id, updates) {
+    const workspaceId = this.getCurrentWorkspaceId();
 
     try {
-      // Update in database first
-      const API_BASE_URL = this._getApiBaseUrl();
-      const response = await fetch(`${API_BASE_URL}/api/requirements/${requirementId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(updates)
+      const response = await apiClient.put(`/api/requirements/${id}`, {
+        ...updates,
+        workspace_id: workspaceId
       });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || `Failed to update requirement: ${response.status}`);
+      if (response.data.success) {
+        const index = this._requirements.findIndex(r => r.id === id);
+        if (index !== -1) {
+          this._requirements[index] = { ...this._requirements[index], ...updates };
+          this._notifyListeners();
+        }
       }
-
-      console.log(`✅ Updated requirement ${requirementId} in database`);
     } catch (error) {
-      console.error('❌ Failed to update in database:', error);
-      console.warn('⚠️ Continuing with local update only');
+      console.error('Error updating requirement:', error);
+      throw error;
     }
-
-    // Update locally
-    Object.assign(requirement, updates);
-
-    // Save to localStorage
-    this._saveToLocalStorage('requirements', this._requirements);
-
-    // Notify listeners
-    this._notifyListeners();
-
-    return requirement;
   }
-
 
   /**
    * Import data from various sources
