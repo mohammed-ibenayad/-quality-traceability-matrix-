@@ -47,10 +47,19 @@ export const importDataToDatabase = async (data) => {
       mappings: data.mappings ? Object.keys(data.mappings).length : 0
     });
 
+    // ✅ GET TOKEN FROM LOCALSTORAGE
+    const token = localStorage.getItem('auth_token');
+    
+    if (!token) {
+      throw new Error('No token provided');
+    }
+
+    // ✅ INCLUDE AUTHORIZATION HEADER
     const response = await fetch(`${API_BASE_URL}/import`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`  // ✅ ADD THIS LINE
       },
       body: JSON.stringify(data)
     });
