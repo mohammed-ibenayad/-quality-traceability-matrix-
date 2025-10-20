@@ -808,14 +808,25 @@ class DataStoreService {
  * @param {Object} testCase - Test case object to add
  * @returns {Promise<Object>} Created test case
  */
+
   async addTestCase(testCase) {
+    // Validate required fields
     if (!testCase.id || !testCase.name) {
       throw new Error('Test case must have id and name');
     }
 
+    // Check if already exists
+    if (this._testCases.find(tc => tc.id === testCase.id)) {
+      throw new Error(`Test case with ID ${testCase.id} already exists`);
+    }
+
+    // ✅ NEW: Get workspace ID (will throw if not set)
     const workspaceId = this.getCurrentWorkspaceId();
 
     try {
+      console.log(`📤 Creating test case ${testCase.id} in workspace:`, workspaceId);
+
+      // ✅ NEW: Use the workspaceId we just got
       const response = await apiClient.post('/api/test-cases', {
         ...testCase,
         workspace_id: workspaceId
@@ -831,7 +842,6 @@ class DataStoreService {
       throw error;
     }
   }
-
 
   /**
  * Centralized validation for version-requirement compatibility
