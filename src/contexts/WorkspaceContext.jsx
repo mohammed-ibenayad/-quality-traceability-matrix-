@@ -3,9 +3,9 @@ import apiClient from '../utils/apiClient';
 
 const WorkspaceContext = createContext({
   currentWorkspace: null,
-  setCurrentWorkspace: () => {},
+  setCurrentWorkspace: () => { },
   workspaces: [],
-  setWorkspaces: () => {},
+  setWorkspaces: () => { },
   fetchWorkspaces: () => Promise.resolve([]),
   isLoading: false
 });
@@ -21,16 +21,39 @@ export const WorkspaceProvider = ({ children }) => {
     initializeWorkspace();
   }, []);
 
+
   const initializeWorkspace = async () => {
     try {
-      // Try to load current workspace from localStorage
+      setIsLoading(true);
+
+      // ✅ FIRST: Fetch fresh workspaces from API
+      const fetchedWorkspaces = await fetchWorkspaces();
+
+      // ✅ THEN: Try to restore saved workspace (only if it still exists)
       const savedWorkspace = localStorage.getItem('currentWorkspace');
       if (savedWorkspace) {
-        setCurrentWorkspace(JSON.parse(savedWorkspace));
+        try {
+          const parsed = JSON.parse(savedWorkspace);
+          const exists = fetchedWorkspaces.find(w => w.id === parsed.id);
+          if (exists) {
+            setCurrentWorkspace(exists);
+          } else {
+            // Saved workspace no longer accessible - clear it and select first available
+            localStorage.removeItem('currentWorkspace');
+            if (fetchedWorkspaces.length > 0) {
+              setCurrentWorkspace(fetchedWorkspaces[0]);
+              localStorage.setItem('currentWorkspace', JSON.stringify(fetchedWorkspaces[0]));
+            }
+          }
+        } catch (e) {
+          console.error('Error parsing saved workspace:', e);
+          localStorage.removeItem('currentWorkspace');
+        }
+      } else if (fetchedWorkspaces.length > 0) {
+        // No saved workspace - select first one
+        setCurrentWorkspace(fetchedWorkspaces[0]);
+        localStorage.setItem('currentWorkspace', JSON.stringify(fetchedWorkspaces[0]));
       }
-      
-      // Fetch workspaces from API
-      await fetchWorkspaces();
     } catch (error) {
       console.error('Error initializing workspace context:', error);
     } finally {
@@ -41,13 +64,13 @@ export const WorkspaceProvider = ({ children }) => {
   const fetchWorkspaces = async () => {
     try {
       setIsLoading(true);
-      
+
       const response = await apiClient.get('/api/workspaces');
-      
+
       if (response.data.success) {
         const fetchedWorkspaces = response.data.data;
         setWorkspaces(fetchedWorkspaces);
-        
+
         // If no current workspace is selected or the current one doesn't exist anymore,
         // select the first available one
         if (
@@ -58,10 +81,10 @@ export const WorkspaceProvider = ({ children }) => {
           setCurrentWorkspace(defaultWorkspace);
           localStorage.setItem('currentWorkspace', JSON.stringify(defaultWorkspace));
         }
-        
+
         return fetchedWorkspaces;
       }
-      
+
       return [];
     } catch (error) {
       console.error('Error fetching workspaces:', error);
