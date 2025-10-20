@@ -1,4 +1,5 @@
-// src/services/DataStore.js - Complete Enhanced Version with localStorage Persistence
+
+import apiClient from '../utils/apiClient';
 
 import defaultRequirements from '../data/requirements';
 import defaultTestCases from '../data/testcases';
@@ -130,54 +131,50 @@ class DataStoreService {
 
       // Fetch requirements
       console.log('📥 Fetching requirements...');
-      const reqResponse = await fetch(`${API_BASE_URL}/api/requirements${workspaceParam}`);
-      if (reqResponse.ok) {
-        const reqData = await reqResponse.json();
-        if (reqData.success && Array.isArray(reqData.data)) {
-          this._requirements = reqData.data;
+      try {
+        const reqResponse = await apiClient.get(`/api/requirements${workspaceParam}`);
+        if (reqResponse.data.success && Array.isArray(reqResponse.data.data)) {
+          this._requirements = reqResponse.data.data;
           console.log(`✅ Loaded ${this._requirements.length} requirements from database`);
         }
-      } else {
-        console.error('❌ Failed to fetch requirements:', reqResponse.status);
+      } catch (error) {
+        console.error('❌ Failed to fetch requirements:', error.message);
       }
 
       // Fetch test cases
       console.log('📥 Fetching test cases...');
-      const tcResponse = await fetch(`${API_BASE_URL}/api/test-cases${workspaceParam}`);
-      if (tcResponse.ok) {
-        const tcData = await tcResponse.json();
-        if (tcData.success && Array.isArray(tcData.data)) {
-          this._testCases = tcData.data.map(tc => this._migrateTestCaseVersionFormat(tc));
+      try {
+        const tcResponse = await apiClient.get(`/api/test-cases${workspaceParam}`);
+        if (tcResponse.data.success && Array.isArray(tcResponse.data.data)) {
+          this._testCases = tcResponse.data.data.map(tc => this._migrateTestCaseVersionFormat(tc));
           console.log(`✅ Loaded ${this._testCases.length} test cases from database`);
         }
-      } else {
-        console.error('❌ Failed to fetch test cases:', tcResponse.status);
+      } catch (error) {
+        console.error('❌ Failed to fetch test cases:', error.message);
       }
 
       // Fetch versions
       console.log('📥 Fetching versions...');
-      const versionResponse = await fetch(`${API_BASE_URL}/api/versions${workspaceParam}`);
-      if (versionResponse.ok) {
-        const versionData = await versionResponse.json();
-        if (versionData.success && Array.isArray(versionData.data)) {
-          this._versions = versionData.data;
+      try {
+        const versionResponse = await apiClient.get(`/api/versions${workspaceParam}`);
+        if (versionResponse.data.success && Array.isArray(versionResponse.data.data)) {
+          this._versions = versionResponse.data.data;
           console.log(`✅ Loaded ${this._versions.length} versions from database`);
         }
-      } else {
-        console.error('❌ Failed to fetch versions:', versionResponse.status);
+      } catch (error) {
+        console.error('❌ Failed to fetch versions:', error.message);
       }
 
       // Fetch mappings
       console.log('📥 Fetching mappings...');
-      const mappingResponse = await fetch(`${API_BASE_URL}/api/mappings${workspaceParam}`);
-      if (mappingResponse.ok) {
-        const mappingData = await mappingResponse.json();
-        if (mappingData.success && mappingData.data) {
-          this._mapping = mappingData.data;
+      try {
+        const mappingResponse = await apiClient.get(`/api/mappings${workspaceParam}`);
+        if (mappingResponse.data.success && mappingResponse.data.data) {
+          this._mapping = mappingResponse.data.data;
           console.log(`✅ Loaded mappings from database`);
         }
-      } else {
-        console.error('❌ Failed to fetch mappings:', mappingResponse.status);
+      } catch (error) {
+        console.error('❌ Failed to fetch mappings:', error.message);
       }
 
       // Mark as initialized if we have data
@@ -882,21 +879,9 @@ class DataStoreService {
 
       console.log(`📤 Creating test case ${testCase.id} in workspace:`, this._currentWorkspaceId);
 
-      const response = await fetch(`${API_BASE_URL}/api/test-cases`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(testCaseWithWorkspace)
-      });
+      const response = await apiClient.post('/api/test-cases', testCaseWithWorkspace);
+      console.log(`✅ Created test case ${testCase.id} in database`, response.data);
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || `Failed to create test case: ${response.status}`);
-      }
-
-      const result = await response.json();
-      console.log(`✅ Created test case ${testCase.id} in database`, result);
     } catch (error) {
       console.error('❌ Failed to create in database:', error);
       console.warn('⚠️ Continuing with local create only');
@@ -1007,18 +992,8 @@ class DataStoreService {
     try {
       // Update in database first
       const API_BASE_URL = this._getApiBaseUrl();
-      const response = await fetch(`${API_BASE_URL}/api/test-cases/${testCaseId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(updates)
-      });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || `Failed to update test case: ${response.status}`);
-      }
+      const response = await apiClient.put(`/api/test-cases/${testCaseId}`, updates);
 
       console.log(`✅ Updated test case ${testCaseId} in database`);
     } catch (error) {
@@ -1376,20 +1351,10 @@ class DataStoreService {
 
     try {
       // Delete from database first
-      const API_BASE_URL = this._getApiBaseUrl();
-      const response = await fetch(`${API_BASE_URL}/api/test-cases/${testCaseId}`, {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || `Failed to delete test case: ${response.status}`);
-      }
+      const response = await apiClient.delete(`/api/test-cases/${testCaseId}`);
+      console.log(`✅ Deleted test case ${testCaseId} from database`, response.data);
 
-      console.log(`✅ Deleted test case ${testCaseId} from database`);
     } catch (error) {
       console.error('❌ Failed to delete from database:', error);
       console.warn('⚠️ Continuing with local delete only');
@@ -1767,19 +1732,9 @@ class DataStoreService {
     try {
       // Delete from database first
       const API_BASE_URL = this._getApiBaseUrl();
-      const response = await fetch(`${API_BASE_URL}/api/versions/${versionId}`, {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      });
+      const response = await apiClient.delete(`/api/versions/${versionId}`);
+      console.log(`✅ Deleted version ${versionId} from database`, response.data);
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || `Failed to delete version: ${response.status}`);
-      }
-
-      console.log(`✅ Deleted version ${versionId} from database`);
     } catch (error) {
       console.error('❌ Failed to delete from database:', error);
       console.warn('⚠️ Continuing with local delete only');
@@ -1950,21 +1905,9 @@ class DataStoreService {
 
       console.log(`📤 Creating requirement ${normalizedRequirement.id} in workspace:`, this._currentWorkspaceId);
 
-      const response = await fetch(`${API_BASE_URL}/api/requirements`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(requirementWithWorkspace)
-      });
+      const response = await apiClient.post('/api/requirements', requirementWithWorkspace);
+      console.log(`✅ Created requirement ${normalizedRequirement.id} in database`, response.data);
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || `Failed to create requirement: ${response.status}`);
-      }
-
-      const result = await response.json();
-      console.log(`✅ Created requirement ${normalizedRequirement.id} in database`, result);
     } catch (error) {
       console.error('❌ Failed to create in database:', error);
       console.warn('⚠️ Continuing with local create only');
