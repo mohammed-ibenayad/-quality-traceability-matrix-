@@ -819,6 +819,7 @@ const Requirements = () => {
                         className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                       >
                         <option value="All">All Status</option>
+                        <option value="Active">Active</option>
                         <option value="Draft">Draft</option>
                         <option value="In Review">In Review</option>
                         <option value="Approved">Approved</option>
