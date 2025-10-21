@@ -142,12 +142,12 @@ const TestCaseRow = ({
         </td>
         <td className="px-2 py-3 w-20 flex-shrink-0">
           <div className="flex flex-col items-start">
-            <span className={`inline-flex px-2 py-1 text-xs font-medium rounded ${testCase.status === 'Passed' ? 'bg-green-100 text-green-800' :
-              testCase.status === 'Failed' ? 'bg-red-100 text-red-800' :
-                testCase.status === 'Blocked' ? 'bg-yellow-100 text-yellow-800' :
-                  testCase.status === 'Not Found' ? 'bg-orange-100 text-orange-800' :
-                    'bg-gray-100 text-gray-800'
-              }`}>
+            <span className="inline-flex items-center px-2 py-1 text-xs font-medium text-gray-700 bg-gray-100 rounded">
+              {testCase.status === 'Passed' && <CheckCircle size={12} className="text-green-600 mr-1" />}
+              {testCase.status === 'Failed' && <XCircle size={12} className="text-red-600 mr-1" />}
+              {testCase.status === 'Blocked' && <Pause size={12} className="text-yellow-600 mr-1" />}
+              {testCase.status === 'Not Found' && <AlertTriangle size={12} className="text-orange-600 mr-1" />}
+              {testCase.status === 'Not Run' && <Clock size={12} className="text-gray-500 mr-1" />}
               {testCase.status === 'Not Run' ? 'Not Run' : testCase.status}
             </span>
 
@@ -579,7 +579,7 @@ const TestCaseRow = ({
       {isExpanded && (
         <tr className="flex w-full">
           <td colSpan="8" className="p-0 w-full">
-            <div className="bg-gradient-to-r from-blue-50 to-gray-50 border-l-4 border-blue-400">
+            <div className="bg-white border border-gray-200 rounded-lg">
               <div className="p-6">
                 {/* Header Section */}
                 <div className="flex items-center justify-between mb-6 pb-4 border-b border-gray-200">
