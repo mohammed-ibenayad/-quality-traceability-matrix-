@@ -1040,11 +1040,7 @@ const Requirements = () => {
                           </div>
                         </td>
                         <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                          <span className={`px-2 py-1 rounded text-xs ${req.type === 'Security' ? 'bg-red-100 text-red-800' :
-                            req.type === 'Performance' ? 'bg-orange-100 text-orange-800' :
-                              req.type === 'Functional' ? 'bg-blue-100 text-blue-800' :
-                                'bg-gray-100 text-gray-800'
-                            }`}>
+                          <span className="px-2 py-1 rounded text-xs bg-gray-100 text-gray-700">
                             {req.type}
                           </span>
                         </td>
@@ -1254,11 +1250,7 @@ const Requirements = () => {
                                       <div className="space-y-3">
                                         <div className="flex justify-between items-center py-2 border-b border-gray-100">
                                           <span className="text-sm text-gray-600">Type</span>
-                                          <span className={`text-xs px-2 py-1 rounded-full font-medium ${req.type === 'Security' ? 'bg-red-100 text-red-800' :
-                                            req.type === 'Performance' ? 'bg-orange-100 text-orange-800' :
-                                              req.type === 'Functional' ? 'bg-blue-100 text-blue-800' :
-                                                'bg-gray-100 text-gray-800'
-                                            }`}>
+                                          <span className="text-xs px-2 py-1 rounded-full font-medium bg-gray-100 text-gray-700">
                                             {req.type}
                                           </span>
                                         </div>
