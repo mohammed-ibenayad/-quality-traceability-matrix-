@@ -1229,7 +1229,7 @@ const Requirements = () => {
                                         <div className="bg-gray-50 rounded-lg p-3">
                                           <div className="flex items-center justify-between mb-2">
                                             <span className="text-sm font-medium text-gray-700">Usage Frequency</span>
-                                            <span className="text-lg font-bold text-green-600">{req.usageFrequency}/5</span>
+                                            <span className="text-lg font-bold text-gray-600">{req.usageFrequency}/5</span>
                                           </div>
                                           <div className="w-full bg-gray-200 rounded-full h-2">
                                             <div
@@ -1260,8 +1260,8 @@ const Requirements = () => {
                                         <div className="flex justify-between items-center py-2 border-b border-gray-100">
                                           <span className="text-sm text-gray-600">Priority</span>
                                           <span className={`text-xs px-2 py-1 rounded-full font-medium ${req.priority === 'High' ? 'bg-red-100 text-red-800' :
-                                              req.priority === 'Medium' ? 'bg-yellow-100 text-yellow-800' :
-                                                'bg-green-100 text-green-800'
+                                            req.priority === 'Medium' ? 'bg-yellow-100 text-yellow-800' :
+                                              'bg-green-100 text-green-800'
                                             }`}>
                                             {req.priority}
                                           </span>
