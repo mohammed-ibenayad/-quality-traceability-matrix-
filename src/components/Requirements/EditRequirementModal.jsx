@@ -4,10 +4,10 @@ import { useVersionContext } from '../../context/VersionContext';
 const EditRequirementModal = ({ requirement, onSave, onCancel }) => {
   // Get available versions from context
   const { versions } = useVersionContext();
-  
+
   // ✅ ADD LOGGING: Log the raw requirement object
   console.log('🔍 EditRequirementModal - Raw requirement prop:', requirement);
-  
+
   // ✅ FIXED: Properly map snake_case to camelCase
   const requirementWithDefaults = {
     id: requirement?.id || '',
@@ -29,22 +29,28 @@ const EditRequirementModal = ({ requirement, onSave, onCancel }) => {
   };
 
   // ✅ ADD LOGGING: Log what we extracted for TDF fields
-  console.log('🔍 TDF Field Extraction:', {
-    'business_impact (snake)': requirement?.business_impact,
-    'businessImpact (camel)': requirement?.businessImpact,
-    'Final businessImpact': requirementWithDefaults.businessImpact,
-    '---': '---',
-    'technical_complexity (snake)': requirement?.technical_complexity,
-    'technicalComplexity (camel)': requirement?.technicalComplexity,
-    'Final technicalComplexity': requirementWithDefaults.technicalComplexity,
-    '---': '---',
-    'regulatory_factor (snake)': requirement?.regulatory_factor,
-    'regulatoryFactor (camel)': requirement?.regulatoryFactor,
-    'Final regulatoryFactor': requirementWithDefaults.regulatoryFactor,
-    '---': '---',
-    'usage_frequency (snake)': requirement?.usage_frequency,
-    'usageFrequency (camel)': requirement?.usageFrequency,
-    'Final usageFrequency': requirementWithDefaults.usageFrequency
+  console.log('🔍 Business Impact:', {
+    'snake_case': requirement?.business_impact,
+    'camelCase': requirement?.businessImpact,
+    'final': requirementWithDefaults.businessImpact
+  });
+
+  console.log('🔍 Technical Complexity:', {
+    'snake_case': requirement?.technical_complexity,
+    'camelCase': requirement?.technicalComplexity,
+    'final': requirementWithDefaults.technicalComplexity
+  });
+
+  console.log('🔍 Regulatory Factor:', {
+    'snake_case': requirement?.regulatory_factor,
+    'camelCase': requirement?.regulatoryFactor,
+    'final': requirementWithDefaults.regulatoryFactor
+  });
+
+  console.log('🔍 Usage Frequency:', {
+    'snake_case': requirement?.usage_frequency,
+    'camelCase': requirement?.usageFrequency,
+    'final': requirementWithDefaults.usageFrequency
   });
 
   console.log('📋 requirementWithDefaults:', requirementWithDefaults);
@@ -62,7 +68,7 @@ const EditRequirementModal = ({ requirement, onSave, onCancel }) => {
     versions: requirementWithDefaults.versions,
     tags: requirementWithDefaults.tags || []
   });
-  
+
 
   // For tags input
   const [tagInput, setTagInput] = useState('');
@@ -351,8 +357,8 @@ const EditRequirementModal = ({ requirement, onSave, onCancel }) => {
                       <span
                         key={index}
                         className={`inline-flex items-center text-xs px-2 py-1 rounded-full ${versionExists
-                            ? 'bg-blue-100 text-blue-800'
-                            : 'bg-yellow-100 text-yellow-800'
+                          ? 'bg-blue-100 text-blue-800'
+                          : 'bg-yellow-100 text-yellow-800'
                           }`}
                       >
                         {versionName}
