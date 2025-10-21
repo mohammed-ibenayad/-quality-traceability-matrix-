@@ -715,8 +715,8 @@ const Requirements = () => {
               <button
                 onClick={() => setPriorityFilterTab('All')}
                 className={`px-3 py-1.5 text-sm rounded-md transition-colors ${priorityFilterTab === 'All'
-                    ? 'bg-blue-600 text-white font-medium'
-                    : 'bg-white border border-gray-300 text-gray-700 hover:border-gray-400'
+                  ? 'bg-blue-600 text-white font-medium'
+                  : 'bg-white border border-gray-300 text-gray-700 hover:border-gray-400'
                   }`}
               >
                 📊 All ({nonPriorityFilteredRequirements.length})
@@ -725,8 +725,8 @@ const Requirements = () => {
               <button
                 onClick={() => setPriorityFilterTab('High')}
                 className={`px-3 py-1.5 text-sm rounded-md transition-colors ${priorityFilterTab === 'High'
-                    ? 'bg-blue-600 text-white font-medium'
-                    : 'bg-white border border-gray-300 text-gray-700 hover:border-gray-400'
+                  ? 'bg-blue-600 text-white font-medium'
+                  : 'bg-white border border-gray-300 text-gray-700 hover:border-gray-400'
                   }`}
               >
                 🔴 High ({nonPriorityFilteredRequirements.filter(r => r.priority === 'High').length})
@@ -735,8 +735,8 @@ const Requirements = () => {
               <button
                 onClick={() => setPriorityFilterTab('Medium')}
                 className={`px-3 py-1.5 text-sm rounded-md transition-colors ${priorityFilterTab === 'Medium'
-                    ? 'bg-blue-600 text-white font-medium'
-                    : 'bg-white border border-gray-300 text-gray-700 hover:border-gray-400'
+                  ? 'bg-blue-600 text-white font-medium'
+                  : 'bg-white border border-gray-300 text-gray-700 hover:border-gray-400'
                   }`}
               >
                 🟡 Medium ({nonPriorityFilteredRequirements.filter(r => r.priority === 'Medium').length})
@@ -745,8 +745,8 @@ const Requirements = () => {
               <button
                 onClick={() => setPriorityFilterTab('Low')}
                 className={`px-3 py-1.5 text-sm rounded-md transition-colors ${priorityFilterTab === 'Low'
-                    ? 'bg-blue-600 text-white font-medium'
-                    : 'bg-white border border-gray-300 text-gray-700 hover:border-gray-400'
+                  ? 'bg-blue-600 text-white font-medium'
+                  : 'bg-white border border-gray-300 text-gray-700 hover:border-gray-400'
                   }`}
               >
                 🟢 Low ({nonPriorityFilteredRequirements.filter(r => r.priority === 'Low').length})
@@ -820,9 +820,11 @@ const Requirements = () => {
                       >
                         <option value="All">All Status</option>
                         <option value="Active">Active</option>
-                        <option value="Proposed">Proposed</option>
-                        <option value="Implemented">Implemented</option>
+                        <option value="Draft">Draft</option>
+                        <option value="In Review">In Review</option>
+                        <option value="Approved">Approved</option>
                         <option value="Deprecated">Deprecated</option>
+                        <option value="Archived">Archived</option>
                       </select>
                     </div>
 
@@ -836,10 +838,11 @@ const Requirements = () => {
                       >
                         <option value="All">All Types</option>
                         <option value="Functional">Functional</option>
+                        <option value="Non-Functional">Non-Functional</option>
                         <option value="Security">Security</option>
                         <option value="Performance">Performance</option>
                         <option value="Usability">Usability</option>
-                        <option value="Compatibility">Compatibility</option>
+                        <option value="Compliance">Compliance</option>
                       </select>
                     </div>
 
@@ -887,8 +890,8 @@ const Requirements = () => {
                                     );
                                   }}
                                   className={`px-3 py-1.5 text-sm rounded-md transition-colors ${isSelected
-                                      ? 'bg-blue-600 text-white font-medium'
-                                      : 'bg-white border border-gray-300 text-gray-700 hover:border-gray-400'
+                                    ? 'bg-blue-600 text-white font-medium'
+                                    : 'bg-white border border-gray-300 text-gray-700 hover:border-gray-400'
                                     }`}
                                 >
                                   {tag} ({count})
@@ -1037,11 +1040,7 @@ const Requirements = () => {
                           </div>
                         </td>
                         <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                          <span className={`px-2 py-1 rounded text-xs ${req.type === 'Security' ? 'bg-red-100 text-red-800' :
-                            req.type === 'Performance' ? 'bg-orange-100 text-orange-800' :
-                              req.type === 'Functional' ? 'bg-blue-100 text-blue-800' :
-                                'bg-gray-100 text-gray-800'
-                            }`}>
+                          <span className="px-2 py-1 rounded text-xs bg-gray-100 text-gray-700">
                             {req.type}
                           </span>
                         </td>
@@ -1054,12 +1053,11 @@ const Requirements = () => {
                           </span>
                         </td>
                         <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                          <span className={`px-2 py-1 rounded text-xs ${req.status === 'Active' ? 'bg-green-100 text-green-800' :
-                            req.status === 'Proposed' ? 'bg-yellow-100 text-yellow-800' :
-                              req.status === 'Implemented' ? 'bg-blue-100 text-blue-800' :
-                                'bg-gray-100 text-gray-800'
-                            }`}>
+                          <span className="text-sm text-gray-700 flex items-center">
                             {req.status}
+                            {req.status === 'Active' && <CheckCircle className="ml-1 text-green-600" size={14} />}
+                            {req.status === 'Deprecated' && <AlertTriangle className="ml-1 text-orange-600" size={14} />}
+                            {req.status === 'Archived' && <Trash2 className="ml-1 text-gray-500" size={14} />}
                           </span>
                         </td>
                         <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
@@ -1129,7 +1127,7 @@ const Requirements = () => {
                       {isExpanded && (
                         <tr>
                           <td colSpan="8" className="p-0">
-                            <div className="bg-gradient-to-r from-green-50 to-gray-50 border-l-4 border-green-400">
+                            <div className="bg-white border border-gray-200 rounded-lg">
                               <div className="p-6">
                                 {/* Header Section */}
                                 <div className="flex items-center mb-6 pb-4 border-b border-gray-200">
@@ -1231,7 +1229,7 @@ const Requirements = () => {
                                         <div className="bg-gray-50 rounded-lg p-3">
                                           <div className="flex items-center justify-between mb-2">
                                             <span className="text-sm font-medium text-gray-700">Usage Frequency</span>
-                                            <span className="text-lg font-bold text-green-600">{req.usageFrequency}/5</span>
+                                            <span className="text-lg font-bold text-gray-600">{req.usageFrequency}/5</span>
                                           </div>
                                           <div className="w-full bg-gray-200 rounded-full h-2">
                                             <div
@@ -1250,16 +1248,15 @@ const Requirements = () => {
                                     <div className="bg-white rounded-lg p-4 shadow-sm border">
                                       <h4 className="font-semibold text-gray-900 mb-4">Quick Info</h4>
                                       <div className="space-y-3">
+                                        {/* Type – Neutral */}
                                         <div className="flex justify-between items-center py-2 border-b border-gray-100">
                                           <span className="text-sm text-gray-600">Type</span>
-                                          <span className={`text-xs px-2 py-1 rounded-full font-medium ${req.type === 'Security' ? 'bg-red-100 text-red-800' :
-                                            req.type === 'Performance' ? 'bg-orange-100 text-orange-800' :
-                                              req.type === 'Functional' ? 'bg-blue-100 text-blue-800' :
-                                                'bg-gray-100 text-gray-800'
-                                            }`}>
+                                          <span className="text-xs px-2 py-1 rounded-full font-medium bg-gray-100 text-gray-700">
                                             {req.type}
                                           </span>
                                         </div>
+
+                                        {/* Priority – Keep colored (High/Medium/Low) */}
                                         <div className="flex justify-between items-center py-2 border-b border-gray-100">
                                           <span className="text-sm text-gray-600">Priority</span>
                                           <span className={`text-xs px-2 py-1 rounded-full font-medium ${req.priority === 'High' ? 'bg-red-100 text-red-800' :
@@ -1269,13 +1266,11 @@ const Requirements = () => {
                                             {req.priority}
                                           </span>
                                         </div>
+
+                                        {/* Status – Neutral (or add icon if desired) */}
                                         <div className="flex justify-between items-center py-2 border-b border-gray-100">
                                           <span className="text-sm text-gray-600">Status</span>
-                                          <span className={`text-xs px-2 py-1 rounded-full font-medium ${req.status === 'Active' ? 'bg-green-100 text-green-800' :
-                                            req.status === 'Proposed' ? 'bg-yellow-100 text-yellow-800' :
-                                              req.status === 'Implemented' ? 'bg-blue-100 text-blue-800' :
-                                                'bg-gray-100 text-gray-800'
-                                            }`}>
+                                          <span className="text-xs px-2 py-1 rounded-full font-medium bg-gray-100 text-gray-700">
                                             {req.status}
                                           </span>
                                         </div>
@@ -1356,7 +1351,7 @@ const Requirements = () => {
                                         <h4 className="font-semibold text-gray-900 mb-3">Tags</h4>
                                         <div className="flex flex-wrap gap-2">
                                           {req.tags.map(tag => (
-                                            <span key={tag} className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">
+                                            <span key={tag} className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-xs font-medium">
                                               {tag}
                                             </span>
                                           ))}

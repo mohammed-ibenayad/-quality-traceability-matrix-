@@ -207,10 +207,11 @@ const EditRequirementModal = ({ requirement, onSave, onCancel }) => {
                   required
                 >
                   <option value="Functional">Functional</option>
+                  <option value="Non-Functional">Non-Functional</option>
                   <option value="Security">Security</option>
                   <option value="Performance">Performance</option>
                   <option value="Usability">Usability</option>
-                  <option value="Compatibility">Compatibility</option>
+                  <option value="Compliance">Compliance</option>
                 </select>
               </div>
               <div>
@@ -223,9 +224,11 @@ const EditRequirementModal = ({ requirement, onSave, onCancel }) => {
                   required
                 >
                   <option value="Active">Active</option>
-                  <option value="Proposed">Proposed</option>
+                  <option value="Draft">Draft</option>
+                  <option value="In Review">In Review</option>
+                  <option value="Approved">Approved</option>
                   <option value="Deprecated">Deprecated</option>
-                  <option value="Implemented">Implemented</option>
+                  <option value="Archived">Archived</option>
                 </select>
               </div>
             </div>

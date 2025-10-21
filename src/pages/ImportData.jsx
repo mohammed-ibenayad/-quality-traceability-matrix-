@@ -78,46 +78,18 @@ const ImportData = () => {
   /**
    * Handle successful import - with database integration
    */
-  const handleImportSuccess = async (importedData) => {
+  const handleImportSuccess = (importedData) => {
+    // ✅ Data is ALREADY imported to database via individual API calls
+    // This function just displays the success message
+
     try {
-      // Show loading state
-      setImportStatus({
-        success: null,
-        message: 'Importing data to database...',
-        loading: true
-      });
-
-      // Get current data from dataStore for complete export
-      const currentData = dataStore.exportData();
-
-      // Prepare data for API import
-      const dataToImport = {
-        requirements: activeTab === 'requirements' ? importedData : currentData.requirements,
-        testCases: activeTab === 'testcases' ? importedData : currentData.testCases,
-        versions: currentData.versions,
-        mappings: currentData.mapping
-      };
-
-      console.log('📤 Importing to database via API...');
-
-      // Import to database via API
-      const result = await apiService.importDataToDatabase(dataToImport);
-
-      // Also update localStorage (existing behavior for backward compatibility)
-      if (activeTab === 'requirements') {
-        dataStore.setRequirements(importedData);
-      } else if (activeTab === 'testcases') {
-        dataStore.setTestCases(importedData);
-      }
-
       // Create formatted JSON string for display
       const jsonString = JSON.stringify(importedData, null, 2);
 
-      // Show success with API import summary
+      // Show success message
       setImportStatus({
         success: true,
         message: `Successfully imported ${importedData.length} ${activeTab === 'requirements' ? 'requirements' : 'test cases'}`,
-        apiResult: result.summary,
         jsonData: jsonString,
         loading: false
       });
@@ -154,7 +126,6 @@ const ImportData = () => {
       }, 100);
     }
   };
-
   // Function to close the preview and reset import status
   const closePreview = () => {
     setImportStatus(null);
@@ -182,8 +153,8 @@ const ImportData = () => {
                   window.location.hash = 'requirements-tab';
                 }}
                 className={`w-1/2 py-4 px-1 text-center border-b-2 font-medium text-sm ${activeTab === 'requirements'
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                   }`}
               >
                 <div className="flex items-center justify-center">
@@ -200,8 +171,8 @@ const ImportData = () => {
                   window.location.hash = 'testcases-tab';
                 }}
                 className={`w-1/2 py-4 px-1 text-center border-b-2 font-medium text-sm ${activeTab === 'testcases'
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                   }`}
               >
                 <div className="flex items-center justify-center">
