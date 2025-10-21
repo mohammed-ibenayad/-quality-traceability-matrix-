@@ -4,7 +4,10 @@ import { useVersionContext } from '../../context/VersionContext';
 const EditRequirementModal = ({ requirement, onSave, onCancel }) => {
   // Get available versions from context
   const { versions } = useVersionContext();
-
+  
+  // ✅ ADD LOGGING: Log the raw requirement object
+  console.log('🔍 EditRequirementModal - Raw requirement prop:', requirement);
+  
   // ✅ FIXED: Properly map snake_case to camelCase
   const requirementWithDefaults = {
     id: requirement?.id || '',
@@ -25,6 +28,27 @@ const EditRequirementModal = ({ requirement, onSave, onCancel }) => {
     workspace_id: requirement?.workspace_id || null
   };
 
+  // ✅ ADD LOGGING: Log what we extracted for TDF fields
+  console.log('🔍 TDF Field Extraction:', {
+    'business_impact (snake)': requirement?.business_impact,
+    'businessImpact (camel)': requirement?.businessImpact,
+    'Final businessImpact': requirementWithDefaults.businessImpact,
+    '---': '---',
+    'technical_complexity (snake)': requirement?.technical_complexity,
+    'technicalComplexity (camel)': requirement?.technicalComplexity,
+    'Final technicalComplexity': requirementWithDefaults.technicalComplexity,
+    '---': '---',
+    'regulatory_factor (snake)': requirement?.regulatory_factor,
+    'regulatoryFactor (camel)': requirement?.regulatoryFactor,
+    'Final regulatoryFactor': requirementWithDefaults.regulatoryFactor,
+    '---': '---',
+    'usage_frequency (snake)': requirement?.usage_frequency,
+    'usageFrequency (camel)': requirement?.usageFrequency,
+    'Final usageFrequency': requirementWithDefaults.usageFrequency
+  });
+
+  console.log('📋 requirementWithDefaults:', requirementWithDefaults);
+
   const [formData, setFormData] = useState({
     name: requirementWithDefaults.name,
     description: requirementWithDefaults.description,
@@ -38,6 +62,7 @@ const EditRequirementModal = ({ requirement, onSave, onCancel }) => {
     versions: requirementWithDefaults.versions,
     tags: requirementWithDefaults.tags || []
   });
+  
 
   // For tags input
   const [tagInput, setTagInput] = useState('');
