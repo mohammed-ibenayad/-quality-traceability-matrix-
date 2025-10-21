@@ -131,6 +131,16 @@ const ImportData = () => {
     setImportStatus(null);
   };
 
+  const handleImportStart = () => {
+    setImportStatus({
+      loading: true,
+      message: `Importing ${activeTab === 'requirements' ? 'requirements' : 'test cases'}...`,
+      success: null,
+      jsonData: null,
+      error: null
+    });
+  };
+
   return (
     <MainLayout>
       <div className="max-w-6xl mx-auto py-6 px-4">
@@ -189,7 +199,10 @@ const ImportData = () => {
         {/* Requirements Import Interface */}
         {activeTab === 'requirements' && (
           <>
-            <ImportRequirements onImportSuccess={handleImportSuccess} />
+            <ImportRequirements
+              onImportStart={handleImportStart}
+              onImportSuccess={handleImportSuccess}
+            />
 
             {/* Import Status using the new component */}
             {importStatus && activeTab === 'requirements' && (
