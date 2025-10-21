@@ -140,7 +140,6 @@ const TestCaseRow = ({
             </div>
           </div>
         </td>
-        {/* END OF REPLACEMENT */}
         <td className="px-2 py-3 w-20 flex-shrink-0">
           <div className="flex flex-col items-start">
             <span className={`inline-flex px-2 py-1 text-xs font-medium rounded ${testCase.status === 'Passed' ? 'bg-green-100 text-green-800' :
@@ -185,10 +184,10 @@ const TestCaseRow = ({
           </span>
         </td>
         <td className="px-2 py-3 w-20 flex-shrink-0">
-          <span className={`inline-flex px-2 py-1 text-xs font-medium rounded ${testCase.automationStatus === 'Automated' ? 'bg-blue-100 text-blue-800' :
-            testCase.automationStatus === 'Semi-Automated' ? 'bg-purple-100 text-purple-800' :
-              'bg-gray-100 text-gray-800'
-            }`}>
+          <span className="inline-flex items-center px-2 py-1 text-xs font-medium text-gray-700 bg-gray-100 rounded">
+            {testCase.automationStatus === 'Automated' && <Code size={12} className="mr-1 text-blue-600" />}
+            {testCase.automationStatus === 'Semi-Automated' && <Edit size={12} className="mr-1 text-purple-600" />}
+            {testCase.automationStatus === 'Manual' && <FileText size={12} className="mr-1 text-gray-600" />}
             {testCase.automationStatus === 'Automated' ? 'Auto' :
               testCase.automationStatus === 'Semi-Automated' ? 'Semi' : 'Manual'}
           </span>
@@ -693,10 +692,10 @@ const TestCaseRow = ({
                         </div>
                         <div className="flex justify-between items-center py-2 border-b border-gray-100">
                           <span className="text-sm text-gray-600">Automation</span>
-                          <span className={`text-xs px-2 py-1 rounded-full font-medium ${testCase.automationStatus === 'Automated' ? 'bg-blue-100 text-blue-800' :
-                            testCase.automationStatus === 'Semi-Automated' ? 'bg-purple-100 text-purple-800' :
-                              'bg-gray-100 text-gray-800'
-                            }`}>
+                          <span className="inline-flex items-center px-2 py-1 text-xs font-medium text-gray-700 bg-gray-100 rounded-full">
+                            {testCase.automationStatus === 'Automated' && <Code size={12} className="mr-1 text-blue-600" />}
+                            {testCase.automationStatus === 'Semi-Automated' && <Edit size={12} className="mr-1 text-purple-600" />}
+                            {testCase.automationStatus === 'Manual' && <FileText size={12} className="mr-1 text-gray-600" />}
                             {testCase.automationStatus}
                           </span>
                         </div>
