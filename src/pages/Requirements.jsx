@@ -1351,7 +1351,7 @@ const Requirements = () => {
                                         <h4 className="font-semibold text-gray-900 mb-3">Tags</h4>
                                         <div className="flex flex-wrap gap-2">
                                           {req.tags.map(tag => (
-                                            <span key={tag} className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">
+                                            <span key={tag} className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-xs font-medium">
                                               {tag}
                                             </span>
                                           ))}
