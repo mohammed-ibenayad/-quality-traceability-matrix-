@@ -219,7 +219,10 @@ const ImportData = () => {
         {/* Test Case Import Interface */}
         {activeTab === 'testcases' && (
           <>
-            <ImportTestCases onImportSuccess={handleImportSuccess} />
+            <ImportTestCases            
+            onImportStart={handleImportStart}
+            onImportSuccess={handleImportSuccess} 
+            />
 
             {/* Import Status using the new component */}
             {importStatus && activeTab === 'testcases' && (
