@@ -1,27 +1,59 @@
-// src/components/Requirements/EditRequirementModal.jsx - Redesigned Compact Version
-
 import React, { useState } from 'react';
 import { useVersionContext } from '../../context/VersionContext';
 
 const EditRequirementModal = ({ requirement, onSave, onCancel }) => {
   // Get available versions from context
   const { versions } = useVersionContext();
-  // Ensure requirement object has all the necessary properties with defaults
+
+  // ✅ ADD LOGGING: Log the raw requirement object
+  console.log('🔍 EditRequirementModal - Raw requirement prop:', requirement);
+
+  // ✅ FIXED: Properly map snake_case to camelCase
   const requirementWithDefaults = {
-    id: '',
-    name: '',
-    description: '',
-    priority: 'Medium',
-    type: 'Functional',
-    status: 'Active',
-    businessImpact: 3,
-    technicalComplexity: 3,
-    regulatoryFactor: 3,
-    usageFrequency: 3,
-    versions: [],
-    tags: [],
-    ...requirement  // This spreads the actual requirement properties over the defaults
+    id: requirement?.id || '',
+    name: requirement?.name || '',
+    description: requirement?.description || '',
+    priority: requirement?.priority || 'Medium',
+    type: requirement?.type || 'Functional',
+    status: requirement?.status || 'Active',
+    // ✅ Map TDF fields: check snake_case first, then camelCase, then default
+    businessImpact: requirement?.business_impact ?? requirement?.businessImpact ?? 3,
+    technicalComplexity: requirement?.technical_complexity ?? requirement?.technicalComplexity ?? 3,
+    regulatoryFactor: requirement?.regulatory_factor ?? requirement?.regulatoryFactor ?? 3,
+    usageFrequency: requirement?.usage_frequency ?? requirement?.usageFrequency ?? 3,
+    testDepthFactor: requirement?.test_depth_factor ?? requirement?.testDepthFactor ?? null,
+    minTestCases: requirement?.min_test_cases ?? requirement?.minTestCases ?? null,
+    versions: requirement?.versions || [],
+    tags: requirement?.tags || [],
+    workspace_id: requirement?.workspace_id || null
   };
+
+  // ✅ ADD LOGGING: Log what we extracted for TDF fields
+  console.log('🔍 Business Impact:', {
+    'snake_case': requirement?.business_impact,
+    'camelCase': requirement?.businessImpact,
+    'final': requirementWithDefaults.businessImpact
+  });
+
+  console.log('🔍 Technical Complexity:', {
+    'snake_case': requirement?.technical_complexity,
+    'camelCase': requirement?.technicalComplexity,
+    'final': requirementWithDefaults.technicalComplexity
+  });
+
+  console.log('🔍 Regulatory Factor:', {
+    'snake_case': requirement?.regulatory_factor,
+    'camelCase': requirement?.regulatoryFactor,
+    'final': requirementWithDefaults.regulatoryFactor
+  });
+
+  console.log('🔍 Usage Frequency:', {
+    'snake_case': requirement?.usage_frequency,
+    'camelCase': requirement?.usageFrequency,
+    'final': requirementWithDefaults.usageFrequency
+  });
+
+  console.log('📋 requirementWithDefaults:', requirementWithDefaults);
 
   const [formData, setFormData] = useState({
     name: requirementWithDefaults.name,
@@ -36,7 +68,8 @@ const EditRequirementModal = ({ requirement, onSave, onCancel }) => {
     versions: requirementWithDefaults.versions,
     tags: requirementWithDefaults.tags || []
   });
-  
+
+
   // For tags input
   const [tagInput, setTagInput] = useState('');
 
@@ -62,16 +95,16 @@ const EditRequirementModal = ({ requirement, onSave, onCancel }) => {
   // Handle form field changes
   const handleChange = (e) => {
     const { name, value } = e.target;
-    
+
     // Define which fields should be treated as numbers
     const numericFields = ['businessImpact', 'technicalComplexity', 'regulatoryFactor', 'usageFrequency'];
-    
+
     setFormData(prev => ({
       ...prev,
       [name]: numericFields.includes(name) ? Number(value) : value
     }));
   };
-  
+
   // Handle adding a new tag
   const handleAddTag = () => {
     if (tagInput.trim() && !formData.tags.includes(tagInput.trim())) {
@@ -82,7 +115,7 @@ const EditRequirementModal = ({ requirement, onSave, onCancel }) => {
       setTagInput('');
     }
   };
-  
+
   // Handle removing a tag
   const handleRemoveTag = (tagToRemove) => {
     setFormData(prev => ({
@@ -100,7 +133,7 @@ const EditRequirementModal = ({ requirement, onSave, onCancel }) => {
       }));
     }
   };
-  
+
   // Handle removing a version
   const handleRemoveVersion = (versionToRemove) => {
     setFormData(prev => ({
@@ -144,11 +177,11 @@ const EditRequirementModal = ({ requirement, onSave, onCancel }) => {
             <p className="text-sm text-gray-500 mt-1">ID: {requirementWithDefaults.id}</p>
           )}
         </div>
-        
+
         {/* Scrollable Form Content */}
         <div className="flex-1 overflow-y-auto px-6 py-4">
           <form onSubmit={handleSubmit} id="requirement-form" className="space-y-4">
-            
+
             {/* Name & Description Row */}
             <div className="grid grid-cols-1 gap-4">
               <div>
@@ -180,7 +213,7 @@ const EditRequirementModal = ({ requirement, onSave, onCancel }) => {
                 />
               </div>
             </div>
-            
+
             {/* Basic Info Row */}
             <div className="grid grid-cols-3 gap-4">
               <div>
@@ -232,7 +265,7 @@ const EditRequirementModal = ({ requirement, onSave, onCancel }) => {
                 </select>
               </div>
             </div>
-            
+
             {/* Test Depth Factors - Compact Grid */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -297,7 +330,7 @@ const EditRequirementModal = ({ requirement, onSave, onCancel }) => {
                 </div>
               </div>
             </div>
-            
+
             {/* Calculated Values - Compact Display */}
             <div className="bg-blue-50 rounded-lg p-3 border border-blue-200">
               <div className="flex items-center justify-between">
@@ -311,7 +344,7 @@ const EditRequirementModal = ({ requirement, onSave, onCancel }) => {
                 </div>
               </div>
             </div>
-            
+
             {/* Versions Section */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Versions</label>
@@ -321,22 +354,20 @@ const EditRequirementModal = ({ requirement, onSave, onCancel }) => {
                     const versionExists = versions.some(v => v.id === versionId);
                     const versionName = versions.find(v => v.id === versionId)?.name || versionId;
                     return (
-                      <span 
-                        key={index} 
-                        className={`inline-flex items-center text-xs px-2 py-1 rounded-full ${
-                          versionExists 
-                            ? 'bg-blue-100 text-blue-800' 
-                            : 'bg-yellow-100 text-yellow-800'
-                        }`}
+                      <span
+                        key={index}
+                        className={`inline-flex items-center text-xs px-2 py-1 rounded-full ${versionExists
+                          ? 'bg-blue-100 text-blue-800'
+                          : 'bg-yellow-100 text-yellow-800'
+                          }`}
                       >
                         {versionName}
                         {!versionExists && <span className="ml-1" title="Version not created yet">⚠️</span>}
                         <button
                           type="button"
                           onClick={() => handleRemoveVersion(versionId)}
-                          className={`ml-1 font-bold text-sm ${
-                            versionExists ? 'text-blue-600 hover:text-blue-800' : 'text-yellow-600 hover:text-yellow-800'
-                          }`}
+                          className={`ml-1 font-bold text-sm ${versionExists ? 'text-blue-600 hover:text-blue-800' : 'text-yellow-600 hover:text-yellow-800'
+                            }`}
                           title="Remove version"
                         >
                           ×
@@ -370,7 +401,7 @@ const EditRequirementModal = ({ requirement, onSave, onCancel }) => {
                 )}
               </select>
             </div>
-            
+
             {/* Tags Section - Compact */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Tags</label>
@@ -415,7 +446,7 @@ const EditRequirementModal = ({ requirement, onSave, onCancel }) => {
                 </button>
               </div>
             </div>
-            
+
             {/* Helper Text - Compact */}
             <div className="bg-gray-50 rounded-lg p-3 text-xs text-gray-600">
               <div className="grid grid-cols-2 gap-x-4 gap-y-1">
@@ -427,7 +458,7 @@ const EditRequirementModal = ({ requirement, onSave, onCancel }) => {
             </div>
           </form>
         </div>
-        
+
         {/* Fixed Footer with Action Buttons */}
         <div className="flex-shrink-0 px-6 py-4 border-t border-gray-200 bg-gray-50 rounded-b-lg">
           <div className="flex justify-end space-x-3">

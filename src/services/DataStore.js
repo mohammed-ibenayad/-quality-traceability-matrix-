@@ -1837,16 +1837,24 @@ class DataStoreService {
     const workspaceId = this.getCurrentWorkspaceId();
 
     try {
+      // ✅ Step 1: Update via API
       const response = await apiClient.put(`/api/requirements/${id}`, {
         ...updates,
         workspace_id: workspaceId
       });
 
       if (response.data.success) {
-        const index = this._requirements.findIndex(r => r.id === id);
-        if (index !== -1) {
-          this._requirements[index] = { ...this._requirements[index], ...updates };
-          this._notifyListeners();
+        // ✅ Step 2: Fetch the fresh data from API to get snake_case fields
+        const getResponse = await apiClient.get(`/api/requirements/${id}?workspace_id=${workspaceId}`);
+
+        if (getResponse.data.success) {
+          const index = this._requirements.findIndex(r => r.id === id);
+          if (index !== -1) {
+            // ✅ Step 3: Update with the complete fresh data from API
+            this._requirements[index] = getResponse.data.data;
+            this._notifyListeners();
+            console.log('✅ Requirement updated and refreshed from API:', id);
+          }
         }
       }
     } catch (error) {
