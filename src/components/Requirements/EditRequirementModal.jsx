@@ -20,7 +20,13 @@ const EditRequirementModal = ({ requirement, onSave, onCancel }) => {
     usageFrequency: 3,
     versions: [],
     tags: [],
-    ...requirement  // This spreads the actual requirement properties over the defaults
+    ...requirement,  // This spreads the actual requirement properties over the defaults
+    businessImpact: requirement?.business_impact ?? requirement?.businessImpact ?? 3,
+    technicalComplexity: requirement?.technical_complexity ?? requirement?.technicalComplexity ?? 3,
+    regulatoryFactor: requirement?.regulatory_factor ?? requirement?.regulatoryFactor ?? 3,
+    usageFrequency: requirement?.usage_frequency ?? requirement?.usageFrequency ?? 3,
+    testDepthFactor: requirement?.test_depth_factor ?? requirement?.testDepthFactor ?? null,
+    minTestCases: requirement?.min_test_cases ?? requirement?.minTestCases ?? null
   };
 
   const [formData, setFormData] = useState({
