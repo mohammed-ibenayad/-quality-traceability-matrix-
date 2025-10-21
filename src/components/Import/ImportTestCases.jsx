@@ -7,8 +7,8 @@ import GitHubImportTestCases from './GitHubImportTestCases';
 /**
  * Enhanced component for importing test case data via multiple sources
  */
-const ImportTestCases = ({ onImportSuccess }) => {
-  // Check if this is being used in a tabbed interface
+const ImportTestCases = ({ onImportStart, onImportSuccess }) => {
+    // Check if this is being used in a tabbed interface
   const [showGitHubImport, setShowGitHubImport] = useState(false);
 
   // File import state
@@ -395,6 +395,8 @@ const ImportTestCases = ({ onImportSuccess }) => {
     if (!processedData || processedData.length === 0) {
       return;
     }
+
+    onImportStart?.();
 
     try {
       // Get existing test cases to check for duplicates
