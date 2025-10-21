@@ -1248,28 +1248,29 @@ const Requirements = () => {
                                     <div className="bg-white rounded-lg p-4 shadow-sm border">
                                       <h4 className="font-semibold text-gray-900 mb-4">Quick Info</h4>
                                       <div className="space-y-3">
+                                        {/* Type – Neutral */}
                                         <div className="flex justify-between items-center py-2 border-b border-gray-100">
                                           <span className="text-sm text-gray-600">Type</span>
                                           <span className="text-xs px-2 py-1 rounded-full font-medium bg-gray-100 text-gray-700">
                                             {req.type}
                                           </span>
                                         </div>
+
+                                        {/* Priority – Keep colored (High/Medium/Low) */}
                                         <div className="flex justify-between items-center py-2 border-b border-gray-100">
                                           <span className="text-sm text-gray-600">Priority</span>
                                           <span className={`text-xs px-2 py-1 rounded-full font-medium ${req.priority === 'High' ? 'bg-red-100 text-red-800' :
-                                            req.priority === 'Medium' ? 'bg-yellow-100 text-yellow-800' :
-                                              'bg-green-100 text-green-800'
+                                              req.priority === 'Medium' ? 'bg-yellow-100 text-yellow-800' :
+                                                'bg-green-100 text-green-800'
                                             }`}>
                                             {req.priority}
                                           </span>
                                         </div>
+
+                                        {/* Status – Neutral (or add icon if desired) */}
                                         <div className="flex justify-between items-center py-2 border-b border-gray-100">
                                           <span className="text-sm text-gray-600">Status</span>
-                                          <span className={`text-xs px-2 py-1 rounded-full font-medium ${req.status === 'Active' ? 'bg-green-100 text-green-800' :
-                                            req.status === 'Proposed' ? 'bg-yellow-100 text-yellow-800' :
-                                              req.status === 'Implemented' ? 'bg-blue-100 text-blue-800' :
-                                                'bg-gray-100 text-gray-800'
-                                            }`}>
+                                          <span className="text-xs px-2 py-1 rounded-full font-medium bg-gray-100 text-gray-700">
                                             {req.status}
                                           </span>
                                         </div>
