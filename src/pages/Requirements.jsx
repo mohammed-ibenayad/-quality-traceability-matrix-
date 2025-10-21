@@ -1127,7 +1127,7 @@ const Requirements = () => {
                       {isExpanded && (
                         <tr>
                           <td colSpan="8" className="p-0">
-                            <div className="bg-gradient-to-r from-green-50 to-gray-50 border-l-4 border-green-400">
+                            <div className="bg-white border border-gray-200 rounded-lg">
                               <div className="p-6">
                                 {/* Header Section */}
                                 <div className="flex items-center mb-6 pb-4 border-b border-gray-200">
