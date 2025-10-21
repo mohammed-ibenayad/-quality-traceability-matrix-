@@ -1057,12 +1057,11 @@ const Requirements = () => {
                           </span>
                         </td>
                         <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                          <span className={`px-2 py-1 rounded text-xs ${req.status === 'Active' ? 'bg-green-100 text-green-800' :
-                            req.status === 'Proposed' ? 'bg-yellow-100 text-yellow-800' :
-                              req.status === 'Implemented' ? 'bg-blue-100 text-blue-800' :
-                                'bg-gray-100 text-gray-800'
-                            }`}>
+                          <span className="text-sm text-gray-700 flex items-center">
                             {req.status}
+                            {req.status === 'Active' && <CheckCircle className="ml-1 text-green-600" size={14} />}
+                            {req.status === 'Deprecated' && <AlertTriangle className="ml-1 text-orange-600" size={14} />}
+                            {req.status === 'Archived' && <Trash2 className="ml-1 text-gray-500" size={14} />}
                           </span>
                         </td>
                         <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
