@@ -1558,13 +1558,7 @@ class DataStoreService {
 
       console.log(`📤 Creating version ${version.id} in workspace:`, this._currentWorkspaceId);
 
-      const response = await fetch(`${API_BASE_URL}/api/versions`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(versionWithWorkspace)
-      });
+      const response = await apiClient.post('/api/versions', versionWithWorkspace);
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
