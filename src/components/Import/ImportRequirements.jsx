@@ -6,7 +6,7 @@ import dataStore from '../../services/DataStore';
  * Component for importing requirements data via file upload
  * Now supports JSON, JSONC, and CSV formats
  */
-const ImportRequirements = ({ onImportSuccess }) => {
+const ImportRequirements = ({ onImportStart, onImportSuccess }) => {
   const [file, setFile] = useState(null);
   const [isValidating, setIsValidating] = useState(false);
   const [validationErrors, setValidationErrors] = useState([]);
@@ -303,6 +303,8 @@ const ImportRequirements = ({ onImportSuccess }) => {
   // Process the import
   const handleImport = async () => {  // ✅ CHANGED: Make it async
     if (!processedData || !validationSuccess) return;
+
+    onImportStart?.();
 
     try {
       console.log('🔍 Current workspace ID in DataStore:', dataStore._currentWorkspaceId);
