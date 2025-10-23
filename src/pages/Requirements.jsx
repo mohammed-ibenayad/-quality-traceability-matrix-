@@ -159,48 +159,7 @@ const Requirements = () => {
     ? requirements
     : requirements.filter(req => req.versions && req.versions.includes(selectedVersion));
 
-  const nonPriorityFilteredRequirements = useMemo(() => {
-    return versionFilteredRequirements.filter(req => {
-      // Search filter
-      const matchesSearch = !searchQuery || (() => {
-        const searchTerms = searchQuery.toLowerCase().trim().split(/\s+/);
-        return searchTerms.some(term =>
-          req.name.toLowerCase().includes(term) ||
-          req.id.toLowerCase().includes(term) ||
-          req.description.toLowerCase().includes(term)
-        );
-      })();
-      // Status filter
-      const matchesStatus = statusFilter === 'All' || req.status === statusFilter;
-      // Type filter
-      const matchesType = typeFilter === 'All' || req.type === typeFilter;
-      // Coverage filter
-      const matchesCoverage = (() => {
-        if (coverageFilter === 'All') return true;
-        const coverage = versionCoverage.find(c => c.reqId === req.id);
-        const hasTests = coverage && coverage.totalTests > 0;
-        if (coverageFilter === 'With Tests') return hasTests;
-        if (coverageFilter === 'No Coverage') return !hasTests;
-        return true;
-      })();
-      // Tags filter
-      const matchesTags = selectedTagsFilter.length === 0 ||
-        (req.tags && req.tags.some(tag => selectedTagsFilter.includes(tag)));
-      // Apply all filters EXCEPT priorityFilterTab
-      const matchesPriorityDropdown = priorityFilter === 'All' || req.priority === priorityFilter;
-      return matchesSearch && matchesStatus && matchesType &&
-        matchesCoverage && matchesTags && matchesPriorityDropdown;
-    });
-  }, [
-    versionFilteredRequirements,
-    searchQuery,
-    statusFilter,
-    typeFilter,
-    coverageFilter,
-    selectedTagsFilter,
-    versionCoverage,
-    priorityFilter
-  ]);
+
 
   // Apply search and filters
   const filteredRequirements = useMemo(() => {
@@ -388,6 +347,62 @@ const Requirements = () => {
         alert('Error deleting requirement: ' + error.message);
       }
     }
+  };
+
+  // Bulk action handlers
+  const handleBulkVersionAssignment = (versionId, action) => {
+    if (selectedRequirements.size === 0) return;
+    setSelectedVersionForAssignment(versionId);
+    setVersionAssignmentAction(action);
+    setShowVersionAssignmentModal(true);
+  };
+
+  const handleBulkTagsUpdate = (tags, action) => {
+    if (selectedRequirements.size === 0) return;
+    setSelectedTagsForAssignment(tags);
+    setTagAssignmentAction(action);
+    setShowTagAssignmentModal(true);
+  };
+
+  const handleExportSelected = () => {
+    if (selectedRequirements.size === 0) return;
+    const selectedIds = Array.from(selectedRequirements);
+    const selectedReqs = requirements.filter(req => selectedIds.includes(req.id));
+    const exportData = selectedReqs.map(req => ({
+      id: req.id,
+      name: req.name,
+      description: req.description,
+      type: req.type,
+      priority: req.priority,
+      status: req.status,
+      versions: req.versions?.join(', ') || '',
+      tags: req.tags?.join(', ') || '',
+      businessImpact: req.businessImpact,
+      technicalComplexity: req.technicalComplexity,
+      regulatoryFactor: req.regulatoryFactor,
+      usageFrequency: req.usageFrequency,
+      testDepthFactor: req.testDepthFactor
+    }));
+
+    // Convert to CSV
+    const headers = Object.keys(exportData[0]);
+    const csvContent = [
+      headers.join(','),
+      ...exportData.map(row =>
+        headers.map(header => {
+          const value = row[header]?.toString() || '';
+          return value.includes(',') ? `"${value}"` : value;
+        }).join(',')
+      )
+    ].join('\n');
+
+    // Download CSV
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `requirements-export-${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+    setSelectedRequirements(new Set());
   };
 
   // Handle bulk delete
@@ -841,19 +856,17 @@ const Requirements = () => {
       </div>
     );
   }, [
-    selectedRequirements,
     selectedRequirement,
+    selectedRequirements,
     requirements,
-    testCases,
-    mapping,
     versions,
-    searchQuery,
-    priorityFilter,
-    statusFilter,
-    typeFilter,
-    coverageFilter,
-    selectedTagsFilter,
-    stats // Add stats to dependencies
+    mapping,  // ✅ Added - used in getLinkedTests
+    testCases,  // ✅ Added - used in getLinkedTests
+    selectedVersion,  // ✅ Added - used in getLinkedTests via testCaseAppliesTo
+    handleBulkVersionAssignment,  // ✅ Added
+    handleBulkTagsUpdate,  // ✅ Added
+    handleBulkDelete,  // ✅ Added
+    handleExportSelected  // ✅ Added
   ]);
 
 
@@ -871,62 +884,6 @@ const Requirements = () => {
       </MainLayout>
     );
   }
-
-  // Bulk action handlers
-  const handleBulkVersionAssignment = (versionId, action) => {
-    if (selectedRequirements.size === 0) return;
-    setSelectedVersionForAssignment(versionId);
-    setVersionAssignmentAction(action);
-    setShowVersionAssignmentModal(true);
-  };
-
-  const handleBulkTagsUpdate = (tags, action) => {
-    if (selectedRequirements.size === 0) return;
-    setSelectedTagsForAssignment(tags);
-    setTagAssignmentAction(action);
-    setShowTagAssignmentModal(true);
-  };
-
-  const handleExportSelected = () => {
-    if (selectedRequirements.size === 0) return;
-    const selectedIds = Array.from(selectedRequirements);
-    const selectedReqs = requirements.filter(req => selectedIds.includes(req.id));
-    const exportData = selectedReqs.map(req => ({
-      id: req.id,
-      name: req.name,
-      description: req.description,
-      type: req.type,
-      priority: req.priority,
-      status: req.status,
-      versions: req.versions?.join(', ') || '',
-      tags: req.tags?.join(', ') || '',
-      businessImpact: req.businessImpact,
-      technicalComplexity: req.technicalComplexity,
-      regulatoryFactor: req.regulatoryFactor,
-      usageFrequency: req.usageFrequency,
-      testDepthFactor: req.testDepthFactor
-    }));
-
-    // Convert to CSV
-    const headers = Object.keys(exportData[0]);
-    const csvContent = [
-      headers.join(','),
-      ...exportData.map(row =>
-        headers.map(header => {
-          const value = row[header]?.toString() || '';
-          return value.includes(',') ? `"${value}"` : value;
-        }).join(',')
-      )
-    ].join('\n');
-
-    // Download CSV
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `requirements-export-${new Date().toISOString().split('T')[0]}.csv`;
-    link.click();
-    setSelectedRequirements(new Set());
-  };
 
   // Add confirmation handler for version assignment
   const confirmVersionAssignment = async () => {
