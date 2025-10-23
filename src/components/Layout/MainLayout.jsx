@@ -28,7 +28,7 @@ const MainLayout = ({
       <div className="h-full flex">
         {/* Left Sidebar - Navigation */}
         <Sidebar />
-        
+
         {/* Main content area */}
         <div className="flex-1 flex flex-col overflow-hidden">
           {/* Header */}
@@ -44,9 +44,8 @@ const MainLayout = ({
           {/* Content area with optional right sidebar */}
           <div className="flex-1 flex overflow-hidden">
             {/* Main content - scrollable */}
-            <main className={`flex-1 overflow-y-auto transition-all duration-300 ${
-              showRightSidebar ? 'mr-0' : ''
-            }`}>
+            <main className={`flex-1 overflow-y-auto transition-all duration-300 ${showRightSidebar ? 'mr-0' : ''
+              }`}>
               <div className="mx-auto px-4 py-4">
                 {children}
               </div>
@@ -54,8 +53,10 @@ const MainLayout = ({
 
             {/* Right sidebar - sticky, only shown when showRightSidebar is true */}
             {showRightSidebar && rightSidebar && (
-              <aside className="hidden lg:block w-80 xl:w-96 bg-white border-l border-gray-200 overflow-y-auto flex-shrink-0 shadow-lg">
-                {rightSidebar}
+              <aside className="hidden lg:block w-80 xl:w-96 bg-white border-l border-gray-200 overflow-y-auto flex-shrink-0 shadow-lg transition-all duration-300">
+                <div className="animate-fadeIn">
+                  {rightSidebar}
+                </div>
               </aside>
             )}
           </div>
