@@ -359,177 +359,75 @@ const BulkActionsPanel = ({
           )}
 
           {/* Tag Management Dropdown */}
-          {availableTags.length > 0 && (
-            <div className="relative">
-              <button
-                onClick={() => {
-                  setShowTagsDropdown(!showTagsDropdown);
-                  setShowVersionDropdown(false);
-                }}
-                className="w-full flex items-center justify-between px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-              >
-                <span className="flex items-center text-sm text-gray-700">
-                  <Tag size={16} className="mr-2" />
-                  Manage Tags
-                </span>
-                <ChevronDown size={16} className={`text-gray-500 transition-transform ${showTagsDropdown ? 'rotate-180' : ''}`} />
-              </button>
+          {/* Tag Management - SIMPLIFIED */}
+{availableTags.length > 0 && (
+  <SidebarSection title="Manage Tags" defaultOpen={false}>
+    <div className="space-y-3">
+      {/* Quick Add Common Tags */}
+      <div>
+        <label className="block text-xs font-medium text-gray-700 mb-2">
+          Quick Add Tags
+        </label>
+        <div className="flex flex-wrap gap-2">
+          {availableTags.slice(0, 6).map(tag => (
+            <button
+              key={tag}
+              onClick={() => onTagsUpdate([tag], 'add')}
+              className="px-3 py-1 text-xs bg-green-50 text-green-700 border border-green-300 rounded-full hover:bg-green-100 transition-colors"
+            >
+              + {tag}
+            </button>
+          ))}
+        </div>
+        {availableTags.length > 6 && (
+          <p className="text-xs text-gray-500 mt-2">
+            Showing top 6 tags. Use custom input for more.
+          </p>
+        )}
+      </div>
 
-              {showTagsDropdown && (
-                <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-96 overflow-hidden flex flex-col">
-                  {/* Tab Selector */}
-                  <div className="flex border-b border-gray-200 bg-gray-50">
-                    <button
-                      onClick={() => setTagActiveTab('add')}
-                      className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
-                        tagActiveTab === 'add'
-                          ? 'text-green-600 bg-green-50 border-b-2 border-green-600'
-                          : 'text-gray-600 hover:text-gray-800'
-                      }`}
-                    >
-                      <Plus size={14} className="inline mr-1" />
-                      Add Tags
-                    </button>
-                    <button
-                      onClick={() => setTagActiveTab('remove')}
-                      className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
-                        tagActiveTab === 'remove'
-                          ? 'text-red-600 bg-red-50 border-b-2 border-red-600'
-                          : 'text-gray-600 hover:text-gray-800'
-                      }`}
-                    >
-                      <Minus size={14} className="inline mr-1" />
-                      Remove Tags
-                    </button>
-                  </div>
+      {/* Quick Remove Common Tags */}
+      <div>
+        <label className="block text-xs font-medium text-gray-700 mb-2">
+          Quick Remove Tags
+        </label>
+        <div className="flex flex-wrap gap-2">
+          {availableTags.slice(0, 6).map(tag => (
+            <button
+              key={tag}
+              onClick={() => onTagsUpdate([tag], 'remove')}
+              className="px-3 py-1 text-xs bg-red-50 text-red-700 border border-red-300 rounded-full hover:bg-red-100 transition-colors"
+            >
+              × {tag}
+            </button>
+          ))}
+        </div>
+      </div>
 
-                  {/* Search Box */}
-                  <div className="p-2 border-b border-gray-100">
-                    <div className="relative">
-                      <Search size={14} className="absolute left-3 top-2.5 text-gray-400" />
-                      <input
-                        type="text"
-                        value={tagSearchQuery}
-                        onChange={(e) => setTagSearchQuery(e.target.value)}
-                        placeholder="Search tags..."
-                        className="w-full pl-8 pr-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500"
-                        onClick={(e) => e.stopPropagation()}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Custom Tag Input */}
-                  <div className="p-2 border-b border-gray-100 bg-indigo-50">
-                    <div className="text-xs font-medium text-indigo-700 mb-2 px-1">
-                      Create Custom Tag
-                    </div>
-                    <div className="flex space-x-2">
-                      <input
-                        type="text"
-                        value={customTagInput}
-                        onChange={(e) => setCustomTagInput(e.target.value)}
-                        onKeyPress={(e) => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault();
-                            handleCustomTagAdd();
-                          }
-                        }}
-                        placeholder="Enter new tag..."
-                        className="flex-1 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-indigo-500"
-                        onClick={(e) => e.stopPropagation()}
-                      />
-                      <button
-                        onClick={handleCustomTagAdd}
-                        disabled={!customTagInput.trim() || availableTags.includes(customTagInput.trim())}
-                        className="px-2 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-sm transition-colors"
-                      >
-                        <Plus size={14} />
-                      </button>
-                    </div>
-                    {customTagInput.trim() && availableTags.includes(customTagInput.trim()) && (
-                      <div className="text-xs text-amber-600 mt-1 flex items-center">
-                        <AlertCircle size={12} className="mr-1" />
-                        Tag already exists
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Tags List */}
-                  {filteredTags.length > 0 ? (
-                    <div className="p-2">
-                      <div className="text-xs font-medium text-gray-700 mb-2 px-1">
-                        Existing Tags ({filteredTags.length})
-                      </div>
-
-                      {/* Select All/None */}
-                      <div className="flex justify-between items-center mb-2 px-1">
-                        <button
-                          onClick={() => setSelectedTagsForAction(new Set(filteredTags))}
-                          className="text-xs text-indigo-600 hover:text-indigo-800"
-                        >
-                          Select All
-                        </button>
-                        <button
-                          onClick={() => setSelectedTagsForAction(new Set())}
-                          className="text-xs text-gray-600 hover:text-gray-800"
-                        >
-                          Select None
-                        </button>
-                      </div>
-
-                      {/* Tag List */}
-                      <div className="space-y-1 max-h-40 overflow-y-auto">
-                        {filteredTags.map(tag => (
-                          <div
-                            key={tag}
-                            onClick={() => toggleTagSelection(tag)}
-                            className={`flex items-center justify-between p-2 text-sm rounded cursor-pointer transition-colors ${
-                              selectedTagsForAction.has(tag)
-                                ? (tagActiveTab === 'add' ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200')
-                                : 'hover:bg-gray-50 border border-transparent'
-                            }`}
-                          >
-                            <div className="flex items-center min-w-0 flex-1">
-                              <span className={`w-2 h-2 rounded-full mr-2 flex-shrink-0 ${
-                                selectedTagsForAction.has(tag)
-                                  ? (tagActiveTab === 'add' ? 'bg-green-400' : 'bg-red-400')
-                                  : 'bg-gray-300'
-                              }`}></span>
-                              <span className="truncate">{tag}</span>
-                            </div>
-                            {selectedTagsForAction.has(tag) && (
-                              <Check size={14} className={tagActiveTab === 'add' ? 'text-green-600' : 'text-red-600'} />
-                            )}
-                          </div>
-                        ))}
-                      </div>
-
-                      {/* Apply Selected Tags */}
-                      {selectedTagsForAction.size > 0 && (
-                        <div className="mt-3 pt-3 border-t border-gray-200">
-                          <button
-                            onClick={handleBulkTagsAction}
-                            className={`w-full px-3 py-2 text-sm font-medium rounded transition-colors ${
-                              tagActiveTab === 'add'
-                                ? 'bg-green-600 text-white hover:bg-green-700'
-                                : 'bg-red-600 text-white hover:bg-red-700'
-                            }`}
-                          >
-                            {tagActiveTab === 'add' ? 'Add' : 'Remove'} {selectedTagsForAction.size} Tag{selectedTagsForAction.size !== 1 ? 's' : ''}
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="p-4 text-center text-gray-500 text-sm">
-                      {tagSearchQuery ? 'No tags found' : 'No tags available'}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-
+      <div className="border-t border-gray-200 pt-3">
+        <label className="block text-xs font-medium text-gray-700 mb-2">
+          Or Create Custom Tag
+        </label>
+        <div className="flex space-x-2">
+          <input
+            type="text"
+            placeholder="Enter tag name..."
+            className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && e.target.value.trim()) {
+                onTagsUpdate([e.target.value.trim()], 'add');
+                e.target.value = '';
+              }
+            }}
+          />
+        </div>
+        <p className="text-xs text-gray-500 mt-1">
+          Press Enter to add custom tag
+        </p>
+      </div>
+    </div>
+  </SidebarSection>
+)}
           {/* Export Button */}
           {showExportButton && onExport && (
             <SidebarActionButton
