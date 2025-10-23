@@ -1,41 +1,47 @@
-// Complete BulkActionsPanel.jsx - Enhanced with Tag Management and Generic Support
-// Replace your entire BulkActionsPanel.jsx file with this content
-
 import React, { useState, useMemo } from 'react';
-import { 
-  Play, 
-  Trash2, 
-  X, 
-  Settings, 
-  ChevronDown, 
-  Search, 
-  Plus, 
+import RightSidebarPanel, {
+  SidebarSection,
+  SidebarActionButton,
+  SidebarBadge
+} from './RightSidebarPanel';
+import {
+  Play,
+  Trash2,
+  X,
+  Settings,
+  ChevronDown,
+  Search,
+  Plus,
   Minus,
   Tag,
   FileDown,
   Check,
   AlertCircle,
-  Hash
+  Hash,
+  CheckSquare,
+  AlertTriangle
 } from 'lucide-react';
 
 /**
- * Enhanced Bulk Actions Panel with comprehensive tag editing and version management
- * Now supports both test cases and requirements
+ * Enhanced Bulk Actions Panel - For Right Sidebar
+ * Combines version management, tag management, and bulk operations
+ * Supports both requirements and test cases
  */
 const BulkActionsPanel = ({
-  selectedCount,
+  selectedCount = 0,
+  selectedItems = [],
   availableVersions = [],
-  availableTags = [], // Available tags from items
+  availableTags = [],
   
-  // NEW: Generic props to customize the component
-  itemType = "test case", // "test case" or "requirement"
-  showExecuteButton = true, // Only show for test cases
-  showExportButton = false, // Can be enabled for both
+  // Generic props to customize the component
+  itemType = "requirement", // "requirement" or "test case"
+  showExecuteButton = false, // Only show for test cases
+  showExportButton = true,
   automatedCount = 0,
   
-  // Existing callbacks
+  // Callbacks
   onVersionAssign,
-  onTagsUpdate, // Callback for tag updates
+  onTagsUpdate,
   onExecuteTests,
   onBulkDelete,
   onClearSelection,
@@ -58,10 +64,17 @@ const BulkActionsPanel = ({
     return null;
   }
 
+  // Calculate stats about selection
+  const stats = {
+    highPriority: selectedItems.filter(r => r.priority === 'High').length,
+    mediumPriority: selectedItems.filter(r => r.priority === 'Medium').length,
+    lowPriority: selectedItems.filter(r => r.priority === 'Low').length,
+  };
+
   // Filter versions based on search query
   const filteredVersions = useMemo(() => {
     if (!versionSearchQuery) return availableVersions;
-    return availableVersions.filter(version => 
+    return availableVersions.filter(version =>
       version.name.toLowerCase().includes(versionSearchQuery.toLowerCase()) ||
       version.id.toLowerCase().includes(versionSearchQuery.toLowerCase())
     );
@@ -70,7 +83,7 @@ const BulkActionsPanel = ({
   // Filter tags based on search query
   const filteredTags = useMemo(() => {
     if (!tagSearchQuery) return availableTags;
-    return availableTags.filter(tag => 
+    return availableTags.filter(tag =>
       tag.toLowerCase().includes(tagSearchQuery.toLowerCase())
     );
   }, [availableTags, tagSearchQuery]);
@@ -116,12 +129,6 @@ const BulkActionsPanel = ({
   };
 
   // Tag action handlers
-  const handleTagsUpdate = (tags, action) => {
-    if (onTagsUpdate) {
-      onTagsUpdate(tags, action); // This will trigger the modal
-    }
-  };
-
   const handleTagAction = (action, tags) => {
     if (onTagsUpdate) {
       onTagsUpdate(Array.isArray(tags) ? tags : [tags], action);
@@ -178,475 +185,422 @@ const BulkActionsPanel = ({
     return icons[groupKey] || '📦';
   };
 
-  // Dropdown toggle handlers
-  const handleVersionDropdownToggle = () => {
-    setShowVersionDropdown(!showVersionDropdown);
-    if (showTagsDropdown) setShowTagsDropdown(false);
-  };
-
-  const handleTagsDropdownToggle = () => {
-    setShowTagsDropdown(!showTagsDropdown);
-    if (showVersionDropdown) setShowVersionDropdown(false);
-  };
-
   return (
-    <div className={`relative bg-blue-50 border border-blue-200 rounded-lg p-4 ${className}`}>
-      <div className="flex items-center justify-between">
-        {/* Selection Info - UPDATED to be generic */}
-        <div className="flex items-center space-x-2">
-          <div className="text-blue-800 font-medium">
-            {selectedCount} {itemType}{selectedCount !== 1 ? 's' : ''} selected
+    <RightSidebarPanel
+      title="Bulk Actions"
+      onClose={onClearSelection}
+    >
+      {/* Selection Header */}
+      <div className="p-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white">
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="flex items-center space-x-2">
+              <CheckSquare size={20} />
+              <span className="text-lg font-bold">{selectedCount}</span>
+            </div>
+            <div className="text-sm text-blue-100 mt-1">
+              {itemType.charAt(0).toUpperCase() + itemType.slice(1)}{selectedCount !== 1 ? 's' : ''} Selected
+            </div>
+          </div>
+          <button
+            onClick={onClearSelection}
+            className="p-2 hover:bg-white/20 rounded-full transition-colors"
+            title="Clear selection"
+          >
+            <X size={20} />
+          </button>
+        </div>
+      </div>
+
+      {/* Quick Stats */}
+      <div className="p-4 bg-blue-50 border-b border-blue-200">
+        <div className="grid grid-cols-3 gap-2 text-center">
+          <div>
+            <div className="text-lg font-bold text-red-600">{stats.highPriority}</div>
+            <div className="text-xs text-gray-600">High</div>
+          </div>
+          <div>
+            <div className="text-lg font-bold text-yellow-600">{stats.mediumPriority}</div>
+            <div className="text-xs text-gray-600">Medium</div>
+          </div>
+          <div>
+            <div className="text-lg font-bold text-green-600">{stats.lowPriority}</div>
+            <div className="text-xs text-gray-600">Low</div>
           </div>
         </div>
+      </div>
 
-        {/* Action Buttons - LIGHTER OUTLINE STYLE */}
-        <div className="flex items-center space-x-2">
-          {/* Execute Tests Button - Only show for test cases */}
+      {/* Warning if risky operation */}
+      {stats.highPriority > 0 && (
+        <div className="p-3 bg-yellow-50 border-l-4 border-yellow-400 mx-4 mt-4 rounded">
+          <div className="flex items-start">
+            <AlertTriangle size={16} className="text-yellow-600 mt-0.5 mr-2 flex-shrink-0" />
+            <div className="text-xs text-yellow-800">
+              <strong>Caution:</strong> {stats.highPriority} high-priority {itemType}{stats.highPriority !== 1 ? 's' : ''} selected.
+              Please review changes carefully.
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Quick Actions */}
+      <SidebarSection title="Quick Actions" defaultOpen={true}>
+        <div className="space-y-2">
+          {/* Execute Tests Button - Only for test cases */}
           {showExecuteButton && onExecuteTests && (
-            <button
+            <SidebarActionButton
+              icon={<Play size={16} />}
+              label={`Execute ${automatedCount > 0 ? `${automatedCount} Automated` : selectedCount} Test${selectedCount !== 1 ? 's' : ''}`}
               onClick={onExecuteTests}
-              className="px-3 py-1 border border-green-500 text-green-700 bg-green-50 rounded hover:bg-green-100 hover:border-green-600 text-sm transition-colors flex items-center"
-              title={`Execute selected ${itemType}s`}
-            >
-              <Play size={14} className="mr-1" />
-              Execute ({automatedCount || selectedCount})
-            </button>
+              variant="primary"
+              disabled={automatedCount === 0}
+            />
           )}
 
-          {/* Version Assignment Dropdown */}
+          {/* Version Management Dropdown */}
           {availableVersions.length > 0 && (
             <div className="relative">
               <button
-                onClick={handleVersionDropdownToggle}
-                className="px-3 py-1 border border-blue-500 text-blue-700 bg-blue-50 rounded hover:bg-blue-100 hover:border-blue-600 text-sm transition-colors flex items-center"
-                title="Manage version assignments"
+                onClick={() => {
+                  setShowVersionDropdown(!showVersionDropdown);
+                  setShowTagsDropdown(false);
+                }}
+                className="w-full flex items-center justify-between px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
               >
-                <Settings size={14} className="mr-1" />
-                Versions ({availableVersions.length})
-                <ChevronDown 
-                  className={`ml-1 transform transition-transform ${showVersionDropdown ? 'rotate-180' : ''}`} 
-                  size={14} 
-                />
+                <span className="flex items-center text-sm text-gray-700">
+                  <Settings size={16} className="mr-2" />
+                  Manage Versions
+                </span>
+                <ChevronDown size={16} className={`text-gray-500 transition-transform ${showVersionDropdown ? 'rotate-180' : ''}`} />
               </button>
 
-              {/* Version Actions Dropdown */}
               {showVersionDropdown && (
-                <div className="absolute right-0 mt-1 w-80 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-96 flex flex-col">
-                  {/* Header with Search */}
-                  <div className="p-3 border-b border-gray-100">
-                    <div className="relative mb-3">
-                      <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400" size={14} />
+                <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-96 overflow-hidden flex flex-col">
+                  {/* Tab Selector */}
+                  <div className="flex border-b border-gray-200 bg-gray-50">
+                    <button
+                      onClick={() => setVersionActiveTab('add')}
+                      className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
+                        versionActiveTab === 'add'
+                          ? 'text-green-600 bg-green-50 border-b-2 border-green-600'
+                          : 'text-gray-600 hover:text-gray-800'
+                      }`}
+                    >
+                      <Plus size={14} className="inline mr-1" />
+                      Add to Versions
+                    </button>
+                    <button
+                      onClick={() => setVersionActiveTab('remove')}
+                      className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
+                        versionActiveTab === 'remove'
+                          ? 'text-red-600 bg-red-50 border-b-2 border-red-600'
+                          : 'text-gray-600 hover:text-gray-800'
+                      }`}
+                    >
+                      <Minus size={14} className="inline mr-1" />
+                      Remove from Versions
+                    </button>
+                  </div>
+
+                  {/* Search Box */}
+                  <div className="p-2 border-b border-gray-100">
+                    <div className="relative">
+                      <Search size={14} className="absolute left-3 top-2.5 text-gray-400" />
                       <input
                         type="text"
-                        placeholder="Search versions..."
                         value={versionSearchQuery}
                         onChange={(e) => setVersionSearchQuery(e.target.value)}
-                        className="w-full pl-7 pr-3 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                        placeholder="Search versions..."
+                        className="w-full pl-8 pr-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500"
                         onClick={(e) => e.stopPropagation()}
                       />
                     </div>
-
-                    {/* Action Tabs */}
-                    <div className="flex space-x-1 bg-gray-100 rounded p-1">
-                      <button
-                        onClick={() => setVersionActiveTab('add')}
-                        className={`flex-1 px-2 py-1 text-xs font-medium rounded transition-colors ${
-                          versionActiveTab === 'add' 
-                            ? 'bg-white text-green-700 shadow-sm' 
-                            : 'text-gray-600 hover:text-gray-800'
-                        }`}
-                      >
-                        <Plus size={12} className="inline mr-1" />
-                        Add to Version
-                      </button>
-                      <button
-                        onClick={() => setVersionActiveTab('remove')}
-                        className={`flex-1 px-2 py-1 text-xs font-medium rounded transition-colors ${
-                          versionActiveTab === 'remove' 
-                            ? 'bg-white text-red-700 shadow-sm' 
-                            : 'text-gray-600 hover:text-gray-800'
-                        }`}
-                      >
-                        <Minus size={12} className="inline mr-1" />
-                        Remove from Version
-                      </button>
-                    </div>
                   </div>
 
-                  {/* Scrollable Content */}
-                  <div className="flex-1 overflow-y-auto">
-                    {filteredVersions.length > 0 ? (
-                      <div className="p-2">
-                        {Object.keys(groupedVersions).length > 1 ? (
-                          // Grouped view
-                          Object.entries(groupedVersions).map(([groupKey, versions]) => (
-                            <div key={groupKey} className="mb-4">
-                              <div className="px-2 py-1 text-xs font-medium text-gray-500 uppercase tracking-wider flex items-center">
-                                <span className="mr-1">{getGroupIcon(groupKey)}</span>
-                                {getGroupTitle(groupKey)} ({versions.length})
-                              </div>
-                              <div className="space-y-1 mt-1">
-                                {versions.map(version => (
-                                  <button
-                                    key={version.id}
-                                    onClick={() => handleVersionAction(versionActiveTab, version.id)}
-                                    className={`w-full text-left px-3 py-2 text-sm rounded hover:bg-gray-50 flex items-center justify-between group ${
-                                      versionActiveTab === 'add' 
-                                        ? 'hover:bg-green-50 hover:text-green-800' 
-                                        : 'hover:bg-red-50 hover:text-red-800'
-                                    }`}
-                                  >
-                                    <div className="flex items-center min-w-0 flex-1">
-                                      <span className={`w-2 h-2 rounded-full mr-2 flex-shrink-0 ${
-                                        versionActiveTab === 'add' ? 'bg-green-400' : 'bg-red-400'
-                                      }`}></span>
-                                      <div className="min-w-0 flex-1">
-                                        <div className="font-medium truncate">{version.name}</div>
-                                        {version.status && (
-                                          <div className="text-xs text-gray-500">{version.status}</div>
-                                        )}
-                                      </div>
-                                    </div>
-                                    {versionActiveTab === 'add' ? (
-                                      <Plus size={14} className="text-green-600 opacity-0 group-hover:opacity-100" />
-                                    ) : (
-                                      <Minus size={14} className="text-red-600 opacity-0 group-hover:opacity-100" />
-                                    )}
-                                  </button>
-                                ))}
-                              </div>
-                            </div>
-                          ))
-                        ) : (
-                          // Flat view
-                          <div className="space-y-1">
-                            {filteredVersions.map(version => (
+                  {/* Version Groups */}
+                  <div className="overflow-y-auto max-h-60">
+                    {Object.keys(groupedVersions).length > 0 ? (
+                      Object.entries(groupedVersions).map(([groupKey, versions]) => (
+                        <div key={groupKey} className="border-b border-gray-100 last:border-b-0">
+                          <div className="px-3 py-2 bg-gray-50 text-xs font-semibold text-gray-600 uppercase flex items-center">
+                            <span className="mr-2">{getGroupIcon(groupKey)}</span>
+                            {getGroupTitle(groupKey)}
+                            <span className="ml-auto text-gray-400">({versions.length})</span>
+                          </div>
+                          <div>
+                            {versions.map(version => (
                               <button
                                 key={version.id}
                                 onClick={() => handleVersionAction(versionActiveTab, version.id)}
-                                className={`w-full text-left px-3 py-2 text-sm rounded hover:bg-gray-50 flex items-center justify-between group ${
-                                  versionActiveTab === 'add' 
-                                    ? 'hover:bg-green-50 hover:text-green-800' 
-                                    : 'hover:bg-red-50 hover:text-red-800'
+                                className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 transition-colors flex items-center justify-between ${
+                                  versionActiveTab === 'add' ? 'hover:bg-green-50' : 'hover:bg-red-50'
                                 }`}
                               >
-                                <div className="flex items-center min-w-0 flex-1">
-                                  <span className={`w-2 h-2 rounded-full mr-2 flex-shrink-0 ${
-                                    versionActiveTab === 'add' ? 'bg-green-400' : 'bg-red-400'
-                                  }`}></span>
-                                  <div className="min-w-0 flex-1">
-                                    <div className="font-medium truncate">{version.name}</div>
-                                    {version.status && (
-                                      <div className="text-xs text-gray-500">{version.status}</div>
-                                    )}
-                                  </div>
-                                </div>
+                                <span className="text-gray-700">{version.name}</span>
                                 {versionActiveTab === 'add' ? (
-                                  <Plus size={14} className="text-green-600 opacity-0 group-hover:opacity-100" />
+                                  <Plus size={14} className="text-green-600" />
                                 ) : (
-                                  <Minus size={14} className="text-red-600 opacity-0 group-hover:opacity-100" />
+                                  <Minus size={14} className="text-red-600" />
                                 )}
                               </button>
                             ))}
                           </div>
-                        )}
-                      </div>
+                        </div>
+                      ))
                     ) : (
                       <div className="p-4 text-center text-gray-500 text-sm">
-                        {versionSearchQuery ? 'No versions found matching search' : 'No versions available'}
+                        {versionSearchQuery ? 'No versions found' : 'No versions available'}
                       </div>
                     )}
-                  </div>
-
-                  {/* Action Summary - UPDATED to be generic */}
-                  <div className="border-t border-gray-100 p-3 bg-gray-50 text-xs text-gray-600">
-                    <div className="flex items-center justify-center">
-                      <span className={`font-medium ${
-                        versionActiveTab === 'add' ? 'text-green-600' : 'text-red-600'
-                      }`}>
-                        {versionActiveTab === 'add' ? 'Adding to' : 'Removing from'} selected versions
-                      </span>
-                    </div>
                   </div>
                 </div>
               )}
             </div>
           )}
 
-          {/* Tags Management Dropdown */}
+          {/* Tag Management Dropdown */}
           {availableTags.length > 0 && (
             <div className="relative">
               <button
-                onClick={handleTagsDropdownToggle}
-                className="px-3 py-1 border border-indigo-500 text-indigo-700 bg-indigo-50 rounded hover:bg-indigo-100 hover:border-indigo-600 text-sm transition-colors flex items-center"
-                title="Manage tags"
+                onClick={() => {
+                  setShowTagsDropdown(!showTagsDropdown);
+                  setShowVersionDropdown(false);
+                }}
+                className="w-full flex items-center justify-between px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
               >
-                <Hash size={14} className="mr-1" />
-                Tags ({availableTags.length})
-                <ChevronDown 
-                  className={`ml-1 transform transition-transform ${showTagsDropdown ? 'rotate-180' : ''}`} 
-                  size={14} 
-                />
+                <span className="flex items-center text-sm text-gray-700">
+                  <Tag size={16} className="mr-2" />
+                  Manage Tags
+                </span>
+                <ChevronDown size={16} className={`text-gray-500 transition-transform ${showTagsDropdown ? 'rotate-180' : ''}`} />
               </button>
 
-              {/* Tags Actions Dropdown */}
               {showTagsDropdown && (
-                <div className="absolute right-0 mt-1 w-80 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-96 flex flex-col">
-                  {/* Header with Search */}
-                  <div className="p-3 border-b border-gray-100">
-                    <div className="relative mb-3">
-                      <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400" size={14} />
+                <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-96 overflow-hidden flex flex-col">
+                  {/* Tab Selector */}
+                  <div className="flex border-b border-gray-200 bg-gray-50">
+                    <button
+                      onClick={() => setTagActiveTab('add')}
+                      className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
+                        tagActiveTab === 'add'
+                          ? 'text-green-600 bg-green-50 border-b-2 border-green-600'
+                          : 'text-gray-600 hover:text-gray-800'
+                      }`}
+                    >
+                      <Plus size={14} className="inline mr-1" />
+                      Add Tags
+                    </button>
+                    <button
+                      onClick={() => setTagActiveTab('remove')}
+                      className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
+                        tagActiveTab === 'remove'
+                          ? 'text-red-600 bg-red-50 border-b-2 border-red-600'
+                          : 'text-gray-600 hover:text-gray-800'
+                      }`}
+                    >
+                      <Minus size={14} className="inline mr-1" />
+                      Remove Tags
+                    </button>
+                  </div>
+
+                  {/* Search Box */}
+                  <div className="p-2 border-b border-gray-100">
+                    <div className="relative">
+                      <Search size={14} className="absolute left-3 top-2.5 text-gray-400" />
                       <input
                         type="text"
-                        placeholder="Search tags..."
                         value={tagSearchQuery}
                         onChange={(e) => setTagSearchQuery(e.target.value)}
-                        className="w-full pl-7 pr-3 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+                        placeholder="Search tags..."
+                        className="w-full pl-8 pr-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500"
                         onClick={(e) => e.stopPropagation()}
                       />
                     </div>
-
-                    {/* Action Tabs */}
-                    <div className="flex space-x-1 bg-gray-100 rounded p-1">
-                      <button
-                        onClick={() => setTagActiveTab('add')}
-                        className={`flex-1 px-2 py-1 text-xs font-medium rounded transition-colors ${
-                          tagActiveTab === 'add' 
-                            ? 'bg-white text-green-700 shadow-sm' 
-                            : 'text-gray-600 hover:text-gray-800'
-                        }`}
-                      >
-                        <Plus size={12} className="inline mr-1" />
-                        Add Tags
-                      </button>
-                      <button
-                        onClick={() => setTagActiveTab('remove')}
-                        className={`flex-1 px-2 py-1 text-xs font-medium rounded transition-colors ${
-                          tagActiveTab === 'remove' 
-                            ? 'bg-white text-red-700 shadow-sm' 
-                            : 'text-gray-600 hover:text-gray-800'
-                        }`}
-                      >
-                        <Minus size={12} className="inline mr-1" />
-                        Remove Tags
-                      </button>
-                    </div>
                   </div>
 
-                  {/* Scrollable Content */}
-                  <div className="flex-1 overflow-y-auto">
-                    {/* Custom Tag Input */}
-                    <div className="p-3 border-b border-gray-100 bg-gray-50">
-                      <div className="text-xs font-medium text-gray-700 mb-2">Add Custom Tag</div>
-                      <div className="flex space-x-2">
-                        <input
-                          type="text"
-                          placeholder="Enter tag name..."
-                          value={customTagInput}
-                          onChange={(e) => setCustomTagInput(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              e.preventDefault();
-                              handleCustomTagAdd();
-                            }
-                          }}
-                          className="flex-1 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
-                          onClick={(e) => e.stopPropagation()}
-                        />
-                        <button
-                          onClick={handleCustomTagAdd}
-                          disabled={!customTagInput.trim() || availableTags.includes(customTagInput.trim())}
-                          className="px-2 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-sm transition-colors"
-                          title="Add custom tag"
-                        >
-                          <Plus size={14} />
-                        </button>
-                      </div>
-                      {customTagInput.trim() && availableTags.includes(customTagInput.trim()) && (
-                        <div className="text-xs text-amber-600 mt-1 flex items-center">
-                          <AlertCircle size={12} className="mr-1" />
-                          Tag already exists
-                        </div>
-                      )}
+                  {/* Custom Tag Input */}
+                  <div className="p-2 border-b border-gray-100 bg-indigo-50">
+                    <div className="text-xs font-medium text-indigo-700 mb-2 px-1">
+                      Create Custom Tag
                     </div>
-
-                    {/* Existing Tags */}
-                    {filteredTags.length > 0 ? (
-                      <div className="p-2">
-                        <div className="text-xs font-medium text-gray-700 mb-2 px-1">
-                          Existing Tags ({filteredTags.length})
-                        </div>
-                        
-                        {/* Select All/None */}
-                        <div className="flex justify-between items-center mb-2 px-1">
-                          <button
-                            onClick={() => setSelectedTagsForAction(new Set(filteredTags))}
-                            className="text-xs text-indigo-600 hover:text-indigo-800"
-                          >
-                            Select All
-                          </button>
-                          <button
-                            onClick={() => setSelectedTagsForAction(new Set())}
-                            className="text-xs text-gray-600 hover:text-gray-800"
-                          >
-                            Select None
-                          </button>
-                        </div>
-
-                        {/* Tag List */}
-                        <div className="space-y-1 max-h-40 overflow-y-auto">
-                          {filteredTags.map(tag => (
-                            <div
-                              key={tag}
-                              onClick={() => toggleTagSelection(tag)}
-                              className={`flex items-center justify-between p-2 text-sm rounded cursor-pointer transition-colors ${
-                                selectedTagsForAction.has(tag)
-                                  ? (tagActiveTab === 'add' ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200')
-                                  : 'hover:bg-gray-50 border border-transparent'
-                              }`}
-                            >
-                              <div className="flex items-center min-w-0 flex-1">
-                                <span className={`w-2 h-2 rounded-full mr-2 flex-shrink-0 ${
-                                  selectedTagsForAction.has(tag)
-                                    ? (tagActiveTab === 'add' ? 'bg-green-400' : 'bg-red-400')
-                                    : 'bg-gray-300'
-                                }`}></span>
-                                <span className="truncate">{tag}</span>
-                              </div>
-                              {selectedTagsForAction.has(tag) && (
-                                <Check size={14} className={tagActiveTab === 'add' ? 'text-green-600' : 'text-red-600'} />
-                              )}
-                            </div>
-                          ))}
-                        </div>
-
-                        {/* Apply Selected Tags */}
-                        {selectedTagsForAction.size > 0 && (
-                          <div className="mt-3 pt-3 border-t border-gray-200">
-                            <button
-                              onClick={handleBulkTagsAction}
-                              className={`w-full px-3 py-2 text-sm font-medium rounded transition-colors ${
-                                tagActiveTab === 'add'
-                                  ? 'bg-green-600 text-white hover:bg-green-700'
-                                  : 'bg-red-600 text-white hover:bg-red-700'
-                              }`}
-                            >
-                              {tagActiveTab === 'add' ? 'Add' : 'Remove'} {selectedTagsForAction.size} Tag{selectedTagsForAction.size !== 1 ? 's' : ''}
-                              {tagActiveTab === 'add' ? (
-                                <Plus size={14} className="ml-1 inline" />
-                              ) : (
-                                <Minus size={14} className="ml-1 inline" />
-                              )}
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="p-4 text-center text-gray-500 text-sm">
-                        {tagSearchQuery ? 'No tags found matching search' : 'No tags available'}
+                    <div className="flex space-x-2">
+                      <input
+                        type="text"
+                        value={customTagInput}
+                        onChange={(e) => setCustomTagInput(e.target.value)}
+                        onKeyPress={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleCustomTagAdd();
+                          }
+                        }}
+                        placeholder="Enter new tag..."
+                        className="flex-1 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-indigo-500"
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                      <button
+                        onClick={handleCustomTagAdd}
+                        disabled={!customTagInput.trim() || availableTags.includes(customTagInput.trim())}
+                        className="px-2 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-sm transition-colors"
+                      >
+                        <Plus size={14} />
+                      </button>
+                    </div>
+                    {customTagInput.trim() && availableTags.includes(customTagInput.trim()) && (
+                      <div className="text-xs text-amber-600 mt-1 flex items-center">
+                        <AlertCircle size={12} className="mr-1" />
+                        Tag already exists
                       </div>
                     )}
                   </div>
 
-                  {/* Action Summary - UPDATED to be generic */}
-                  <div className="border-t border-gray-100 p-3 bg-gray-50 text-xs text-gray-600">
-                    <div className="flex items-center justify-center">
-                      <span className={`font-medium ${
-                        tagActiveTab === 'add' ? 'text-green-600' : 'text-red-600'
-                      }`}>
-                        {tagActiveTab === 'add' ? 'Adding' : 'Removing'} tags {tagActiveTab === 'add' ? 'to' : 'from'} selected {itemType}s
-                      </span>
+                  {/* Tags List */}
+                  {filteredTags.length > 0 ? (
+                    <div className="p-2">
+                      <div className="text-xs font-medium text-gray-700 mb-2 px-1">
+                        Existing Tags ({filteredTags.length})
+                      </div>
+
+                      {/* Select All/None */}
+                      <div className="flex justify-between items-center mb-2 px-1">
+                        <button
+                          onClick={() => setSelectedTagsForAction(new Set(filteredTags))}
+                          className="text-xs text-indigo-600 hover:text-indigo-800"
+                        >
+                          Select All
+                        </button>
+                        <button
+                          onClick={() => setSelectedTagsForAction(new Set())}
+                          className="text-xs text-gray-600 hover:text-gray-800"
+                        >
+                          Select None
+                        </button>
+                      </div>
+
+                      {/* Tag List */}
+                      <div className="space-y-1 max-h-40 overflow-y-auto">
+                        {filteredTags.map(tag => (
+                          <div
+                            key={tag}
+                            onClick={() => toggleTagSelection(tag)}
+                            className={`flex items-center justify-between p-2 text-sm rounded cursor-pointer transition-colors ${
+                              selectedTagsForAction.has(tag)
+                                ? (tagActiveTab === 'add' ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200')
+                                : 'hover:bg-gray-50 border border-transparent'
+                            }`}
+                          >
+                            <div className="flex items-center min-w-0 flex-1">
+                              <span className={`w-2 h-2 rounded-full mr-2 flex-shrink-0 ${
+                                selectedTagsForAction.has(tag)
+                                  ? (tagActiveTab === 'add' ? 'bg-green-400' : 'bg-red-400')
+                                  : 'bg-gray-300'
+                              }`}></span>
+                              <span className="truncate">{tag}</span>
+                            </div>
+                            {selectedTagsForAction.has(tag) && (
+                              <Check size={14} className={tagActiveTab === 'add' ? 'text-green-600' : 'text-red-600'} />
+                            )}
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Apply Selected Tags */}
+                      {selectedTagsForAction.size > 0 && (
+                        <div className="mt-3 pt-3 border-t border-gray-200">
+                          <button
+                            onClick={handleBulkTagsAction}
+                            className={`w-full px-3 py-2 text-sm font-medium rounded transition-colors ${
+                              tagActiveTab === 'add'
+                                ? 'bg-green-600 text-white hover:bg-green-700'
+                                : 'bg-red-600 text-white hover:bg-red-700'
+                            }`}
+                          >
+                            {tagActiveTab === 'add' ? 'Add' : 'Remove'} {selectedTagsForAction.size} Tag{selectedTagsForAction.size !== 1 ? 's' : ''}
+                          </button>
+                        </div>
+                      )}
                     </div>
-                  </div>
+                  ) : (
+                    <div className="p-4 text-center text-gray-500 text-sm">
+                      {tagSearchQuery ? 'No tags found' : 'No tags available'}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
           )}
 
-          {/* Export Button - Show conditionally */}
+          {/* Export Button */}
           {showExportButton && onExport && (
-            <button
+            <SidebarActionButton
+              icon={<FileDown size={16} />}
+              label={`Export ${selectedCount} Item${selectedCount !== 1 ? 's' : ''}`}
               onClick={onExport}
-              className="px-3 py-1 border border-orange-500 text-orange-700 bg-orange-50 rounded hover:bg-orange-100 hover:border-orange-600 text-sm transition-colors flex items-center"
-              title={`Export selected ${itemType}s`}
-            >
-              <FileDown size={14} className="mr-1" />
-              Export ({selectedCount})
-            </button>
+              variant="secondary"
+            />
           )}
-
-          {/* Delete Button - UPDATED tooltip to be generic */}
-          <button
-            onClick={onBulkDelete}
-            className="px-3 py-1 border border-red-500 text-red-700 bg-red-50 rounded hover:bg-red-100 hover:border-red-600 text-sm transition-colors flex items-center"
-            title={`Delete selected ${itemType}s`}
-          >
-            <Trash2 size={14} className="mr-1" />
-            Delete ({selectedCount})
-          </button>
-
-          {/* Clear Selection - UPDATED tooltip to be generic */}
-          <button
-            onClick={onClearSelection}
-            className="px-3 py-1 border border-gray-400 text-gray-700 bg-gray-50 rounded hover:bg-gray-100 hover:border-gray-500 text-sm transition-colors flex items-center"
-            title="Clear current selection"
-          >
-            <X size={14} className="mr-1" />
-            Clear ({selectedCount})
-          </button>
         </div>
-      </div>
+      </SidebarSection>
 
-      {/* Enhanced Selection Summary - UPDATED to be generic */}
-      <div className="mt-3 pt-3 border-t border-blue-200">
-        <div className="flex items-center justify-between text-xs">
-          <div className="flex items-center space-x-4 text-blue-600">
-            <span>Quick Actions Available:</span>
-            <div className="flex items-center space-x-2">
-              {showExecuteButton && onExecuteTests && (
-                <span className="flex items-center">
-                  <Play size={12} className="mr-1" />
-                  Execute ({selectedCount})
+      {/* Selected Items List */}
+      <SidebarSection
+        title={`Selected Items (${selectedCount})`}
+        defaultOpen={selectedCount <= 5}
+      >
+        <div className="space-y-2 max-h-64 overflow-y-auto">
+          {selectedItems.map((item) => (
+            <div
+              key={item.id}
+              className="p-3 bg-gray-50 rounded-lg border border-gray-200"
+            >
+              <div className="flex items-center space-x-2 mb-1">
+                <span className="font-mono text-xs text-blue-600 font-semibold">
+                  {item.id}
                 </span>
-              )}
-              {availableVersions.length > 0 && (
-                <span className="flex items-center">
-                  <Settings size={12} className="mr-1" />
-                  Version Management ({availableVersions.length} versions)
-                </span>
-              )}
-              {availableTags.length > 0 && (
-                <span className="flex items-center">
-                  <Hash size={12} className="mr-1" />
-                  Tag Management ({availableTags.length} tags)
-                </span>
-              )}
-              <span className="flex items-center">
-                <Trash2 size={12} className="mr-1" />
-                Delete ({selectedCount})
-              </span>
+                <SidebarBadge
+                  label={item.priority}
+                  color={
+                    item.priority === 'High' ? 'red' :
+                    item.priority === 'Medium' ? 'yellow' : 'green'
+                  }
+                />
+              </div>
+              <div className="text-sm text-gray-900 line-clamp-2">
+                {item.name || item.title}
+              </div>
             </div>
-          </div>
-          
-          <div className="text-blue-500">
-            {selectedCount === 1 ? 
-              `Select more ${itemType}s for additional bulk operations` : 
-              `${selectedCount} ${itemType}s selected`}
-          </div>
+          ))}
         </div>
+      </SidebarSection>
+
+      {/* Danger Zone */}
+      <div className="p-4 border-t-2 border-red-100 bg-red-50">
+        <h3 className="text-xs font-semibold text-red-700 uppercase mb-3 flex items-center">
+          <AlertTriangle size={14} className="mr-1" />
+          Danger Zone
+        </h3>
+        <SidebarActionButton
+          icon={<Trash2 size={16} />}
+          label={`Delete ${selectedCount} ${itemType.charAt(0).toUpperCase() + itemType.slice(1)}${selectedCount !== 1 ? 's' : ''}`}
+          onClick={onBulkDelete}
+          variant="danger"
+        />
+        <p className="text-xs text-red-600 mt-2">
+          This action cannot be undone. Please confirm before proceeding.
+        </p>
       </div>
 
       {/* Click outside handler to close dropdowns */}
       {(showVersionDropdown || showTagsDropdown) && (
-        <div 
-          className="fixed inset-0 z-40" 
+        <div
+          className="fixed inset-0 z-40"
           onClick={() => {
             setShowVersionDropdown(false);
             setShowTagsDropdown(false);
           }}
         />
       )}
-    </div>
+    </RightSidebarPanel>
   );
 };
 
