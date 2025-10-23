@@ -309,22 +309,41 @@ const Requirements = () => {
   };
 
   // Handle saving the edited requirement
-  const handleSaveRequirement = async (updatedRequirement) => {
+  const handleSaveRequirement = async () => {
+    if (!requirementToEdit) {
+      console.error('No requirement to save');
+      return;
+    }
+
+    // Validate required fields
+    if (!requirementToEdit.id?.trim()) {
+      alert('Requirement ID is required');
+      return;
+    }
+    if (!requirementToEdit.name?.trim()) {
+      alert('Requirement name is required');
+      return;
+    }
+    if (!requirementToEdit.description?.trim()) {
+      alert('Description is required');
+      return;
+    }
+
     try {
-      console.log('Saving requirement:', updatedRequirement);
-      if (updatedRequirement.id) {
+      console.log('Saving requirement:', requirementToEdit);
+      if (requirementToEdit.id && requirements.some(r => r.id === requirementToEdit.id)) {
         // UPDATE EXISTING
-        console.log('Updating existing requirement:', updatedRequirement.id);
-        await dataStore.updateRequirement(updatedRequirement.id, {
-          ...updatedRequirement,
+        console.log('Updating existing requirement:', requirementToEdit.id);
+        await dataStore.updateRequirement(requirementToEdit.id, {
+          ...requirementToEdit,
           updatedAt: new Date().toISOString()
         });
         console.log('✅ Requirement updated successfully');
       } else {
         // CREATE NEW
         const newRequirement = {
-          ...updatedRequirement,
-          id: `REQ-${Date.now()}`, // Generate unique ID
+          ...requirementToEdit,
+          id: `REQ-${Date.now()}`, // Generate unique ID if not provided by form
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString()
         };
@@ -335,9 +354,14 @@ const Requirements = () => {
       // Close the panel
       setEditPanelOpen(false);
       setRequirementToEdit(null);
+
+      // Update selected requirement if it was edited
+      if (selectedRequirement?.id === requirementToEdit.id) {
+        setSelectedRequirement(requirementToEdit);
+      }
     } catch (error) {
       console.error("❌ Error saving requirement:", error);
-      alert('Error saving requirement: ' + error.message);
+      alert('Failed to save requirement. Please try again.');
     }
   };
 
@@ -400,7 +424,11 @@ const Requirements = () => {
       regulatoryFactor: 1,
       usageFrequency: 3,
       versions: selectedVersion !== 'unassigned' ? [selectedVersion] : [],
-      tags: []
+      tags: [],
+      acceptanceCriteria: [],
+      businessRationale: '',
+      dependencies: [],
+      parentRequirementId: null
     });
     setEditPanelOpen(true);
   };
@@ -425,7 +453,27 @@ const Requirements = () => {
           icon={<Edit size={16} />}
           label="Edit Requirement"
           onClick={() => {
-            setRequirementToEdit(selectedRequirement);
+            // Create a complete copy with all fields
+            setRequirementToEdit({
+              id: selectedRequirement.id || '',
+              name: selectedRequirement.name || '',
+              description: selectedRequirement.description || '',
+              priority: selectedRequirement.priority || 'Medium',
+              type: selectedRequirement.type || 'Functional',
+              status: selectedRequirement.status || 'Active',
+              owner: selectedRequirement.owner || '',
+              businessImpact: selectedRequirement.businessImpact || 3,
+              technicalComplexity: selectedRequirement.technicalComplexity || 3,
+              regulatoryFactor: selectedRequirement.regulatoryFactor || 1,
+              usageFrequency: selectedRequirement.usageFrequency || 3,
+              minTestCases: selectedRequirement.minTestCases || 1,
+              versions: selectedRequirement.versions || [],
+              tags: selectedRequirement.tags || [],
+              acceptanceCriteria: selectedRequirement.acceptanceCriteria || [],
+              businessRationale: selectedRequirement.businessRationale || '',
+              dependencies: selectedRequirement.dependencies || [],
+              parentRequirementId: selectedRequirement.parentRequirementId || null
+            });
             setEditPanelOpen(true);
           }}
           variant="primary"
@@ -1291,7 +1339,27 @@ const Requirements = () => {
                             <button
                               onClick={(e) => {
                                 e.stopPropagation(); // Prevent row click
-                                setRequirementToEdit(req);
+                                // Create a complete copy with all fields
+                                setRequirementToEdit({
+                                  id: req.id || '',
+                                  name: req.name || '',
+                                  description: req.description || '',
+                                  priority: req.priority || 'Medium',
+                                  type: req.type || 'Functional',
+                                  status: req.status || 'Active',
+                                  owner: req.owner || '',
+                                  businessImpact: req.businessImpact || 3,
+                                  technicalComplexity: req.technicalComplexity || 3,
+                                  regulatoryFactor: req.regulatoryFactor || 1,
+                                  usageFrequency: req.usageFrequency || 3,
+                                  minTestCases: req.minTestCases || 1,
+                                  versions: req.versions || [],
+                                  tags: req.tags || [],
+                                  acceptanceCriteria: req.acceptanceCriteria || [],
+                                  businessRationale: req.businessRationale || '',
+                                  dependencies: req.dependencies || [],
+                                  parentRequirementId: req.parentRequirementId || null
+                                });
                                 setEditPanelOpen(true); // Open panel instead of modal
                               }}
                               className="text-blue-600 hover:text-blue-900 p-1"
@@ -1564,31 +1632,49 @@ const Requirements = () => {
         <SlideOutPanel
           isOpen={editPanelOpen}
           onClose={() => {
-            setEditPanelOpen(false);
-            setRequirementToEdit(null);
+            // Check for unsaved changes
+            const hasChanges = requirementToEdit &&
+              JSON.stringify(requirementToEdit) !== JSON.stringify(requirements.find(r => r.id === requirementToEdit.id) || {});
+            if (hasChanges) {
+              if (window.confirm('You have unsaved changes. Discard them?')) {
+                setEditPanelOpen(false);
+                setRequirementToEdit(null);
+              }
+            } else {
+              setEditPanelOpen(false);
+              setRequirementToEdit(null);
+            }
           }}
-          title={requirementToEdit ? 'Edit Requirement' : 'Create New Requirement'}
+          title={requirementToEdit?.id && requirements.some(r => r.id === requirementToEdit.id) ? 'Edit Requirement' : 'Create New Requirement'}
           width="lg"
           footer={
             <div className="flex space-x-3">
               <button
+                type="button"
                 onClick={() => {
-                  setEditPanelOpen(false);
-                  setRequirementToEdit(null);
+                  // Check for unsaved changes
+                  const hasChanges = requirementToEdit &&
+                    JSON.stringify(requirementToEdit) !== JSON.stringify(requirements.find(r => r.id === requirementToEdit.id) || {});
+                  if (hasChanges) {
+                    if (window.confirm('You have unsaved changes. Discard them?')) {
+                      setEditPanelOpen(false);
+                      setRequirementToEdit(null);
+                    }
+                  } else {
+                    setEditPanelOpen(false);
+                    setRequirementToEdit(null);
+                  }
                 }}
                 className="flex-1 px-4 py-2 border border-gray-300 rounded-lg font-medium text-gray-700 hover:bg-gray-50"
               >
                 Cancel
               </button>
               <button
-                onClick={() => {
-                  // Your save logic here
-                  handleSaveRequirement(requirementToEdit);
-                  setEditPanelOpen(false);
-                }}
+                type="button"
+                onClick={handleSaveRequirement}
                 className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700"
               >
-                {requirementToEdit ? 'Update' : 'Create'}
+                {requirementToEdit?.id && requirements.some(r => r.id === requirementToEdit.id) ? 'Update Requirement' : 'Create Requirement'}
               </button>
             </div>
           }
@@ -1613,7 +1699,7 @@ const Requirements = () => {
                     })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                     placeholder="e.g., REQ-001"
-                    disabled={!!requirementToEdit} // Can't edit ID
+                    disabled={!!(requirementToEdit?.id && requirements.some(r => r.id === requirementToEdit.id))} // Can't edit existing ID
                   />
                 </div>
                 {/* Name Field */}
@@ -1843,21 +1929,109 @@ const Requirements = () => {
             <div>
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Versions & Tags</h3>
               <div className="grid grid-cols-1 gap-4">
-                {/* Versions */}
+                {/* Versions - Multi-select with Badges */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Versions (comma-separated)
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Applicable Versions
                   </label>
-                  <input
-                    type="text"
-                    value={requirementToEdit?.versions?.join(', ') || ''}
-                    onChange={(e) => setRequirementToEdit({
-                      ...requirementToEdit,
-                      versions: e.target.value ? e.target.value.split(',').map(v => v.trim()) : []
-                    })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                    placeholder="e.g., v1.0, v2.0"
-                  />
+                  <div className="space-y-3">
+                    {/* Selected versions display */}
+                    {requirementToEdit?.versions && requirementToEdit.versions.length > 0 && (
+                      <div className="flex flex-wrap gap-2 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                        {requirementToEdit.versions.map((versionId) => {
+                          const version = versions.find(v => v.id === versionId);
+                          return (
+                            <span key={versionId}
+                              className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium bg-blue-600 text-white">
+                              {version?.name || versionId}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setRequirementToEdit({
+                                    ...requirementToEdit,
+                                    versions: requirementToEdit.versions.filter(v => v !== versionId)
+                                  });
+                                }}
+                                className="hover:bg-blue-700 rounded-full p-0.5"
+                                title="Remove"
+                              >
+                                <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                                </svg>
+                              </button>
+                            </span>
+                          );
+                        })}
+                      </div>
+                    )}
+                    {/* Dropdown to add versions */}
+                    {versions.length > 0 ? (
+                      <>
+                        <select
+                          value=""
+                          onChange={(e) => {
+                            const versionId = e.target.value;
+                            if (versionId && !requirementToEdit?.versions?.includes(versionId)) {
+                              setRequirementToEdit({
+                                ...requirementToEdit,
+                                versions: [...(requirementToEdit?.versions || []), versionId]
+                              });
+                            }
+                          }}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                        >
+                          <option value="">+ Select Version to Add</option>
+                          {versions
+                            .filter(v => !requirementToEdit?.versions?.includes(v.id))
+                            .map(v => (
+                              <option key={v.id} value={v.id}>
+                                {v.name}
+                              </option>
+                            ))}
+                        </select>
+                        {/* Quick actions */}
+                        <div className="flex items-center justify-between text-xs">
+                          <div className="flex gap-3">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setRequirementToEdit({
+                                  ...requirementToEdit,
+                                  versions: versions.map(v => v.id)
+                                });
+                              }}
+                              className="text-blue-600 hover:text-blue-800 font-medium"
+                            >
+                              Select All
+                            </button>
+                            {requirementToEdit?.versions && requirementToEdit.versions.length > 0 && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setRequirementToEdit({
+                                    ...requirementToEdit,
+                                    versions: []
+                                  });
+                                }}
+                                className="text-red-600 hover:text-red-800 font-medium"
+                              >
+                                Clear All
+                              </button>
+                            )}
+                          </div>
+                          {requirementToEdit?.versions && requirementToEdit.versions.length > 0 && (
+                            <span className="text-gray-500"> {requirementToEdit.versions.length} selected </span>
+                          )}
+                        </div>
+                      </>
+                    ) : (
+                      <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                        <p className="text-sm text-yellow-800">
+                          ⚠ No versions available. Create versions in the Releases page first.
+                        </p>
+                      </div>
+                    )}
+                  </div>
                 </div>
                 {/* Tags */}
                 <div>
