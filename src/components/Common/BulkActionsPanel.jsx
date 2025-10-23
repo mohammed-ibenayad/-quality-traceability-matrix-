@@ -360,74 +360,53 @@ const BulkActionsPanel = ({
 
           {/* Tag Management Dropdown */}
           {/* Tag Management - SIMPLIFIED */}
-{availableTags.length > 0 && (
-  <SidebarSection title="Manage Tags" defaultOpen={false}>
-    <div className="space-y-3">
-      {/* Quick Add Common Tags */}
-      <div>
-        <label className="block text-xs font-medium text-gray-700 mb-2">
-          Quick Add Tags
-        </label>
-        <div className="flex flex-wrap gap-2">
-          {availableTags.slice(0, 6).map(tag => (
-            <button
-              key={tag}
-              onClick={() => onTagsUpdate([tag], 'add')}
-              className="px-3 py-1 text-xs bg-green-50 text-green-700 border border-green-300 rounded-full hover:bg-green-100 transition-colors"
-            >
-              + {tag}
-            </button>
-          ))}
-        </div>
-        {availableTags.length > 6 && (
-          <p className="text-xs text-gray-500 mt-2">
-            Showing top 6 tags. Use custom input for more.
-          </p>
-        )}
-      </div>
-
-      {/* Quick Remove Common Tags */}
-      <div>
-        <label className="block text-xs font-medium text-gray-700 mb-2">
-          Quick Remove Tags
-        </label>
-        <div className="flex flex-wrap gap-2">
-          {availableTags.slice(0, 6).map(tag => (
-            <button
-              key={tag}
-              onClick={() => onTagsUpdate([tag], 'remove')}
-              className="px-3 py-1 text-xs bg-red-50 text-red-700 border border-red-300 rounded-full hover:bg-red-100 transition-colors"
-            >
-              × {tag}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="border-t border-gray-200 pt-3">
-        <label className="block text-xs font-medium text-gray-700 mb-2">
-          Or Create Custom Tag
-        </label>
-        <div className="flex space-x-2">
-          <input
-            type="text"
-            placeholder="Enter tag name..."
-            className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && e.target.value.trim()) {
-                onTagsUpdate([e.target.value.trim()], 'add');
-                e.target.value = '';
-              }
-            }}
-          />
-        </div>
-        <p className="text-xs text-gray-500 mt-1">
-          Press Enter to add custom tag
-        </p>
-      </div>
+{/* Tag Management - COMBOBOX STYLE */}
+<SidebarSection title="Add/Remove Tags" defaultOpen={false}>
+  <div className="space-y-3">
+    {/* Add Tags Combobox */}
+    <div>
+      <label className="block text-xs font-medium text-gray-700 mb-2">
+        Add Tags
+      </label>
+      <select
+        onChange={(e) => {
+          if (e.target.value) {
+            onTagsUpdate([e.target.value], 'add');
+            e.target.value = '';
+          }
+        }}
+        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+      >
+        <option value="">Select tag to add...</option>
+        {availableTags.map(tag => (
+          <option key={tag} value={tag}>{tag}</option>
+        ))}
+        <option value="__custom__">+ Create custom tag</option>
+      </select>
     </div>
-  </SidebarSection>
-)}
+
+    {/* Remove Tags Combobox */}
+    <div>
+      <label className="block text-xs font-medium text-gray-700 mb-2">
+        Remove Tags
+      </label>
+      <select
+        onChange={(e) => {
+          if (e.target.value) {
+            onTagsUpdate([e.target.value], 'remove');
+            e.target.value = '';
+          }
+        }}
+        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
+      >
+        <option value="">Select tag to remove...</option>
+        {availableTags.map(tag => (
+          <option key={tag} value={tag}>{tag}</option>
+        ))}
+      </select>
+    </div>
+  </div>
+</SidebarSection>
           {/* Export Button */}
           {showExportButton && onExport && (
             <SidebarActionButton
