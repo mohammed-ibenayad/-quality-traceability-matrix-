@@ -12,19 +12,29 @@ import {
   Target,
   TrendingUp,
   AlertTriangle,
-  CheckCircle
+  CheckCircle,
+  FileText,
+  Tag,
+  BarChart3,
+  Users,
+  Calendar,
+  Activity
 } from 'lucide-react';
 import MainLayout from '../components/Layout/MainLayout';
 import EmptyState from '../components/Common/EmptyState';
-import EditRequirementModal from '../components/Requirements/EditRequirementModal';
+import SlideOutPanel from '../components/Common/SlideOutPanel';
+import RightSidebarPanel, {
+  SidebarSection,
+  SidebarField,
+  SidebarActionButton,
+  SidebarBadge
+} from '../components/Common/RightSidebarPanel';
 import TDFInfoTooltip from '../components/Common/TDFInfoTooltip';
 import { useVersionContext } from '../context/VersionContext';
 import { calculateCoverage } from '../utils/coverage';
 import dataStore from '../services/DataStore';
 import BulkActionsPanel from '../components/Common/BulkActionsPanel';
-
 import { useLocation } from 'react-router-dom';
-
 
 /**
  * Helper function to check if a test case applies to a version
@@ -34,14 +44,12 @@ import { useLocation } from 'react-router-dom';
  */
 const testCaseAppliesTo = (testCase, selectedVersion) => {
   if (selectedVersion === 'unassigned') return true;
-
   // Handle new format
   if (testCase.applicableVersions) {
     // Empty array means applies to all versions
     if (testCase.applicableVersions.length === 0) return true;
     return testCase.applicableVersions.includes(selectedVersion);
   }
-
   // Handle legacy format during transition
   return !testCase.version || testCase.version === selectedVersion || testCase.version === '';
 };
@@ -58,7 +66,6 @@ const getVersionTags = (testCase) => {
       ? testCase.applicableVersions
       : ['All Versions'];
   }
-
   // Handle legacy format
   return testCase.version ? [testCase.version] : ['All Versions'];
 };
@@ -83,10 +90,14 @@ const Requirements = () => {
   const [requirements, setRequirements] = useState([]);
   const [testCases, setTestCases] = useState([]);
   const [mapping, setMapping] = useState({});
-  const [editingRequirement, setEditingRequirement] = useState(null);
+  const [editingRequirement, setEditingRequirement] = useState(null); // Renamed from setEditingRequirement to setRequirementToEdit
   const [hasData, setHasData] = useState(false);
   const location = useLocation();
 
+  // NEW: Add these state variables
+  const [selectedRequirement, setSelectedRequirement] = useState(null);
+  const [editPanelOpen, setEditPanelOpen] = useState(false);
+  const [requirementToEdit, setRequirementToEdit] = useState(null);
 
   // UI State
   const [searchQuery, setSearchQuery] = useState('');
@@ -120,18 +131,14 @@ const Requirements = () => {
       setMapping(dataStore.getMapping());
       setHasData(dataStore.hasData());
     };
-
     updateData();
-
     if (location.state?.searchQuery) {
       setSearchQuery(location.state.searchQuery);
       // Clear the state after using it
       window.history.replaceState({}, document.title);
     }
-
     // Subscribe to DataStore changes
     const unsubscribe = dataStore.subscribe(updateData);
-
     // Clean up subscription
     return () => unsubscribe();
   }, [location]);
@@ -146,7 +153,6 @@ const Requirements = () => {
       return calculateCoverage(requirements, mapping, filteredTests);
     }
   }, [requirements, mapping, testCases, selectedVersion]);
-
 
   // Filter requirements by selected version
   const versionFilteredRequirements = selectedVersion === 'unassigned'
@@ -164,13 +170,10 @@ const Requirements = () => {
           req.description.toLowerCase().includes(term)
         );
       })();
-
       // Status filter
       const matchesStatus = statusFilter === 'All' || req.status === statusFilter;
-
       // Type filter
       const matchesType = typeFilter === 'All' || req.type === typeFilter;
-
       // Coverage filter
       const matchesCoverage = (() => {
         if (coverageFilter === 'All') return true;
@@ -180,14 +183,11 @@ const Requirements = () => {
         if (coverageFilter === 'No Coverage') return !hasTests;
         return true;
       })();
-
       // Tags filter
       const matchesTags = selectedTagsFilter.length === 0 ||
         (req.tags && req.tags.some(tag => selectedTagsFilter.includes(tag)));
-
       // Apply all filters EXCEPT priorityFilterTab
       const matchesPriorityDropdown = priorityFilter === 'All' || req.priority === priorityFilter;
-
       return matchesSearch && matchesStatus && matchesType &&
         matchesCoverage && matchesTags && matchesPriorityDropdown;
     });
@@ -214,30 +214,22 @@ const Requirements = () => {
           req.description.toLowerCase().includes(term)
         );
       })();
-
       // Priority filters (both tab and dropdown)
       const matchesPriority = priorityFilter === 'All' || req.priority === priorityFilter;
       const matchesTabFilter = priorityFilterTab === 'All' || req.priority === priorityFilterTab;
-
       // Status filter
       const matchesStatus = statusFilter === 'All' || req.status === statusFilter;
-
       // Type filter
       const matchesType = typeFilter === 'All' || req.type === typeFilter;
-
       // NEW: Coverage filter
       const matchesCoverage = (() => {
         if (coverageFilter === 'All') return true;
-
         const coverage = versionCoverage.find(c => c.reqId === req.id);
         const hasTests = coverage && coverage.totalTests > 0;
-
         if (coverageFilter === 'With Tests') return hasTests;
         if (coverageFilter === 'No Coverage') return !hasTests;
-
         return true;
       })();
-
       // NEW: Tags filter
       const matchesTags = selectedTagsFilter.length === 0 ||
         (req.tags && req.tags.some(tag => selectedTagsFilter.includes(tag)));
@@ -256,22 +248,20 @@ const Requirements = () => {
     selectedTagsFilter,
     versionCoverage
   ]);
+
   // Calculate summary statistics
   const stats = useMemo(() => {
     const total = filteredRequirements.length;
     const highPriority = filteredRequirements.filter(req => req.priority === 'High').length;
-
     // FIXED: Calculate stats based on FILTERED requirements only
     const filteredRequirementIds = new Set(filteredRequirements.map(req => req.id));
     const filteredCoverage = versionCoverage.filter(stat => filteredRequirementIds.has(stat.reqId));
-
     const withTests = filteredCoverage.filter(stat => stat.totalTests > 0).length;
     const noCoverage = total - withTests; // NOW CORRECT: Uses filtered count
     const fullyTested = filteredCoverage.filter(stat => stat.meetsMinimum).length;
     const fullyAutomated = filteredCoverage.filter(stat =>
       stat.automationPercentage === 100 && stat.totalTests > 0
     ).length;
-
     const avgTDF = total > 0 ?
       (filteredRequirements.reduce((sum, req) => sum + req.testDepthFactor, 0) / total).toFixed(1) : 0;
     const testCoverage = total > 0 ? Math.round((withTests / total) * 100) : 0;
@@ -322,7 +312,6 @@ const Requirements = () => {
   const handleSaveRequirement = async (updatedRequirement) => {
     try {
       console.log('Saving requirement:', updatedRequirement);
-
       if (updatedRequirement.id) {
         // UPDATE EXISTING
         console.log('Updating existing requirement:', updatedRequirement.id);
@@ -343,10 +332,9 @@ const Requirements = () => {
         await dataStore.addRequirement(newRequirement);
         console.log('✅ Requirement created successfully');
       }
-
-      // Close the modal
-      setEditingRequirement(null);
-
+      // Close the panel
+      setEditPanelOpen(false);
+      setRequirementToEdit(null);
     } catch (error) {
       console.error("❌ Error saving requirement:", error);
       alert('Error saving requirement: ' + error.message);
@@ -358,17 +346,18 @@ const Requirements = () => {
     if (window.confirm('Are you sure you want to delete this requirement?')) {
       try {
         console.log('Deleting requirement:', reqId);
-
         // Delete from database (this will also update localStorage)
         await dataStore.deleteRequirement(reqId);
-
         // Clear from selection if selected
         setSelectedRequirements(prev => {
           const newSet = new Set(prev);
           newSet.delete(reqId);
           return newSet;
         });
-
+        // Deselect the requirement if it was the one being viewed in the sidebar
+        if (selectedRequirement && selectedRequirement.id === reqId) {
+          setSelectedRequirement(null);
+        }
         console.log('✅ Requirement deleted successfully');
       } catch (error) {
         console.error('❌ Error deleting requirement:', error);
@@ -380,19 +369,15 @@ const Requirements = () => {
   // Handle bulk delete
   const handleBulkDelete = async () => {
     if (selectedRequirements.size === 0) return;
-
     if (window.confirm(`Are you sure you want to delete ${selectedRequirements.size} requirement(s)?`)) {
       try {
         console.log(`Deleting ${selectedRequirements.size} requirements...`);
-
         // Delete each requirement (this will update database and localStorage)
         for (const reqId of selectedRequirements) {
           await dataStore.deleteRequirement(reqId);
         }
-
         // Clear selection
         setSelectedRequirements(new Set());
-
         console.log(`✅ ${selectedRequirements.size} requirements deleted successfully`);
       } catch (error) {
         console.error('❌ Error deleting requirements:', error);
@@ -403,7 +388,7 @@ const Requirements = () => {
 
   // Handle new requirement creation
   const handleNewRequirement = () => {
-    setEditingRequirement({
+    setRequirementToEdit({
       id: '',
       name: '',
       description: '',
@@ -417,7 +402,233 @@ const Requirements = () => {
       versions: selectedVersion !== 'unassigned' ? [selectedVersion] : [],
       tags: []
     });
+    setEditPanelOpen(true);
   };
+
+  // NEW: Helper function to get linked test cases
+  const getLinkedTests = (requirementId) => {
+    const mappings = Object.entries(mapping).flatMap(([reqId, testCaseIds]) =>
+      reqId === requirementId ? testCaseIds.map(tcId => tcId) : []
+    );
+    return mappings
+      .map(tcId => testCases.find(tc => tc.id === tcId))
+      .filter(Boolean)
+      .filter(tc => testCaseAppliesTo(tc, selectedVersion));
+  };
+
+  // NEW: Create right sidebar content
+  const rightSidebarContent = selectedRequirement && (
+    <RightSidebarPanel title="Requirement Details" onClose={() => setSelectedRequirement(null)}>
+      {/* Quick Actions */}
+      <div className="p-4 space-y-2 border-b border-gray-200">
+        <SidebarActionButton
+          icon={<Edit size={16} />}
+          label="Edit Requirement"
+          onClick={() => {
+            setRequirementToEdit(selectedRequirement);
+            setEditPanelOpen(true);
+          }}
+          variant="primary"
+        />
+        <SidebarActionButton
+          icon={<Trash2 size={16} />}
+          label="Delete Requirement"
+          onClick={() => handleDeleteRequirement(selectedRequirement.id)}
+          variant="danger"
+        />
+      </div>
+
+      {/* Basic Information */}
+      <SidebarSection title="Basic Information" icon={<FileText size={16} />} defaultOpen={true}>
+        <SidebarField
+          label="Requirement ID"
+          value={<span className="font-mono font-semibold">{selectedRequirement.id}</span>}
+        />
+        <SidebarField
+          label="Name"
+          value={selectedRequirement.name}
+        />
+        <SidebarField
+          label="Description"
+          value={<p className="text-sm leading-relaxed">{selectedRequirement.description}</p>}
+        />
+      </SidebarSection>
+
+      {/* Classification */}
+      <SidebarSection title="Classification" icon={<Tag size={16} />} defaultOpen={true}>
+        <SidebarField
+          label="Priority"
+          value={
+            <SidebarBadge
+              label={selectedRequirement.priority}
+              color={
+                selectedRequirement.priority === 'High' ? 'red' : selectedRequirement.priority === 'Medium' ? 'yellow' : 'green'
+              }
+            />
+          }
+        />
+        <SidebarField
+          label="Type"
+          value={selectedRequirement.type}
+        />
+        <SidebarField
+          label="Status"
+          value={
+            <SidebarBadge label={selectedRequirement.status || 'Active'} color="green" />
+          }
+        />
+      </SidebarSection>
+
+      {/* Test Depth Factors */}
+      <SidebarSection title="Test Depth Analysis" icon={<BarChart3 size={16} />} defaultOpen={false}>
+        <div className="space-y-3">
+          <SidebarField
+            label="Business Impact"
+            value={
+              <div className="flex items-center space-x-2">
+                <div className="flex-1 bg-gray-200 rounded-full h-2">
+                  <div
+                    className="bg-blue-600 h-2 rounded-full"
+                    style={{ width: `${(selectedRequirement.businessImpact / 5) * 100}%` }}
+                  />
+                </div>
+                <span className="text-sm font-medium">{selectedRequirement.businessImpact}/5</span>
+              </div>
+            }
+          />
+          <SidebarField
+            label="Technical Complexity"
+            value={
+              <div className="flex items-center space-x-2">
+                <div className="flex-1 bg-gray-200 rounded-full h-2">
+                  <div
+                    className="bg-purple-600 h-2 rounded-full"
+                    style={{ width: `${(selectedRequirement.technicalComplexity / 5) * 100}%` }}
+                  />
+                </div>
+                <span className="text-sm font-medium">{selectedRequirement.technicalComplexity}/5</span>
+              </div>
+            }
+          />
+          <SidebarField
+            label="Regulatory Factor"
+            value={
+              <div className="flex items-center space-x-2">
+                <div className="flex-1 bg-gray-200 rounded-full h-2">
+                  <div
+                    className="bg-orange-600 h-2 rounded-full"
+                    style={{ width: `${(selectedRequirement.regulatoryFactor / 5) * 100}%` }}
+                  />
+                </div>
+                <span className="text-sm font-medium">{selectedRequirement.regulatoryFactor}/5</span>
+              </div>
+            }
+          />
+          <SidebarField
+            label="Usage Frequency"
+            value={
+              <div className="flex items-center space-x-2">
+                <div className="flex-1 bg-gray-200 rounded-full h-2">
+                  <div
+                    className="bg-green-600 h-2 rounded-full"
+                    style={{ width: `${(selectedRequirement.usageFrequency / 5) * 100}%` }}
+                  />
+                </div>
+                <span className="text-sm font-medium">{selectedRequirement.usageFrequency}/5</span>
+              </div>
+            }
+          />
+          <SidebarField
+            label="Test Depth Factor"
+            value={
+              <div className="text-2xl font-bold text-indigo-600">
+                {selectedRequirement.testDepthFactor}
+              </div>
+            }
+          />
+          <SidebarField
+            label="Required Test Cases"
+            value={
+              <div className="text-2xl font-bold text-green-600">
+                {selectedRequirement.minTestCases}
+              </div>
+            }
+          />
+        </div>
+      </SidebarSection>
+
+      {/* Linked Test Cases */}
+      <SidebarSection title="Linked Test Cases" defaultOpen={true}>
+        {(() => {
+          const linkedTests = getLinkedTests(selectedRequirement.id);
+          return linkedTests.length > 0 ? (
+            <div className="space-y-2">
+              <span className="text-xs text-gray-500">
+                {linkedTests.length} test case{linkedTests.length !== 1 ? 's' : ''} linked
+              </span>
+              {linkedTests.map((test, idx) => (
+                <div
+                  key={idx}
+                  className="p-2 bg-gray-50 rounded border border-gray-200"
+                >
+                  <div className="font-mono text-xs text-blue-600">{test.id}</div>
+                  <div className="text-sm text-gray-900 mt-1">{test.title}</div>
+                  <div className="text-xs text-gray-500 mt-1">{getVersionDisplayText(test)}</div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-gray-500 italic">No test cases linked</p>
+          );
+        })()}
+      </SidebarSection>
+
+      {/* Versions */}
+      {selectedRequirement.versions && selectedRequirement.versions.length > 0 && (
+        <SidebarSection title="Associated Versions" icon={<Activity size={16} />} defaultOpen={false}>
+          <div className="space-y-2">
+            {selectedRequirement.versions.map(vId => {
+              const versionExists = versions.some(v => v.id === vId);
+              return (
+                <div key={vId} className="flex items-center space-x-2">
+                  <div className={`w-2 h-2 rounded-full ${versionExists ? 'bg-blue-400' : 'bg-yellow-400'}`}></div>
+                  <span className="text-sm text-gray-700 font-mono">{vId}</span>
+                  {!versionExists && (
+                    <span className="text-xs text-yellow-600">(Pending)</span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </SidebarSection>
+      )}
+
+      {/* Tags */}
+      {selectedRequirement.tags && selectedRequirement.tags.length > 0 && (
+        <SidebarSection title="Tags" icon={<Tag size={16} />} defaultOpen={false}>
+          <div className="flex flex-wrap gap-2">
+            {selectedRequirement.tags.map(tag => (
+              <span key={tag} className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-xs font-medium">
+                {tag}
+              </span>
+            ))}
+          </div>
+        </SidebarSection>
+      )}
+
+      {/* Metadata */}
+      <SidebarSection title="Metadata" icon={<Calendar size={16} />} defaultOpen={false}>
+        <SidebarField
+          label="Created"
+          value={selectedRequirement.createdDate ? new Date(selectedRequirement.createdDate).toLocaleDateString() : 'Unknown'}
+        />
+        <SidebarField
+          label="Updated"
+          value={selectedRequirement.updatedAt ? new Date(selectedRequirement.updatedAt).toLocaleDateString() : 'Never'}
+        />
+      </SidebarSection>
+    </RightSidebarPanel>
+  );
 
   if (requirements.length === 0) {
     return (
@@ -437,7 +648,6 @@ const Requirements = () => {
   // Bulk action handlers
   const handleBulkVersionAssignment = (versionId, action) => {
     if (selectedRequirements.size === 0) return;
-
     setSelectedVersionForAssignment(versionId);
     setVersionAssignmentAction(action);
     setShowVersionAssignmentModal(true);
@@ -445,7 +655,6 @@ const Requirements = () => {
 
   const handleBulkTagsUpdate = (tags, action) => {
     if (selectedRequirements.size === 0) return;
-
     setSelectedTagsForAssignment(tags);
     setTagAssignmentAction(action);
     setShowTagAssignmentModal(true);
@@ -453,10 +662,8 @@ const Requirements = () => {
 
   const handleExportSelected = () => {
     if (selectedRequirements.size === 0) return;
-
     const selectedIds = Array.from(selectedRequirements);
     const selectedReqs = requirements.filter(req => selectedIds.includes(req.id));
-
     const exportData = selectedReqs.map(req => ({
       id: req.id,
       name: req.name,
@@ -491,7 +698,6 @@ const Requirements = () => {
     link.href = URL.createObjectURL(blob);
     link.download = `requirements-export-${new Date().toISOString().split('T')[0]}.csv`;
     link.click();
-
     setSelectedRequirements(new Set());
   };
 
@@ -509,16 +715,13 @@ const Requirements = () => {
           }
           : req
       );
-
       dataStore.setRequirements(updatedRequirements);
       setSelectedRequirements(new Set());
       setShowVersionAssignmentModal(false);
-
       // Show success message
       const versionName = versions.find(v => v.id === selectedVersionForAssignment)?.name;
       const actionText = versionAssignmentAction === 'add' ? 'added to' : 'removed from';
       alert(`✅ ${selectedRequirements.size} requirements ${actionText} ${versionName}`);
-
     } catch (error) {
       console.error('Version assignment failed:', error);
       alert('❌ Version assignment failed: ' + error.message);
@@ -539,18 +742,15 @@ const Requirements = () => {
           }
           : req
       );
-
       dataStore.setRequirements(updatedRequirements);
       setSelectedRequirements(new Set());
       setShowTagAssignmentModal(false);
-
       // Show success message
       const actionText = tagAssignmentAction === 'add' ? 'added to' : 'removed from';
       const tagText = selectedTagsForAssignment.length === 1
         ? `"${selectedTagsForAssignment[0]}"`
         : `${selectedTagsForAssignment.length} tags`;
       alert(`✅ Tag ${tagText} ${actionText} ${selectedRequirements.size} requirements`);
-
     } catch (error) {
       console.error('Tag assignment failed:', error);
       alert('❌ Tag assignment failed: ' + error.message);
@@ -574,7 +774,6 @@ const Requirements = () => {
           <h3 className="text-lg font-semibold mb-4">
             Confirm Version {action === 'add' ? 'Addition' : 'Removal'}
           </h3>
-
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
             <p className="text-sm mb-2">
               You are about to <strong>{action}</strong> {selectedCount} requirement(s) {action === 'add' ? 'to' : 'from'}:
@@ -583,7 +782,6 @@ const Requirements = () => {
               {versions.find(v => v.id === version)?.name || version}
             </div>
           </div>
-
           <div className="flex space-x-3">
             <button
               onClick={onConfirm}
@@ -615,14 +813,12 @@ const Requirements = () => {
     selectedCount
   }) => {
     if (!show) return null;
-
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
         <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
           <h3 className="text-lg font-semibold mb-4">
             Confirm Tag {action === 'add' ? 'Addition' : 'Removal'}
           </h3>
-
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
             <p className="text-sm mb-2">
               You are about to <strong>{action}</strong> the following tags {action === 'add' ? 'to' : 'from'} {selectedCount} requirement(s):
@@ -635,7 +831,6 @@ const Requirements = () => {
               ))}
             </div>
           </div>
-
           <div className="flex space-x-3">
             <button
               onClick={onConfirm}
@@ -659,7 +854,7 @@ const Requirements = () => {
   };
 
   return (
-    <MainLayout title="Requirements" hasData={hasData}>
+    <MainLayout title="Requirements" hasData={hasData} showRightSidebar={!!selectedRequirement} rightSidebar={rightSidebarContent}>
       <div className="space-y-6">
         {/* Unified Filter Card — Merged Main + Advanced Filters */}
         <div className="bg-white rounded-lg shadow mb-4">
@@ -677,7 +872,6 @@ const Requirements = () => {
                   </div>
                 )}
               </div>
-
               {/* Inline Metrics Bar (Desktop) */}
               <div className="hidden lg:flex items-center divide-x divide-gray-300">
                 <div className="flex items-center space-x-1.5 px-4">
@@ -698,7 +892,6 @@ const Requirements = () => {
                 </div>
               </div>
             </div>
-
             {/* Add Button */}
             <button
               onClick={handleNewRequirement}
@@ -708,7 +901,6 @@ const Requirements = () => {
               Add
             </button>
           </div>
-
           {/* Priority Filter Tabs Row */}
           <div className="px-4 py-2 bg-gray-50 border-b flex items-center justify-between">
             <div className="flex space-x-2">
@@ -721,7 +913,6 @@ const Requirements = () => {
               >
                 📊 All ({nonPriorityFilteredRequirements.length})
               </button>
-
               <button
                 onClick={() => setPriorityFilterTab('High')}
                 className={`px-3 py-1.5 text-sm rounded-md transition-colors ${priorityFilterTab === 'High'
@@ -731,7 +922,6 @@ const Requirements = () => {
               >
                 🔴 High ({nonPriorityFilteredRequirements.filter(r => r.priority === 'High').length})
               </button>
-
               <button
                 onClick={() => setPriorityFilterTab('Medium')}
                 className={`px-3 py-1.5 text-sm rounded-md transition-colors ${priorityFilterTab === 'Medium'
@@ -741,7 +931,6 @@ const Requirements = () => {
               >
                 🟡 Medium ({nonPriorityFilteredRequirements.filter(r => r.priority === 'Medium').length})
               </button>
-
               <button
                 onClick={() => setPriorityFilterTab('Low')}
                 className={`px-3 py-1.5 text-sm rounded-md transition-colors ${priorityFilterTab === 'Low'
@@ -752,7 +941,6 @@ const Requirements = () => {
                 🟢 Low ({nonPriorityFilteredRequirements.filter(r => r.priority === 'Low').length})
               </button>
             </div>
-
             {/* Quick Search */}
             <div className="flex items-center space-x-2">
               <input
@@ -764,7 +952,6 @@ const Requirements = () => {
               />
             </div>
           </div>
-
           {/* Mobile Metrics (shown on mobile only) */}
           <div className="lg:hidden px-4 py-3 border-t bg-gray-50">
             <div className="grid grid-cols-3 gap-3 text-center">
@@ -782,7 +969,6 @@ const Requirements = () => {
               </div>
             </div>
           </div>
-
           {/* Advanced Filters - Expandable Section */}
           <div className="border-t">
             <button
@@ -803,7 +989,6 @@ const Requirements = () => {
                 className={`text-gray-600 transition-transform ${showAdvancedFilters ? 'rotate-180' : ''}`}
               />
             </button>
-
             {/* Advanced Filters Content */}
             {showAdvancedFilters && (
               <div className="px-4 py-4 bg-gray-50">
@@ -827,7 +1012,6 @@ const Requirements = () => {
                         <option value="Archived">Archived</option>
                       </select>
                     </div>
-
                     {/* Type Filter */}
                     <div>
                       <label className="block text-xs font-medium text-gray-700 mb-1">Type</label>
@@ -845,7 +1029,6 @@ const Requirements = () => {
                         <option value="Compliance">Compliance</option>
                       </select>
                     </div>
-
                     {/* Coverage Filter */}
                     <div>
                       <label className="block text-xs font-medium text-gray-700 mb-1">Coverage</label>
@@ -860,7 +1043,6 @@ const Requirements = () => {
                       </select>
                     </div>
                   </div>
-
                   {/* Second Row: Tags - Full Width with Show More/Less */}
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-2">Tags</label>
@@ -870,7 +1052,6 @@ const Requirements = () => {
                         const INITIAL_TAGS_COUNT = 10;
                         const tagsToShow = showAllTags ? allTags : allTags.slice(0, INITIAL_TAGS_COUNT);
                         const remainingCount = allTags.length - INITIAL_TAGS_COUNT;
-
                         return (
                           <>
                             {tagsToShow.map(tag => {
@@ -878,7 +1059,6 @@ const Requirements = () => {
                                 req.tags && req.tags.includes(tag)
                               ).length;
                               const isSelected = selectedTagsFilter.includes(tag);
-
                               return (
                                 <button
                                   key={tag}
@@ -898,7 +1078,6 @@ const Requirements = () => {
                                 </button>
                               );
                             })}
-
                             {/* Show More / Show Less button */}
                             {allTags.length > INITIAL_TAGS_COUNT && (
                               <button
@@ -908,7 +1087,6 @@ const Requirements = () => {
                                 {showAllTags ? 'Show Less' : `+${remainingCount} more`}
                               </button>
                             )}
-
                             {allTags.length === 0 && (
                               <span className="text-sm text-gray-500">No tags available</span>
                             )}
@@ -917,7 +1095,6 @@ const Requirements = () => {
                       })()}
                     </div>
                   </div>
-
                   {/* Clear Filters Section */}
                   {(statusFilter !== 'All' || typeFilter !== 'All' || coverageFilter !== 'All' || selectedTagsFilter.length > 0) && (
                     <div className="pt-4 border-t flex justify-end">
@@ -1001,32 +1178,38 @@ const Requirements = () => {
                 {filteredRequirements.map((req) => {
                   // Find corresponding coverage data
                   const coverage = versionCoverage.find(c => c.reqId === req.id);
-
                   // Change 2: Get linked test cases for this requirement using new format
                   const linkedTests = (mapping[req.id] || [])
                     .map(tcId => testCases.find(tc => tc.id === tcId))
                     .filter(Boolean)
                     .filter(tc => testCaseAppliesTo(tc, selectedVersion));
-
                   const linkedTestCount = linkedTests.length;
-
                   const isExpanded = expandedRows.has(req.id);
 
                   return (
                     <React.Fragment key={req.id}>
-                      <tr className={`hover:bg-gray-50 ${selectedRequirements.has(req.id) ? 'bg-blue-50' : ''}`}>
+                      <tr
+                        className={`hover:bg-gray-50 ${selectedRequirements.has(req.id) ? 'bg-blue-50' : ''} ${selectedRequirement?.id === req.id ? 'bg-blue-100' : ''} cursor-pointer`}
+                        onClick={() => setSelectedRequirement(req)}
+                      >
                         <td className="px-4 py-4 whitespace-nowrap">
                           <input
                             type="checkbox"
                             checked={selectedRequirements.has(req.id)}
-                            onChange={(e) => handleRequirementSelection(req.id, e.target.checked)}
+                            onChange={(e) => {
+                              e.stopPropagation();
+                              handleRequirementSelection(req.id, e.target.checked);
+                            }}
                             className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                           />
                         </td>
                         <td className="px-4 py-4 text-sm text-gray-900">
                           <div className="flex items-start">
                             <button
-                              onClick={() => toggleRowExpansion(req.id)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleRowExpansion(req.id);
+                              }}
                               className="mr-2 p-1 hover:bg-gray-200 rounded flex-shrink-0 mt-0.5"
                             >
                               {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
@@ -1106,14 +1289,21 @@ const Requirements = () => {
                         <td className="px-4 py-4 whitespace-nowrap text-right text-sm font-medium">
                           <div className="flex items-center justify-end space-x-2">
                             <button
-                              onClick={() => setEditingRequirement(req)}
+                              onClick={(e) => {
+                                e.stopPropagation(); // Prevent row click
+                                setRequirementToEdit(req);
+                                setEditPanelOpen(true); // Open panel instead of modal
+                              }}
                               className="text-blue-600 hover:text-blue-900 p-1"
                               title="Edit requirement"
                             >
                               <Edit size={16} />
                             </button>
                             <button
-                              onClick={() => handleDeleteRequirement(req.id)}
+                              onClick={(e) => {
+                                e.stopPropagation(); // Prevent row click
+                                handleDeleteRequirement(req.id);
+                              }}
                               className="text-red-600 hover:text-red-900 p-1"
                               title="Delete requirement"
                             >
@@ -1122,9 +1312,8 @@ const Requirements = () => {
                           </div>
                         </td>
                       </tr>
-
-                      {/* Expanded Row Details */}
-                      {isExpanded && (
+                      {/* Expanded Row Details - Only show if not in sidebar mode */}
+                      {isExpanded && !selectedRequirement && (
                         <tr>
                           <td colSpan="8" className="p-0">
                             <div className="bg-white border border-gray-200 rounded-lg">
@@ -1136,7 +1325,6 @@ const Requirements = () => {
                                     <h3 className="text-lg font-semibold text-gray-900">Requirement Details</h3>
                                   </div>
                                 </div>
-
                                 {/* Main Content Grid */}
                                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                                   {/* Left Column - Requirement Details */}
@@ -1151,7 +1339,6 @@ const Requirements = () => {
                                         <p className="text-gray-700 leading-relaxed">{req.description}</p>
                                       </div>
                                     )}
-
                                     {/* Business Rationale (if available) */}
                                     {req.businessRationale && (
                                       <div className="bg-white rounded-lg p-4 shadow-sm border">
@@ -1162,7 +1349,6 @@ const Requirements = () => {
                                         <p className="text-gray-700 leading-relaxed">{req.businessRationale}</p>
                                       </div>
                                     )}
-
                                     {/* Acceptance Criteria (if available) */}
                                     {req.acceptanceCriteria && req.acceptanceCriteria.length > 0 && (
                                       <div className="bg-white rounded-lg p-4 shadow-sm border">
@@ -1182,7 +1368,6 @@ const Requirements = () => {
                                         </ul>
                                       </div>
                                     )}
-
                                     {/* Risk Factors */}
                                     <div className="bg-white rounded-lg p-4 shadow-sm border">
                                       <div className="flex items-center mb-3">
@@ -1241,7 +1426,6 @@ const Requirements = () => {
                                       </div>
                                     </div>
                                   </div>
-
                                   {/* Right Column - Metadata */}
                                   <div className="space-y-4">
                                     {/* Quick Info Card */}
@@ -1255,7 +1439,6 @@ const Requirements = () => {
                                             {req.type}
                                           </span>
                                         </div>
-
                                         {/* Priority – Keep colored (High/Medium/Low) */}
                                         <div className="flex justify-between items-center py-2 border-b border-gray-100">
                                           <span className="text-sm text-gray-600">Priority</span>
@@ -1266,7 +1449,6 @@ const Requirements = () => {
                                             {req.priority}
                                           </span>
                                         </div>
-
                                         {/* Status – Neutral (or add icon if desired) */}
                                         <div className="flex justify-between items-center py-2 border-b border-gray-100">
                                           <span className="text-sm text-gray-600">Status</span>
@@ -1282,7 +1464,6 @@ const Requirements = () => {
                                         </div>
                                       </div>
                                     </div>
-
                                     {/* Test Depth Analysis */}
                                     <div className="bg-white rounded-lg p-4 shadow-sm border">
                                       <h4 className="font-semibold text-gray-900 mb-4">Test Depth Analysis</h4>
@@ -1322,7 +1503,6 @@ const Requirements = () => {
                                         </div>
                                       </div>
                                     </div>
-
                                     {/* Versions */}
                                     {req.versions && req.versions.length > 0 && (
                                       <div className="bg-white rounded-lg p-4 shadow-sm border">
@@ -1344,7 +1524,6 @@ const Requirements = () => {
                                         </div>
                                       </div>
                                     )}
-
                                     {/* Tags */}
                                     {req.tags && req.tags.length > 0 && (
                                       <div className="bg-white rounded-lg p-4 shadow-sm border">
@@ -1358,8 +1537,6 @@ const Requirements = () => {
                                         </div>
                                       </div>
                                     )}
-
-
                                   </div>
                                 </div>
                               </div>
@@ -1383,14 +1560,340 @@ const Requirements = () => {
           )}
         </div>
 
-        {/* Edit Requirement Modal */}
-        {editingRequirement && (
-          <EditRequirementModal
-            requirement={editingRequirement}
-            onSave={handleSaveRequirement}
-            onCancel={() => setEditingRequirement(null)}
-          />
-        )}
+        {/* NEW: Replace EditRequirementModal with SlideOutPanel */}
+        <SlideOutPanel
+          isOpen={editPanelOpen}
+          onClose={() => {
+            setEditPanelOpen(false);
+            setRequirementToEdit(null);
+          }}
+          title={requirementToEdit ? 'Edit Requirement' : 'Create New Requirement'}
+          width="lg"
+          footer={
+            <div className="flex space-x-3">
+              <button
+                onClick={() => {
+                  setEditPanelOpen(false);
+                  setRequirementToEdit(null);
+                }}
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  // Your save logic here
+                  handleSaveRequirement(requirementToEdit);
+                  setEditPanelOpen(false);
+                }}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700"
+              >
+                {requirementToEdit ? 'Update' : 'Create'}
+              </button>
+            </div>
+          }
+        >
+          {/* NEW: Put your edit form content here */}
+          <div className="space-y-6">
+            {/* Basic Information */}
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Basic Information</h3>
+              <div className="space-y-4">
+                {/* ID Field */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Requirement ID <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={requirementToEdit?.id || ''}
+                    onChange={(e) => setRequirementToEdit({
+                      ...requirementToEdit,
+                      id: e.target.value
+                    })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    placeholder="e.g., REQ-001"
+                    disabled={!!requirementToEdit} // Can't edit ID
+                  />
+                </div>
+                {/* Name Field */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={requirementToEdit?.name || ''}
+                    onChange={(e) => setRequirementToEdit({
+                      ...requirementToEdit,
+                      name: e.target.value
+                    })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    placeholder="Enter requirement name"
+                  />
+                </div>
+                {/* Description Field */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Description <span className="text-red-500">*</span>
+                  </label>
+                  <textarea
+                    value={requirementToEdit?.description || ''}
+                    onChange={(e) => setRequirementToEdit({
+                      ...requirementToEdit,
+                      description: e.target.value
+                    })}
+                    rows={4}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    placeholder="Describe the requirement"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Classification */}
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Classification</h3>
+              <div className="grid grid-cols-2 gap-4">
+                {/* Priority */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Priority
+                  </label>
+                  <select
+                    value={requirementToEdit?.priority || 'Medium'}
+                    onChange={(e) => setRequirementToEdit({
+                      ...requirementToEdit,
+                      priority: e.target.value
+                    })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  >
+                    <option value="High">High</option>
+                    <option value="Medium">Medium</option>
+                    <option value="Low">Low</option>
+                  </select>
+                </div>
+                {/* Type */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Type
+                  </label>
+                  <select
+                    value={requirementToEdit?.type || 'Functional'}
+                    onChange={(e) => setRequirementToEdit({
+                      ...requirementToEdit,
+                      type: e.target.value
+                    })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  >
+                    <option value="Functional">Functional</option>
+                    <option value="Non-Functional">Non-Functional</option>
+                    <option value="Security">Security</option>
+                    <option value="Performance">Performance</option>
+                    <option value="Usability">Usability</option>
+                    <option value="Compliance">Compliance</option>
+                  </select>
+                </div>
+                {/* Status */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Status
+                  </label>
+                  <select
+                    value={requirementToEdit?.status || 'Active'}
+                    onChange={(e) => setRequirementToEdit({
+                      ...requirementToEdit,
+                      status: e.target.value
+                    })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  >
+                    <option value="Active">Active</option>
+                    <option value="Draft">Draft</option>
+                    <option value="In Review">In Review</option>
+                    <option value="Approved">Approved</option>
+                    <option value="Deprecated">Deprecated</option>
+                    <option value="Archived">Archived</option>
+                  </select>
+                </div>
+                {/* Business Rationale */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Business Rationale
+                  </label>
+                  <input
+                    type="text"
+                    value={requirementToEdit?.businessRationale || ''}
+                    onChange={(e) => setRequirementToEdit({
+                      ...requirementToEdit,
+                      businessRationale: e.target.value
+                    })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    placeholder="Business rationale"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Test Depth Factors */}
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Test Depth Analysis Factors</h3>
+              <div className="grid grid-cols-2 gap-4">
+                {/* Business Impact */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Business Impact (1-5)
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="5"
+                    value={requirementToEdit?.businessImpact || 3}
+                    onChange={(e) => setRequirementToEdit({
+                      ...requirementToEdit,
+                      businessImpact: parseInt(e.target.value) || 3
+                    })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  />
+                </div>
+                {/* Technical Complexity */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Technical Complexity (1-5)
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="5"
+                    value={requirementToEdit?.technicalComplexity || 3}
+                    onChange={(e) => setRequirementToEdit({
+                      ...requirementToEdit,
+                      technicalComplexity: parseInt(e.target.value) || 3
+                    })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  />
+                </div>
+                {/* Regulatory Factor */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Regulatory Factor (1-5)
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="5"
+                    value={requirementToEdit?.regulatoryFactor || 1}
+                    onChange={(e) => setRequirementToEdit({
+                      ...requirementToEdit,
+                      regulatoryFactor: parseInt(e.target.value) || 1
+                    })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  />
+                </div>
+                {/* Usage Frequency */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Usage Frequency (1-5)
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="5"
+                    value={requirementToEdit?.usageFrequency || 3}
+                    onChange={(e) => setRequirementToEdit({
+                      ...requirementToEdit,
+                      usageFrequency: parseInt(e.target.value) || 3
+                    })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  />
+                </div>
+                {/* Min Test Cases */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Minimum Test Cases
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={requirementToEdit?.minTestCases || 1}
+                    onChange={(e) => setRequirementToEdit({
+                      ...requirementToEdit,
+                      minTestCases: parseInt(e.target.value) || 1
+                    })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  />
+                </div>
+                {/* Test Depth Factor (Calculated) */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Test Depth Factor (Calculated)
+                  </label>
+                  <input
+                    type="text"
+                    value={requirementToEdit ? (
+                      (requirementToEdit.businessImpact + requirementToEdit.technicalComplexity + requirementToEdit.regulatoryFactor + requirementToEdit.usageFrequency) / 4
+                    ).toFixed(1) : '0.0'}
+                    readOnly
+                    className="w-full px-3 py-2 border border-gray-300 bg-gray-100 rounded-lg"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Versions and Tags */}
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Versions & Tags</h3>
+              <div className="grid grid-cols-1 gap-4">
+                {/* Versions */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Versions (comma-separated)
+                  </label>
+                  <input
+                    type="text"
+                    value={requirementToEdit?.versions?.join(', ') || ''}
+                    onChange={(e) => setRequirementToEdit({
+                      ...requirementToEdit,
+                      versions: e.target.value ? e.target.value.split(',').map(v => v.trim()) : []
+                    })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    placeholder="e.g., v1.0, v2.0"
+                  />
+                </div>
+                {/* Tags */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Tags (comma-separated)
+                  </label>
+                  <input
+                    type="text"
+                    value={requirementToEdit?.tags?.join(', ') || ''}
+                    onChange={(e) => setRequirementToEdit({
+                      ...requirementToEdit,
+                      tags: e.target.value ? e.target.value.split(',').map(t => t.trim()) : []
+                    })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    placeholder="e.g., critical, login, api"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Acceptance Criteria */}
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Acceptance Criteria</h3>
+              <textarea
+                value={requirementToEdit?.acceptanceCriteria ? requirementToEdit.acceptanceCriteria.join('\n') : ''}
+                onChange={(e) => setRequirementToEdit({
+                  ...requirementToEdit,
+                  acceptanceCriteria: e.target.value ? e.target.value.split('\n').filter(line => line.trim() !== '') : []
+                })}
+                rows={4}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                placeholder="Enter acceptance criteria, one per line"
+              />
+            </div>
+          </div>
+        </SlideOutPanel>
 
         {/* Version and Tag Assignment Modals */}
         <VersionAssignmentModal
@@ -1402,7 +1905,6 @@ const Requirements = () => {
           selectedCount={selectedRequirements.size}
           versions={versions}
         />
-
         <TagAssignmentModal
           show={showTagAssignmentModal}
           onClose={() => setShowTagAssignmentModal(false)}
