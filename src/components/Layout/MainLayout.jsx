@@ -60,21 +60,6 @@ const MainLayout = ({
               </aside>
             )}
           </div>
-
-          {/* Footer - always at bottom */}
-          <footer className="flex-shrink-0 bg-white shadow-md p-4 text-center text-gray-600">
-            <div className="flex justify-center items-center mb-2">
-              <img
-                src="/asal-logo.png"
-                alt="ASAL Technologies"
-                className="h-5 mr-2"
-              />
-              <span className="font-medium">Developed by ASAL Technologies</span>
-            </div>
-            <div className="text-sm">
-              © {new Date().getFullYear()} ASAL Technologies. All rights reserved.
-            </div>
-          </footer>
         </div>
       </div>
     </div>
