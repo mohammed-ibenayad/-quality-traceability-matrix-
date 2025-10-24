@@ -786,31 +786,90 @@ const Requirements = () => {
 
   // Add confirmation handler for version assignment
   const confirmVersionAssignment = async () => {
-    try {
-      const updatedRequirements = requirements.map(req =>
-        selectedRequirements.has(req.id)
-          ? {
-            ...req,
-            versions: versionAssignmentAction === 'add'
-              ? [...new Set([...(req.versions || []), selectedVersionForAssignment])]
-              : (req.versions || []).filter(v => v !== selectedVersionForAssignment),
-            updatedAt: new Date().toISOString()
-          }
-          : req
-      );
-      dataStore.setRequirements(updatedRequirements);
-      setSelectedRequirements(new Set());
-      setShowVersionAssignmentModal(false);
-      // Show success message
-      const versionName = versions.find(v => v.id === selectedVersionForAssignment)?.name;
-      const actionText = versionAssignmentAction === 'add' ? 'added to' : 'removed from';
-      alert(`✅ ${selectedRequirements.size} requirements ${actionText} ${versionName}`);
-    } catch (error) {
-      console.error('Version assignment failed:', error);
-      alert('❌ Version assignment failed: ' + error.message);
-    }
-  };
+  try {
+    console.log('🔧 Starting version assignment...', {
+      action: versionAssignmentAction,
+      version: selectedVersionForAssignment,
+      selectedCount: selectedRequirements.size
+    });
 
+    // Track success/failure
+    const results = {
+      successful: [],
+      failed: []
+    };
+
+    // Update each selected requirement individually to ensure database persistence
+    for (const reqId of selectedRequirements) {
+      try {
+        const requirement = requirements.find(r => r.id === reqId);
+        if (!requirement) {
+          console.warn(`⚠️ Requirement ${reqId} not found`);
+          results.failed.push(reqId);
+          continue;
+        }
+
+        // Calculate new versions array
+        const currentVersions = requirement.versions || [];
+        let newVersions;
+
+        if (versionAssignmentAction === 'add') {
+          // Add version and remove duplicates
+          newVersions = [...new Set([...currentVersions, selectedVersionForAssignment])];
+        } else {
+          // Remove version
+          newVersions = currentVersions.filter(v => v !== selectedVersionForAssignment);
+        }
+
+        // Only update if versions actually changed
+        if (JSON.stringify(currentVersions.sort()) === JSON.stringify(newVersions.sort())) {
+          console.log(`ℹ️ No version changes needed for ${reqId}`);
+          results.successful.push(reqId);
+          continue;
+        }
+
+        console.log(`📝 Updating versions for ${reqId}:`, {
+          before: currentVersions,
+          after: newVersions
+        });
+
+        // Call the API to update the requirement
+        // This will persist to the database
+        await dataStore.updateRequirement(reqId, {
+          versions: newVersions,
+          updatedAt: new Date().toISOString()
+        });
+
+        results.successful.push(reqId);
+        console.log(`✅ Successfully updated versions for ${reqId}`);
+
+      } catch (error) {
+        console.error(`❌ Failed to update versions for ${reqId}:`, error);
+        results.failed.push(reqId);
+      }
+    }
+
+    // Clear selection and close modal
+    setSelectedRequirements(new Set());
+    setShowVersionAssignmentModal(false);
+
+    // Show success message with details
+    const versionName = versions.find(v => v.id === selectedVersionForAssignment)?.name;
+    const actionText = versionAssignmentAction === 'add' ? 'added to' : 'removed from';
+    
+    if (results.successful.length > 0) {
+      alert(`✅ ${results.successful.length} requirements ${actionText} ${versionName}`);
+    }
+    
+    if (results.failed.length > 0) {
+      alert(`⚠️ ${results.failed.length} requirements failed to update`);
+    }
+    
+  } catch (error) {
+    console.error('Version assignment failed:', error);
+    alert('❌ Version assignment failed: ' + error.message);
+  }
+};
   // Add confirmation handler for tag assignment
   const confirmTagAssignment = async () => {
     try {
