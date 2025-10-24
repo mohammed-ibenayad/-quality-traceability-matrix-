@@ -24,8 +24,7 @@ import {
 
 /**
  * Enhanced Bulk Actions Panel - For Right Sidebar
- * Combines version management, tag management, and bulk operations
- * Supports both requirements and test cases
+ * With multi-select tag support and database persistence
  */
 const BulkActionsPanel = ({
   selectedCount = 0,
@@ -58,6 +57,7 @@ const BulkActionsPanel = ({
   const [tagSearchQuery, setTagSearchQuery] = useState('');
   const [tagActiveTab, setTagActiveTab] = useState('add');
   const [customTagInput, setCustomTagInput] = useState('');
+  const [selectedTagsForAction, setSelectedTagsForAction] = useState(new Set());
 
   if (selectedCount === 0) {
     return null;
@@ -176,23 +176,54 @@ const BulkActionsPanel = ({
     setVersionSearchQuery('');
   };
 
-  // Tag action handlers
-  const handleTagAction = (tag) => {
-    if (onTagsUpdate) {
-      onTagsUpdate([tag], tagActiveTab);
-    }
-    setShowTagsDropdown(false);
-    setTagSearchQuery('');
+  // Toggle tag selection for multi-select
+  const toggleTagSelection = (tag) => {
+    setSelectedTagsForAction(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(tag)) {
+        newSet.delete(tag);
+      } else {
+        newSet.add(tag);
+      }
+      return newSet;
+    });
   };
 
-  const handleCustomTagAdd = () => {
-    const trimmedTag = customTagInput.trim();
-    if (trimmedTag && !availableTags.includes(trimmedTag)) {
-      onTagsUpdate([trimmedTag], 'add');
-      setCustomTagInput('');
+  // Apply selected tags
+  const handleApplyTagsAction = () => {
+    if (selectedTagsForAction.size > 0 && onTagsUpdate) {
+      const tagsArray = Array.from(selectedTagsForAction);
+      onTagsUpdate(tagsArray, tagActiveTab);
+      
+      // Clear selection and close dropdown
+      setSelectedTagsForAction(new Set());
       setShowTagsDropdown(false);
       setTagSearchQuery('');
     }
+  };
+
+  // Handle custom tag creation
+  const handleCustomTagAdd = () => {
+    const trimmedTag = customTagInput.trim();
+    if (trimmedTag && !availableTags.includes(trimmedTag)) {
+      // Add custom tag to selection
+      setSelectedTagsForAction(prev => new Set([...prev, trimmedTag]));
+      setCustomTagInput('');
+    }
+  };
+
+  // Select all visible tags (for current tab)
+  const handleSelectAllTags = () => {
+    const tagsToSelect = tagActiveTab === 'add' 
+      ? filteredTagsForAdd.filter(tag => !isTagAssigned(tag))  // Only unassigned in Add tab
+      : filteredTagsForAdd;  // All tags in Remove tab
+    
+    setSelectedTagsForAction(new Set(tagsToSelect));
+  };
+
+  // Clear tag selection
+  const handleClearTagSelection = () => {
+    setSelectedTagsForAction(new Set());
   };
 
   // Check if a tag is assigned (common or partial)
@@ -390,12 +421,18 @@ const BulkActionsPanel = ({
                 onClick={() => {
                   setShowTagsDropdown(!showTagsDropdown);
                   setShowVersionDropdown(false);
+                  setSelectedTagsForAction(new Set()); // Clear selection when opening
                 }}
                 className="w-full flex items-center justify-between px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
               >
                 <span className="flex items-center text-sm text-gray-700">
                   <Tag size={16} className="mr-2" />
                   Manage Tags
+                  {selectedTagsForAction.size > 0 && (
+                    <span className="ml-2 px-2 py-0.5 bg-blue-100 text-blue-800 text-xs rounded-full font-medium">
+                      {selectedTagsForAction.size}
+                    </span>
+                  )}
                 </span>
                 <ChevronDown size={16} className={`text-gray-500 transition-transform ${showTagsDropdown ? 'rotate-180' : ''}`} />
               </button>
@@ -405,7 +442,10 @@ const BulkActionsPanel = ({
                   {/* Tab Selector */}
                   <div className="flex border-b border-gray-200 bg-gray-50">
                     <button
-                      onClick={() => setTagActiveTab('add')}
+                      onClick={() => {
+                        setTagActiveTab('add');
+                        setSelectedTagsForAction(new Set());
+                      }}
                       className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${tagActiveTab === 'add'
                         ? 'text-green-600 bg-green-50 border-b-2 border-green-600'
                         : 'text-gray-600 hover:text-gray-800'
@@ -415,7 +455,10 @@ const BulkActionsPanel = ({
                       Add Tags
                     </button>
                     <button
-                      onClick={() => setTagActiveTab('remove')}
+                      onClick={() => {
+                        setTagActiveTab('remove');
+                        setSelectedTagsForAction(new Set());
+                      }}
                       className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${tagActiveTab === 'remove'
                         ? 'text-red-600 bg-red-50 border-b-2 border-red-600'
                         : 'text-gray-600 hover:text-gray-800'
@@ -479,9 +522,39 @@ const BulkActionsPanel = ({
                     </div>
                   )}
 
+                  {/* Selection Controls */}
+                  {filteredTagsForAdd.length > 0 && (
+                    <div className="px-3 py-2 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <button
+                          onClick={handleSelectAllTags}
+                          className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                        >
+                          Select All {tagActiveTab === 'add' ? 'Available' : ''}
+                        </button>
+                        {selectedTagsForAction.size > 0 && (
+                          <>
+                            <span className="text-gray-400">|</span>
+                            <button
+                              onClick={handleClearTagSelection}
+                              className="text-xs text-gray-600 hover:text-gray-800 font-medium"
+                            >
+                              Clear
+                            </button>
+                          </>
+                        )}
+                      </div>
+                      {selectedTagsForAction.size > 0 && (
+                        <span className="text-xs text-gray-600">
+                          {selectedTagsForAction.size} selected
+                        </span>
+                      )}
+                    </div>
+                  )}
+
                   {/* Tags List */}
                   {filteredTagsForAdd.length > 0 ? (
-                    <div className="overflow-y-auto max-h-60">
+                    <div className="overflow-y-auto max-h-48">
                       {tagActiveTab === 'add' ? (
                         <>
                           {/* Unassigned Tags (Active/Clickable) */}
@@ -498,11 +571,22 @@ const BulkActionsPanel = ({
                                 {filteredTagsForAdd.filter(tag => !isTagAssigned(tag)).map(tag => (
                                   <button
                                     key={tag}
-                                    onClick={() => handleTagAction(tag)}
-                                    className="w-full text-left px-4 py-2 text-sm hover:bg-green-50 transition-colors flex items-center justify-between"
+                                    onClick={() => toggleTagSelection(tag)}
+                                    className={`w-full text-left px-4 py-2 text-sm transition-colors flex items-center justify-between ${
+                                      selectedTagsForAction.has(tag)
+                                        ? 'bg-green-100 border-l-4 border-green-600'
+                                        : 'hover:bg-green-50'
+                                    }`}
                                   >
-                                    <span className="text-gray-700 font-medium">{tag}</span>
-                                    <Plus size={14} className="text-green-600" />
+                                    <span className="text-gray-700 font-medium flex items-center">
+                                      {selectedTagsForAction.has(tag) && (
+                                        <Check size={14} className="mr-2 text-green-600" />
+                                      )}
+                                      {tag}
+                                    </span>
+                                    {!selectedTagsForAction.has(tag) && (
+                                      <Plus size={14} className="text-green-600" />
+                                    )}
                                   </button>
                                 ))}
                               </div>
@@ -543,25 +627,34 @@ const BulkActionsPanel = ({
                           )}
                         </>
                       ) : (
-                        // Remove Tab - Only show assigned tags
+                        // Remove Tab - Only show assigned tags (multi-select)
                         <div>
                           {filteredTagsForAdd.map(tag => (
                             <button
                               key={tag}
-                              onClick={() => handleTagAction(tag)}
-                              className="w-full text-left px-4 py-2 text-sm hover:bg-red-50 transition-colors flex items-center justify-between"
+                              onClick={() => toggleTagSelection(tag)}
+                              className={`w-full text-left px-4 py-2 text-sm transition-colors flex items-center justify-between ${
+                                selectedTagsForAction.has(tag)
+                                  ? 'bg-red-100 border-l-4 border-red-600'
+                                  : 'hover:bg-red-50'
+                              }`}
                               title={isTagPartial(tag) 
                                 ? "This tag is assigned to some of the selected items"
                                 : "This tag is assigned to all selected items"
                               }
                             >
                               <span className="text-gray-700 flex items-center">
+                                {selectedTagsForAction.has(tag) && (
+                                  <Check size={14} className="mr-2 text-red-600" />
+                                )}
                                 {tag}
                                 {isTagPartial(tag) && (
                                   <span className="ml-2 inline-block w-2 h-2 rounded-full bg-amber-400" title="Partially assigned"></span>
                                 )}
                               </span>
-                              <Minus size={14} className="text-red-600" />
+                              {!selectedTagsForAction.has(tag) && (
+                                <Minus size={14} className="text-red-600" />
+                              )}
                             </button>
                           ))}
                         </div>
@@ -585,6 +678,22 @@ const BulkActionsPanel = ({
                         <span className="inline-block w-2 h-2 rounded-full bg-amber-400 mr-1.5"></span>
                         = Tag on some items (not all)
                       </p>
+                    </div>
+                  )}
+
+                  {/* Apply Button */}
+                  {selectedTagsForAction.size > 0 && (
+                    <div className="p-3 bg-gray-50 border-t border-gray-200">
+                      <button
+                        onClick={handleApplyTagsAction}
+                        className={`w-full py-2 px-4 rounded-lg text-sm font-medium transition-colors ${
+                          tagActiveTab === 'add'
+                            ? 'bg-green-600 text-white hover:bg-green-700'
+                            : 'bg-red-600 text-white hover:bg-red-700'
+                        }`}
+                      >
+                        {tagActiveTab === 'add' ? 'Add' : 'Remove'} {selectedTagsForAction.size} Tag{selectedTagsForAction.size !== 1 ? 's' : ''}
+                      </button>
                     </div>
                   )}
                 </div>
@@ -628,6 +737,7 @@ const BulkActionsPanel = ({
           onClick={() => {
             setShowVersionDropdown(false);
             setShowTagsDropdown(false);
+            setSelectedTagsForAction(new Set());
           }}
         />
       )}
