@@ -179,7 +179,7 @@ const EditRequirementPanel = ({
         {/* Basic Information */}
         <div>
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Basic Information</h3>
-          
+
           {/* Requirement ID */}
           <div className="mb-4">
             <label htmlFor="req-id" className="block text-sm font-medium text-gray-700 mb-1">
@@ -190,9 +190,8 @@ const EditRequirementPanel = ({
               type="text"
               value={formData.id}
               onChange={(e) => handleInputChange('id', e.target.value)}
-              className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                errors.id ? 'border-red-300' : 'border-gray-300'
-              }`}
+              className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.id ? 'border-red-300' : 'border-gray-300'
+                }`}
               placeholder="e.g., REQ-001"
               disabled={!!requirement} // Can't change ID when editing
             />
@@ -209,9 +208,8 @@ const EditRequirementPanel = ({
               type="text"
               value={formData.name}
               onChange={(e) => handleInputChange('name', e.target.value)}
-              className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                errors.name ? 'border-red-300' : 'border-gray-300'
-              }`}
+              className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.name ? 'border-red-300' : 'border-gray-300'
+                }`}
               placeholder="Enter requirement name"
             />
             {errors.name && <p className="mt-1 text-sm text-red-600">{errors.name}</p>}
@@ -227,9 +225,8 @@ const EditRequirementPanel = ({
               value={formData.description}
               onChange={(e) => handleInputChange('description', e.target.value)}
               rows={4}
-              className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                errors.description ? 'border-red-300' : 'border-gray-300'
-              }`}
+              className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.description ? 'border-red-300' : 'border-gray-300'
+                }`}
               placeholder="Describe the requirement in detail"
             />
             {errors.description && <p className="mt-1 text-sm text-red-600">{errors.description}</p>}
@@ -239,7 +236,7 @@ const EditRequirementPanel = ({
         {/* Classification */}
         <div>
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Classification</h3>
-          
+
           <div className="grid grid-cols-2 gap-4">
             {/* Priority */}
             <div>
@@ -271,8 +268,10 @@ const EditRequirementPanel = ({
               >
                 <option value="Functional">Functional</option>
                 <option value="Non-Functional">Non-Functional</option>
-                <option value="Technical">Technical</option>
-                <option value="Business">Business</option>
+                <option value="Security">Security</option>
+                <option value="Performance">Performance</option>
+                <option value="Usability">Usability</option>
+                <option value="Compliance">Compliance</option>
               </select>
             </div>
 
@@ -313,7 +312,7 @@ const EditRequirementPanel = ({
         {/* Test Depth Factors */}
         <div>
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Test Depth Factors</h3>
-          
+
           {/* Business Impact */}
           <div className="mb-4">
             <label className="block text-sm font-medium text-gray-700 mb-2">

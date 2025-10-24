@@ -18,10 +18,10 @@ const FilterPanel = ({
   typeFilter = 'All',
   coverageFilter = 'All',
   selectedTags = [],
-  
+
   // Available options
   allTags = [],
-  
+
   // Callbacks
   onSearchChange,
   onPriorityChange,
@@ -30,7 +30,7 @@ const FilterPanel = ({
   onCoverageChange,
   onTagsChange,
   onClearAll,
-  
+
   // Statistics
   stats = {
     total: 0,
@@ -186,8 +186,10 @@ const FilterPanel = ({
           <option value="All">All Types</option>
           <option value="Functional">Functional</option>
           <option value="Non-Functional">Non-Functional</option>
-          <option value="Technical">Technical</option>
-          <option value="Business">Business</option>
+          <option value="Security">Security</option>
+          <option value="Performance">Performance</option>
+          <option value="Usability">Usability</option>
+          <option value="Compliance">Compliance</option>
         </select>
       </SidebarSection>
 

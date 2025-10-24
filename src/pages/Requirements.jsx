@@ -1164,8 +1164,8 @@ const Requirements = () => {
                       {/* Priority */}
                       <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
                         <span className={`px-2 py-1 rounded text-xs ${req.priority === 'High' ? 'bg-red-100 text-red-800' :
-                            req.priority === 'Medium' ? 'bg-yellow-100 text-yellow-800' :
-                              'bg-green-100 text-green-800'
+                          req.priority === 'Medium' ? 'bg-yellow-100 text-yellow-800' :
+                            'bg-green-100 text-green-800'
                           }`}>
                           {req.priority}
                         </span>
@@ -1197,20 +1197,62 @@ const Requirements = () => {
         </div>
 
         {/* NEW: Replace EditRequirementModal with SlideOutPanel */}
+        {/* Fix the SlideOutPanel onClose handler */}
         <SlideOutPanel
           isOpen={editPanelOpen}
           onClose={() => {
             // Check for unsaved changes
-            const hasChanges = requirementToEdit &&
-              JSON.stringify(requirementToEdit) !== JSON.stringify(requirements.find(r => r.id === requirementToEdit.id) || {});
-            if (hasChanges) {
-              if (window.confirm('You have unsaved changes. Discard them?')) {
+            const originalRequirement = requirementToEdit?.id
+              ? requirements.find(r => r.id === requirementToEdit.id)
+              : null;
+
+            // Only check for changes if editing an existing requirement
+            if (originalRequirement) {
+              // Create a normalized comparison by only comparing the fields that matter
+              const hasChanges = JSON.stringify({
+                id: requirementToEdit.id,
+                name: requirementToEdit.name,
+                description: requirementToEdit.description,
+                priority: requirementToEdit.priority,
+                type: requirementToEdit.type,
+                status: requirementToEdit.status,
+                businessImpact: requirementToEdit.businessImpact,
+                technicalComplexity: requirementToEdit.technicalComplexity,
+                regulatoryFactor: requirementToEdit.regulatoryFactor,
+                usageFrequency: requirementToEdit.usageFrequency,
+                minTestCases: requirementToEdit.minTestCases,
+                versions: requirementToEdit.versions || [],
+                tags: requirementToEdit.tags || []
+              }) !== JSON.stringify({
+                id: originalRequirement.id,
+                name: originalRequirement.name,
+                description: originalRequirement.description,
+                priority: originalRequirement.priority,
+                type: originalRequirement.type,
+                status: originalRequirement.status,
+                businessImpact: originalRequirement.businessImpact,
+                technicalComplexity: originalRequirement.technicalComplexity,
+                regulatoryFactor: originalRequirement.regulatoryFactor,
+                usageFrequency: originalRequirement.usageFrequency,
+                minTestCases: originalRequirement.minTestCases,
+                versions: originalRequirement.versions || [],
+                tags: originalRequirement.tags || []
+              });
+
+              if (hasChanges && window.confirm('You have unsaved changes. Discard them?')) {
+                setEditPanelOpen(false);
+                setRequirementToEdit(null);
+              } else if (!hasChanges) {
                 setEditPanelOpen(false);
                 setRequirementToEdit(null);
               }
             } else {
-              setEditPanelOpen(false);
-              setRequirementToEdit(null);
+              // Creating new requirement - just close without warning if empty
+              const isEmpty = !requirementToEdit?.name && !requirementToEdit?.description;
+              if (isEmpty || window.confirm('Discard new requirement?')) {
+                setEditPanelOpen(false);
+                setRequirementToEdit(null);
+              }
             }
           }}
           title={requirementToEdit?.id && requirements.some(r => r.id === requirementToEdit.id) ? 'Edit Requirement' : 'Create New Requirement'}
@@ -1220,17 +1262,55 @@ const Requirements = () => {
               <button
                 type="button"
                 onClick={() => {
-                  // Check for unsaved changes
-                  const hasChanges = requirementToEdit &&
-                    JSON.stringify(requirementToEdit) !== JSON.stringify(requirements.find(r => r.id === requirementToEdit.id) || {});
-                  if (hasChanges) {
-                    if (window.confirm('You have unsaved changes. Discard them?')) {
+                  // Use the same logic as onClose
+                  const originalRequirement = requirementToEdit?.id
+                    ? requirements.find(r => r.id === requirementToEdit.id)
+                    : null;
+
+                  if (originalRequirement) {
+                    const hasChanges = JSON.stringify({
+                      id: requirementToEdit.id,
+                      name: requirementToEdit.name,
+                      description: requirementToEdit.description,
+                      priority: requirementToEdit.priority,
+                      type: requirementToEdit.type,
+                      status: requirementToEdit.status,
+                      businessImpact: requirementToEdit.businessImpact,
+                      technicalComplexity: requirementToEdit.technicalComplexity,
+                      regulatoryFactor: requirementToEdit.regulatoryFactor,
+                      usageFrequency: requirementToEdit.usageFrequency,
+                      minTestCases: requirementToEdit.minTestCases,
+                      versions: requirementToEdit.versions || [],
+                      tags: requirementToEdit.tags || []
+                    }) !== JSON.stringify({
+                      id: originalRequirement.id,
+                      name: originalRequirement.name,
+                      description: originalRequirement.description,
+                      priority: originalRequirement.priority,
+                      type: originalRequirement.type,
+                      status: originalRequirement.status,
+                      businessImpact: originalRequirement.businessImpact,
+                      technicalComplexity: originalRequirement.technicalComplexity,
+                      regulatoryFactor: originalRequirement.regulatoryFactor,
+                      usageFrequency: originalRequirement.usageFrequency,
+                      minTestCases: originalRequirement.minTestCases,
+                      versions: originalRequirement.versions || [],
+                      tags: originalRequirement.tags || []
+                    });
+
+                    if (hasChanges && window.confirm('You have unsaved changes. Discard them?')) {
+                      setEditPanelOpen(false);
+                      setRequirementToEdit(null);
+                    } else if (!hasChanges) {
                       setEditPanelOpen(false);
                       setRequirementToEdit(null);
                     }
                   } else {
-                    setEditPanelOpen(false);
-                    setRequirementToEdit(null);
+                    const isEmpty = !requirementToEdit?.name && !requirementToEdit?.description;
+                    if (isEmpty || window.confirm('Discard new requirement?')) {
+                      setEditPanelOpen(false);
+                      setRequirementToEdit(null);
+                    }
                   }
                 }}
                 className="flex-1 px-4 py-2 border border-gray-300 rounded-lg font-medium text-gray-700 hover:bg-gray-50"
