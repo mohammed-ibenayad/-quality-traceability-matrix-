@@ -23,6 +23,8 @@ import {
 import MainLayout from '../components/Layout/MainLayout';
 import EmptyState from '../components/Common/EmptyState';
 import SlideOutPanel from '../components/Common/SlideOutPanel';
+import FilterPanel from '../components/Common/FilterPanel';
+
 import RightSidebarPanel, {
   SidebarSection,
   SidebarField,
@@ -159,48 +161,7 @@ const Requirements = () => {
     ? requirements
     : requirements.filter(req => req.versions && req.versions.includes(selectedVersion));
 
-  const nonPriorityFilteredRequirements = useMemo(() => {
-    return versionFilteredRequirements.filter(req => {
-      // Search filter
-      const matchesSearch = !searchQuery || (() => {
-        const searchTerms = searchQuery.toLowerCase().trim().split(/\s+/);
-        return searchTerms.some(term =>
-          req.name.toLowerCase().includes(term) ||
-          req.id.toLowerCase().includes(term) ||
-          req.description.toLowerCase().includes(term)
-        );
-      })();
-      // Status filter
-      const matchesStatus = statusFilter === 'All' || req.status === statusFilter;
-      // Type filter
-      const matchesType = typeFilter === 'All' || req.type === typeFilter;
-      // Coverage filter
-      const matchesCoverage = (() => {
-        if (coverageFilter === 'All') return true;
-        const coverage = versionCoverage.find(c => c.reqId === req.id);
-        const hasTests = coverage && coverage.totalTests > 0;
-        if (coverageFilter === 'With Tests') return hasTests;
-        if (coverageFilter === 'No Coverage') return !hasTests;
-        return true;
-      })();
-      // Tags filter
-      const matchesTags = selectedTagsFilter.length === 0 ||
-        (req.tags && req.tags.some(tag => selectedTagsFilter.includes(tag)));
-      // Apply all filters EXCEPT priorityFilterTab
-      const matchesPriorityDropdown = priorityFilter === 'All' || req.priority === priorityFilter;
-      return matchesSearch && matchesStatus && matchesType &&
-        matchesCoverage && matchesTags && matchesPriorityDropdown;
-    });
-  }, [
-    versionFilteredRequirements,
-    searchQuery,
-    statusFilter,
-    typeFilter,
-    coverageFilter,
-    selectedTagsFilter,
-    versionCoverage,
-    priorityFilter
-  ]);
+
 
   // Apply search and filters
   const filteredRequirements = useMemo(() => {
@@ -388,6 +349,62 @@ const Requirements = () => {
         alert('Error deleting requirement: ' + error.message);
       }
     }
+  };
+
+  // Bulk action handlers
+  const handleBulkVersionAssignment = (versionId, action) => {
+    if (selectedRequirements.size === 0) return;
+    setSelectedVersionForAssignment(versionId);
+    setVersionAssignmentAction(action);
+    setShowVersionAssignmentModal(true);
+  };
+
+  const handleBulkTagsUpdate = (tags, action) => {
+    if (selectedRequirements.size === 0) return;
+    setSelectedTagsForAssignment(tags);
+    setTagAssignmentAction(action);
+    setShowTagAssignmentModal(true);
+  };
+
+  const handleExportSelected = () => {
+    if (selectedRequirements.size === 0) return;
+    const selectedIds = Array.from(selectedRequirements);
+    const selectedReqs = requirements.filter(req => selectedIds.includes(req.id));
+    const exportData = selectedReqs.map(req => ({
+      id: req.id,
+      name: req.name,
+      description: req.description,
+      type: req.type,
+      priority: req.priority,
+      status: req.status,
+      versions: req.versions?.join(', ') || '',
+      tags: req.tags?.join(', ') || '',
+      businessImpact: req.businessImpact,
+      technicalComplexity: req.technicalComplexity,
+      regulatoryFactor: req.regulatoryFactor,
+      usageFrequency: req.usageFrequency,
+      testDepthFactor: req.testDepthFactor
+    }));
+
+    // Convert to CSV
+    const headers = Object.keys(exportData[0]);
+    const csvContent = [
+      headers.join(','),
+      ...exportData.map(row =>
+        headers.map(header => {
+          const value = row[header]?.toString() || '';
+          return value.includes(',') ? `"${value}"` : value;
+        }).join(',')
+      )
+    ].join('\n');
+
+    // Download CSV
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `requirements-export-${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+    setSelectedRequirements(new Set());
   };
 
   // Handle bulk delete
@@ -702,158 +719,52 @@ const Requirements = () => {
       );
     }
 
-    // Case 3: Nothing selected -> Show Filters (This would be FilterPanel, but we'll keep the old filters for now)
-    // For now, let's return a placeholder or just null if no filters panel is available.
-    // We will remove the top filter bar and bottom bulk actions, but keep the right sidebar open for potential future FilterPanel.
-    // Since the guide says "Case 3: Nothing selected -> Show Filters", we need FilterPanel component.
-    // Assuming FilterPanel is available.
-    // import FilterPanel from '../components/Common/FilterPanel';
-    // return (
-    //   <FilterPanel
-    //     searchQuery={searchQuery}
-    //     onSearchChange={setSearchQuery}
-    //     priorityFilter={priorityFilter}
-    //     onPriorityChange={setPriorityFilter}
-    //     statusFilter={statusFilter}
-    //     onStatusChange={setStatusFilter}
-    //     typeFilter={typeFilter}
-    //     onTypeChange={setTypeFilter}
-    //     coverageFilter={coverageFilter}
-    //     onCoverageChange={setCoverageFilter}
-    //     selectedTags={selectedTagsFilter}
-    //     allTags={getAllTags(requirements)}
-    //     onTagsChange={setSelectedTagsFilter}
-    //     onClearAll={() => {
-    //       setSearchQuery('');
-    //       setPriorityFilter('All');
-    //       setStatusFilter('All');
-    //       setTypeFilter('All');
-    //       setCoverageFilter('All');
-    //       setSelectedTagsFilter([]);
-    //     }}
-    //     stats={stats} // Use the stats calculated above
-    //   />
-    // );
 
-    // Since FilterPanel is not imported and its content is not specified in the guide beyond props,
-    // and the original requirement was to focus only on Requirements.jsx changes based on the last version,
-    // we will return null or a simple placeholder for the 'nothing selected' state in the right sidebar.
-    // However, the guide clearly intends for the FilterPanel to be shown.
-    // Let's assume FilterPanel exists and import it implicitly for the purpose of this specific task.
-    // We need to import FilterPanel.
-    // import FilterPanel from '../components/Common/FilterPanel'; // This is already done implicitly as per guide step 2
-    // Let's proceed assuming FilterPanel is available or we create a simplified version inline if not.
-    // The guide suggests FilterPanel should be here, but the original file didn't have it explicitly.
-    // Let's assume it exists or create a simplified inline version.
-    // For now, we'll return a placeholder div to keep the sidebar open, or remove the right sidebar when nothing is selected.
-    // Looking back at the guide's Step 5: "showRightSidebar={true} // 🆕 ALWAYS show right sidebar now!"
-    // This implies the right sidebar should always be present, even if empty or showing filters.
-    // Let's create a simple placeholder for the 'no selection' state that could be replaced by FilterPanel later.
-    // Or, let's follow the guide more literally and assume FilterPanel is available.
-    // Let's add the import for FilterPanel if it's not already there.
-    // import FilterPanel from '../components/Common/FilterPanel'; // This was added in the guide step 2, but not in the original file context.
-    // The guide says: "import FilterPanel from '../components/Common/FilterPanel';"
-    // Let's add the import here if it's missing.
-    // The original file context provided did not have this import initially, but the guide says to add it.
-    // Since the original context doesn't have FilterPanel import, and the guide says to add it, we'll add it here.
-    // However, the initial context provided to me only had BulkActionsPanel imported.
-    // Let's assume FilterPanel is also available and import it.
-    // This is getting complex. The guide implies FilterPanel is available.
-    // Let's assume the requirement is to keep the right sidebar open, and the content is dynamic.
-    // If nothing is selected, the guide says to show FilterPanel.
-    // We don't have FilterPanel code, but the guide shows its props.
-    // Let's create a placeholder or assume it exists.
-    // The guide Step 5 says: "showRightSidebar={true} // 🆕 ALWAYS show right sidebar now!"
-    // And the return of MainLayout has showRightSidebar={!!selectedRequirement} rightSidebar={rightSidebarContent}
-    // This needs to be updated to showRightSidebar={true} rightSidebar={rightSidebarContent}
-    // And rightSidebarContent should handle the no selection case.
-    // Let's create a simple placeholder for the no selection state.
-    // Or, let's find FilterPanel in the provided context or assume it's available.
-    // The provided context does not contain FilterPanel code.
-    // The guide says to copy FilterPanel.jsx. Let's assume it exists and has the expected interface.
-    // For now, I will return null for the 'nothing selected' case, but update MainLayout to always show the sidebar.
-    // This is not ideal as per the guide, but without FilterPanel code, it's the safest.
-    // Actually, let's re-read the guide. It says "Case 3: Nothing selected -> Show Filters (FilterPanel)".
-    // And it shows the props. It expects FilterPanel to be imported.
-    // Let's add the import and a placeholder render.
-    // Since the original context didn't have this import, I'll add it here conceptually.
-    // The guide says "import FilterPanel from '../components/Common/FilterPanel';" - let's assume this is done or available.
-    // For now, returning null for the placeholder state when nothing is selected.
-    // However, the guide clearly wants the FilterPanel here.
-    // Let's proceed by updating MainLayout to always show the sidebar and returning a placeholder.
-    // The guide's intent is clear: show filters when nothing selected. We need FilterPanel.
-    // Since FilterPanel is not provided in the context, I'll create a very basic inline placeholder mimicking its likely structure based on the guide's props.
-    // This is suboptimal, but follows the guide's logic.
+    // Case 3: Nothing selected -> Show Filters
     return (
-      <div className="p-4">
-        <h3 className="font-semibold text-gray-900 mb-4">Filters</h3>
-        <div className="space-y-4">
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Search</label>
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
-              placeholder="Search..."
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Priority</label>
-            <select
-              value={priorityFilter}
-              onChange={(e) => setPriorityFilter(e.target.value)}
-              className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
-            >
-              <option value="All">All</option>
-              <option value="High">High</option>
-              <option value="Medium">Medium</option>
-              <option value="Low">Low</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Status</label>
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
-            >
-              <option value="All">All</option>
-              <option value="Active">Active</option>
-              <option value="Draft">Draft</option>
-              <option value="In Review">In Review</option>
-              <option value="Approved">Approved</option>
-              <option value="Deprecated">Deprecated</option>
-              <option value="Archived">Archived</option>
-            </select>
-          </div>
-          {/* Add more filter fields as needed */}
-          <div className="pt-2 border-t">
-            <h4 className="text-xs font-medium text-gray-700 mb-2">Statistics</h4>
-            <div className="text-xs text-gray-600 space-y-1">
-              <div>Total: {stats.total}</div>
-              <div>High Priority: {stats.highPriority}</div>
-              <div>With Tests: {stats.withTests}</div>
-              <div>No Coverage: {stats.noCoverage}</div>
-            </div>
-          </div>
-        </div>
-      </div>
+      <FilterPanel
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        priorityFilter={priorityFilter}
+        onPriorityChange={setPriorityFilter}
+        statusFilter={statusFilter}
+        onStatusChange={setStatusFilter}
+        typeFilter={typeFilter}
+        onTypeChange={setTypeFilter}
+        coverageFilter={coverageFilter}
+        onCoverageChange={setCoverageFilter}
+        selectedTags={selectedTagsFilter}
+        allTags={getAllTags(requirements)}
+        onTagsChange={setSelectedTagsFilter}
+        onClearAll={() => {
+          setSearchQuery('');
+          setPriorityFilter('All');
+          setStatusFilter('All');
+          setTypeFilter('All');
+          setCoverageFilter('All');
+          setSelectedTagsFilter([]);
+        }}
+        stats={{
+          total: requirements.length,
+          filtered: filteredRequirements.length,
+          highPriority: stats.highPriority,
+          withTests: stats.withTests,
+          noCoverage: stats.noCoverage
+        }}
+      />
     );
   }, [
-    selectedRequirements,
     selectedRequirement,
+    selectedRequirements,
     requirements,
-    testCases,
-    mapping,
     versions,
-    searchQuery,
-    priorityFilter,
-    statusFilter,
-    typeFilter,
-    coverageFilter,
-    selectedTagsFilter,
-    stats // Add stats to dependencies
+    mapping,  // ✅ Added - used in getLinkedTests
+    testCases,  // ✅ Added - used in getLinkedTests
+    selectedVersion,  // ✅ Added - used in getLinkedTests via testCaseAppliesTo
+    handleBulkVersionAssignment,  // ✅ Added
+    handleBulkTagsUpdate,  // ✅ Added
+    handleBulkDelete,  // ✅ Added
+    handleExportSelected  // ✅ Added
   ]);
 
 
@@ -871,62 +782,6 @@ const Requirements = () => {
       </MainLayout>
     );
   }
-
-  // Bulk action handlers
-  const handleBulkVersionAssignment = (versionId, action) => {
-    if (selectedRequirements.size === 0) return;
-    setSelectedVersionForAssignment(versionId);
-    setVersionAssignmentAction(action);
-    setShowVersionAssignmentModal(true);
-  };
-
-  const handleBulkTagsUpdate = (tags, action) => {
-    if (selectedRequirements.size === 0) return;
-    setSelectedTagsForAssignment(tags);
-    setTagAssignmentAction(action);
-    setShowTagAssignmentModal(true);
-  };
-
-  const handleExportSelected = () => {
-    if (selectedRequirements.size === 0) return;
-    const selectedIds = Array.from(selectedRequirements);
-    const selectedReqs = requirements.filter(req => selectedIds.includes(req.id));
-    const exportData = selectedReqs.map(req => ({
-      id: req.id,
-      name: req.name,
-      description: req.description,
-      type: req.type,
-      priority: req.priority,
-      status: req.status,
-      versions: req.versions?.join(', ') || '',
-      tags: req.tags?.join(', ') || '',
-      businessImpact: req.businessImpact,
-      technicalComplexity: req.technicalComplexity,
-      regulatoryFactor: req.regulatoryFactor,
-      usageFrequency: req.usageFrequency,
-      testDepthFactor: req.testDepthFactor
-    }));
-
-    // Convert to CSV
-    const headers = Object.keys(exportData[0]);
-    const csvContent = [
-      headers.join(','),
-      ...exportData.map(row =>
-        headers.map(header => {
-          const value = row[header]?.toString() || '';
-          return value.includes(',') ? `"${value}"` : value;
-        }).join(',')
-      )
-    ].join('\n');
-
-    // Download CSV
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `requirements-export-${new Date().toISOString().split('T')[0]}.csv`;
-    link.click();
-    setSelectedRequirements(new Set());
-  };
 
   // Add confirmation handler for version assignment
   const confirmVersionAssignment = async () => {
