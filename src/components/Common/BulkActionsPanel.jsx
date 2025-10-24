@@ -58,7 +58,6 @@ const BulkActionsPanel = ({
   const [tagSearchQuery, setTagSearchQuery] = useState('');
   const [tagActiveTab, setTagActiveTab] = useState('add');
   const [customTagInput, setCustomTagInput] = useState('');
-  const [selectedTagsForAction, setSelectedTagsForAction] = useState(new Set());
 
   if (selectedCount === 0) {
     return null;
@@ -71,6 +70,63 @@ const BulkActionsPanel = ({
     lowPriority: selectedItems.filter(r => r.priority === 'Low').length,
   };
 
+  // Calculate which tags are currently assigned to ALL selected items
+  const commonAssignedTags = useMemo(() => {
+    if (selectedItems.length === 0) return [];
+    
+    // Get tags from first item
+    const firstItemTags = new Set(selectedItems[0].tags || []);
+    
+    // Filter to only tags that exist on ALL selected items
+    return Array.from(firstItemTags).filter(tag => 
+      selectedItems.every(item => (item.tags || []).includes(tag))
+    );
+  }, [selectedItems]);
+
+  // Calculate which tags are assigned to SOME (but not all) selected items
+  const partiallyAssignedTags = useMemo(() => {
+    if (selectedItems.length === 0) return [];
+    
+    const allTags = new Set();
+    selectedItems.forEach(item => {
+      (item.tags || []).forEach(tag => allTags.add(tag));
+    });
+    
+    return Array.from(allTags).filter(tag => 
+      !commonAssignedTags.includes(tag)
+    );
+  }, [selectedItems, commonAssignedTags]);
+
+  // For Add tab: separate assigned vs unassigned tags
+  const unassignedTags = useMemo(() => {
+    return availableTags.filter(tag => 
+      !commonAssignedTags.includes(tag) && !partiallyAssignedTags.includes(tag)
+    );
+  }, [availableTags, commonAssignedTags, partiallyAssignedTags]);
+
+  const assignedTags = useMemo(() => {
+    return availableTags.filter(tag => 
+      commonAssignedTags.includes(tag) || partiallyAssignedTags.includes(tag)
+    );
+  }, [availableTags, commonAssignedTags, partiallyAssignedTags]);
+
+  // For Remove tab: only show assigned tags
+  const removableTags = useMemo(() => {
+    return [...commonAssignedTags, ...partiallyAssignedTags];
+  }, [commonAssignedTags, partiallyAssignedTags]);
+
+  // Filter tags based on search query and active tab
+  const filteredTagsForAdd = useMemo(() => {
+    const tagsToFilter = tagActiveTab === 'add' 
+      ? [...unassignedTags, ...assignedTags]  // Show all, but assigned will be grayed out
+      : removableTags;  // Only show assigned tags
+
+    if (!tagSearchQuery) return tagsToFilter;
+    return tagsToFilter.filter(tag =>
+      tag.toLowerCase().includes(tagSearchQuery.toLowerCase())
+    );
+  }, [tagActiveTab, unassignedTags, assignedTags, removableTags, tagSearchQuery]);
+
   // Filter versions based on search query
   const filteredVersions = useMemo(() => {
     if (!versionSearchQuery) return availableVersions;
@@ -79,14 +135,6 @@ const BulkActionsPanel = ({
       version.id.toLowerCase().includes(versionSearchQuery.toLowerCase())
     );
   }, [availableVersions, versionSearchQuery]);
-
-  // Filter tags based on search query
-  const filteredTags = useMemo(() => {
-    if (!tagSearchQuery) return availableTags;
-    return availableTags.filter(tag =>
-      tag.toLowerCase().includes(tagSearchQuery.toLowerCase())
-    );
-  }, [availableTags, tagSearchQuery]);
 
   // Group versions by status for better organization
   const groupedVersions = useMemo(() => {
@@ -129,39 +177,32 @@ const BulkActionsPanel = ({
   };
 
   // Tag action handlers
-  const handleTagAction = (action, tags) => {
+  const handleTagAction = (tag) => {
     if (onTagsUpdate) {
-      onTagsUpdate(Array.isArray(tags) ? tags : [tags], action);
+      onTagsUpdate([tag], tagActiveTab);
     }
     setShowTagsDropdown(false);
     setTagSearchQuery('');
-    setCustomTagInput('');
-    setSelectedTagsForAction(new Set());
   };
 
   const handleCustomTagAdd = () => {
     const trimmedTag = customTagInput.trim();
     if (trimmedTag && !availableTags.includes(trimmedTag)) {
-      handleTagAction(tagActiveTab, [trimmedTag]);
+      onTagsUpdate([trimmedTag], 'add');
+      setCustomTagInput('');
+      setShowTagsDropdown(false);
+      setTagSearchQuery('');
     }
   };
 
-  const handleBulkTagsAction = () => {
-    if (selectedTagsForAction.size > 0) {
-      handleTagAction(tagActiveTab, Array.from(selectedTagsForAction));
-    }
+  // Check if a tag is assigned (common or partial)
+  const isTagAssigned = (tag) => {
+    return commonAssignedTags.includes(tag) || partiallyAssignedTags.includes(tag);
   };
 
-  const toggleTagSelection = (tag) => {
-    setSelectedTagsForAction(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(tag)) {
-        newSet.delete(tag);
-      } else {
-        newSet.add(tag);
-      }
-      return newSet;
-    });
+  // Check if a tag is partially assigned
+  const isTagPartial = (tag) => {
+    return partiallyAssignedTags.includes(tag);
   };
 
   // Utility functions for version grouping
@@ -217,7 +258,7 @@ const BulkActionsPanel = ({
         <div className="grid grid-cols-3 gap-2 text-center">
           <div>
             <div className="text-lg font-bold text-red-600">{stats.highPriority}</div>
-            <div className="text-xs text-gray-600">High</div>
+            <div className="text-xs text-gray-600">High Priority</div>
           </div>
           <div>
             <div className="text-lg font-bold text-yellow-600">{stats.mediumPriority}</div>
@@ -225,32 +266,19 @@ const BulkActionsPanel = ({
           </div>
           <div>
             <div className="text-lg font-bold text-green-600">{stats.lowPriority}</div>
-            <div className="text-xs text-gray-600">Low</div>
+            <div className="text-xs text-gray-600">Low Priority</div>
           </div>
         </div>
       </div>
 
-      {/* Warning if risky operation */}
-      {stats.highPriority > 0 && (
-        <div className="p-3 bg-yellow-50 border-l-4 border-yellow-400 mx-4 mt-4 rounded">
-          <div className="flex items-start">
-            <AlertTriangle size={16} className="text-yellow-600 mt-0.5 mr-2 flex-shrink-0" />
-            <div className="text-xs text-yellow-800">
-              <strong>Caution:</strong> {stats.highPriority} high-priority {itemType}{stats.highPriority !== 1 ? 's' : ''} selected.
-              Please review changes carefully.
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Quick Actions */}
-      <SidebarSection title="Quick Actions" defaultOpen={true}>
-        <div className="space-y-2">
-          {/* Execute Tests Button - Only for test cases */}
-          {showExecuteButton && onExecuteTests && (
+      {/* Actions Section */}
+      <SidebarSection title="Actions" defaultOpen={true}>
+        <div className="space-y-3">
+          {/* Execute Tests Button (Test Cases Only) */}
+          {showExecuteButton && (
             <SidebarActionButton
               icon={<Play size={16} />}
-              label={`Execute ${automatedCount > 0 ? `${automatedCount} Automated` : selectedCount} Test${selectedCount !== 1 ? 's' : ''}`}
+              label={`Execute ${automatedCount} Automated Test${automatedCount !== 1 ? 's' : ''}`}
               onClick={onExecuteTests}
               variant="primary"
               disabled={automatedCount === 0}
@@ -355,76 +383,215 @@ const BulkActionsPanel = ({
             </div>
           )}
 
-          {/* Tag Management*/}
-          {/* Tag Management - SIMPLIFIED */}
-{availableTags.length > 0 && (
-  <SidebarSection title="Manage Tags" defaultOpen={false}>
-    <div className="space-y-3">
-      {/* Quick Add Common Tags */}
-      <div>
-        <label className="block text-xs font-medium text-gray-700 mb-2">
-          Quick Add Tags
-        </label>
-        <div className="flex flex-wrap gap-2">
-          {availableTags.slice(0, 6).map(tag => (
-            <button
-              key={tag}
-              onClick={() => onTagsUpdate([tag], 'add')}
-              className="px-3 py-1 text-xs bg-green-50 text-green-700 border border-green-300 rounded-full hover:bg-green-100 transition-colors"
-            >
-              + {tag}
-            </button>
-          ))}
-        </div>
-        {availableTags.length > 6 && (
-          <p className="text-xs text-gray-500 mt-2">
-            Showing top 6 tags. Use custom input for more.
-          </p>
-        )}
-      </div>
+          {/* Tag Management Dropdown */}
+          {availableTags.length > 0 && (
+            <div className="relative">
+              <button
+                onClick={() => {
+                  setShowTagsDropdown(!showTagsDropdown);
+                  setShowVersionDropdown(false);
+                }}
+                className="w-full flex items-center justify-between px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                <span className="flex items-center text-sm text-gray-700">
+                  <Tag size={16} className="mr-2" />
+                  Manage Tags
+                </span>
+                <ChevronDown size={16} className={`text-gray-500 transition-transform ${showTagsDropdown ? 'rotate-180' : ''}`} />
+              </button>
 
-      {/* Quick Remove Common Tags */}
-      <div>
-        <label className="block text-xs font-medium text-gray-700 mb-2">
-          Quick Remove Tags
-        </label>
-        <div className="flex flex-wrap gap-2">
-          {availableTags.slice(0, 6).map(tag => (
-            <button
-              key={tag}
-              onClick={() => onTagsUpdate([tag], 'remove')}
-              className="px-3 py-1 text-xs bg-red-50 text-red-700 border border-red-300 rounded-full hover:bg-red-100 transition-colors"
-            >
-              × {tag}
-            </button>
-          ))}
-        </div>
-      </div>
+              {showTagsDropdown && (
+                <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-96 overflow-hidden flex flex-col">
+                  {/* Tab Selector */}
+                  <div className="flex border-b border-gray-200 bg-gray-50">
+                    <button
+                      onClick={() => setTagActiveTab('add')}
+                      className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${tagActiveTab === 'add'
+                        ? 'text-green-600 bg-green-50 border-b-2 border-green-600'
+                        : 'text-gray-600 hover:text-gray-800'
+                        }`}
+                    >
+                      <Plus size={14} className="inline mr-1" />
+                      Add Tags
+                    </button>
+                    <button
+                      onClick={() => setTagActiveTab('remove')}
+                      className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${tagActiveTab === 'remove'
+                        ? 'text-red-600 bg-red-50 border-b-2 border-red-600'
+                        : 'text-gray-600 hover:text-gray-800'
+                        }`}
+                    >
+                      <Minus size={14} className="inline mr-1" />
+                      Remove Tags
+                    </button>
+                  </div>
 
-      <div className="border-t border-gray-200 pt-3">
-        <label className="block text-xs font-medium text-gray-700 mb-2">
-          Or Create Custom Tag
-        </label>
-        <div className="flex space-x-2">
-          <input
-            type="text"
-            placeholder="Enter tag name..."
-            className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && e.target.value.trim()) {
-                onTagsUpdate([e.target.value.trim()], 'add');
-                e.target.value = '';
-              }
-            }}
-          />
-        </div>
-        <p className="text-xs text-gray-500 mt-1">
-          Press Enter to add custom tag
-        </p>
-      </div>
-    </div>
-  </SidebarSection>
-)}
+                  {/* Search Box */}
+                  <div className="p-2 border-b border-gray-100">
+                    <div className="relative">
+                      <Search size={14} className="absolute left-3 top-2.5 text-gray-400" />
+                      <input
+                        type="text"
+                        value={tagSearchQuery}
+                        onChange={(e) => setTagSearchQuery(e.target.value)}
+                        placeholder={tagActiveTab === 'add' ? "Search all tags..." : "Search assigned tags..."}
+                        className="w-full pl-8 pr-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500"
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Custom Tag Input (Only in Add Tab) */}
+                  {tagActiveTab === 'add' && (
+                    <div className="p-2 border-b border-gray-100 bg-blue-50">
+                      <div className="text-xs font-medium text-blue-700 mb-2 px-1">
+                        Create New Tag
+                      </div>
+                      <div className="flex space-x-2">
+                        <input
+                          type="text"
+                          value={customTagInput}
+                          onChange={(e) => setCustomTagInput(e.target.value)}
+                          onKeyPress={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              handleCustomTagAdd();
+                            }
+                          }}
+                          placeholder="Enter new tag name..."
+                          className="flex-1 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                        <button
+                          onClick={handleCustomTagAdd}
+                          disabled={!customTagInput.trim() || availableTags.includes(customTagInput.trim())}
+                          className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                        >
+                          <Plus size={14} />
+                        </button>
+                      </div>
+                      {customTagInput.trim() && availableTags.includes(customTagInput.trim()) && (
+                        <div className="text-xs text-amber-600 mt-1 flex items-center">
+                          <AlertCircle size={12} className="mr-1" />
+                          Tag already exists
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Tags List */}
+                  {filteredTagsForAdd.length > 0 ? (
+                    <div className="overflow-y-auto max-h-60">
+                      {tagActiveTab === 'add' ? (
+                        <>
+                          {/* Unassigned Tags (Active/Clickable) */}
+                          {filteredTagsForAdd.filter(tag => !isTagAssigned(tag)).length > 0 && (
+                            <div className="border-b border-gray-100">
+                              <div className="px-3 py-2 bg-gray-50 text-xs font-semibold text-gray-600 uppercase flex items-center">
+                                <span className="mr-2">➕</span>
+                                Available Tags
+                                <span className="ml-auto text-gray-400">
+                                  ({filteredTagsForAdd.filter(tag => !isTagAssigned(tag)).length})
+                                </span>
+                              </div>
+                              <div>
+                                {filteredTagsForAdd.filter(tag => !isTagAssigned(tag)).map(tag => (
+                                  <button
+                                    key={tag}
+                                    onClick={() => handleTagAction(tag)}
+                                    className="w-full text-left px-4 py-2 text-sm hover:bg-green-50 transition-colors flex items-center justify-between"
+                                  >
+                                    <span className="text-gray-700 font-medium">{tag}</span>
+                                    <Plus size={14} className="text-green-600" />
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Assigned Tags (Grayed Out) */}
+                          {filteredTagsForAdd.filter(tag => isTagAssigned(tag)).length > 0 && (
+                            <div>
+                              <div className="px-3 py-2 bg-gray-50 text-xs font-semibold text-gray-600 uppercase flex items-center">
+                                <span className="mr-2">✓</span>
+                                Already Assigned
+                                <span className="ml-auto text-gray-400">
+                                  ({filteredTagsForAdd.filter(tag => isTagAssigned(tag)).length})
+                                </span>
+                              </div>
+                              <div>
+                                {filteredTagsForAdd.filter(tag => isTagAssigned(tag)).map(tag => (
+                                  <div
+                                    key={tag}
+                                    className="w-full text-left px-4 py-2 text-sm bg-gray-100 cursor-not-allowed flex items-center justify-between opacity-60"
+                                    title={isTagPartial(tag) 
+                                      ? "This tag is assigned to some of the selected items"
+                                      : "This tag is already assigned to all selected items"
+                                    }
+                                  >
+                                    <span className="text-gray-500 flex items-center">
+                                      {tag}
+                                      {isTagPartial(tag) && (
+                                        <span className="ml-2 inline-block w-2 h-2 rounded-full bg-amber-400" title="Partially assigned"></span>
+                                      )}
+                                    </span>
+                                    <Check size={14} className="text-gray-400" />
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        // Remove Tab - Only show assigned tags
+                        <div>
+                          {filteredTagsForAdd.map(tag => (
+                            <button
+                              key={tag}
+                              onClick={() => handleTagAction(tag)}
+                              className="w-full text-left px-4 py-2 text-sm hover:bg-red-50 transition-colors flex items-center justify-between"
+                              title={isTagPartial(tag) 
+                                ? "This tag is assigned to some of the selected items"
+                                : "This tag is assigned to all selected items"
+                              }
+                            >
+                              <span className="text-gray-700 flex items-center">
+                                {tag}
+                                {isTagPartial(tag) && (
+                                  <span className="ml-2 inline-block w-2 h-2 rounded-full bg-amber-400" title="Partially assigned"></span>
+                                )}
+                              </span>
+                              <Minus size={14} className="text-red-600" />
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="p-4 text-center text-gray-500 text-sm">
+                      {tagSearchQuery ? 'No tags found' : (
+                        tagActiveTab === 'add' 
+                          ? 'All tags are already assigned' 
+                          : 'No tags assigned to selected items'
+                      )}
+                    </div>
+                  )}
+
+                  {/* Legend for partial tags */}
+                  {(tagActiveTab === 'remove' || (tagActiveTab === 'add' && assignedTags.length > 0)) && 
+                   partiallyAssignedTags.length > 0 && (
+                    <div className="px-3 py-2 bg-gray-50 border-t border-gray-200">
+                      <p className="text-xs text-gray-600 flex items-center">
+                        <span className="inline-block w-2 h-2 rounded-full bg-amber-400 mr-1.5"></span>
+                        = Tag on some items (not all)
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Export Button */}
           {showExportButton && onExport && (
             <SidebarActionButton
