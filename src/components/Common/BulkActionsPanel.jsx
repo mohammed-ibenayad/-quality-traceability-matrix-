@@ -355,50 +355,84 @@ const BulkActionsPanel = ({
             </div>
           )}
 
-          {/* Tag Management - COMBOBOX STYLE */}
-<SidebarSection title="Add/Remove Tags" defaultOpen={false}>
+          {/* Tag Management*/}
+          {/* Tag Management - HYBRID */}
+<SidebarSection title="Manage Tags" defaultOpen={false}>
   <div className="space-y-3">
-    {/* Add Tags Combobox */}
-    <div>
-      <label className="block text-xs font-medium text-gray-700 mb-2">
-        Add Tags
-      </label>
-      <select
-        onChange={(e) => {
-          if (e.target.value) {
-            onTagsUpdate([e.target.value], 'add');
-            e.target.value = '';
-          }
-        }}
-        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
-      >
-        <option value="">Select tag to add...</option>
-        {availableTags.map(tag => (
-          <option key={tag} value={tag}>{tag}</option>
-        ))}
-        <option value="__custom__">+ Create custom tag</option>
-      </select>
-    </div>
+    {/* Popular Tags - Quick Actions */}
+    {availableTags.length > 0 && (
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <label className="text-xs font-medium text-gray-700">
+            Popular Tags
+          </label>
+          <button
+            onClick={() => setShowAllTags(!showAllTags)}
+            className="text-xs text-blue-600 hover:text-blue-800"
+          >
+            {showAllTags ? 'Show Less' : `Show All (${availableTags.length})`}
+          </button>
+        </div>
+        
+        <div className="space-y-2">
+          {(showAllTags ? availableTags : availableTags.slice(0, 5)).map(tag => (
+            <div
+              key={tag}
+              className="flex items-center justify-between p-2 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+            >
+              <span className="text-sm text-gray-700 font-medium">{tag}</span>
+              <div className="flex space-x-1">
+                <button
+                  onClick={() => onTagsUpdate([tag], 'add')}
+                  className="px-2 py-1 text-xs bg-green-500 text-white rounded hover:bg-green-600 transition-colors"
+                  title="Add this tag"
+                >
+                  +
+                </button>
+                <button
+                  onClick={() => onTagsUpdate([tag], 'remove')}
+                  className="px-2 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600 transition-colors"
+                  title="Remove this tag"
+                >
+                  −
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    )}
 
-    {/* Remove Tags Combobox */}
-    <div>
+    {/* Create Custom Tag */}
+    <div className="border-t border-gray-200 pt-3">
       <label className="block text-xs font-medium text-gray-700 mb-2">
-        Remove Tags
+        Create New Tag
       </label>
-      <select
-        onChange={(e) => {
-          if (e.target.value) {
-            onTagsUpdate([e.target.value], 'remove');
-            e.target.value = '';
-          }
-        }}
-        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
-      >
-        <option value="">Select tag to remove...</option>
-        {availableTags.map(tag => (
-          <option key={tag} value={tag}>{tag}</option>
-        ))}
-      </select>
+      <div className="flex space-x-2">
+        <input
+          type="text"
+          placeholder="Tag name..."
+          className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && e.target.value.trim()) {
+              onTagsUpdate([e.target.value.trim()], 'add');
+              e.target.value = '';
+            }
+          }}
+        />
+        <button
+          onClick={(e) => {
+            const input = e.target.previousSibling;
+            if (input.value.trim()) {
+              onTagsUpdate([input.value.trim()], 'add');
+              input.value = '';
+            }
+          }}
+          className="px-3 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
+        >
+          Add
+        </button>
+      </div>
     </div>
   </div>
 </SidebarSection>
