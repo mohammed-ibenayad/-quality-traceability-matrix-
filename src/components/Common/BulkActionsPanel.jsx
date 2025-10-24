@@ -415,37 +415,6 @@ const BulkActionsPanel = ({
         </div>
       </SidebarSection>
 
-      {/* Selected Items List */}
-      <SidebarSection
-        title={`Selected Items (${selectedCount})`}
-        defaultOpen={selectedCount <= 5}
-      >
-        <div className="space-y-2 max-h-64 overflow-y-auto">
-          {selectedItems.map((item) => (
-            <div
-              key={item.id}
-              className="p-3 bg-gray-50 rounded-lg border border-gray-200"
-            >
-              <div className="flex items-center space-x-2 mb-1">
-                <span className="font-mono text-xs text-blue-600 font-semibold">
-                  {item.id}
-                </span>
-                <SidebarBadge
-                  label={item.priority}
-                  color={
-                    item.priority === 'High' ? 'red' :
-                      item.priority === 'Medium' ? 'yellow' : 'green'
-                  }
-                />
-              </div>
-              <div className="text-sm text-gray-900 line-clamp-2">
-                {item.name || item.title}
-              </div>
-            </div>
-          ))}
-        </div>
-      </SidebarSection>
-
       {/* Danger Zone */}
       <div className="p-4 border-t-2 border-red-100 bg-red-50">
         <h3 className="text-xs font-semibold text-red-700 uppercase mb-3 flex items-center">
