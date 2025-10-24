@@ -1090,9 +1090,10 @@ const Requirements = () => {
         {/* Requirements Table */}
         <div className="bg-white rounded-lg shadow overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full table-auto divide-y divide-gray-200" style={{ minWidth: '1000px' }}>
+            <table className="w-full divide-y divide-gray-200">
               <thead className="bg-gray-50 sticky top-0 z-10">
                 <tr>
+                  {/* Checkbox - Fixed small width */}
                   <th className="px-4 py-3 text-left w-12">
                     <input
                       type="checkbox"
@@ -1101,20 +1102,29 @@ const Requirements = () => {
                       className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                     />
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-80">
+
+                  {/* ID / Name - Flexible, takes remaining space */}
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     ID / Name
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-28">
+
+                  {/* Type - Fixed width */}
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32">
                     Type
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-24">
+
+                  {/* Priority - Fixed width */}
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-28">
                     Priority
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-28">
+
+                  {/* Status - Fixed width */}
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32">
                     Status
                   </th>
                 </tr>
               </thead>
+
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredRequirements.map((req) => {
                   return (
@@ -1136,10 +1146,10 @@ const Requirements = () => {
                         />
                       </td>
 
-                      {/* ID / Name - REMOVED expand button */}
+                      {/* ID / Name - Allow text to wrap naturally */}
                       <td className="px-4 py-4 text-sm text-gray-900">
                         <div className="font-medium text-gray-900 mb-1">{req.id}</div>
-                        <div className="text-sm text-gray-700 break-words" title={req.name}>
+                        <div className="text-sm text-gray-700 line-clamp-2" title={req.name}>
                           {req.name}
                         </div>
                       </td>
