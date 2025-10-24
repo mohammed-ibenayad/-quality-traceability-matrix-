@@ -355,54 +355,53 @@ const BulkActionsPanel = ({
             </div>
           )}
 
-          {/* Tag Management*/}
           {/* Tag Management - COMBOBOX STYLE */}
-          <SidebarSection title="Add/Remove Tags" defaultOpen={false}>
-            <div className="space-y-3">
-              {/* Add Tags Combobox */}
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-2">
-                  Add Tags
-                </label>
-                <select
-                  onChange={(e) => {
-                    if (e.target.value) {
-                      onTagsUpdate([e.target.value], 'add');
-                      e.target.value = '';
-                    }
-                  }}
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
-                >
-                  <option value="">Select tag to add...</option>
-                  {availableTags.map(tag => (
-                    <option key={tag} value={tag}>{tag}</option>
-                  ))}
-                  <option value="__custom__">+ Create custom tag</option>
-                </select>
-              </div>
+<SidebarSection title="Add/Remove Tags" defaultOpen={false}>
+  <div className="space-y-3">
+    {/* Add Tags Combobox */}
+    <div>
+      <label className="block text-xs font-medium text-gray-700 mb-2">
+        Add Tags
+      </label>
+      <select
+        onChange={(e) => {
+          if (e.target.value) {
+            onTagsUpdate([e.target.value], 'add');
+            e.target.value = '';
+          }
+        }}
+        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+      >
+        <option value="">Select tag to add...</option>
+        {availableTags.map(tag => (
+          <option key={tag} value={tag}>{tag}</option>
+        ))}
+        <option value="__custom__">+ Create custom tag</option>
+      </select>
+    </div>
 
-              {/* Remove Tags Combobox */}
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-2">
-                  Remove Tags
-                </label>
-                <select
-                  onChange={(e) => {
-                    if (e.target.value) {
-                      onTagsUpdate([e.target.value], 'remove');
-                      e.target.value = '';
-                    }
-                  }}
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
-                >
-                  <option value="">Select tag to remove...</option>
-                  {availableTags.map(tag => (
-                    <option key={tag} value={tag}>{tag}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          </SidebarSection>
+    {/* Remove Tags Combobox */}
+    <div>
+      <label className="block text-xs font-medium text-gray-700 mb-2">
+        Remove Tags
+      </label>
+      <select
+        onChange={(e) => {
+          if (e.target.value) {
+            onTagsUpdate([e.target.value], 'remove');
+            e.target.value = '';
+          }
+        }}
+        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
+      >
+        <option value="">Select tag to remove...</option>
+        {availableTags.map(tag => (
+          <option key={tag} value={tag}>{tag}</option>
+        ))}
+      </select>
+    </div>
+  </div>
+</SidebarSection>
           {/* Export Button */}
           {showExportButton && onExport && (
             <SidebarActionButton
