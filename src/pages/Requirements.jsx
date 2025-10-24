@@ -787,30 +787,89 @@ const Requirements = () => {
   // Add confirmation handler for version assignment
   const confirmVersionAssignment = async () => {
     try {
-      const updatedRequirements = requirements.map(req =>
-        selectedRequirements.has(req.id)
-          ? {
-            ...req,
-            versions: versionAssignmentAction === 'add'
-              ? [...new Set([...(req.versions || []), selectedVersionForAssignment])]
-              : (req.versions || []).filter(v => v !== selectedVersionForAssignment),
-            updatedAt: new Date().toISOString()
+      console.log('🔧 Starting version assignment...', {
+        action: versionAssignmentAction,
+        version: selectedVersionForAssignment,
+        selectedCount: selectedRequirements.size
+      });
+
+      // Track success/failure
+      const results = {
+        successful: [],
+        failed: []
+      };
+
+      // Update each selected requirement individually to ensure database persistence
+      for (const reqId of selectedRequirements) {
+        try {
+          const requirement = requirements.find(r => r.id === reqId);
+          if (!requirement) {
+            console.warn(`⚠️ Requirement ${reqId} not found`);
+            results.failed.push(reqId);
+            continue;
           }
-          : req
-      );
-      dataStore.setRequirements(updatedRequirements);
+
+          // Calculate new versions array
+          const currentVersions = requirement.versions || [];
+          let newVersions;
+
+          if (versionAssignmentAction === 'add') {
+            // Add version and remove duplicates
+            newVersions = [...new Set([...currentVersions, selectedVersionForAssignment])];
+          } else {
+            // Remove version
+            newVersions = currentVersions.filter(v => v !== selectedVersionForAssignment);
+          }
+
+          // Only update if versions actually changed
+          if (JSON.stringify(currentVersions.sort()) === JSON.stringify(newVersions.sort())) {
+            console.log(`ℹ️ No version changes needed for ${reqId}`);
+            results.successful.push(reqId);
+            continue;
+          }
+
+          console.log(`📝 Updating versions for ${reqId}:`, {
+            before: currentVersions,
+            after: newVersions
+          });
+
+          // Call the API to update the requirement
+          // This will persist to the database
+          await dataStore.updateRequirement(reqId, {
+            versions: newVersions,
+            updatedAt: new Date().toISOString()
+          });
+
+          results.successful.push(reqId);
+          console.log(`✅ Successfully updated versions for ${reqId}`);
+
+        } catch (error) {
+          console.error(`❌ Failed to update versions for ${reqId}:`, error);
+          results.failed.push(reqId);
+        }
+      }
+
+      // Clear selection and close modal
       setSelectedRequirements(new Set());
       setShowVersionAssignmentModal(false);
-      // Show success message
+
+      // Show success message with details
       const versionName = versions.find(v => v.id === selectedVersionForAssignment)?.name;
       const actionText = versionAssignmentAction === 'add' ? 'added to' : 'removed from';
-      alert(`✅ ${selectedRequirements.size} requirements ${actionText} ${versionName}`);
+
+      if (results.successful.length > 0) {
+        alert(`✅ ${results.successful.length} requirements ${actionText} ${versionName}`);
+      }
+
+      if (results.failed.length > 0) {
+        alert(`⚠️ ${results.failed.length} requirements failed to update`);
+      }
+
     } catch (error) {
       console.error('Version assignment failed:', error);
       alert('❌ Version assignment failed: ' + error.message);
     }
   };
-
   // Add confirmation handler for tag assignment
   const confirmTagAssignment = async () => {
     try {
@@ -1031,9 +1090,10 @@ const Requirements = () => {
         {/* Requirements Table */}
         <div className="bg-white rounded-lg shadow overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full table-auto divide-y divide-gray-200" style={{ minWidth: '1000px' }}>
+            <table className="w-full divide-y divide-gray-200">
               <thead className="bg-gray-50 sticky top-0 z-10">
                 <tr>
+                  {/* Checkbox - Fixed small width */}
                   <th className="px-4 py-3 text-left w-12">
                     <input
                       type="checkbox"
@@ -1042,423 +1102,85 @@ const Requirements = () => {
                       className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                     />
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-80">
+
+                  {/* ID / Name - Flexible, takes remaining space */}
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     ID / Name
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-28">
+
+                  {/* Type - Fixed width */}
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32">
                     Type
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-24">
+
+                  {/* Priority - Fixed width */}
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-28">
                     Priority
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-28">
+
+                  {/* Status - Fixed width */}
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32">
                     Status
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32">
-                    <div className="flex items-center">
-                      Coverage
-                      <TDFInfoTooltip />
-                    </div>
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32">
-                    Versions
-                  </th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-24">
-                    Actions
                   </th>
                 </tr>
               </thead>
+
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredRequirements.map((req) => {
-                  // Find corresponding coverage data
-                  const coverage = versionCoverage.find(c => c.reqId === req.id);
-                  // Change 2: Get linked test cases for this requirement using new format
-                  const linkedTests = (mapping[req.id] || [])
-                    .map(tcId => testCases.find(tc => tc.id === tcId))
-                    .filter(Boolean)
-                    .filter(tc => testCaseAppliesTo(tc, selectedVersion));
-                  const linkedTestCount = linkedTests.length;
-                  const isExpanded = expandedRows.has(req.id);
-
                   return (
-                    <React.Fragment key={req.id}>
-                      <tr
-                        className={`hover:bg-gray-50 ${selectedRequirements.has(req.id) ? 'bg-blue-50' : ''} ${selectedRequirement?.id === req.id ? 'bg-blue-100' : ''} cursor-pointer`}
-                        onClick={() => setSelectedRequirement(req)}
-                      >
-                        <td className="px-4 py-4 whitespace-nowrap">
-                          <input
-                            type="checkbox"
-                            checked={selectedRequirements.has(req.id)}
-                            onChange={(e) => {
-                              e.stopPropagation();
-                              handleRequirementSelection(req.id, e.target.checked);
-                            }}
-                            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                          />
-                        </td>
-                        <td className="px-4 py-4 text-sm text-gray-900">
-                          <div className="flex items-start">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                toggleRowExpansion(req.id);
-                              }}
-                              className="mr-2 p-1 hover:bg-gray-200 rounded flex-shrink-0 mt-0.5"
-                            >
-                              {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                            </button>
-                            <div className="flex-1">
-                              <div className="font-medium text-gray-900 mb-1">{req.id}</div>
-                              <div className="text-sm text-gray-700 break-words" title={req.name}>
-                                {req.name}
-                              </div>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                          <span className="px-2 py-1 rounded text-xs bg-gray-100 text-gray-700">
-                            {req.type}
-                          </span>
-                        </td>
-                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                          <span className={`px-2 py-1 rounded text-xs ${req.priority === 'High' ? 'bg-red-100 text-red-800' :
-                            req.priority === 'Medium' ? 'bg-yellow-100 text-yellow-800' :
-                              'bg-green-100 text-green-800'
-                            }`}>
-                            {req.priority}
-                          </span>
-                        </td>
-                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                          <span className="text-sm text-gray-700 flex items-center">
-                            {req.status}
-                            {req.status === 'Active' && <CheckCircle className="ml-1 text-green-600" size={14} />}
-                            {req.status === 'Deprecated' && <AlertTriangle className="ml-1 text-orange-600" size={14} />}
-                            {req.status === 'Archived' && <Trash2 className="ml-1 text-gray-500" size={14} />}
-                          </span>
-                        </td>
-                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                          <div className="flex items-center">
-                            <div className="flex-1 min-w-24">
-                              <div className={`text-sm font-medium ${coverage && coverage.meetsMinimum ? 'text-green-600' : 'text-red-600'
-                                }`}>
-                                {linkedTestCount} / {req.minTestCases}
-                              </div>
-                              <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
-                                <div
-                                  className={`h-2 rounded-full ${coverage && coverage.meetsMinimum ? 'bg-green-500' : 'bg-red-500'
-                                    }`}
-                                  style={{
-                                    width: `${Math.min(100, (linkedTestCount / req.minTestCases) * 100)}%`
-                                  }}
-                                ></div>
-                              </div>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
-                          <div className="flex flex-wrap gap-1">
-                            {req.versions && req.versions.length > 0 ? req.versions.slice(0, 2).map(vId => {
-                              const versionExists = versions.some(v => v.id === vId);
-                              return (
-                                <span
-                                  key={vId}
-                                  className={`px-2 py-1 rounded text-xs ${versionExists
-                                    ? 'bg-blue-100 text-blue-800'
-                                    : 'bg-yellow-100 text-yellow-800'
-                                    }`}
-                                  title={versionExists ? 'Existing version' : 'Version not created yet'}
-                                >
-                                  {vId}
-                                </span>
-                              );
-                            }) : (
-                              <span className="text-gray-400 text-xs">No versions</span>
-                            )}
-                            {req.versions && req.versions.length > 2 && (
-                              <span className="text-gray-400 text-xs">+{req.versions.length - 2}</span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-4 py-4 whitespace-nowrap text-right text-sm font-medium">
-                          <div className="flex items-center justify-end space-x-2">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation(); // Prevent row click
-                                // Create a complete copy with all fields
-                                setRequirementToEdit({
-                                  id: req.id || '',
-                                  name: req.name || '',
-                                  description: req.description || '',
-                                  priority: req.priority || 'Medium',
-                                  type: req.type || 'Functional',
-                                  status: req.status || 'Active',
-                                  owner: req.owner || '',
-                                  businessImpact: req.businessImpact || 3,
-                                  technicalComplexity: req.technicalComplexity || 3,
-                                  regulatoryFactor: req.regulatoryFactor || 1,
-                                  usageFrequency: req.usageFrequency || 3,
-                                  minTestCases: req.minTestCases || 1,
-                                  versions: req.versions || [],
-                                  tags: req.tags || [],
-                                  acceptanceCriteria: req.acceptanceCriteria || [],
-                                  businessRationale: req.businessRationale || '',
-                                  dependencies: req.dependencies || [],
-                                  parentRequirementId: req.parentRequirementId || null
-                                });
-                                setEditPanelOpen(true); // Open panel instead of modal
-                              }}
-                              className="text-blue-600 hover:text-blue-900 p-1"
-                              title="Edit requirement"
-                            >
-                              <Edit size={16} />
-                            </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation(); // Prevent row click
-                                handleDeleteRequirement(req.id);
-                              }}
-                              className="text-red-600 hover:text-red-900 p-1"
-                              title="Delete requirement"
-                            >
-                              <Trash2 size={16} />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                      {/* Expanded Row Details - Only show if not in sidebar mode */}
-                      {isExpanded && !selectedRequirement && (
-                        <tr>
-                          <td colSpan="8" className="p-0">
-                            <div className="bg-white border border-gray-200 rounded-lg">
-                              <div className="p-6">
-                                {/* Header Section */}
-                                <div className="flex items-center mb-6 pb-4 border-b border-gray-200">
-                                  <div className="flex items-center space-x-3">
-                                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                                    <h3 className="text-lg font-semibold text-gray-900">Requirement Details</h3>
-                                  </div>
-                                </div>
-                                {/* Main Content Grid */}
-                                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                                  {/* Left Column - Requirement Details */}
-                                  <div className="lg:col-span-2 space-y-6">
-                                    {/* Description */}
-                                    {req.description && (
-                                      <div className="bg-white rounded-lg p-4 shadow-sm border">
-                                        <div className="flex items-center mb-3">
-                                          <div className="w-1 h-6 bg-green-500 rounded mr-3"></div>
-                                          <h4 className="font-semibold text-gray-900">Description</h4>
-                                        </div>
-                                        <p className="text-gray-700 leading-relaxed">{req.description}</p>
-                                      </div>
-                                    )}
-                                    {/* Business Rationale (if available) */}
-                                    {req.businessRationale && (
-                                      <div className="bg-white rounded-lg p-4 shadow-sm border">
-                                        <div className="flex items-center mb-3">
-                                          <div className="w-1 h-6 bg-blue-500 rounded mr-3"></div>
-                                          <h4 className="font-semibold text-gray-900">Business Rationale</h4>
-                                        </div>
-                                        <p className="text-gray-700 leading-relaxed">{req.businessRationale}</p>
-                                      </div>
-                                    )}
-                                    {/* Acceptance Criteria (if available) */}
-                                    {req.acceptanceCriteria && req.acceptanceCriteria.length > 0 && (
-                                      <div className="bg-white rounded-lg p-4 shadow-sm border">
-                                        <div className="flex items-center mb-3">
-                                          <div className="w-1 h-6 bg-purple-500 rounded mr-3"></div>
-                                          <h4 className="font-semibold text-gray-900">Acceptance Criteria</h4>
-                                        </div>
-                                        <ul className="space-y-2">
-                                          {req.acceptanceCriteria.map((criteria, index) => (
-                                            <li key={index} className="flex items-start">
-                                              <span className="flex-shrink-0 w-5 h-5 bg-purple-100 text-purple-800 rounded-full text-xs font-medium flex items-center justify-center mr-3 mt-0.5">
-                                                ✓
-                                              </span>
-                                              <span className="text-gray-700 leading-relaxed">{criteria}</span>
-                                            </li>
-                                          ))}
-                                        </ul>
-                                      </div>
-                                    )}
-                                    {/* Risk Factors */}
-                                    <div className="bg-white rounded-lg p-4 shadow-sm border">
-                                      <div className="flex items-center mb-3">
-                                        <div className="w-1 h-6 bg-orange-500 rounded mr-3"></div>
-                                        <h4 className="font-semibold text-gray-900">Risk Assessment Factors</h4>
-                                      </div>
-                                      <div className="grid grid-cols-2 gap-4">
-                                        <div className="bg-gray-50 rounded-lg p-3">
-                                          <div className="flex items-center justify-between mb-2">
-                                            <span className="text-sm font-medium text-gray-700">Business Impact</span>
-                                            <span className="text-lg font-bold text-gray-600">{req.businessImpact}/5</span>
-                                          </div>
-                                          <div className="w-full bg-gray-200 rounded-full h-2">
-                                            <div
-                                              className="bg-gray-500 h-2 rounded-full"
-                                              style={{ width: `${(req.businessImpact / 5) * 100}%` }}
-                                            ></div>
-                                          </div>
-                                        </div>
-                                        <div className="bg-gray-50 rounded-lg p-3">
-                                          <div className="flex items-center justify-between mb-2">
-                                            <span className="text-sm font-medium text-gray-700">Technical Complexity</span>
-                                            <span className="text-lg font-bold text-gray-600">{req.technicalComplexity}/5</span>
-                                          </div>
-                                          <div className="w-full bg-gray-200 rounded-full h-2">
-                                            <div
-                                              className="bg-gray-500 h-2 rounded-full"
-                                              style={{ width: `${(req.technicalComplexity / 5) * 100}%` }}
-                                            ></div>
-                                          </div>
-                                        </div>
-                                        <div className="bg-gray-50 rounded-lg p-3">
-                                          <div className="flex items-center justify-between mb-2">
-                                            <span className="text-sm font-medium text-gray-700">Regulatory Factor</span>
-                                            <span className="text-lg font-bold text-gray-600">{req.regulatoryFactor}/5</span>
-                                          </div>
-                                          <div className="w-full bg-gray-200 rounded-full h-2">
-                                            <div
-                                              className="bg-gray-500 h-2 rounded-full"
-                                              style={{ width: `${(req.regulatoryFactor / 5) * 100}%` }}
-                                            ></div>
-                                          </div>
-                                        </div>
-                                        <div className="bg-gray-50 rounded-lg p-3">
-                                          <div className="flex items-center justify-between mb-2">
-                                            <span className="text-sm font-medium text-gray-700">Usage Frequency</span>
-                                            <span className="text-lg font-bold text-gray-600">{req.usageFrequency}/5</span>
-                                          </div>
-                                          <div className="w-full bg-gray-200 rounded-full h-2">
-                                            <div
-                                              className="bg-gray-500 h-2 rounded-full"
-                                              style={{ width: `${(req.usageFrequency / 5) * 100}%` }}
-                                            ></div>
-                                          </div>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  </div>
-                                  {/* Right Column - Metadata */}
-                                  <div className="space-y-4">
-                                    {/* Quick Info Card */}
-                                    <div className="bg-white rounded-lg p-4 shadow-sm border">
-                                      <h4 className="font-semibold text-gray-900 mb-4">Quick Info</h4>
-                                      <div className="space-y-3">
-                                        {/* Type – Neutral */}
-                                        <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                                          <span className="text-sm text-gray-600">Type</span>
-                                          <span className="text-xs px-2 py-1 rounded-full font-medium bg-gray-100 text-gray-700">
-                                            {req.type}
-                                          </span>
-                                        </div>
-                                        {/* Priority – Keep colored (High/Medium/Low) */}
-                                        <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                                          <span className="text-sm text-gray-600">Priority</span>
-                                          <span className={`text-xs px-2 py-1 rounded-full font-medium ${req.priority === 'High' ? 'bg-red-100 text-red-800' :
-                                            req.priority === 'Medium' ? 'bg-yellow-100 text-yellow-800' :
-                                              'bg-green-100 text-green-800'
-                                            }`}>
-                                            {req.priority}
-                                          </span>
-                                        </div>
-                                        {/* Status – Neutral (or add icon if desired) */}
-                                        <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                                          <span className="text-sm text-gray-600">Status</span>
-                                          <span className="text-xs px-2 py-1 rounded-full font-medium bg-gray-100 text-gray-700">
-                                            {req.status}
-                                          </span>
-                                        </div>
-                                        <div className="flex justify-between items-center py-2">
-                                          <span className="text-sm text-gray-600">Created</span>
-                                          <span className="text-sm font-medium text-gray-900">
-                                            {req.createdDate ? new Date(req.createdDate).toLocaleDateString() : 'Unknown'}
-                                          </span>
-                                        </div>
-                                      </div>
-                                    </div>
-                                    {/* Test Depth Analysis */}
-                                    <div className="bg-white rounded-lg p-4 shadow-sm border">
-                                      <h4 className="font-semibold text-gray-900 mb-4">Test Depth Analysis</h4>
-                                      <div className="space-y-4">
-                                        <div className="text-center">
-                                          <div className="text-3xl font-bold text-indigo-600 mb-1">
-                                            {req.testDepthFactor}
-                                          </div>
-                                          <div className="text-sm text-gray-500">Test Depth Factor</div>
-                                        </div>
-                                        <div className="text-center pt-2 border-t border-gray-100">
-                                          <div className="text-2xl font-bold text-green-600 mb-1">
-                                            {req.minTestCases}
-                                          </div>
-                                          <div className="text-sm text-gray-500">Required Test Cases</div>
-                                        </div>
-                                        {/* Change 5: Enhanced Test Coverage Summary */}
-                                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                                          <h4 className="font-semibold text-blue-800 mb-2">Test Coverage</h4>
-                                          <div className="space-y-2">
-                                            <div className="text-sm text-blue-700">
-                                              This requirement has {linkedTestCount} associated test case{linkedTestCount !== 1 ? 's' : ''}
-                                              {selectedVersion !== 'unassigned' && (
-                                                <span className="font-medium"> for {selectedVersion}</span>
-                                              )}
-                                            </div>
-                                            {linkedTests.length > 0 && (
-                                              <div className="text-xs text-blue-600">
-                                                Status breakdown: {' '}
-                                                {['Passed', 'Failed', 'Not Run', 'Blocked'].map(status => {
-                                                  const count = linkedTests.filter(tc => tc.status === status).length;
-                                                  return count > 0 ? `${count} ${status}` : null;
-                                                }).filter(Boolean).join(', ')}
-                                              </div>
-                                            )}
-                                          </div>
-                                        </div>
-                                      </div>
-                                    </div>
-                                    {/* Versions */}
-                                    {req.versions && req.versions.length > 0 && (
-                                      <div className="bg-white rounded-lg p-4 shadow-sm border">
-                                        <h4 className="font-semibold text-gray-900 mb-3">Associated Versions</h4>
-                                        <div className="space-y-2">
-                                          {req.versions.map(vId => {
-                                            const versionExists = versions.some(v => v.id === vId);
-                                            return (
-                                              <div key={vId} className="flex items-center space-x-2">
-                                                <div className={`w-2 h-2 rounded-full ${versionExists ? 'bg-blue-400' : 'bg-yellow-400'
-                                                  }`}></div>
-                                                <span className="text-sm text-gray-700 font-mono">{vId}</span>
-                                                {!versionExists && (
-                                                  <span className="text-xs text-yellow-600">(Pending)</span>
-                                                )}
-                                              </div>
-                                            );
-                                          })}
-                                        </div>
-                                      </div>
-                                    )}
-                                    {/* Tags */}
-                                    {req.tags && req.tags.length > 0 && (
-                                      <div className="bg-white rounded-lg p-4 shadow-sm border">
-                                        <h4 className="font-semibold text-gray-900 mb-3">Tags</h4>
-                                        <div className="flex flex-wrap gap-2">
-                                          {req.tags.map(tag => (
-                                            <span key={tag} className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-xs font-medium">
-                                              {tag}
-                                            </span>
-                                          ))}
-                                        </div>
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          </td>
-                        </tr>
-                      )}
-                    </React.Fragment>
+                    <tr
+                      key={req.id}
+                      className={`hover:bg-gray-50 ${selectedRequirements.has(req.id) ? 'bg-blue-50' : ''} ${selectedRequirement?.id === req.id ? 'bg-blue-100' : ''} cursor-pointer`}
+                      onClick={() => setSelectedRequirement(req)}
+                    >
+                      {/* Checkbox */}
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <input
+                          type="checkbox"
+                          checked={selectedRequirements.has(req.id)}
+                          onChange={(e) => {
+                            e.stopPropagation();
+                            handleRequirementSelection(req.id, e.target.checked);
+                          }}
+                          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                        />
+                      </td>
+
+                      {/* ID / Name - Allow text to wrap naturally */}
+                      <td className="px-4 py-4 text-sm text-gray-900">
+                        <div className="font-medium text-gray-900 mb-1">{req.id}</div>
+                        <div className="text-sm text-gray-700 line-clamp-2" title={req.name}>
+                          {req.name}
+                        </div>
+                      </td>
+
+                      {/* Type */}
+                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                        <span className="px-2 py-1 rounded text-xs bg-gray-100 text-gray-700">
+                          {req.type}
+                        </span>
+                      </td>
+
+                      {/* Priority */}
+                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                        <span className={`px-2 py-1 rounded text-xs ${req.priority === 'High' ? 'bg-red-100 text-red-800' :
+                          req.priority === 'Medium' ? 'bg-yellow-100 text-yellow-800' :
+                            'bg-green-100 text-green-800'
+                          }`}>
+                          {req.priority}
+                        </span>
+                      </td>
+
+                      {/* Status */}
+                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                        <span className="text-sm text-gray-700 flex items-center">
+                          {req.status}
+                          {req.status === 'Active' && <CheckCircle className="ml-1 text-green-600" size={14} />}
+                          {req.status === 'Deprecated' && <AlertTriangle className="ml-1 text-orange-600" size={14} />}
+                          {req.status === 'Archived' && <Trash2 className="ml-1 text-gray-500" size={14} />}
+                        </span>
+                      </td>
+                    </tr>
                   );
                 })}
               </tbody>
@@ -1475,20 +1197,62 @@ const Requirements = () => {
         </div>
 
         {/* NEW: Replace EditRequirementModal with SlideOutPanel */}
+        {/* Fix the SlideOutPanel onClose handler */}
         <SlideOutPanel
           isOpen={editPanelOpen}
           onClose={() => {
             // Check for unsaved changes
-            const hasChanges = requirementToEdit &&
-              JSON.stringify(requirementToEdit) !== JSON.stringify(requirements.find(r => r.id === requirementToEdit.id) || {});
-            if (hasChanges) {
-              if (window.confirm('You have unsaved changes. Discard them?')) {
+            const originalRequirement = requirementToEdit?.id
+              ? requirements.find(r => r.id === requirementToEdit.id)
+              : null;
+
+            // Only check for changes if editing an existing requirement
+            if (originalRequirement) {
+              // Create a normalized comparison by only comparing the fields that matter
+              const hasChanges = JSON.stringify({
+                id: requirementToEdit.id,
+                name: requirementToEdit.name,
+                description: requirementToEdit.description,
+                priority: requirementToEdit.priority,
+                type: requirementToEdit.type,
+                status: requirementToEdit.status,
+                businessImpact: requirementToEdit.businessImpact,
+                technicalComplexity: requirementToEdit.technicalComplexity,
+                regulatoryFactor: requirementToEdit.regulatoryFactor,
+                usageFrequency: requirementToEdit.usageFrequency,
+                minTestCases: requirementToEdit.minTestCases,
+                versions: requirementToEdit.versions || [],
+                tags: requirementToEdit.tags || []
+              }) !== JSON.stringify({
+                id: originalRequirement.id,
+                name: originalRequirement.name,
+                description: originalRequirement.description,
+                priority: originalRequirement.priority,
+                type: originalRequirement.type,
+                status: originalRequirement.status,
+                businessImpact: originalRequirement.businessImpact,
+                technicalComplexity: originalRequirement.technicalComplexity,
+                regulatoryFactor: originalRequirement.regulatoryFactor,
+                usageFrequency: originalRequirement.usageFrequency,
+                minTestCases: originalRequirement.minTestCases,
+                versions: originalRequirement.versions || [],
+                tags: originalRequirement.tags || []
+              });
+
+              if (hasChanges && window.confirm('You have unsaved changes. Discard them?')) {
+                setEditPanelOpen(false);
+                setRequirementToEdit(null);
+              } else if (!hasChanges) {
                 setEditPanelOpen(false);
                 setRequirementToEdit(null);
               }
             } else {
-              setEditPanelOpen(false);
-              setRequirementToEdit(null);
+              // Creating new requirement - just close without warning if empty
+              const isEmpty = !requirementToEdit?.name && !requirementToEdit?.description;
+              if (isEmpty || window.confirm('Discard new requirement?')) {
+                setEditPanelOpen(false);
+                setRequirementToEdit(null);
+              }
             }
           }}
           title={requirementToEdit?.id && requirements.some(r => r.id === requirementToEdit.id) ? 'Edit Requirement' : 'Create New Requirement'}
@@ -1498,17 +1262,55 @@ const Requirements = () => {
               <button
                 type="button"
                 onClick={() => {
-                  // Check for unsaved changes
-                  const hasChanges = requirementToEdit &&
-                    JSON.stringify(requirementToEdit) !== JSON.stringify(requirements.find(r => r.id === requirementToEdit.id) || {});
-                  if (hasChanges) {
-                    if (window.confirm('You have unsaved changes. Discard them?')) {
+                  // Use the same logic as onClose
+                  const originalRequirement = requirementToEdit?.id
+                    ? requirements.find(r => r.id === requirementToEdit.id)
+                    : null;
+
+                  if (originalRequirement) {
+                    const hasChanges = JSON.stringify({
+                      id: requirementToEdit.id,
+                      name: requirementToEdit.name,
+                      description: requirementToEdit.description,
+                      priority: requirementToEdit.priority,
+                      type: requirementToEdit.type,
+                      status: requirementToEdit.status,
+                      businessImpact: requirementToEdit.businessImpact,
+                      technicalComplexity: requirementToEdit.technicalComplexity,
+                      regulatoryFactor: requirementToEdit.regulatoryFactor,
+                      usageFrequency: requirementToEdit.usageFrequency,
+                      minTestCases: requirementToEdit.minTestCases,
+                      versions: requirementToEdit.versions || [],
+                      tags: requirementToEdit.tags || []
+                    }) !== JSON.stringify({
+                      id: originalRequirement.id,
+                      name: originalRequirement.name,
+                      description: originalRequirement.description,
+                      priority: originalRequirement.priority,
+                      type: originalRequirement.type,
+                      status: originalRequirement.status,
+                      businessImpact: originalRequirement.businessImpact,
+                      technicalComplexity: originalRequirement.technicalComplexity,
+                      regulatoryFactor: originalRequirement.regulatoryFactor,
+                      usageFrequency: originalRequirement.usageFrequency,
+                      minTestCases: originalRequirement.minTestCases,
+                      versions: originalRequirement.versions || [],
+                      tags: originalRequirement.tags || []
+                    });
+
+                    if (hasChanges && window.confirm('You have unsaved changes. Discard them?')) {
+                      setEditPanelOpen(false);
+                      setRequirementToEdit(null);
+                    } else if (!hasChanges) {
                       setEditPanelOpen(false);
                       setRequirementToEdit(null);
                     }
                   } else {
-                    setEditPanelOpen(false);
-                    setRequirementToEdit(null);
+                    const isEmpty = !requirementToEdit?.name && !requirementToEdit?.description;
+                    if (isEmpty || window.confirm('Discard new requirement?')) {
+                      setEditPanelOpen(false);
+                      setRequirementToEdit(null);
+                    }
                   }
                 }}
                 className="flex-1 px-4 py-2 border border-gray-300 rounded-lg font-medium text-gray-700 hover:bg-gray-50"
