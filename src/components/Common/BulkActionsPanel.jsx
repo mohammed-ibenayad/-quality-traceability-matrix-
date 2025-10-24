@@ -215,7 +215,7 @@ const BulkActionsPanel = ({
   // Select all visible tags (for current tab)
   const handleSelectAllTags = () => {
     const tagsToSelect = tagActiveTab === 'add' 
-      ? filteredTagsForAdd.filter(tag => !isTagAssigned(tag))  // Only unassigned in Add tab
+      ? filteredTagsForAdd.filter(tag => !isTagFullyAssigned(tag))  // Only unassigned in Add tab
       : filteredTagsForAdd;  // All tags in Remove tab
     
     setSelectedTagsForAction(new Set(tagsToSelect));
@@ -234,6 +234,11 @@ const BulkActionsPanel = ({
   // Check if a tag is partially assigned
   const isTagPartial = (tag) => {
     return partiallyAssignedTags.includes(tag);
+  };
+
+  // NEW: Check if a tag is fully assigned (on ALL items)
+  const isTagFullyAssigned = (tag) => {
+    return commonAssignedTags.includes(tag);
   };
 
   // Utility functions for version grouping
@@ -557,18 +562,18 @@ const BulkActionsPanel = ({
                     <div className="overflow-y-auto max-h-48">
                       {tagActiveTab === 'add' ? (
                         <>
-                          {/* Unassigned Tags (Active/Clickable) */}
-                          {filteredTagsForAdd.filter(tag => !isTagAssigned(tag)).length > 0 && (
+                          {/* Unassigned or Partially Assigned Tags (Active/Clickable) */}
+                          {filteredTagsForAdd.filter(tag => !isTagFullyAssigned(tag)).length > 0 && (
                             <div className="border-b border-gray-100">
                               <div className="px-3 py-2 bg-gray-50 text-xs font-semibold text-gray-600 uppercase flex items-center">
                                 <span className="mr-2">➕</span>
                                 Available Tags
                                 <span className="ml-auto text-gray-400">
-                                  ({filteredTagsForAdd.filter(tag => !isTagAssigned(tag)).length})
+                                  ({filteredTagsForAdd.filter(tag => !isTagFullyAssigned(tag)).length})
                                 </span>
                               </div>
                               <div>
-                                {filteredTagsForAdd.filter(tag => !isTagAssigned(tag)).map(tag => (
+                                {filteredTagsForAdd.filter(tag => !isTagFullyAssigned(tag)).map(tag => (
                                   <button
                                     key={tag}
                                     onClick={() => toggleTagSelection(tag)}
@@ -583,6 +588,11 @@ const BulkActionsPanel = ({
                                         <Check size={14} className="mr-2 text-green-600" />
                                       )}
                                       {tag}
+                                      {isTagPartial(tag) && (
+                                        <span className="ml-2 text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded" title="On some requirements">
+                                          partial
+                                        </span>
+                                      )}
                                     </span>
                                     {!selectedTagsForAction.has(tag) && (
                                       <Plus size={14} className="text-green-600" />
@@ -593,31 +603,25 @@ const BulkActionsPanel = ({
                             </div>
                           )}
 
-                          {/* Assigned Tags (Grayed Out) */}
-                          {filteredTagsForAdd.filter(tag => isTagAssigned(tag)).length > 0 && (
+                          {/* Fully Assigned Tags (Grayed Out) */}
+                          {filteredTagsForAdd.filter(tag => isTagFullyAssigned(tag)).length > 0 && (
                             <div>
                               <div className="px-3 py-2 bg-gray-50 text-xs font-semibold text-gray-600 uppercase flex items-center">
                                 <span className="mr-2">✓</span>
-                                Already Assigned
+                                Already Assigned to All
                                 <span className="ml-auto text-gray-400">
-                                  ({filteredTagsForAdd.filter(tag => isTagAssigned(tag)).length})
+                                  ({filteredTagsForAdd.filter(tag => isTagFullyAssigned(tag)).length})
                                 </span>
                               </div>
                               <div>
-                                {filteredTagsForAdd.filter(tag => isTagAssigned(tag)).map(tag => (
+                                {filteredTagsForAdd.filter(tag => isTagFullyAssigned(tag)).map(tag => (
                                   <div
                                     key={tag}
                                     className="w-full text-left px-4 py-2 text-sm bg-gray-100 cursor-not-allowed flex items-center justify-between opacity-60"
-                                    title={isTagPartial(tag) 
-                                      ? "This tag is assigned to some of the selected items"
-                                      : "This tag is already assigned to all selected items"
-                                    }
+                                    title="This tag is already assigned to all selected items"
                                   >
                                     <span className="text-gray-500 flex items-center">
                                       {tag}
-                                      {isTagPartial(tag) && (
-                                        <span className="ml-2 inline-block w-2 h-2 rounded-full bg-amber-400" title="Partially assigned"></span>
-                                      )}
                                     </span>
                                     <Check size={14} className="text-gray-400" />
                                   </div>
