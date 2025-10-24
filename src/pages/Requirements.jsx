@@ -469,6 +469,7 @@ const Requirements = () => {
       return (
         <BulkActionsPanel
           selectedCount={selectedRequirements.size}
+          selectedItems={requirements.filter(req => selectedRequirements.has(req.id))}
           itemType="requirement"
           availableVersions={versions}
           availableTags={getAllTags(requirements)}
@@ -813,28 +814,89 @@ const Requirements = () => {
   // Add confirmation handler for tag assignment
   const confirmTagAssignment = async () => {
     try {
-      const updatedRequirements = requirements.map(req =>
-        selectedRequirements.has(req.id)
-          ? {
-            ...req,
-            tags: tagAssignmentAction === 'add'
-              ? [...new Set([...(req.tags || []), ...selectedTagsForAssignment])]
-              : (req.tags || []).filter(t => !selectedTagsForAssignment.includes(t)),
-            updatedAt: new Date().toISOString()
+      console.log('🏷️ Starting tag assignment...', {
+        action: tagAssignmentAction,
+        tags: selectedTagsForAssignment,
+        selectedCount: selectedRequirements.size
+      });
+
+      // Track success/failure
+      const results = {
+        successful: [],
+        failed: []
+      };
+
+      // Update each selected requirement individually to ensure database persistence
+      for (const reqId of selectedRequirements) {
+        try {
+          const requirement = requirements.find(r => r.id === reqId);
+          if (!requirement) {
+            console.warn(`⚠️ Requirement ${reqId} not found`);
+            results.failed.push(reqId);
+            continue;
           }
-          : req
-      );
-      dataStore.setRequirements(updatedRequirements);
+
+          // Calculate new tags array
+          const currentTags = requirement.tags || [];
+          let newTags;
+
+          if (tagAssignmentAction === 'add') {
+            // Add tags and remove duplicates using Set
+            newTags = [...new Set([...currentTags, ...selectedTagsForAssignment])];
+          } else {
+            // Remove tags
+            newTags = currentTags.filter(t => !selectedTagsForAssignment.includes(t));
+          }
+
+          // Only update if tags actually changed
+          if (JSON.stringify(currentTags.sort()) === JSON.stringify(newTags.sort())) {
+            console.log(`ℹ️ No tag changes needed for ${reqId}`);
+            results.successful.push(reqId); // Still count as successful (no error)
+            continue;
+          }
+
+          console.log(`📝 Updating tags for ${reqId}:`, {
+            before: currentTags,
+            after: newTags
+          });
+
+          // Call the API to update the requirement
+          // This will persist to the database
+          await dataStore.updateRequirement(reqId, {
+            tags: newTags,
+            updatedAt: new Date().toISOString()
+          });
+
+          results.successful.push(reqId);
+          console.log(`✅ Successfully updated tags for ${reqId}`);
+
+        } catch (error) {
+          console.error(`❌ Failed to update tags for ${reqId}:`, error);
+          results.failed.push(reqId);
+        }
+      }
+
+      // Clear selection and close modal
       setSelectedRequirements(new Set());
       setShowTagAssignmentModal(false);
-      // Show success message
+
+      // Show success message with details
       const actionText = tagAssignmentAction === 'add' ? 'added to' : 'removed from';
       const tagText = selectedTagsForAssignment.length === 1
         ? `"${selectedTagsForAssignment[0]}"`
         : `${selectedTagsForAssignment.length} tags`;
-      alert(`✅ Tag ${tagText} ${actionText} ${selectedRequirements.size} requirements`);
+
+      let message = `✅ ${tagText} ${actionText} ${results.successful.length} requirement(s)`;
+
+      if (results.failed.length > 0) {
+        message += `\n⚠️ Failed to update ${results.failed.length} requirement(s)`;
+        console.error('Failed requirement IDs:', results.failed);
+      }
+
+      alert(message);
+
     } catch (error) {
-      console.error('Tag assignment failed:', error);
+      console.error('❌ Tag assignment failed:', error);
       alert('❌ Tag assignment failed: ' + error.message);
     }
   };
