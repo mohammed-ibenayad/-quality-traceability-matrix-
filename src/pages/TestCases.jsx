@@ -989,40 +989,67 @@ const TestCases = () => {
   }, [testCases, selectedVersion]);
   // NEW: Filter logic including suite filtering
   const filteredTestCases = useMemo(() => {
+    console.log('🔍 Filtering Debug:', {
+      versionFilteredCount: versionFilteredTestCases.length,
+      selectedVersion,
+      selectedTags: Array.from(selectedTags),
+      sampleTestCaseTags: versionFilteredTestCases.slice(0, 3).map(tc => ({ id: tc.id, tags: tc.tags }))
+    });
+
     let filtered = versionFilteredTestCases;
+
     // Search filter
-    if (searchQuery) {
-      filtered = filtered.filter(testCase =>
+    filtered = filtered.filter(testCase => {
+      const matchesSearch = !searchQuery ||
         testCase.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        testCase.id.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-    }
+        testCase.id.toLowerCase().includes(searchQuery.toLowerCase());
+      return matchesSearch;
+    });
+
     // Status filter
-    if (statusFilter !== 'All') {
-      filtered = filtered.filter(testCase => testCase.status === statusFilter);
-    }
+    filtered = filtered.filter(testCase => statusFilter === 'All' || testCase.status === statusFilter);
+
     // Priority filter
-    if (priorityFilter !== 'All') {
-      filtered = filtered.filter(testCase => testCase.priority === priorityFilter);
-    }
+    filtered = filtered.filter(testCase => priorityFilter === 'All' || testCase.priority === priorityFilter);
+
     // Automation filter
-    if (automationFilter !== 'All') {
-      filtered = filtered.filter(testCase => testCase.automationStatus === automationFilter);
-    }
+    filtered = filtered.filter(testCase => automationFilter === 'All' || testCase.automationStatus === automationFilter);
+
     // Tag filter
-    if (selectedTags.size > 0) {
-      filtered = filtered.filter(testCase =>
-        testCase.tags && Array.isArray(testCase.tags) &&
-        Array.from(selectedTags).some(tag => testCase.tags.includes(tag))
-      );
-    }
-    // NEW: Suite filter
+    filtered = filtered.filter(testCase => {
+      const matchesTags = selectedTags.size === 0 ||
+        (testCase.tags && Array.isArray(testCase.tags) &&
+          Array.from(selectedTags).some(tag => testCase.tags.includes(tag)));
+      return matchesTags;
+    });
+
+    // ✅ ADD THIS: Suite filter (Step 2.6)
     if (activeSuite) {
       const memberIds = activeSuite.members?.map(m => m.id) || [];
       filtered = filtered.filter(tc => memberIds.includes(tc.id));
     }
+
+    // Debug specific test case if it has the Sample tag
+    filtered.forEach(testCase => {
+      if (testCase.tags && testCase.tags.includes('Sample')) {
+        console.log('🏷️ Sample tag test case after filtering:', {
+          id: testCase.id,
+          tags: testCase.tags,
+          selectedTags: Array.from(selectedTags)
+        });
+      }
+    });
+
     return filtered;
-  }, [versionFilteredTestCases, searchQuery, statusFilter, priorityFilter, automationFilter, selectedTags, activeSuite]);
+  }, [
+    versionFilteredTestCases,
+    searchQuery,
+    statusFilter,
+    priorityFilter,
+    automationFilter,
+    selectedTags,
+    activeSuite // ✅ ADD THIS DEPENDENCY
+  ]);
   // NEW: Get all unique categories
   const allCategories = useMemo(() => {
     return getAllCategories(testCases);
@@ -1641,6 +1668,7 @@ Do you want to continue?`
     });
   };
   // NEW: Right sidebar content logic with multiple states
+  // Right sidebar content logic (Step 2.8)
   const rightSidebarContent = useMemo(() => {
     // State 1: Browse Mode
     if (selectedTestCases.size === 0 && !selectedSuite && !activeSuite) {
@@ -1655,8 +1683,8 @@ Do you want to continue?`
           priorityFilter={priorityFilter}
           automationFilter={automationFilter}
           selectedTagsFilter={Array.from(selectedTags)}
-          allCategories={allCategories}
-          allTags={allTags}
+          allCategories={getAllCategories(testCases)}
+          allTags={getAllTags(testCases)}
           onCategoryChange={setCategoryFilter}
           onStatusChange={setStatusFilter}
           onPriorityChange={setPriorityFilter}
@@ -1680,7 +1708,8 @@ Do you want to continue?`
         />
       );
     }
-    // State 2: Suite View (TODO - placeholder for now)
+
+    // State 2: Suite View (placeholder)
     if (activeSuite && selectedTestCases.size === 0) {
       return (
         <div className="p-4 text-center text-gray-500">
@@ -1694,6 +1723,7 @@ Do you want to continue?`
         </div>
       );
     }
+
     // State 3: Bulk Actions (existing)
     if (selectedTestCases.size > 1) {
       return (
@@ -1703,16 +1733,18 @@ Do you want to continue?`
           itemType="test case"
           showExecuteButton={true}
           availableVersions={versions}
-          availableTags={allTags}
+          availableTags={getAllTags(testCases)}
           onVersionAssign={handleBulkVersionAssignment}
           onTagsUpdate={handleBulkTagAssignment}
           onBulkDelete={handleBulkDelete}
           onClearSelection={() => setSelectedTestCases(new Set())}
           onExecuteTests={executeSelectedTests}
+          onExport={handleExportSelected}
         />
       );
     }
-    // State 4: Single Selection (TODO - placeholder for now)
+
+    // State 4: Single Selection (placeholder)
     if (selectedTestCases.size === 1) {
       return (
         <div className="p-4 text-center text-gray-500">
@@ -1720,6 +1752,7 @@ Do you want to continue?`
         </div>
       );
     }
+
     return null;
   }, [
     selectedTestCases,
@@ -1734,8 +1767,13 @@ Do you want to continue?`
     selectedTags,
     filteredTestCases,
     versionFilteredTestCases,
-    allCategories,
-    allTags
+    versions,
+    handleBulkVersionAssignment,
+    handleBulkTagAssignment,
+    handleBulkDelete,
+    executeSelectedTests,
+    handleExportSelected,
+    handleClearSuiteFilter
   ]);
   const selectedTestCasesArray = Array.from(selectedTestCases)
     .map(id => filteredTestCases.find(tc => tc.id === id))
@@ -1758,7 +1796,9 @@ Do you want to continue?`
     );
   }
   return (
-    <MainLayout title="Test Cases" hasData={hasTestCases} rightSidebar={rightSidebarContent}>
+    <MainLayout title="Test Cases"
+      hasData={hasTestCases}
+      rightSidebar={rightSidebarContent}>
       <div className="space-y-6">
         {/* Version indicator for unassigned view */}
         {selectedVersion === 'unassigned' && (
@@ -2033,6 +2073,30 @@ Do you want to continue?`
             )}
           </div>
         </div>
+
+        {/* Suite Filter Banner (Step 2.9) */}
+        {activeSuite && (
+          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <FolderOpen size={16} className="text-blue-600" />
+                <span className="text-sm font-medium text-blue-900">
+                  Viewing Suite: {activeSuite.name}
+                </span>
+                <span className="text-xs text-blue-600">
+                  ({activeSuite.members?.length || 0} tests)
+                </span>
+              </div>
+              <button
+                onClick={handleClearSuiteFilter}
+                className="text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center"
+              >
+                <X size={14} className="mr-1" />
+                Clear Filter
+              </button>
+            </div>
+          </div>
+        )}
         {/* Bulk Actions */}
         {/* Enhanced Bulk Actions with Version Assignment */}
         {selectedTestCases.size > 0 && (
@@ -2295,6 +2359,8 @@ Do you want to continue?`
         )}
       </div>
     </MainLayout>
+
+
   );
 };
 
