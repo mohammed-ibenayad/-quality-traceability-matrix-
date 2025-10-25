@@ -53,6 +53,9 @@ import MainLayout from '../components/Layout/MainLayout';
 import EmptyState from '../components/Common/EmptyState';
 import TestExecutionModal from '../components/TestExecution/TestExecutionModal';
 import FailureDetailsPanel from '../components/TestExecution/FailureDetailsPanel';
+import CreateSuiteModal from '../components/TestCases/CreateSuiteModal';
+import EditSuiteModal from '../components/TestCases/EditSuiteModal';  // ✅ ADD THIS
+import AddToSuiteModal from '../components/TestCases/AddToSuiteModal';
 import { useVersionContext } from '../context/VersionContext';
 import dataStore from '../services/DataStore';
 
@@ -879,6 +882,20 @@ const TestCases = () => {
     // Clean up subscription
     return () => unsubscribe();
   }, []);
+
+  // Add this with the other useEffect hooks
+  useEffect(() => {
+    loadTestSuites();
+  }, []);
+
+  const loadTestSuites = async () => {
+    try {
+      const suites = await dataStore.getTestSuites();
+      setTestSuites(suites);
+    } catch (error) {
+      console.error('Failed to load test suites:', error);
+    }
+  };
   // NEW: Load test suites
   useEffect(() => {
     const loadTestSuites = async () => {
@@ -1015,6 +1032,8 @@ const TestCases = () => {
     // Priority filter
     filtered = filtered.filter(testCase => priorityFilter === 'All' || testCase.priority === priorityFilter);
 
+    filtered = filtered.filter(testCase => categoryFilter === 'All' || testCase.category === categoryFilter);
+
     // Automation filter
     filtered = filtered.filter(testCase => automationFilter === 'All' || testCase.automationStatus === automationFilter);
 
@@ -1047,6 +1066,7 @@ const TestCases = () => {
   }, [
     versionFilteredTestCases,
     searchQuery,
+    categoryFilter,
     statusFilter,
     priorityFilter,
     automationFilter,
@@ -1145,6 +1165,72 @@ const TestCases = () => {
       alert('Failed to delete suite');
     }
   };
+
+  // NEW: Handle edit suite
+  const handleEditSuite = (suite) => {
+    setSelectedSuite(suite);
+    setShowEditSuiteModal(true);
+  };
+
+  // NEW: Handle update suite
+  const handleUpdateSuite = async (suiteId, suiteData) => {
+    try {
+      await dataStore.updateTestSuite(suiteId, suiteData);
+      await loadTestSuites(); // Refresh the suites list
+
+      // If we're currently viewing this suite, refresh it
+      if (activeSuite && activeSuite.id === suiteId) {
+        const updatedSuite = await dataStore.getTestSuite(suiteId);
+        const members = await dataStore.getTestSuiteMembers(suiteId);
+        setActiveSuite({ ...updatedSuite, members });
+      }
+
+      setShowEditSuiteModal(false);
+      setSelectedSuite(null);
+    } catch (error) {
+      console.error('Failed to update suite:', error);
+      alert('Failed to update suite. Please try again.');
+    }
+  };
+
+  // NEW: Handle add tests to suite
+  const handleAddTestsToSuite = async (suiteId, testCaseIds) => {
+    try {
+      await dataStore.addTestCasesToSuite(suiteId, testCaseIds);
+
+      // Refresh the current suite view
+      if (activeSuite && activeSuite.id === suiteId) {
+        const updatedSuite = await dataStore.getTestSuite(suiteId);
+        const members = await dataStore.getTestSuiteMembers(suiteId);
+        setActiveSuite({ ...updatedSuite, members });
+      }
+
+      setShowAddToSuiteModal(false);
+    } catch (error) {
+      console.error('Failed to add tests to suite:', error);
+      alert('Failed to add tests to suite. Please try again.');
+    }
+  };
+
+  // NEW: Handle remove test from suite
+  const handleRemoveTestFromSuite = async (suiteId, testCaseId) => {
+    if (!confirm('Remove this test case from the suite?')) return;
+
+    try {
+      await dataStore.removeTestCaseFromSuite(suiteId, testCaseId);
+
+      // Refresh the current suite view
+      if (activeSuite && activeSuite.id === suiteId) {
+        const updatedSuite = await dataStore.getTestSuite(suiteId);
+        const members = await dataStore.getTestSuiteMembers(suiteId);
+        setActiveSuite({ ...updatedSuite, members });
+      }
+    } catch (error) {
+      console.error('Failed to remove test from suite:', error);
+      alert('Failed to remove test from suite. Please try again.');
+    }
+  };
+
   // Handle test case selection
   const handleTestCaseSelection = (testCaseId, checked) => {
     setSelectedTestCases(prev => {
@@ -1718,16 +1804,10 @@ Do you want to continue?`
       return (
         <TestCasesSuiteSidebar
           suite={activeSuite}
-          onEditSuite={() => {
-            setSelectedSuite(activeSuite);
-            setShowEditSuiteModal(true);
-          }}
+          onEditSuite={() => handleEditSuite(activeSuite)}
           onDeleteSuite={() => handleDeleteSuite(activeSuite.id)}
           onClose={handleClearSuiteFilter}
-          onAddTests={() => {
-            setSelectedSuite(activeSuite);
-            setShowAddToSuiteModal(true);
-          }}
+          onAddTests={() => setShowAddToSuiteModal(true)}
         />
       );
     }
@@ -1754,26 +1834,24 @@ Do you want to continue?`
 
     // State 4: Single Selection (placeholder)
     // State 4: Single Selection - Show test case details sidebar
+    // State 4: Single Test Case Details
     if (selectedTestCases.size === 1) {
-      const selectedId = Array.from(selectedTestCases)[0];
-      const selectedTestCase = testCases.find(tc => tc.id === selectedId);
+      const selectedTestCaseId = Array.from(selectedTestCases)[0];
+      const selectedTestCase = testCases.find(tc => tc.id === selectedTestCaseId);
 
-      if (!selectedTestCase) {
-        return null;
+      if (selectedTestCase) {
+        const linkedReqs = getLinkedRequirements(selectedTestCaseId, mapping, requirements);
+
+        return (
+          <TestCaseDetailsSidebar
+            testCase={selectedTestCase}
+            linkedRequirements={linkedReqs}
+            onEdit={() => handleEditTestCase(selectedTestCase)}
+            onDelete={() => handleDeleteTestCase(selectedTestCaseId)}
+            onClose={() => setSelectedTestCases(new Set())}
+          />
+        );
       }
-
-      return (
-        <TestCaseDetailsSidebar
-          testCase={selectedTestCase}
-          onEdit={() => handleEditTestCase(selectedTestCase)}
-          onDelete={() => {
-            handleDeleteTestCase(selectedTestCase.id);
-            setSelectedTestCases(new Set());
-          }}
-          onClose={() => setSelectedTestCases(new Set())}
-          linkedRequirements={getLinkedRequirementsForTestCase(selectedTestCase.id)}
-        />
-      );
     }
 
     return null;
@@ -2232,6 +2310,49 @@ Do you want to continue?`
           )}
         </div>
         {/* MODALS */}
+
+        {/* Create Suite Modal */}
+        {showCreateSuiteModal && (
+          <CreateSuiteModal
+            isOpen={showCreateSuiteModal}
+            onClose={() => setShowCreateSuiteModal(false)}
+            onCreate={async (suiteData) => {
+              try {
+                await dataStore.createTestSuite(suiteData);
+                await loadTestSuites();
+                setShowCreateSuiteModal(false);
+              } catch (error) {
+                console.error('Failed to create suite:', error);
+                alert('Failed to create suite');
+              }
+            }}
+          />
+        )}
+
+        {/* Edit Suite Modal */}
+        {showEditSuiteModal && selectedSuite && (
+          <EditSuiteModal
+            isOpen={showEditSuiteModal}
+            suite={selectedSuite}
+            onClose={() => {
+              setShowEditSuiteModal(false);
+              setSelectedSuite(null);
+            }}
+            onUpdate={handleUpdateSuite}
+          />
+        )}
+
+        {/* Add To Suite Modal */}
+        {showAddToSuiteModal && activeSuite && (
+          <AddToSuiteModal
+            isOpen={showAddToSuiteModal}
+            suite={activeSuite}
+            availableTestCases={testCases}
+            existingMemberIds={activeSuite.members?.map(m => m.id) || []}
+            onClose={() => setShowAddToSuiteModal(false)}
+            onAdd={handleAddTestsToSuite}
+          />
+        )}
         {/* NEW: Enhanced View Test Case Modal - NOW ACTIVE */}
         <ViewTestCaseModal
           testCase={viewingTestCase}
