@@ -1834,26 +1834,24 @@ Do you want to continue?`
 
     // State 4: Single Selection (placeholder)
     // State 4: Single Selection - Show test case details sidebar
+    // State 4: Single Test Case Details
     if (selectedTestCases.size === 1) {
-      const selectedId = Array.from(selectedTestCases)[0];
-      const selectedTestCase = testCases.find(tc => tc.id === selectedId);
+      const selectedTestCaseId = Array.from(selectedTestCases)[0];
+      const selectedTestCase = testCases.find(tc => tc.id === selectedTestCaseId);
 
-      if (!selectedTestCase) {
-        return null;
+      if (selectedTestCase) {
+        const linkedReqs = getLinkedRequirements(selectedTestCaseId, mapping, requirements);
+
+        return (
+          <TestCaseDetailsSidebar
+            testCase={selectedTestCase}
+            linkedRequirements={linkedReqs}
+            onEdit={() => handleEditTestCase(selectedTestCase)}
+            onDelete={() => handleDeleteTestCase(selectedTestCaseId)}
+            onClose={() => setSelectedTestCases(new Set())}
+          />
+        );
       }
-
-      return (
-        <TestCaseDetailsSidebar
-          testCase={selectedTestCase}
-          onEdit={() => handleEditTestCase(selectedTestCase)}
-          onDelete={() => {
-            handleDeleteTestCase(selectedTestCase.id);
-            setSelectedTestCases(new Set());
-          }}
-          onClose={() => setSelectedTestCases(new Set())}
-          linkedRequirements={getLinkedRequirementsForTestCase(selectedTestCase.id)}
-        />
-      );
     }
 
     return null;
