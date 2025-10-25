@@ -882,6 +882,20 @@ const TestCases = () => {
     // Clean up subscription
     return () => unsubscribe();
   }, []);
+
+  // Add this with the other useEffect hooks
+  useEffect(() => {
+    loadTestSuites();
+  }, []);
+
+  const loadTestSuites = async () => {
+    try {
+      const suites = await dataStore.getTestSuites();
+      setTestSuites(suites);
+    } catch (error) {
+      console.error('Failed to load test suites:', error);
+    }
+  };
   // NEW: Load test suites
   useEffect(() => {
     const loadTestSuites = async () => {
