@@ -1799,6 +1799,29 @@ Do you want to continue?`
     <MainLayout title="Test Cases"
       hasData={hasTestCases}
       rightSidebar={rightSidebarContent}>
+      {/* Add suite filter banner if active */}
+      {activeSuite && (
+        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <FolderOpen size={16} className="text-blue-600" />
+              <span className="text-sm font-medium text-blue-900">
+                Viewing Suite: {activeSuite.name}
+              </span>
+              <span className="text-xs text-blue-600">
+                ({activeSuite.members?.length || 0} tests)
+              </span>
+            </div>
+            <button
+              onClick={handleClearSuiteFilter}
+              className="text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center"
+            >
+              <X size={14} className="mr-1" />
+              Clear Filter
+            </button>
+          </div>
+        </div>
+      )}
       <div className="space-y-6">
         {/* Version indicator for unassigned view */}
         {selectedVersion === 'unassigned' && (
