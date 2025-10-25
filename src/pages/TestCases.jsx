@@ -59,6 +59,9 @@ import dataStore from '../services/DataStore';
 // NEW: Import enhanced modals - UNCOMMENT when components are created
 import ViewTestCaseModal from '../components/TestCases/ViewTestCaseModal';
 import EditTestCaseModal from '../components/TestCases/EditTestCaseModal';
+import TestCasesSuiteSidebar from '../components/TestCases/TestCasesSuiteSidebar';
+import TestCaseDetailsSidebar from '../components/TestCases/TestCaseDetailsSidebar';
+
 // NEW: Import the sidebar component
 import TestCasesBrowseSidebar from '../components/TestCases/TestCasesBrowseSidebar';
 // NEW: Import additional sidebar components (placeholder for now)
@@ -1710,17 +1713,22 @@ Do you want to continue?`
     }
 
     // State 2: Suite View (placeholder)
+    // State 2: Suite View - Show suite details sidebar
     if (activeSuite && selectedTestCases.size === 0) {
       return (
-        <div className="p-4 text-center text-gray-500">
-          Suite View Coming Soon
-          <button
-            onClick={handleClearSuiteFilter}
-            className="block w-full mt-4 px-4 py-2 bg-blue-600 text-white rounded"
-          >
-            Back to Browse
-          </button>
-        </div>
+        <TestCasesSuiteSidebar
+          suite={activeSuite}
+          onEditSuite={() => {
+            setSelectedSuite(activeSuite);
+            setShowEditSuiteModal(true);
+          }}
+          onDeleteSuite={() => handleDeleteSuite(activeSuite.id)}
+          onClose={handleClearSuiteFilter}
+          onAddTests={() => {
+            setSelectedSuite(activeSuite);
+            setShowAddToSuiteModal(true);
+          }}
+        />
       );
     }
 
@@ -1745,11 +1753,26 @@ Do you want to continue?`
     }
 
     // State 4: Single Selection (placeholder)
+    // State 4: Single Selection - Show test case details sidebar
     if (selectedTestCases.size === 1) {
+      const selectedId = Array.from(selectedTestCases)[0];
+      const selectedTestCase = testCases.find(tc => tc.id === selectedId);
+
+      if (!selectedTestCase) {
+        return null;
+      }
+
       return (
-        <div className="p-4 text-center text-gray-500">
-          Test Details Coming Soon
-        </div>
+        <TestCaseDetailsSidebar
+          testCase={selectedTestCase}
+          onEdit={() => handleEditTestCase(selectedTestCase)}
+          onDelete={() => {
+            handleDeleteTestCase(selectedTestCase.id);
+            setSelectedTestCases(new Set());
+          }}
+          onClose={() => setSelectedTestCases(new Set())}
+          linkedRequirements={getLinkedRequirementsForTestCase(selectedTestCase.id)}
+        />
       );
     }
 
@@ -1796,11 +1819,11 @@ Do you want to continue?`
     );
   }
   return (
-    <MainLayout 
-    title="Test Cases"
-    hasData={hasTestCases}
-    showRightSidebar={true}
-    rightSidebar={rightSidebarContent}>
+    <MainLayout
+      title="Test Cases"
+      hasData={hasTestCases}
+      showRightSidebar={true}
+      rightSidebar={rightSidebarContent}>
       <div className="space-y-6">
         {/* Version indicator for unassigned view */}
         {selectedVersion === 'unassigned' && (
