@@ -53,6 +53,8 @@ import MainLayout from '../components/Layout/MainLayout';
 import EmptyState from '../components/Common/EmptyState';
 import TestExecutionModal from '../components/TestExecution/TestExecutionModal';
 import FailureDetailsPanel from '../components/TestExecution/FailureDetailsPanel';
+import { useVersionContext } from '../context/VersionContext';
+
 // NEW: Import enhanced modals - UNCOMMENT when components are created
 import ViewTestCaseModal from '../components/TestCases/ViewTestCaseModal';
 import EditTestCaseModal from '../components/TestCases/EditTestCaseModal';
