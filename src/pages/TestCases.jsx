@@ -1796,9 +1796,11 @@ Do you want to continue?`
     );
   }
   return (
-    <MainLayout title="Test Cases"
-      hasData={hasTestCases}
-      rightSidebar={rightSidebarContent}>
+    <MainLayout 
+    title="Test Cases"
+    hasData={hasTestCases}
+    showRightSidebar={true}
+    rightSidebar={rightSidebarContent}>
       <div className="space-y-6">
         {/* Version indicator for unassigned view */}
         {selectedVersion === 'unassigned' && (
