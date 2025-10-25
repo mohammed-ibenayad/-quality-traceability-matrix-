@@ -53,7 +53,8 @@ const MainLayout = ({
 
             {/* Right sidebar - sticky, only shown when showRightSidebar is true */}
             {showRightSidebar && rightSidebar && (
-              <aside className="hidden lg:block w-80 xl:w-96 bg-white border-l border-gray-200 overflow-y-auto flex-shrink-0 shadow-lg transition-all duration-300">
+              // <aside className="hidden lg:block w-80 xl:w-96 bg-white border-l border-gray-200 overflow-y-auto flex-shrink-0 shadow-lg transition-all duration-300">
+              <aside className="hidden md:block w-80 xl:w-96 bg-white border-l border-gray-200 overflow-y-auto flex-shrink-0 shadow-lg transition-all duration-300">
                 <div className="animate-fadeIn">
                   {rightSidebar}
                 </div>
