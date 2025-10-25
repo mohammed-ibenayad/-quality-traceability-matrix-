@@ -1,4 +1,4 @@
-// src/pages/TestCases.jsx - Enhanced Version with Clear Selection, Execute Button, Last Execution Info, and Failure Details
+// src/pages/TestCases.jsx - Enhanced Version with Test Suites Integration
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Play,
@@ -27,30 +27,49 @@ import {
   Copy, // NEW: Copy icon for duplicate action
   Hash,     // 🆕 ADD - for tag icon  
   Minus,    // 🆕 ADD - for remove operations
-  Tag
-
+  Tag,
+  FolderOpen, // NEW: For suite filter banner
+  // NEW: Import icons for sidebar states
+  Folder,
+  Filter as FilterIcon,
+  User,
+  Calendar,
+  BarChart3,
+  CheckSquare,
+  AlertCircle,
+  Zap,
+  FileText as FileTextIcon,
+  Layers,
+  Plus as PlusIcon,
+  Edit as EditIcon,
+  Trash2 as TrashIcon,
+  XCircle as XCircleIcon,
+  CheckCircle as CheckCircleIcon,
+  Clock as ClockIcon,
+  Play as PlayIcon,
+  Eye as EyeIcon
 } from 'lucide-react';
 import MainLayout from '../components/Layout/MainLayout';
 import EmptyState from '../components/Common/EmptyState';
 import TestExecutionModal from '../components/TestExecution/TestExecutionModal';
 import FailureDetailsPanel from '../components/TestExecution/FailureDetailsPanel';
+import { useVersionContext } from '../context/VersionContext';
+import dataStore from '../services/DataStore';
+
 // NEW: Import enhanced modals - UNCOMMENT when components are created
 import ViewTestCaseModal from '../components/TestCases/ViewTestCaseModal';
 import EditTestCaseModal from '../components/TestCases/EditTestCaseModal';
-import { useVersionContext } from '../context/VersionContext';
-import dataStore from '../services/DataStore';
+// NEW: Import the sidebar component
+import TestCasesBrowseSidebar from '../components/TestCases/TestCasesBrowseSidebar';
+// NEW: Import additional sidebar components (placeholder for now)
 import BulkActionsPanel from '../components/Common/BulkActionsPanel';
 import TestCaseRowActions from '../components/TestCases/TestCaseRowActions';
-
-
-
 // Helper function to format last execution date
 const formatLastExecution = (lastExecuted) => {
   if (!lastExecuted) return 'Never';
   const date = new Date(lastExecuted);
   return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 };
-
 /**
  * Helper function to get display text for test case versions
  * @param {Object} testCase - Test case object
@@ -64,11 +83,9 @@ const getVersionDisplayText = (testCase) => {
     }
     return testCase.applicableVersions.join(', ');
   }
-
   // Handle legacy format
   return testCase.version || 'All Versions';
 };
-
 /**
  * Helper function to get version tags for display
  * @param {Object} testCase - Test case object
@@ -81,11 +98,37 @@ const getVersionTags = (testCase) => {
       ? testCase.applicableVersions
       : ['All Versions'];
   }
-
   // Handle legacy format
   return testCase.version ? [testCase.version] : ['All Versions'];
 };
 
+// NEW: Get all unique categories
+const getAllCategories = (testCases) => {
+  const categories = new Set();
+  testCases.forEach(tc => {
+    if (tc.category) categories.add(tc.category);
+  });
+  return Array.from(categories).sort();
+};
+
+// NEW: Get all unique tags
+const getAllTags = (testCases) => {
+  const tags = new Set();
+  testCases.forEach(tc => {
+    if (tc.tags && Array.isArray(tc.tags)) {
+      tc.tags.forEach(tag => tags.add(tag));
+    }
+  });
+  return Array.from(tags).sort();
+};
+
+// NEW: Get linked requirements for a test case
+const getLinkedRequirements = (testCaseId, mapping, requirements) => {
+  const linkedReqIds = Object.entries(mapping)
+    .filter(([reqId, tcIds]) => tcIds.includes(testCaseId))
+    .map(([reqId]) => reqId);
+  return requirements.filter(req => linkedReqIds.includes(req.id));
+};
 
 // TestCaseRow Component (updated with view action and optimized layout)
 const TestCaseRow = ({
@@ -107,7 +150,6 @@ const TestCaseRow = ({
   setShowVersionModal // Add this line
 }) => {
   const isFailureExpanded = expandedTests.has(testCase.id);
-
   return (
     <React.Fragment>
       <tr className={`flex w-full hover:bg-gray-50 ${isSelected ? 'bg-blue-50' : ''}`}>
@@ -136,7 +178,6 @@ const TestCaseRow = ({
                   {testCase.name}
                 </div>
               )}
-
             </div>
           </div>
         </td>
@@ -150,15 +191,13 @@ const TestCaseRow = ({
               {testCase.status === 'Not Run' && <Clock size={12} className="text-gray-500 mr-1" />}
               {testCase.status === 'Not Run' ? 'Not Run' : testCase.status}
             </span>
-
             {/* Execution Info - moved below status */}
-            {(testCase.status === 'Failed' || testCase.status === 'Passed') && testCase.duration && (
+            {(testCase.status === 'Passed' || testCase.status === 'Failed') && testCase.duration && (
               <div className="flex items-center mt-1 text-xs text-gray-500">
                 <Clock size={12} />
                 <span className="ml-1">{testCase.duration}ms</span>
               </div>
             )}
-
             {/* Expand/Collapse Button - only for failed/error tests */}
             {(testCase.status === 'Failed' || testCase.status === 'Not Found') && (
               <button
@@ -225,7 +264,6 @@ const TestCaseRow = ({
           </div>
         </td>
         <td className="px-2 py-3 w-24 flex-shrink-0">
-
           <div className="text-xs text-gray-500">
             {testCase.applicableVersions?.length > 0 ? (
               <div>
@@ -234,10 +272,8 @@ const TestCaseRow = ({
                     // Smart display: always show current version first if it's assigned
                     const currentVersionAssigned = testCase.applicableVersions.includes(selectedVersion);
                     const otherVersions = testCase.applicableVersions.filter(v => v !== selectedVersion);
-
                     let versionsToShow = [];
                     let remainingCount = 0;
-
                     if (currentVersionAssigned) {
                       // Show current version first, then fill remaining slot
                       versionsToShow = [selectedVersion, ...otherVersions.slice(0, 1)];
@@ -247,7 +283,6 @@ const TestCaseRow = ({
                       versionsToShow = testCase.applicableVersions.slice(0, 2);
                       remainingCount = Math.max(0, testCase.applicableVersions.length - 2);
                     }
-
                     return (
                       <>
                         {versionsToShow.map(versionId => {
@@ -289,7 +324,6 @@ const TestCaseRow = ({
               <span className="text-gray-400 italic text-xs">All</span>
             )}
           </div>
-
         </td>
         <td className="px-2 py-3 w-24 flex-shrink-0">
           <TestCaseRowActions
@@ -302,7 +336,6 @@ const TestCaseRow = ({
           />
         </td>
       </tr>
-
       {/* Expanded Failure Details Row */}
       {/* Expanded Failure Details Row */}
       {isFailureExpanded && (testCase.status === 'Failed' || testCase.status === 'Not Found') && (
@@ -329,7 +362,6 @@ const TestCaseRow = ({
                     </span>
                   </div>
                 </div>
-
                 {/* Error Summary - Compact Horizontal */}
                 <div className="mb-6">
                   <div className="bg-white rounded-lg p-4 shadow-sm border">
@@ -391,7 +423,6 @@ const TestCaseRow = ({
                     </div>
                   </div>
                 </div>
-
                 {/* Stack Trace - Full Width */}
                 {testCase.failure?.stackTrace && (
                   <div className="mb-6">
@@ -403,7 +434,7 @@ const TestCaseRow = ({
                         </div>
                         <div className="flex items-center space-x-2">
                           <span className="text-xs text-gray-500">
-                            {testCase.failure.stackTrace.split('\n').length} lines
+                            {testCase.failure.stackTrace.split('').length} lines
                           </span>
                           <button
                             onClick={() => navigator.clipboard.writeText(testCase.failure.stackTrace)}
@@ -417,7 +448,7 @@ const TestCaseRow = ({
                       <div className="relative">
                         <div className="bg-gray-900 text-green-400 p-4 rounded font-mono text-xs overflow-auto h-80 border">
                           <pre className="whitespace-pre-wrap">
-                            {testCase.failure.stackTrace.split('\n').map((line, index) => (
+                            {testCase.failure.stackTrace.split('').map((line, index) => (
                               <div
                                 key={index}
                                 className={`${line.includes('at ') && (line.includes('.spec.') || line.includes('.test.') || line.includes(testCase.name))
@@ -438,7 +469,6 @@ const TestCaseRow = ({
                     </div>
                   </div>
                 )}
-
                 {/* Assertion Details - Full Width */}
                 {testCase.failure?.assertion?.available && (
                   <div className="mb-6">
@@ -470,7 +500,6 @@ const TestCaseRow = ({
                     </div>
                   </div>
                 )}
-
                 {/* Bottom Row - Technical Details */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   <div className="bg-white rounded-lg p-4 shadow-sm border">
@@ -527,7 +556,6 @@ const TestCaseRow = ({
                       </div>
                     </div>
                   </div>
-
                   <div className="bg-white rounded-lg p-4 shadow-sm border">
                     <div className="flex items-center mb-3">
                       <div className="w-1 h-6 bg-indigo-500 rounded mr-3"></div>
@@ -567,14 +595,11 @@ const TestCaseRow = ({
                     </div>
                   </div>
                 </div>
-
-
               </div>
             </div>
           </td>
         </tr>
       )}
-
       {/* Expanded Row Content - IMPROVED UI/UX */}
       {isExpanded && (
         <tr className="flex w-full">
@@ -606,7 +631,6 @@ const TestCaseRow = ({
                     </span>
                   </div>
                 </div>
-
                 {/* Main Content Grid */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                   {/* Left Column - Test Details */}
@@ -621,7 +645,6 @@ const TestCaseRow = ({
                         <p className="text-gray-700 leading-relaxed">{testCase.description}</p>
                       </div>
                     )}
-
                     {/* Preconditions */}
                     {testCase.preconditions && (
                       <div className="bg-white rounded-lg p-4 shadow-sm border">
@@ -632,7 +655,6 @@ const TestCaseRow = ({
                         <p className="text-gray-700 leading-relaxed">{testCase.preconditions}</p>
                       </div>
                     )}
-
                     {/* Test Steps */}
                     {testCase.steps && testCase.steps.length > 0 && (
                       <div className="bg-white rounded-lg p-4 shadow-sm border">
@@ -652,7 +674,6 @@ const TestCaseRow = ({
                         </ol>
                       </div>
                     )}
-
                     {/* Expected Result */}
                     {testCase.expectedResult && (
                       <div className="bg-white rounded-lg p-4 shadow-sm border">
@@ -663,7 +684,6 @@ const TestCaseRow = ({
                         <p className="text-gray-700 leading-relaxed">{testCase.expectedResult}</p>
                       </div>
                     )}
-
                     {/* Test Data */}
                     {testCase.testData && (
                       <div className="bg-white rounded-lg p-4 shadow-sm border">
@@ -677,7 +697,6 @@ const TestCaseRow = ({
                       </div>
                     )}
                   </div>
-
                   {/* Right Column - Metadata */}
                   <div className="space-y-4">
                     {/* Quick Info Card */}
@@ -720,7 +739,6 @@ const TestCaseRow = ({
                         </div>
                       </div>
                     </div>
-
                     {/* Execution History */}
                     <div className="bg-white rounded-lg p-4 shadow-sm border">
                       <h4 className="font-semibold text-gray-900 mb-4">Execution History</h4>
@@ -751,7 +769,6 @@ const TestCaseRow = ({
                         )}
                       </div>
                     </div>
-
                     {/* Tags */}
                     {testCase.tags && testCase.tags.length > 0 && (
                       <div className="bg-white rounded-lg p-4 shadow-sm border">
@@ -765,7 +782,6 @@ const TestCaseRow = ({
                         </div>
                       </div>
                     )}
-
                     {/* Linked Requirements */}
                     {testCase.requirementIds && testCase.requirementIds.length > 0 && (
                       <div className="bg-white rounded-lg p-4 shadow-sm border">
@@ -799,13 +815,20 @@ const TestCaseRow = ({
 const TestCases = () => {
   // Get version context
   const { selectedVersion, versions } = useVersionContext();
-
   // State for data from DataStore
   const [testCases, setTestCases] = useState([]);
   const [requirements, setRequirements] = useState([]);
   const [mapping, setMapping] = useState({});
   const [hasTestCases, setHasTestCases] = useState(false);
-
+  // NEW: Add state variables for test suites
+  const [testSuites, setTestSuites] = useState([]);
+  const [selectedSuite, setSelectedSuite] = useState(null);
+  const [activeSuite, setActiveSuite] = useState(null);
+  const [categoryFilter, setCategoryFilter] = useState('All');
+  // Modal states
+  const [showCreateSuiteModal, setShowCreateSuiteModal] = useState(false);
+  const [showEditSuiteModal, setShowEditSuiteModal] = useState(false);
+  const [showAddToSuiteModal, setShowAddToSuiteModal] = useState(false);
   // UI State
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
@@ -817,37 +840,28 @@ const TestCases = () => {
   const [automationFilter, setAutomationFilter] = useState('All');
   const [showAllTags, setShowAllTags] = useState(false);
   const [expandedRows, setExpandedRows] = useState(new Set()); // Corrected line
-
   // Add new state variables for tag filter
   const [showTagFilter, setShowTagFilter] = useState(false);
   const [tagSearchQuery, setTagSearchQuery] = useState('');
-
   // Modal states - ENHANCED
   const [showViewModal, setShowViewModal] = useState(false); // NEW: View modal state
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [showExecutionModal, setShowExecutionModal] = useState(false);
   const [viewingTestCase, setViewingTestCase] = useState(null); // NEW: Currently viewing test case
+  const [showEditModal, setShowEditModal] = useState(false);
   const [editingTestCase, setEditingTestCase] = useState(null);
-
+  const [showExecutionModal, setShowExecutionModal] = useState(false);
   // State for collapsed/expanded sections
   const [collapsedSections, setCollapsedSections] = useState(new Set()); // Corrected initialization
-
   // Add new state variables for failure expansion
   const [expandedTests, setExpandedTests] = useState(new Set());
   const [allExpanded, setAllExpanded] = useState(false);
-
   const [showVersionAssignmentModal, setShowVersionAssignmentModal] = useState(false);
   const [versionAssignmentAction, setVersionAssignmentAction] = useState(null);
   const [selectedVersionForAssignment, setSelectedVersionForAssignment] = useState('');
   const [showVersionModal, setShowVersionModal] = useState(false);
   const [modalVersions, setModalVersions] = useState(null);
-
   const [showTagAssignmentModal, setShowTagAssignmentModal] = useState(false);
   const [selectedTagsForAssignment, setSelectedTagsForAssignment] = useState([]);
   const [tagAssignmentAction, setTagAssignmentAction] = useState('add');
-
-
-
   // Load data from DataStore
   useEffect(() => {
     const updateData = () => {
@@ -856,21 +870,34 @@ const TestCases = () => {
       setMapping(dataStore.getMapping());
       setHasTestCases(dataStore.getTestCases().length > 0);
     };
-
     updateData();
-
     // Subscribe to DataStore changes
     const unsubscribe = dataStore.subscribe(updateData);
-
     // Clean up subscription
     return () => unsubscribe();
   }, []);
-
+  // NEW: Load test suites
+  useEffect(() => {
+    const loadTestSuites = async () => {
+      try {
+        const suites = await dataStore.getTestSuites();
+        setTestSuites(suites);
+      } catch (error) {
+        console.error('Failed to load test suites:', error);
+        setTestSuites([]);
+      }
+    };
+    loadTestSuites();
+    // Subscribe to changes
+    const unsubscribe = dataStore.subscribe(() => {
+      loadTestSuites();
+    });
+    return () => unsubscribe();
+  }, []);
   // Auto-reset filters when version changes to avoid confusion
   useEffect(() => {
     // Don't reset on initial load
     if (!selectedVersion) return;
-
     // Get tags available in the new version
     const newVersionTestCases = selectedVersion === 'unassigned'
       ? testCases
@@ -881,14 +908,12 @@ const TestCases = () => {
         }
         return !tc.version || tc.version === selectedVersion || tc.version === '';
       });
-
     const tagsInNewVersion = new Set();
     newVersionTestCases.forEach(tc => {
       if (tc.tags && Array.isArray(tc.tags)) {
         tc.tags.forEach(tag => tagsInNewVersion.add(tag));
       }
     });
-
     // Reset selected tags that don't exist in the new version
     setSelectedTags(prev => {
       const validTags = new Set();
@@ -897,34 +922,27 @@ const TestCases = () => {
           validTags.add(tag);
         }
       });
-
       // If some tags were removed, also reset status filter to "All" to avoid double confusion
       if (validTags.size < prev.size) {
         console.log('🔄 Version changed: Resetting invalid filters');
         setStatusFilter('All');
         setSearchQuery(''); // Optional: also reset search
       }
-
       return validTags;
     });
-
     // Optional: Reset other filters too
     // setStatusFilter('All');
     // setPriorityFilter('All');
     // setAutomationFilter('All');
-
   }, [selectedVersion, testCases]); // Triggers when version changes
-
   // NEW: Get linked requirements for the currently viewing test case
   const linkedRequirements = useMemo(() => {
     if (!viewingTestCase || !viewingTestCase.requirementIds?.length) return [];
-
     const requirements = dataStore.getRequirements();
     return requirements.filter(req =>
       viewingTestCase.requirementIds.includes(req.id)
     );
   }, [viewingTestCase]);
-
   // Toggle individual test expansion for failures
   const toggleTestExpansion = (testId) => {
     setExpandedTests(prev => {
@@ -937,7 +955,6 @@ const TestCases = () => {
       return newSet;
     });
   };
-
   // Expand/Collapse All failures
   const toggleExpandAll = () => {
     if (allExpanded) {
@@ -953,7 +970,6 @@ const TestCases = () => {
       setAllExpanded(true);
     }
   };
-
   // Filter test cases by selected version (from context)
   const versionFilteredTestCases = useMemo(() => {
     if (selectedVersion === 'unassigned') {
@@ -967,26 +983,11 @@ const TestCases = () => {
         if (tc.applicableVersions.length === 0) return true;
         return tc.applicableVersions.includes(selectedVersion);
       }
-
       // Handle legacy format during transition
       return !tc.version || tc.version === selectedVersion || tc.version === '';
     });
   }, [testCases, selectedVersion]);
-
-  // Get unique tags from all test cases
-  const availableTags = useMemo(() => {
-    return dataStore.getAllTags();
-  }, [testCases]);
-
-  // Add this computed value for filtered tags
-  const filteredAvailableTags = useMemo(() => {
-    if (!tagSearchQuery) return availableTags;
-    return availableTags.filter(tag =>
-      tag.toLowerCase().includes(tagSearchQuery.toLowerCase())
-    );
-  }, [availableTags, tagSearchQuery]);
-
-
+  // NEW: Filter logic including suite filtering
   const filteredTestCases = useMemo(() => {
     console.log('🔍 Filtering Debug:', {
       versionFilteredCount: versionFilteredTestCases.length,
@@ -995,45 +996,72 @@ const TestCases = () => {
       sampleTestCaseTags: versionFilteredTestCases.slice(0, 3).map(tc => ({ id: tc.id, tags: tc.tags }))
     });
 
-    return versionFilteredTestCases.filter(testCase => {
-      // Search filter
+    let filtered = versionFilteredTestCases;
+
+    // Search filter
+    filtered = filtered.filter(testCase => {
       const matchesSearch = !searchQuery ||
         testCase.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         testCase.id.toLowerCase().includes(searchQuery.toLowerCase());
+      return matchesSearch;
+    });
 
-      // Status filter
-      const matchesStatus = statusFilter === 'All' || testCase.status === statusFilter;
+    // Status filter
+    filtered = filtered.filter(testCase => statusFilter === 'All' || testCase.status === statusFilter);
 
-      // Priority filter
-      const matchesPriority = priorityFilter === 'All' || testCase.priority === priorityFilter;
+    // Priority filter
+    filtered = filtered.filter(testCase => priorityFilter === 'All' || testCase.priority === priorityFilter);
 
-      // Automation filter
-      const matchesAutomation = automationFilter === 'All' || testCase.automationStatus === automationFilter;
+    // Automation filter
+    filtered = filtered.filter(testCase => automationFilter === 'All' || testCase.automationStatus === automationFilter);
 
-      // Tag filter - Enhanced debugging
+    // Tag filter
+    filtered = filtered.filter(testCase => {
       const matchesTags = selectedTags.size === 0 ||
         (testCase.tags && Array.isArray(testCase.tags) &&
           Array.from(selectedTags).some(tag => testCase.tags.includes(tag)));
+      return matchesTags;
+    });
 
-      // Debug specific test case if it has the Sample tag
+    // ✅ ADD THIS: Suite filter (Step 2.6)
+    if (activeSuite) {
+      const memberIds = activeSuite.members?.map(m => m.id) || [];
+      filtered = filtered.filter(tc => memberIds.includes(tc.id));
+    }
+
+    // Debug specific test case if it has the Sample tag
+    filtered.forEach(testCase => {
       if (testCase.tags && testCase.tags.includes('Sample')) {
-        console.log('🏷️ Sample tag test case:', {
+        console.log('🏷️ Sample tag test case after filtering:', {
           id: testCase.id,
           tags: testCase.tags,
-          selectedTags: Array.from(selectedTags),
-          matchesTags,
-          matchesSearch,
-          matchesStatus,
-          matchesPriority,
-          matchesAutomation
+          selectedTags: Array.from(selectedTags)
         });
       }
-
-      return matchesSearch && matchesStatus && matchesPriority && matchesAutomation && matchesTags;
     });
-  }, [versionFilteredTestCases, searchQuery, statusFilter, priorityFilter, automationFilter, selectedTags]);
 
-  // Calculate summary statistics
+    return filtered;
+  }, [
+    versionFilteredTestCases,
+    searchQuery,
+    statusFilter,
+    priorityFilter,
+    automationFilter,
+    selectedTags,
+    activeSuite // ✅ ADD THIS DEPENDENCY
+  ]);
+  // NEW: Get all unique categories
+  const allCategories = useMemo(() => {
+    return getAllCategories(testCases);
+  }, [testCases]);
+  // NEW: Get all unique tags
+  const allTags = useMemo(() => {
+    return getAllTags(testCases);
+  }, [testCases]);
+  // NEW: Get linked requirements for a test case
+  const getLinkedRequirementsForTestCase = (testCaseId) => {
+    return getLinkedRequirements(testCaseId, mapping, requirements);
+  };
   // Calculate summary statistics
   const summaryStats = useMemo(() => {
     // Base counts from version-filtered test cases (before other filters)
@@ -1045,7 +1073,6 @@ const TestCases = () => {
     const notFoundBase = versionFilteredTestCases.filter(tc => tc.status === 'Not Found').length;
     const automatedBase = versionFilteredTestCases.filter(tc => tc.automationStatus === 'Automated').length;
     const linkedBase = versionFilteredTestCases.filter(tc => tc.requirementIds && tc.requirementIds.length > 0).length;
-
     // Current filtered counts (for display in metrics cards)
     const total = filteredTestCases.length;
     const passed = filteredTestCases.filter(tc => tc.status === 'Passed').length;
@@ -1055,7 +1082,6 @@ const TestCases = () => {
     const notFound = filteredTestCases.filter(tc => tc.status === 'Not Found').length;
     const automated = filteredTestCases.filter(tc => tc.automationStatus === 'Automated').length;
     const linked = filteredTestCases.filter(tc => tc.requirementIds && tc.requirementIds.length > 0).length;
-
     return {
       // Current filtered counts (for metrics cards)
       total,
@@ -1069,7 +1095,6 @@ const TestCases = () => {
       passRate: total > 0 ? Math.round((passed / total) * 100) : 0,
       automationRate: total > 0 ? Math.round((automated / total) * 100) : 0,
       linkageRate: total > 0 ? Math.round((linked / total) * 100) : 0,
-
       // Base counts (for status filter buttons)
       totalBase,
       passedBase,
@@ -1081,7 +1106,42 @@ const TestCases = () => {
       linkedBase
     };
   }, [filteredTestCases, versionFilteredTestCases]);
-
+  // NEW: Handle suite selection
+  const handleSuiteClick = async (suite) => {
+    try {
+      const fullSuite = await dataStore.getTestSuite(suite.id);
+      const members = await dataStore.getTestSuiteMembers(suite.id);
+      setActiveSuite({ ...fullSuite, members });
+      setSelectedTestCases(new Set());
+    } catch (error) {
+      console.error('Failed to load suite:', error);
+    }
+  };
+  // NEW: Handle create suite
+  const handleCreateSuite = () => {
+    setShowCreateSuiteModal(true);
+  };
+  // NEW: Handle add test case
+  const handleAddTestCase = () => {
+    handleNewTestCase(); // Use existing function
+  };
+  // NEW: Handle clear suite filter
+  const handleClearSuiteFilter = () => {
+    setActiveSuite(null);
+  };
+  // NEW: Handle delete suite
+  const handleDeleteSuite = async (suiteId) => {
+    if (!confirm('Are you sure you want to delete this suite?')) return;
+    try {
+      await dataStore.deleteTestSuite(suiteId);
+      if (activeSuite?.id === suiteId) {
+        setActiveSuite(null);
+      }
+    } catch (error) {
+      console.error('Failed to delete suite:', error);
+      alert('Failed to delete suite');
+    }
+  };
   // Handle test case selection
   const handleTestCaseSelection = (testCaseId, checked) => {
     setSelectedTestCases(prev => {
@@ -1094,7 +1154,6 @@ const TestCases = () => {
       return newSelection;
     });
   };
-
   const handleSelectAll = (checked) => {
     if (checked) {
       setSelectedTestCases(new Set(filteredTestCases.map(tc => tc.id)));
@@ -1102,7 +1161,6 @@ const TestCases = () => {
       setSelectedTestCases(new Set());
     }
   };
-
   // Handle select/deselect all in a specific category
   const handleSelectAllInCategory = (category, checked) => {
     setSelectedTestCases(prev => {
@@ -1120,18 +1178,15 @@ const TestCases = () => {
       return newSelection;
     });
   };
-
   // Clear selection function
   const handleClearSelection = () => {
     setSelectedTestCases(new Set());
   };
-
   const selectedAutomatedTestCases = useMemo(() => {
     return Array.from(selectedTestCases)
       .map(id => filteredTestCases.find(tc => tc.id === id))
       .filter(tc => tc && (tc.automationStatus === 'Automated' || tc.automationStatus === 'Semi-Automated'));
   }, [selectedTestCases, filteredTestCases]);
-
   // Execute selected test cases
   const executeSelectedTests = () => {
     if (selectedAutomatedTestCases.length === 0) {
@@ -1140,7 +1195,6 @@ const TestCases = () => {
     }
     setShowExecutionModal(true);
   };
-
   // Toggle row expansion
   const toggleRowExpansion = (testCaseId) => {
     setExpandedRows(prev => {
@@ -1153,13 +1207,11 @@ const TestCases = () => {
       return newExpanded;
     });
   };
-
   // NEW: Handle view test case - ENHANCED VERSION
   const handleViewTestCase = (testCase) => {
     setViewingTestCase(testCase);
     setShowViewModal(true);
   };
-
   // Handle new test case creation
   const handleNewTestCase = () => {
     setEditingTestCase({
@@ -1179,21 +1231,18 @@ const TestCases = () => {
     });
     setShowEditModal(true);
   };
-
   // Handle test case editing (can be called from view modal)
   const handleEditTestCase = (testCase) => {
     setEditingTestCase({ ...testCase });
     setShowEditModal(true);
     setShowViewModal(false); // Close view modal when editing
   };
-
   // Handle execute test case
   const handleExecuteTestCase = (testCase) => {
     setSelectedTestCases(new Set([testCase.id]));
     setShowExecutionModal(true);
     setShowViewModal(false); // Close view modal when executing
   };
-
   // Handle duplicate test case - NEW
   // Handle duplicate test case
   const handleDuplicateTestCase = (testCase) => {
@@ -1205,12 +1254,10 @@ const TestCases = () => {
       lastExecuted: '',
       executedBy: ''
     };
-
     setEditingTestCase(duplicatedTestCase);
     setShowEditModal(true);
     setShowViewModal(false); // Close view modal when duplicating
   };
-
   // Save test case (create or update)
   const handleSaveTestCase = async (testCaseData) => {
     try {
@@ -1236,27 +1283,21 @@ const TestCases = () => {
       alert('Error saving test case: ' + error.message);
     }
   };
-
-
   // Delete test case
   const handleDeleteTestCase = async (testCaseId) => {
     if (window.confirm('Are you sure you want to delete this test case?')) {
       try {
         console.log('Deleting test case:', testCaseId);
-
         // Delete from database (this will also update localStorage)
         await dataStore.deleteTestCase(testCaseId);
-
         // Clear from selection if selected
         setSelectedTestCases(prev => {
           const newSet = new Set(prev);
           newSet.delete(testCaseId);
           return newSet;
         });
-
         // Close view modal if currently viewing deleted test case
         setShowViewModal(false);
-
         console.log('✅ Test case deleted successfully');
       } catch (error) {
         console.error('❌ Error deleting test case:', error);
@@ -1264,23 +1305,18 @@ const TestCases = () => {
       }
     }
   };
-
   // Handle bulk delete
   const handleBulkDelete = async () => {
     if (selectedTestCases.size === 0) return;
-
     if (window.confirm(`Are you sure you want to delete ${selectedTestCases.size} test case(s)?`)) {
       try {
         console.log(`Deleting ${selectedTestCases.size} test cases...`);
-
         // Delete each test case (this will update database and localStorage)
         for (const testCaseId of selectedTestCases) {
           await dataStore.deleteTestCase(testCaseId);
         }
-
         // Clear selection
         setSelectedTestCases(new Set());
-
         console.log(`✅ ${selectedTestCases.size} test cases deleted successfully`);
       } catch (error) {
         console.error('❌ Error deleting test cases:', error);
@@ -1288,116 +1324,96 @@ const TestCases = () => {
       }
     }
   };
-
   // Bulk version assignment handler
   const handleBulkVersionAssignment = (versionId, action) => {
     if (selectedTestCases.size === 0) return;
-
     console.log('Bulk version assignment:', { versionId, action, selectedCount: selectedTestCases.size });
-
     setSelectedVersionForAssignment(versionId);
     setVersionAssignmentAction(action);
     setShowVersionAssignmentModal(true);
   };
-
   /**
    * NEW: Bulk tag assignment handler
    */
   const handleBulkTagAssignment = (tags, action) => {
     if (selectedTestCases.size === 0) return;
-
     console.log('Bulk tag assignment:', { tags, action, selectedCount: selectedTestCases.size });
-
     // Validate the operation before showing modal
     const testCaseIds = Array.from(selectedTestCases);
     const validation = dataStore.validateTagOperation(testCaseIds, tags, action);
-
     if (!validation.valid) {
-      alert('Cannot proceed with tag operation:\n' + validation.errors.join('\n'));
+      alert('Cannot proceed with tag operation:' + validation.errors.join(''));
       return;
     }
-
     // Show warnings if any
     if (validation.warnings.length > 0) {
       const proceed = confirm(
-        `Tag operation warnings:\n${validation.warnings.join('\n')}\n\nDo you want to continue?`
+        `Tag operation warnings:
+${validation.warnings.join('')}
+Do you want to continue?`
       );
       if (!proceed) return;
     }
-
     setSelectedTagsForAssignment(tags);
     setTagAssignmentAction(action);
     setShowTagAssignmentModal(true);
   };
-
   /**
    * NEW: Confirm tag assignment
    */
   const confirmTagAssignment = async () => {
     try {
       const testCaseIds = Array.from(selectedTestCases);
-
       console.log('Confirming tag assignment:', {
         testCaseIds: testCaseIds.length,
         tags: selectedTagsForAssignment,
         action: tagAssignmentAction
       });
-
       const result = await dataStore.updateTestCaseTags(
         testCaseIds,
         selectedTagsForAssignment,
         tagAssignmentAction
       );
-
       // Clear selection and close modal
       setSelectedTestCases(new Set());
       setShowTagAssignmentModal(false);
-
       // Show detailed success message
       const actionText = tagAssignmentAction === 'add' ? 'added to' : 'removed from';
       const tagText = selectedTagsForAssignment.length === 1
         ? `"${selectedTagsForAssignment[0]}"`
         : `${selectedTagsForAssignment.length} tags`;
-
       if (result.successful.length > 0) {
-        let message = `✅ ${tagText} ${actionText} ${result.successful.length} test case${result.successful.length !== 1 ? 's' : ''}`;
-
+        let message = `✅ ${tagText} ${actionText} ${result.successful.length} test case${result.successful.length !== 1 ? 's' : ''} `;
         // Add details for partial operations
         const details = [];
         if (result.skipped.length > 0) {
-          details.push(`${result.skipped.length} skipped (no changes needed)`);
+          details.push(`${result.skipped.length} skipped(no changes needed)`);
         }
         if (result.failed.length > 0) {
           details.push(`${result.failed.length} failed`);
         }
-
         if (details.length > 0) {
-          message += `\n\nDetails: ${details.join(', ')}`;
+          message += `
+      Details: ${details.join(', ')} `;
         }
-
         alert(message);
       } else {
-        alert(`ℹ️ No changes were made. ${result.skipped.length + result.failed.length} test cases were not modified.`);
+        alert(`ℹ️ No changes were made.${result.skipped.length + result.failed.length} test cases were not modified.`);
       }
-
     } catch (error) {
       console.error('Tag assignment failed:', error);
       alert('❌ Tag assignment failed: ' + error.message);
-
       // Don't clear the modal so user can retry
       setShowTagAssignmentModal(false);
     }
   };
-
   /**
    * NEW: Enhanced export functionality
    */
   const handleExportSelected = () => {
     if (selectedTestCases.size === 0) return;
-
     const selectedIds = Array.from(selectedTestCases);
     const selectedTestCaseObjects = testCases.filter(tc => selectedIds.includes(tc.id));
-
     // Create export data with enhanced information
     const exportData = selectedTestCaseObjects.map(tc => ({
       id: tc.id,
@@ -1414,47 +1430,68 @@ const TestCases = () => {
       estimatedDuration: tc.estimatedDuration || '',
       lastExecuted: tc.lastExecuted || 'Never'
     }));
-
     // Convert to CSV
     const csvContent = convertToCSV(exportData);
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
-
     if (link.download !== undefined) {
       const url = URL.createObjectURL(blob);
       link.setAttribute('href', url);
-      link.setAttribute('download', `test-cases-export-${new Date().toISOString().split('T')[0]}.csv`);
+      link.setAttribute('download', `test - cases -export -${new Date().toISOString().split('T')[0]}.csv`);
       link.style.visibility = 'hidden';
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
     }
-
     // Clear selection after export
     setSelectedTestCases(new Set());
     alert(`✅ Exported ${selectedTestCaseObjects.length} test cases to CSV file.`);
   };
-
   /**
-   * Helper function to convert data to CSV
-   */
+ * Converts an array of objects into a CSV (Comma Separated Values) string.
+ *
+ * @param {Array<Object>} data An array of objects to convert. Assumes all objects
+ * have the same keys.
+ * @returns {string} A string formatted as a CSV.
+ */
   const convertToCSV = (data) => {
-    const headers = Object.keys(data[0]);
-    const csvContent = [
-      headers.join(','),
-      ...data.map(row =>
-        headers.map(header => {
-          const value = row[header]?.toString() || '';
-          // Escape quotes and wrap in quotes if contains comma, quote, or newline
-          return value.includes(',') || value.includes('"') || value.includes('\n')
-            ? `"${value.replace(/"/g, '""')}"`
-            : value;
-        }).join(',')
-      )
-    ].join('\n');
+    // 1. Handle empty data
+    if (!data || data.length === 0) {
+      return "";
+    }
 
-    return csvContent;
+    // 2. Get headers from the first object
+    const headers = Object.keys(data[0]);
+
+    // 3. Create an array to hold all rows, starting with the header row
+    const csvRows = [
+      headers.join(','), // Join header titles with a comma
+    ];
+
+    // 4. Process each data row
+    data.forEach(row => {
+      const values = headers.map(header => {
+        // Get the value, default to empty string if null/undefined
+        const value = row[header]?.toString() || '';
+
+        // Escape all double-quotes (") by replacing them with two double-quotes ("")
+        const escapedValue = value.replace(/"/g, '""');
+
+        // Check if the value contains characters that require quoting
+        const needsQuotes = value.includes(',') || value.includes('"') || value.includes('\n');
+
+        // Wrap in quotes if needed, otherwise just use the (escaped) value
+        return needsQuotes ? `"${escapedValue}"` : escapedValue;
+      });
+
+      // Add the newly formatted row string to our array
+      csvRows.push(values.join(','));
+    });
+
+    // 5. Join all rows (header + data) with a newline character
+    return csvRows.join('\n');
   };
+
 
   /**
    * NEW: Tag Assignment Confirmation Modal Component
@@ -1462,12 +1499,10 @@ const TestCases = () => {
    */
   const TagAssignmentModal = () => {
     if (!showTagAssignmentModal) return null;
-
     const actionText = tagAssignmentAction === 'add' ? 'add' : 'remove';
     const prepositionText = tagAssignmentAction === 'add' ? 'to' : 'from';
     const colorClass = tagAssignmentAction === 'add' ? 'text-green-600' : 'text-red-600';
     const bgColorClass = tagAssignmentAction === 'add' ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200';
-
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
         <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
@@ -1475,7 +1510,6 @@ const TestCases = () => {
             <Hash className={`mr-2 ${colorClass}`} size={20} />
             Confirm Tag {tagAssignmentAction === 'add' ? 'Addition' : 'Removal'}
           </h3>
-
           <div className={`p-4 rounded-lg ${bgColorClass} mb-4`}>
             <p className="text-sm mb-3">
               You are about to <strong className={colorClass}>{actionText}</strong> the following tag{selectedTagsForAssignment.length !== 1 ? 's' : ''}{' '}
@@ -1496,7 +1530,6 @@ const TestCases = () => {
               ))}
             </div>
           </div>
-
           <div className="text-sm text-gray-600 mb-6 p-3 bg-gray-50 rounded">
             <strong>Selected test cases ({selectedTestCases.size}):</strong>
             <div className="mt-1 text-xs">
@@ -1507,7 +1540,6 @@ const TestCases = () => {
               {selectedTestCases.size > 5 && ` and ${selectedTestCases.size - 5} more...`}
             </div>
           </div>
-
           <div className="flex space-x-3">
             <button
               onClick={confirmTagAssignment}
@@ -1535,32 +1567,26 @@ const TestCases = () => {
       </div>
     );
   };
-
   const confirmVersionAssignment = async () => {
     try {
       const testCaseIds = Array.from(selectedTestCases);
-
       await dataStore.updateTestCaseVersions(
         testCaseIds,
         selectedVersionForAssignment,
         versionAssignmentAction
       );
-
       // Clear selection and close modal
       setSelectedTestCases(new Set());
       setShowVersionAssignmentModal(false);
-
       // Show success message
       const versionName = versions.find(v => v.id === selectedVersionForAssignment)?.name;
       const actionText = versionAssignmentAction === 'add' ? 'added to' : 'removed from';
       alert(`${testCaseIds.length} test cases ${actionText} ${versionName}`);
-
     } catch (error) {
       console.error('Version assignment failed:', error);
       alert('Version assignment failed: ' + error.message);
     }
   };
-
   // Handle tag selection
   // Find your handleTagToggle function and update it:
   const handleTagToggle = (tag) => {
@@ -1576,12 +1602,10 @@ const TestCases = () => {
       return newSet;
     });
   };
-
   // Clear all selected tags
   const handleClearTags = () => {
     setSelectedTags(new Set());
   };
-
   // Group test cases by category
   const groupedTestCases = useMemo(() => {
     const groups = {};
@@ -1598,7 +1622,6 @@ const TestCases = () => {
       return sorted;
     }, {});
   }, [filteredTestCases]);
-
   // Toggle category section collapse
   const toggleSection = (category) => {
     setCollapsedSections(prev => {
@@ -1611,38 +1634,31 @@ const TestCases = () => {
       return newSet;
     });
   };
-
   // Generate category statistics
   const getCategoryStats = (testCases) => {
     const total = testCases.length;
     const passed = testCases.filter(tc => tc.status === 'Passed').length;
     const failed = testCases.filter(tc => tc.status === 'Failed').length;
     const automated = testCases.filter(tc => tc.automationStatus === 'Automated').length;
-
     return { total, passed, failed, automated, passRate: total > 0 ? Math.round((passed / total) * 100) : 0 };
   };
-
   // Available versions for the Edit Test Case Modal's multi-select
   const availableVersions = useMemo(() => {
     return versions.map(v => ({ id: v.id, name: v.name }));
   }, [versions]);
-
   // Handle version toggle in Edit Test Case Modal (for applicableVersions)
   const handleVersionToggle = (testCaseId, versionId, isChecked) => {
     setEditingTestCase(prev => {
       if (!prev) return null;
-
       const currentApplicableVersions = Array.isArray(prev.applicableVersions)
         ? [...prev.applicableVersions]
         : (prev.version ? [prev.version] : []); // Handle legacy during editing
-
       let newApplicableVersions;
       if (isChecked) {
         newApplicableVersions = [...new Set([...currentApplicableVersions, versionId])];
       } else {
         newApplicableVersions = currentApplicableVersions.filter(v => v !== versionId);
       }
-
       return {
         ...prev,
         applicableVersions: newApplicableVersions,
@@ -1651,15 +1667,120 @@ const TestCases = () => {
       };
     });
   };
+  // NEW: Right sidebar content logic with multiple states
+  // Right sidebar content logic (Step 2.8)
+  const rightSidebarContent = useMemo(() => {
+    // State 1: Browse Mode
+    if (selectedTestCases.size === 0 && !selectedSuite && !activeSuite) {
+      return (
+        <TestCasesBrowseSidebar
+          testSuites={testSuites}
+          onSuiteClick={handleSuiteClick}
+          onCreateSuite={handleCreateSuite}
+          onAddTestCase={handleAddTestCase}
+          categoryFilter={categoryFilter}
+          statusFilter={statusFilter}
+          priorityFilter={priorityFilter}
+          automationFilter={automationFilter}
+          selectedTagsFilter={Array.from(selectedTags)}
+          allCategories={getAllCategories(testCases)}
+          allTags={getAllTags(testCases)}
+          onCategoryChange={setCategoryFilter}
+          onStatusChange={setStatusFilter}
+          onPriorityChange={setPriorityFilter}
+          onAutomationChange={setAutomationFilter}
+          onTagsChange={(tags) => setSelectedTags(new Set(tags))}
+          onClearAllFilters={() => {
+            setCategoryFilter('All');
+            setStatusFilter('All');
+            setPriorityFilter('All');
+            setAutomationFilter('All');
+            setSelectedTags(new Set());
+          }}
+          stats={{
+            total: versionFilteredTestCases.length,
+            filtered: filteredTestCases.length,
+            automated: filteredTestCases.filter(tc => tc.automationStatus === 'Automated').length,
+            manual: filteredTestCases.filter(tc => tc.automationStatus === 'Manual').length,
+            passed: filteredTestCases.filter(tc => tc.status === 'Passed').length,
+            failed: filteredTestCases.filter(tc => tc.status === 'Failed').length
+          }}
+        />
+      );
+    }
 
+    // State 2: Suite View (placeholder)
+    if (activeSuite && selectedTestCases.size === 0) {
+      return (
+        <div className="p-4 text-center text-gray-500">
+          Suite View Coming Soon
+          <button
+            onClick={handleClearSuiteFilter}
+            className="block w-full mt-4 px-4 py-2 bg-blue-600 text-white rounded"
+          >
+            Back to Browse
+          </button>
+        </div>
+      );
+    }
+
+    // State 3: Bulk Actions (existing)
+    if (selectedTestCases.size > 1) {
+      return (
+        <BulkActionsPanel
+          selectedCount={selectedTestCases.size}
+          selectedItems={testCases.filter(tc => selectedTestCases.has(tc.id))}
+          itemType="test case"
+          showExecuteButton={true}
+          availableVersions={versions}
+          availableTags={getAllTags(testCases)}
+          onVersionAssign={handleBulkVersionAssignment}
+          onTagsUpdate={handleBulkTagAssignment}
+          onBulkDelete={handleBulkDelete}
+          onClearSelection={() => setSelectedTestCases(new Set())}
+          onExecuteTests={executeSelectedTests}
+          onExport={handleExportSelected}
+        />
+      );
+    }
+
+    // State 4: Single Selection (placeholder)
+    if (selectedTestCases.size === 1) {
+      return (
+        <div className="p-4 text-center text-gray-500">
+          Test Details Coming Soon
+        </div>
+      );
+    }
+
+    return null;
+  }, [
+    selectedTestCases,
+    selectedSuite,
+    activeSuite,
+    testSuites,
+    testCases,
+    categoryFilter,
+    statusFilter,
+    priorityFilter,
+    automationFilter,
+    selectedTags,
+    filteredTestCases,
+    versionFilteredTestCases,
+    versions,
+    handleBulkVersionAssignment,
+    handleBulkTagAssignment,
+    handleBulkDelete,
+    executeSelectedTests,
+    handleExportSelected,
+    handleClearSuiteFilter
+  ]);
   const selectedTestCasesArray = Array.from(selectedTestCases)
     .map(id => filteredTestCases.find(tc => tc.id === id))
     .filter(Boolean);
-
   const hasAutomatedTests = selectedTestCasesArray.some(
     tc => tc.automationStatus === 'Automated' || tc.automationStatus === 'Semi-Automated'
   );
-
   if (!hasTestCases) {
     return (
       <MainLayout title="Test Cases" hasData={false}>
@@ -1671,13 +1792,13 @@ const TestCases = () => {
           icon="tests"  // Use the tests icon
           className="mt-8"
         />
-
       </MainLayout>
     );
   }
-
   return (
-    <MainLayout title="Test Cases" hasData={hasTestCases}>
+    <MainLayout title="Test Cases"
+      hasData={hasTestCases}
+      rightSidebar={rightSidebarContent}>
       <div className="space-y-6">
         {/* Version indicator for unassigned view */}
         {selectedVersion === 'unassigned' && (
@@ -1688,7 +1809,30 @@ const TestCases = () => {
             </p>
           </div>
         )}
-
+        {/* NEW: Suite Filter Banner */}
+        {/* Suite Filter Banner */}
+        {activeSuite && (
+          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <FolderOpen size={16} className="text-blue-600" />
+                <span className="text-sm font-medium text-blue-900">
+                  Viewing Suite: {activeSuite.name}
+                </span>
+                <span className="text-xs text-blue-600">
+                  ({activeSuite.members?.length || 0} tests)
+                </span>
+              </div>
+              <button
+                onClick={handleClearSuiteFilter}
+                className="text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center"
+              >
+                <X size={14} className="mr-1" />
+                Clear Filter
+              </button>
+            </div>
+          </div>
+        )}
         {/* Header */}
         {/* Compact Header - Matching Requirements Design */}
         {/* Unified Filter Card — Merged from Quick + Advanced */}
@@ -1707,7 +1851,6 @@ const TestCases = () => {
                   </div>
                 )}
               </div>
-
               {/* Inline Metrics Bar (Desktop) */}
               <div className="hidden lg:flex items-center divide-x divide-gray-300">
                 <div className="flex items-center space-x-1.5 px-4">
@@ -1728,7 +1871,6 @@ const TestCases = () => {
                 </div>
               </div>
             </div>
-
             {/* Add Button */}
             <button
               onClick={handleNewTestCase}
@@ -1738,7 +1880,6 @@ const TestCases = () => {
               Add
             </button>
           </div>
-
           {/* Status Filter Tabs */}
           <div className="px-4 py-2 bg-gray-50 border-b flex items-center justify-between">
             <div className="flex space-x-2">
@@ -1790,7 +1931,6 @@ const TestCases = () => {
                 </button>
               )}
             </div>
-
             {/* Quick Search */}
             <div className="flex items-center space-x-2">
               <input
@@ -1802,7 +1942,6 @@ const TestCases = () => {
               />
             </div>
           </div>
-
           {/* Mobile Metrics */}
           <div className="lg:hidden px-4 py-3 border-t bg-gray-50">
             <div className="grid grid-cols-4 gap-3 text-center">
@@ -1824,7 +1963,6 @@ const TestCases = () => {
               </div>
             </div>
           </div>
-
           {/* Advanced Filters - Collapsible Section */}
           <div className="border-t">
             <button
@@ -1845,7 +1983,6 @@ const TestCases = () => {
                 className={`text-gray-600 transition-transform ${showAdvancedFilters ? 'rotate-180' : ''}`}
               />
             </button>
-
             {showAdvancedFilters && (
               <div className="px-4 py-4 bg-gray-50">
                 <div className="space-y-4">
@@ -1877,7 +2014,6 @@ const TestCases = () => {
                       </select>
                     </div>
                   </div>
-
                   {/* Tags */}
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-2">Tags</label>
@@ -1917,7 +2053,6 @@ const TestCases = () => {
                       })()}
                     </div>
                   </div>
-
                   {/* Clear Filters */}
                   {(priorityFilter !== 'All' || automationFilter !== 'All' || selectedTags.size > 0) && (
                     <div className="pt-4 border-t flex justify-end">
@@ -1939,16 +2074,37 @@ const TestCases = () => {
           </div>
         </div>
 
+        {/* Suite Filter Banner (Step 2.9) */}
+        {activeSuite && (
+          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <FolderOpen size={16} className="text-blue-600" />
+                <span className="text-sm font-medium text-blue-900">
+                  Viewing Suite: {activeSuite.name}
+                </span>
+                <span className="text-xs text-blue-600">
+                  ({activeSuite.members?.length || 0} tests)
+                </span>
+              </div>
+              <button
+                onClick={handleClearSuiteFilter}
+                className="text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center"
+              >
+                <X size={14} className="mr-1" />
+                Clear Filter
+              </button>
+            </div>
+          </div>
+        )}
         {/* Bulk Actions */}
         {/* Enhanced Bulk Actions with Version Assignment */}
-
-
         {selectedTestCases.size > 0 && (
           <BulkActionsPanel
             selectedCount={selectedTestCases.size}
             automatedCount={selectedAutomatedTestCases.length}  // ✅ ADD THIS LINE
             availableVersions={availableVersions}
-            availableTags={availableTags}
+            availableTags={allTags}
             itemType="test case"
             showExecuteButton={selectedAutomatedTestCases.length > 0}
             showExportButton={true}
@@ -1960,14 +2116,11 @@ const TestCases = () => {
             onExport={handleExportSelected}
           />
         )}
-
-
         {/* Test Cases Table - Grouped by Category */}
         <div className="space-y-4">
           {Object.entries(groupedTestCases).map(([category, categoryTests]) => {
             const isCollapsed = collapsedSections.has(category);
             const stats = getCategoryStats(categoryTests);
-
             return (
               <div key={category} className="bg-white rounded-lg shadow">
                 {/* Category Header */}
@@ -1983,7 +2136,6 @@ const TestCases = () => {
                     <h3 className="text-lg font-medium text-gray-900">{category}</h3>
                     <span className="text-sm text-gray-500">({stats.total} tests)</span>
                   </div>
-
                   {/* Category Stats */}
                   <div className="flex items-center space-x-4 text-sm">
                     <span className="text-green-600">{stats.passed} passed</span>
@@ -1992,7 +2144,6 @@ const TestCases = () => {
                     <span className="font-medium">{stats.passRate}% pass rate</span>
                   </div>
                 </div>
-
                 {/* Category Tests */}
                 {!isCollapsed && (
                   <div className="overflow-x-auto">
@@ -2048,7 +2199,6 @@ const TestCases = () => {
             );
           })}
         </div>
-
         {/* Results Info */}
         <div className="text-sm text-gray-500 text-center">
           Showing {filteredTestCases.length} of {versionFilteredTestCases.length} test cases
@@ -2056,9 +2206,7 @@ const TestCases = () => {
             <span> for version {versions.find(v => v.id === selectedVersion)?.name || selectedVersion}</span>
           )}
         </div>
-
         {/* MODALS */}
-
         {/* NEW: Enhanced View Test Case Modal - NOW ACTIVE */}
         <ViewTestCaseModal
           testCase={viewingTestCase}
@@ -2073,7 +2221,6 @@ const TestCases = () => {
           onDuplicate={handleDuplicateTestCase}
           onDelete={handleDeleteTestCase}
         />
-
         {/* Test Execution Modal */}
         {showExecutionModal && (
           <TestExecutionModal
@@ -2090,7 +2237,6 @@ const TestCases = () => {
             }}
           />
         )}
-
         {/* Edit Test Case Modal - NOW USING SEPARATE COMPONENT */}
         {showEditModal && (
           <EditTestCaseModal
@@ -2104,7 +2250,6 @@ const TestCases = () => {
             onVersionToggle={handleVersionToggle} // Pass the new handler
           />
         )}
-
         {/* Version Details Modal */}
         {showVersionModal && modalVersions && (
           <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
@@ -2120,7 +2265,6 @@ const TestCases = () => {
                   <X size={20} />
                 </button>
               </div>
-
               <div className="mb-4">
                 <p className="text-sm text-gray-600 mb-3">
                   <strong>{modalVersions.testCaseId}</strong> applies to {modalVersions.versions.length} version{modalVersions.versions.length !== 1 ? 's' : ''}:
@@ -2143,7 +2287,6 @@ const TestCases = () => {
                   })}
                 </div>
               </div>
-
               {modalVersions.versions.includes(selectedVersion) && (
                 <div className="bg-green-50 border border-green-200 rounded p-3">
                   <p className="text-green-800 text-sm font-medium">
@@ -2151,7 +2294,6 @@ const TestCases = () => {
                   </p>
                 </div>
               )}
-
               <div className="flex justify-end mt-4">
                 <button
                   onClick={() => setShowVersionModal(false)}
@@ -2179,12 +2321,10 @@ const TestCases = () => {
                   <X size={20} />
                 </button>
               </div>
-
               <div className="mb-6">
                 <p className="text-sm text-gray-600 mb-2">
                   You are about to <strong>{versionAssignmentAction}</strong> {selectedTestCases.size} test case{selectedTestCases.size !== 1 ? 's' : ''}:
                 </p>
-
                 <div className="bg-blue-50 border border-blue-200 rounded p-3 mb-4">
                   <div className="text-sm font-medium text-blue-800">
                     {versionAssignmentAction === 'add' ? 'Add to' : 'Remove from'} version:
@@ -2193,12 +2333,10 @@ const TestCases = () => {
                     </span>
                   </div>
                 </div>
-
                 <div className="text-xs text-gray-500">
                   {selectedTestCases.size} test case{selectedTestCases.size !== 1 ? 's' : ''} selected
                 </div>
               </div>
-
               <div className="flex justify-end space-x-3">
                 <button
                   onClick={() => setShowVersionAssignmentModal(false)}
@@ -2219,9 +2357,10 @@ const TestCases = () => {
             </div>
           </div>
         )}
-
       </div>
     </MainLayout>
+
+
   );
 };
 
