@@ -13,7 +13,8 @@ import {
   Calendar,
   CheckCircle,
   AlertCircle,
-  Zap
+  Zap,
+  Layers // <-- Added for Create Suite button icon
 } from 'lucide-react';
 import MainLayout from '../components/Layout/MainLayout';
 import EmptyState from '../components/Common/EmptyState';
@@ -28,6 +29,10 @@ import RightSidebarPanel, {
 import { useVersionContext } from '../context/VersionContext';
 import dataStore from '../services/DataStore';
 import TestCasesBrowseSidebar from '../components/TestCases/TestCasesBrowseSidebar';
+
+// === NEW IMPORTS FROM SECTION 1 ===
+import CreateSuiteModal from '../components/TestCases/CreateSuiteModal';
+import AddToSuiteModal from '../components/TestCases/AddToSuiteModal';
 
 // Helper to get linked requirements for a test case
 const getLinkedRequirements = (testCaseId, mapping, requirements) => {
@@ -166,16 +171,25 @@ const TestCases = () => {
   // UI State
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTestCases, setSelectedTestCases] = useState(new Set());
-  const [selectedTestCase, setSelectedTestCase] = useState(null); // Single test case for details view
+  const [selectedTestCase, setSelectedTestCase] = useState(null);
   const [editPanelOpen, setEditPanelOpen] = useState(false);
   const [testCaseToEdit, setTestCaseToEdit] = useState(null);
 
-  // === FILTER STATE (Step 3.1) ===
+  // === FILTER STATE ===
   const [categoryFilter, setCategoryFilter] = useState('All');
   const [statusFilter, setStatusFilter] = useState('All');
   const [priorityFilter, setPriorityFilter] = useState('All');
   const [automationFilter, setAutomationFilter] = useState('All');
   const [selectedTagsFilter, setSelectedTagsFilter] = useState([]);
+
+  // === NEW STATE VARIABLES FROM SECTION 2 ===
+  // Test Suite State
+  const [testSuites, setTestSuites] = useState([]);
+  const [showCreateSuiteModal, setShowCreateSuiteModal] = useState(false);
+  const [showAddToSuiteModal, setShowAddToSuiteModal] = useState(false);
+  const [selectedSuiteForAdding, setSelectedSuiteForAdding] = useState(null);
+  const [suiteMembers, setSuiteMembers] = useState([]);
+  const [isLoadingSuiteOperation, setIsLoadingSuiteOperation] = useState(false);
 
   // Load data from DataStore
   useEffect(() => {
@@ -189,6 +203,24 @@ const TestCases = () => {
     
     // Subscribe to DataStore changes
     const unsubscribe = dataStore.subscribe(updateData);
+    return () => unsubscribe();
+  }, []);
+
+  // === NEW USEEFFECT FROM SECTION 3 ===
+  // Load test suites
+  useEffect(() => {
+    const loadTestSuites = async () => {
+      try {
+        const suites = await dataStore.getTestSuites();
+        setTestSuites(suites);
+      } catch (error) {
+        console.error('Error loading test suites:', error);
+      }
+    };
+    loadTestSuites();
+    const unsubscribe = dataStore.subscribe(() => {
+      loadTestSuites();
+    });
     return () => unsubscribe();
   }, []);
 
@@ -207,7 +239,7 @@ const TestCases = () => {
     });
   }, [testCases, selectedVersion]);
 
-  // === HELPER FUNCTIONS (Step 3.2) ===
+  // === HELPER FUNCTIONS ===
   const getAllCategories = (testCases) => {
     const categories = new Set();
     testCases.forEach(tc => {
@@ -226,7 +258,7 @@ const TestCases = () => {
     return Array.from(tags).sort();
   };
 
-  // === COMPREHENSIVE FILTERING LOGIC (Step 3.3) ===
+  // === COMPREHENSIVE FILTERING LOGIC ===
   const filteredTestCases = useMemo(() => {
     return versionFilteredTestCases.filter(tc => {
       // Search filter
@@ -268,7 +300,7 @@ const TestCases = () => {
     selectedTagsFilter
   ]);
 
-  // === FILTER STATISTICS (Step 3.4) ===
+  // === FILTER STATISTICS ===
   const filterStats = useMemo(() => {
     return {
       total: versionFilteredTestCases.length,
@@ -390,7 +422,71 @@ const TestCases = () => {
     }));
   }, [versions]);
 
-  // === RIGHT SIDEBAR CONTENT (Step 3.5) ===
+  // === NEW HANDLER FUNCTIONS FROM SECTION 4 ===
+  // Handler: Create a new test suite
+  const handleCreateSuite = async (suiteData) => {
+    try {
+      setIsLoadingSuiteOperation(true);
+      const newSuite = await dataStore.createTestSuite({
+        name: suiteData.name,
+        description: suiteData.description || '',
+        version: suiteData.version || '',
+        suite_type: suiteData.suite_type || 'custom',
+        estimated_duration: suiteData.estimated_duration ? parseInt(suiteData.estimated_duration) : null,
+        recommended_environment: suiteData.recommended_environment || ''
+      });
+      setShowCreateSuiteModal(false);
+      alert(`Test suite "${newSuite.name}" created successfully!`);
+      const updatedSuites = await dataStore.getTestSuites();
+      setTestSuites(updatedSuites);
+    } catch (error) {
+      console.error('Error creating test suite:', error);
+      alert(`Failed to create test suite: ${error.message}`);
+    } finally {
+      setIsLoadingSuiteOperation(false);
+    }
+  };
+
+  // Handler: Open the "Add to Suite" modal
+  const handleOpenAddToSuite = async (suite) => {
+    try {
+      setIsLoadingSuiteOperation(true);
+      setSelectedSuiteForAdding(suite);
+      const members = await dataStore.getTestSuiteMembers(suite.id);
+      setSuiteMembers(members);
+      setShowAddToSuiteModal(true);
+    } catch (error) {
+      console.error('Error loading suite members:', error);
+      alert('Failed to load suite members');
+    } finally {
+      setIsLoadingSuiteOperation(false);
+    }
+  };
+
+  // Handler: Add test cases to a suite
+  const handleAddTestCasesToSuite = async (suiteId, testCaseIds) => {
+    try {
+      setIsLoadingSuiteOperation(true);
+      const result = await dataStore.addTestCasesToSuite(suiteId, testCaseIds);
+      if (result.added > 0) {
+        alert(`Successfully added ${result.added} test case(s) to the suite.${result.skipped > 0 ? ` (${result.skipped} already in suite)` : ''}`);
+      } else {
+        alert('No new test cases were added. They may already be in the suite.');
+      }
+      const updatedSuites = await dataStore.getTestSuites();
+      setTestSuites(updatedSuites);
+      setShowAddToSuiteModal(false);
+      setSelectedSuiteForAdding(null);
+    } catch (error) {
+      console.error('Error adding test cases to suite:', error);
+      alert(`Failed to add test cases: ${error.message}`);
+      throw error;
+    } finally {
+      setIsLoadingSuiteOperation(false);
+    }
+  };
+
+  // === RIGHT SIDEBAR CONTENT ===
   const rightSidebarContent = useMemo(() => {
     // Case 1: Single test case selected -> Show details
     if (selectedTestCase) {
@@ -677,6 +773,10 @@ const TestCases = () => {
         }}
         // Statistics
         stats={filterStats}
+        // === SECTION 7: PASS TEST SUITES AND CALLBACKS TO SIDEBAR ===
+        testSuites={testSuites}
+        onCreateSuite={() => setShowCreateSuiteModal(true)}
+        onSuiteClick={handleOpenAddToSuite}
       />
     );
   }, [
@@ -692,7 +792,9 @@ const TestCases = () => {
     priorityFilter,
     automationFilter,
     selectedTagsFilter,
-    filterStats
+    filterStats,
+    // === ADDED DEPENDENCIES FOR SIDEBAR ===
+    testSuites
   ]);
 
   // Check if no test cases exist
@@ -715,7 +817,7 @@ const TestCases = () => {
     <MainLayout 
       title="Test Cases" 
       hasData={hasTestCases}
-      showRightSidebar={true} // Always show sidebar (Step 3.6)
+      showRightSidebar={true}
       rightSidebar={rightSidebarContent}
     >
       <div className="space-y-6">
@@ -770,13 +872,23 @@ const TestCases = () => {
             </div>
 
             {/* Add Button */}
-            <button
-              onClick={handleNewTestCase}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center text-sm flex-shrink-0"
-            >
-              <Plus className="mr-2" size={16} />
-              Add
-            </button>
+            <div className="flex items-center gap-2">
+              {/* === SECTION 6: CREATE SUITE BUTTON === */}
+              <button
+                onClick={() => setShowCreateSuiteModal(true)}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-2 text-sm"
+              >
+                <Layers size={16} />
+                Create Test Suite
+              </button>
+              <button
+                onClick={handleNewTestCase}
+                className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 flex items-center text-sm flex-shrink-0"
+              >
+                <Plus className="mr-2" size={16} />
+                Add
+              </button>
+            </div>
           </div>
 
           {/* Search Bar */}
@@ -823,7 +935,7 @@ const TestCases = () => {
             </div>
           </div>
 
-          {/* Results count + Active Filter Indicator (Step 3.7) */}
+          {/* Results count + Active Filter Indicator */}
           <div className="px-6 py-2 text-sm text-gray-600 bg-gray-50 flex justify-between items-center">
             <span>
               Showing {filteredTestCases.length} of {versionFilteredTestCases.length} test cases
@@ -928,6 +1040,27 @@ const TestCases = () => {
         onSave={handleSaveTestCase}
         versions={versions}
         requirements={requirements}
+      />
+
+      {/* === SECTION 5: MODALS === */}
+      {/* Create Suite Modal */}
+      <CreateSuiteModal
+        isOpen={showCreateSuiteModal}
+        onClose={() => setShowCreateSuiteModal(false)}
+        onCreate={handleCreateSuite}
+      />
+      {/* Add to Suite Modal */}
+      <AddToSuiteModal
+        isOpen={showAddToSuiteModal}
+        onClose={() => {
+          setShowAddToSuiteModal(false);
+          setSelectedSuiteForAdding(null);
+        }}
+        onAdd={handleAddTestCasesToSuite}
+        suite={selectedSuiteForAdding}
+        availableTestCases={testCases}
+        existingMemberIds={suiteMembers.map(m => m.id)}
+        isLoading={isLoadingSuiteOperation}
       />
     </MainLayout>
   );
