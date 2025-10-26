@@ -9,6 +9,8 @@ import { X, Layers, Search, Check, AlertCircle, CheckSquare, Square } from 'luci
  * - Shows which tests are already in the suite
  * - Prevents duplicate additions
  * - Displays test details for easy identification
+ * 
+ * FIXED: Moved useMemo hook before conditional return to follow React's Rules of Hooks
  */
 const AddToSuiteModal = ({
   isOpen,
@@ -19,13 +21,13 @@ const AddToSuiteModal = ({
   existingMemberIds = [], // Test case IDs already in the suite
   isLoading = false
 }) => {
+  // ✅ ALL STATE HOOKS FIRST
   const [selectedTestCaseIds, setSelectedTestCaseIds] = useState(new Set());
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [selectAll, setSelectAll] = useState(false);
 
-  if (!isOpen) return null;
-
+  // ✅ ALL OTHER HOOKS (useMemo, useEffect, etc.) BEFORE CONDITIONAL RETURNS
   // Filter test cases based on search and status
   const filteredTestCases = useMemo(() => {
     let filtered = availableTestCases;
@@ -50,6 +52,9 @@ const AddToSuiteModal = ({
 
     return filtered;
   }, [availableTestCases, searchQuery, statusFilter, existingMemberIds]);
+
+  // ✅ CONDITIONAL RETURN AFTER ALL HOOKS
+  if (!isOpen) return null;
 
   // Handle individual checkbox toggle
   const handleToggleTestCase = (testCaseId) => {
@@ -102,6 +107,7 @@ const AddToSuiteModal = ({
 
   // Handle cancel
   const handleCancel = () => {
+    // Reset state and close
     setSelectedTestCaseIds(new Set());
     setSearchQuery('');
     setStatusFilter('All');
@@ -109,55 +115,44 @@ const AddToSuiteModal = ({
     onClose();
   };
 
-  // Get status badge color
-  const getStatusColor = (status) => {
-    const colors = {
-      'Passed': 'bg-green-100 text-green-800',
-      'Failed': 'bg-red-100 text-red-800',
-      'Not Run': 'bg-gray-100 text-gray-800',
-      'Blocked': 'bg-yellow-100 text-yellow-800',
-      'Not Found': 'bg-orange-100 text-orange-800'
-    };
-    return colors[status] || 'bg-gray-100 text-gray-800';
-  };
-
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col">
-        
-        {/* Header */}
+        {/* Header - Fixed */}
         <div className="p-6 border-b border-gray-200 flex-shrink-0">
-          <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
-              <Layers size={24} className="text-blue-600" />
+              <div className="p-2 bg-blue-100 rounded-lg">
+                <Layers size={24} className="text-blue-600" />
+              </div>
               <div>
                 <h2 className="text-xl font-semibold text-gray-900">
-                  Add Tests to Suite
+                  Add Test Cases to Suite
                 </h2>
-                {suite && (
-                  <p className="text-sm text-gray-600 mt-1">
-                    {suite.name} {suite.version && `(v${suite.version})`}
-                  </p>
-                )}
+                <p className="text-sm text-gray-500 mt-1">
+                  {suite?.name || 'Unknown Suite'}
+                </p>
               </div>
             </div>
             <button
               onClick={handleCancel}
-              className="text-gray-400 hover:text-gray-600 transition-colors"
               disabled={isLoading}
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <X size={24} />
+              <X size={20} className="text-gray-500" />
             </button>
           </div>
+        </div>
 
-          {/* Search and Filter Bar */}
-          <div className="mt-4 flex flex-col sm:flex-row gap-3">
-            {/* Search */}
+        {/* Filters - Fixed */}
+        <div className="p-6 border-b border-gray-200 flex-shrink-0">
+          <div className="flex space-x-4">
+            {/* Search Input */}
             <div className="flex-1 relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
               <input
                 type="text"
-                placeholder="Search test cases..."
+                placeholder="Search test cases by ID, name, or description..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
@@ -212,17 +207,6 @@ const AddToSuiteModal = ({
                   ? 'All available test cases are already in this suite, or no tests match your filters.'
                   : 'No test cases found matching your search criteria.'}
               </p>
-              {(searchQuery || statusFilter !== 'All') && (
-                <button
-                  onClick={() => {
-                    setSearchQuery('');
-                    setStatusFilter('All');
-                  }}
-                  className="mt-4 text-sm text-blue-600 hover:text-blue-700 font-medium"
-                >
-                  Clear filters
-                </button>
-              )}
             </div>
           ) : (
             // Test Cases Grid
@@ -235,68 +219,71 @@ const AddToSuiteModal = ({
                     key={testCase.id}
                     onClick={() => handleToggleTestCase(testCase.id)}
                     className={`
-                      p-4 rounded-lg border-2 cursor-pointer transition-all
+                      p-4 border rounded-lg cursor-pointer transition-all
                       ${isSelected 
                         ? 'border-blue-500 bg-blue-50' 
-                        : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm'
+                        : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
                       }
                     `}
                   >
-                    <div className="flex items-start">
+                    <div className="flex items-start space-x-3">
                       {/* Checkbox */}
-                      <div className="flex-shrink-0 mt-1 mr-3">
-                        <div
-                          className={`
-                            w-5 h-5 rounded border-2 flex items-center justify-center
-                            ${isSelected 
-                              ? 'bg-blue-600 border-blue-600' 
-                              : 'bg-white border-gray-300'
-                            }
-                          `}
-                        >
-                          {isSelected && <Check size={14} className="text-white" />}
-                        </div>
+                      <div className="flex-shrink-0 mt-1">
+                        {isSelected ? (
+                          <CheckSquare size={20} className="text-blue-600" />
+                        ) : (
+                          <Square size={20} className="text-gray-400" />
+                        )}
                       </div>
 
                       {/* Test Case Info */}
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between mb-2">
-                          <div className="flex-1 min-w-0 mr-4">
-                            <h4 className="font-semibold text-gray-900 mb-1">
-                              {testCase.id}
+                        {/* ID and Name */}
+                        <div className="flex items-start justify-between mb-1">
+                          <div className="flex-1">
+                            <div className="flex items-center space-x-2">
+                              <span className="text-xs font-mono text-gray-500">
+                                {testCase.id}
+                              </span>
+                              {testCase.priority && (
+                                <span className={`
+                                  text-xs px-2 py-0.5 rounded-full font-medium
+                                  ${testCase.priority === 'High' ? 'bg-red-100 text-red-700' :
+                                    testCase.priority === 'Medium' ? 'bg-yellow-100 text-yellow-700' :
+                                    'bg-green-100 text-green-700'}
+                                `}>
+                                  {testCase.priority}
+                                </span>
+                              )}
+                            </div>
+                            <h4 className="text-sm font-medium text-gray-900 mt-1">
+                              {testCase.name}
                             </h4>
-                            {testCase.name && testCase.name !== testCase.id && (
-                              <p className="text-sm text-gray-700 truncate">
-                                {testCase.name}
-                              </p>
-                            )}
                           </div>
                           
                           {/* Status Badge */}
-                          <span
-                            className={`
-                              px-2 py-1 rounded text-xs font-medium flex-shrink-0
-                              ${getStatusColor(testCase.status)}
-                            `}
-                          >
-                            {testCase.status || 'Not Run'}
-                          </span>
+                          {testCase.status && (
+                            <span className={`
+                              text-xs px-2 py-1 rounded-full font-medium flex-shrink-0
+                              ${testCase.status === 'Passed' ? 'bg-green-100 text-green-700' :
+                                testCase.status === 'Failed' ? 'bg-red-100 text-red-700' :
+                                testCase.status === 'Blocked' ? 'bg-orange-100 text-orange-700' :
+                                'bg-gray-100 text-gray-700'}
+                            `}>
+                              {testCase.status}
+                            </span>
+                          )}
                         </div>
 
                         {/* Description */}
                         {testCase.description && (
-                          <p className="text-sm text-gray-600 line-clamp-2 mb-2">
+                          <p className="text-xs text-gray-600 mb-2 line-clamp-2">
                             {testCase.description}
                           </p>
                         )}
 
                         {/* Metadata */}
-                        <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500">
-                          {testCase.priority && (
-                            <span className="flex items-center">
-                              Priority: <span className="font-medium ml-1">{testCase.priority}</span>
-                            </span>
-                          )}
+                        <div className="flex items-center space-x-4 text-xs text-gray-500">
                           {testCase.automationStatus && (
                             <span className="flex items-center">
                               {testCase.automationStatus === 'Automated' ? '⚡' : '👤'} {testCase.automationStatus}
