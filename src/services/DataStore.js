@@ -1260,16 +1260,54 @@ class DataStoreService {
     const workspaceId = this.getCurrentWorkspaceId();
 
     try {
-      const response = await apiClient.put(`/api/test-cases/${id}`, {
-        ...updates,
+      // ✅ Transform camelCase to snake_case for API
+      const apiPayload = {
         workspace_id: workspaceId
+      };
+
+      // Map all standard fields
+      const fieldMapping = {
+        name: 'name',
+        description: 'description',
+        category: 'category',
+        priority: 'priority',
+        status: 'status',
+        steps: 'steps',
+        expectedResult: 'expected_result',
+        automationStatus: 'automation_status',
+        tags: 'tags',
+        customFields: 'custom_fields',
+        // ✅ Key mappings for the problematic fields
+        requirementIds: 'requirement_ids',
+        applicableVersions: 'applicable_versions'
+      };
+
+      // Transform each field that exists in updates
+      Object.keys(updates).forEach(key => {
+        if (key === 'workspace_id') return; // Skip, already added
+
+        const apiKey = fieldMapping[key] || key; // Use mapping or original key
+        apiPayload[apiKey] = updates[key];
       });
 
+      console.log('📤 Sending API payload:', apiPayload);
+
+      const response = await apiClient.put(`/api/test-cases/${id}`, apiPayload);
+
       if (response.data.success) {
-        const index = this._testCases.findIndex(tc => tc.id === id);
-        if (index !== -1) {
-          this._testCases[index] = { ...this._testCases[index], ...updates };
-          this._notifyListeners();
+        // ✅ After successful update, fetch fresh data from API to get all fields
+        const getResponse = await apiClient.get(
+          `/api/test-cases/${id}?workspace_id=${workspaceId}`
+        );
+
+        if (getResponse.data.success) {
+          const index = this._testCases.findIndex(tc => tc.id === id);
+          if (index !== -1) {
+            // ✅ Update with complete fresh data from API (includes requirement_ids, applicable_versions)
+            this._testCases[index] = getResponse.data.data;
+            this._notifyListeners();
+            console.log('✅ Test case updated and refreshed from API:', id);
+          }
         }
       }
     } catch (error) {
