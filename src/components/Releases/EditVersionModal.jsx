@@ -246,7 +246,6 @@ const EditVersionModal = ({ version, isOpen, onClose, onSave, existingVersions }
           </form>
         </div>
 
-        {/* Fixed Footer with Action Buttons - consistent styling with EditTestCaseModal */}
         <div className="flex-shrink-0 px-6 py-4 border-t border-gray-200 bg-gray-50 rounded-b-lg">
           <div className="flex justify-end space-x-3">
             <button

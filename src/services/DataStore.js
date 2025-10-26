@@ -110,6 +110,136 @@ class DataStoreService {
   }
 
   /**
+   * ✅ CENTRALIZED: Convert snake_case object to camelCase
+   * Use this when receiving data FROM the API
+   * @param {Object} snakeObj - Object with snake_case keys
+   * @returns {Object} Object with camelCase keys
+   */
+  _toCamelCase(snakeObj) {
+    if (!snakeObj || typeof snakeObj !== 'object') return snakeObj;
+
+    const mapping = {
+      // Test Case fields
+      requirement_ids: 'requirementIds',
+      applicable_versions: 'applicableVersions',
+      expected_result: 'expectedResult',
+      automation_status: 'automationStatus',
+      custom_fields: 'customFields',
+      test_data: 'testData',
+      automation_path: 'automationPath',
+      estimated_duration: 'estimatedDuration',
+      last_executed: 'lastExecuted',
+      last_executed_by: 'lastExecutedBy',
+      execution_count: 'executionCount',
+      pass_count: 'passCount',
+      fail_count: 'failCount',
+      external_id: 'externalId',
+      external_url: 'externalUrl',
+      created_at: 'createdAt',
+      updated_at: 'updatedAt',
+      created_by: 'createdBy',
+      updated_by: 'updatedBy',
+
+      // Requirement fields
+      business_impact: 'businessImpact',
+      technical_complexity: 'technicalComplexity',
+      regulatory_factor: 'regulatoryFactor',
+      usage_frequency: 'usageFrequency',
+      test_depth_factor: 'testDepthFactor',
+      min_test_cases: 'minTestCases',
+
+      // Test Suite fields
+      suite_type: 'suiteType',
+      recommended_environment: 'recommendedEnvironment',
+      is_active: 'isActive',
+      test_count: 'testCount',
+      automated_count: 'automatedCount',
+
+      // Workspace fields
+      workspace_id: 'workspaceId'
+    };
+
+    const result = {};
+    for (const [key, value] of Object.entries(snakeObj)) {
+      const camelKey = mapping[key] || key;
+      result[camelKey] = value;
+    }
+    return result;
+  }
+
+  /**
+   * ✅ CENTRALIZED: Convert camelCase object to snake_case
+   * Use this when sending data TO the API
+   * @param {Object} camelObj - Object with camelCase keys
+   * @returns {Object} Object with snake_case keys
+   */
+  _toSnakeCase(camelObj) {
+    if (!camelObj || typeof camelObj !== 'object') return camelObj;
+
+    const mapping = {
+      // Test Case fields
+      requirementIds: 'requirement_ids',
+      applicableVersions: 'applicable_versions',
+      expectedResult: 'expected_result',
+      automationStatus: 'automation_status',
+      customFields: 'custom_fields',
+      testData: 'test_data',
+      automationPath: 'automation_path',
+      estimatedDuration: 'estimated_duration',
+      lastExecuted: 'last_executed',
+      lastExecutedBy: 'last_executed_by',
+      executionCount: 'execution_count',
+      passCount: 'pass_count',
+      failCount: 'fail_count',
+      externalId: 'external_id',
+      externalUrl: 'external_url',
+      createdAt: 'created_at',
+      updatedAt: 'updated_at',
+      createdBy: 'created_by',
+      updatedBy: 'updated_by',
+
+      // Requirement fields
+      businessImpact: 'business_impact',
+      technicalComplexity: 'technical_complexity',
+      regulatoryFactor: 'regulatory_factor',
+      usageFrequency: 'usage_frequency',
+      testDepthFactor: 'test_depth_factor',
+      minTestCases: 'min_test_cases',
+
+      // Test Suite fields
+      suiteType: 'suite_type',
+      recommendedEnvironment: 'recommended_environment',
+      isActive: 'is_active',
+      testCount: 'test_count',
+      automatedCount: 'automated_count',
+
+      // Workspace fields
+      workspaceId: 'workspace_id'
+    };
+
+    const result = {};
+    for (const [key, value] of Object.entries(camelObj)) {
+      const snakeKey = mapping[key] || key;
+      result[snakeKey] = value;
+    }
+    return result;
+  }
+
+  /**
+   * ✅ BONUS: Convert arrays of objects
+   * Useful for bulk operations
+   */
+  _arrayToSnakeCase(camelArray) {
+    if (!Array.isArray(camelArray)) return camelArray;
+    return camelArray.map(item => this._toSnakeCase(item));
+  }
+
+  _arrayToCamelCase(snakeArray) {
+    if (!Array.isArray(snakeArray)) return snakeArray;
+    return snakeArray.map(item => this._toCamelCase(item));
+  }
+
+  /**
  * Get current workspace ID - throws error if not set
  * @returns {string} Current workspace ID
  */
@@ -991,12 +1121,15 @@ class DataStoreService {
     const workspaceId = this.getCurrentWorkspaceId();
 
     try {
-      console.log(`📤 Updating test suite: ${suiteId}`);
-
-      const response = await apiClient.put(`/api/test-suites/${suiteId}`, {
-        ...updates,
+      // ✅ Convert camelCase to snake_case before sending to API
+      const apiPayload = {
+        ...this._toSnakeCase(updates),
         workspace_id: workspaceId
-      });
+      };
+
+      console.log('📤 Sending test suite update to API:', apiPayload);
+
+      const response = await apiClient.put(`/api/test-suites/${suiteId}`, apiPayload);
 
       if (response.data.success) {
         console.log(`✅ Updated test suite: ${response.data.data.name}`);
@@ -1260,16 +1393,30 @@ class DataStoreService {
     const workspaceId = this.getCurrentWorkspaceId();
 
     try {
-      const response = await apiClient.put(`/api/test-cases/${id}`, {
-        ...updates,
+      // ✅ Convert camelCase to snake_case before sending to API
+      const apiPayload = {
+        ...this._toSnakeCase(updates),
         workspace_id: workspaceId
-      });
+      };
+
+      console.log('📤 Sending test case update to API:', apiPayload);
+
+      const response = await apiClient.put(`/api/test-cases/${id}`, apiPayload);
 
       if (response.data.success) {
-        const index = this._testCases.findIndex(tc => tc.id === id);
-        if (index !== -1) {
-          this._testCases[index] = { ...this._testCases[index], ...updates };
-          this._notifyListeners();
+        // ✅ Fetch fresh data from API to ensure we have all fields
+        const getResponse = await apiClient.get(
+          `/api/test-cases/${id}?workspace_id=${workspaceId}`
+        );
+
+        if (getResponse.data.success) {
+          const index = this._testCases.findIndex(tc => tc.id === id);
+          if (index !== -1) {
+            // ✅ Store the API response (already in snake_case from DB)
+            this._testCases[index] = getResponse.data.data;
+            this._notifyListeners();
+            console.log('✅ Test case updated and refreshed from API:', id);
+          }
         }
       }
     } catch (error) {
@@ -1277,7 +1424,6 @@ class DataStoreService {
       throw error;
     }
   }
-
   /**
    * Update versions for multiple test cases (bulk assignment) with validation
    * @param {string[]} testCaseIds - Array of test case IDs to update
@@ -2160,20 +2306,26 @@ class DataStoreService {
     const workspaceId = this.getCurrentWorkspaceId();
 
     try {
-      // ✅ Step 1: Update via API
-      const response = await apiClient.put(`/api/requirements/${id}`, {
-        ...updates,
+      // ✅ Convert camelCase to snake_case before sending to API
+      const apiPayload = {
+        ...this._toSnakeCase(updates),
         workspace_id: workspaceId
-      });
+      };
+
+      console.log('📤 Sending requirement update to API:', apiPayload);
+
+      const response = await apiClient.put(`/api/requirements/${id}`, apiPayload);
 
       if (response.data.success) {
-        // ✅ Step 2: Fetch the fresh data from API to get snake_case fields
-        const getResponse = await apiClient.get(`/api/requirements/${id}?workspace_id=${workspaceId}`);
+        // ✅ Fetch fresh data from API
+        const getResponse = await apiClient.get(
+          `/api/requirements/${id}?workspace_id=${workspaceId}`
+        );
 
         if (getResponse.data.success) {
           const index = this._requirements.findIndex(r => r.id === id);
           if (index !== -1) {
-            // ✅ Step 3: Update with the complete fresh data from API
+            // ✅ Store the API response
             this._requirements[index] = getResponse.data.data;
             this._notifyListeners();
             console.log('✅ Requirement updated and refreshed from API:', id);
