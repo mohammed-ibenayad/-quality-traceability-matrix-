@@ -246,6 +246,9 @@ class DataStoreService {
    * @private
    */
   _loadPersistedData() {
+    console.log(`⏭️ Skipping localStorage load - using backend database only`);
+    return;
+    /** 
     console.log(`🚀 DataStore initializing - loading persisted data from localStorage...`);
 
     try {
@@ -332,6 +335,7 @@ class DataStoreService {
       console.log(`🔄 Continuing with empty data due to load error`);
       // Continue with empty data if loading fails
     }
+    */
   }
 
   /**
@@ -612,6 +616,10 @@ class DataStoreService {
 
     // If no test cases in memory, try to reload from localStorage (defensive programming)
     if (this._testCases.length === 0) {
+      console.log(`⏭️ No test cases in memory - backend should be loaded via loadFromDatabase()`);
+
+      /** 
+
       console.log(`🔍 No test cases in memory, checking localStorage...`);
       try {
         const savedTestCases = localStorage.getItem('qualityTracker_testCases');
@@ -625,6 +633,7 @@ class DataStoreService {
       } catch (error) {
         console.warn('⚠️ Failed to reload test cases from localStorage:', error);
       }
+      */
     }
 
     console.log(`📤 Returning ${this._testCases.length} test cases`);
@@ -745,6 +754,7 @@ class DataStoreService {
     console.log(`📋 Data marked as initialized`);
 
     // Persist to localStorage
+    /**
     console.log(`💿 Saving to localStorage...`);
 
     try {
@@ -768,6 +778,11 @@ class DataStoreService {
       console.error('❌ Failed to save to localStorage:', error);
       // Don't throw here - we want the operation to continue even if persistence fails
     }
+
+    */
+
+    console.log(`⏭️ Skipping localStorage save - using backend database only`);
+
 
     // Notify all listeners of the change
     console.log(`📢 Notifying ${this._listeners.length} listeners of data change...`);
@@ -844,318 +859,318 @@ class DataStoreService {
   }
 
   // ========================================================================
-// TEST SUITES METHODS - Add these to your DataStore.js class
-// ========================================================================
-// Add these methods after your existing test case methods in DataStore.js
-// Follow the same pattern as getTestCases(), createTestCase(), etc.
+  // TEST SUITES METHODS - Add these to your DataStore.js class
+  // ========================================================================
+  // Add these methods after your existing test case methods in DataStore.js
+  // Follow the same pattern as getTestCases(), createTestCase(), etc.
 
-/**
- * Get all test suites for current workspace
- * @returns {Promise<Array>} Array of test suite objects
- */
-async getTestSuites() {
-  const workspaceId = this.getCurrentWorkspaceId();
+  /**
+   * Get all test suites for current workspace
+   * @returns {Promise<Array>} Array of test suite objects
+   */
+  async getTestSuites() {
+    const workspaceId = this.getCurrentWorkspaceId();
 
-  try {
-    console.log(`📦 Fetching test suites for workspace: ${workspaceId}`);
-    
-    const response = await apiClient.get(`/api/test-suites?workspace_id=${workspaceId}`);
+    try {
+      console.log(`📦 Fetching test suites for workspace: ${workspaceId}`);
 
-    if (response.data.success) {
-      console.log(`✅ Loaded ${response.data.count} test suites`);
-      return response.data.data;
-    }
-    
-    return [];
-  } catch (error) {
-    console.error('❌ Failed to fetch test suites:', error);
-    throw error;
-  }
-}
+      const response = await apiClient.get(`/api/test-suites?workspace_id=${workspaceId}`);
 
-/**
- * Get a single test suite by ID
- * @param {string} suiteId - Test suite ID (UUID)
- * @returns {Promise<Object>} Test suite object
- */
-async getTestSuite(suiteId) {
-  const workspaceId = this.getCurrentWorkspaceId();
-
-  try {
-    console.log(`📦 Fetching test suite: ${suiteId}`);
-    
-    const response = await apiClient.get(
-      `/api/test-suites/${suiteId}?workspace_id=${workspaceId}`
-    );
-
-    if (response.data.success) {
-      console.log(`✅ Loaded test suite: ${response.data.data.name}`);
-      return response.data.data;
-    }
-    
-    return null;
-  } catch (error) {
-    console.error('❌ Failed to fetch test suite:', error);
-    throw error;
-  }
-}
-
-/**
- * Get test cases in a suite (suite members)
- * @param {string} suiteId - Test suite ID (UUID)
- * @returns {Promise<Array>} Array of test case objects with membership data
- */
-async getTestSuiteMembers(suiteId) {
-  const workspaceId = this.getCurrentWorkspaceId();
-
-  try {
-    console.log(`📦 Fetching members for suite: ${suiteId}`);
-    
-    const response = await apiClient.get(
-      `/api/test-suites/${suiteId}/members?workspace_id=${workspaceId}`
-    );
-
-    if (response.data.success) {
-      console.log(`✅ Loaded ${response.data.count} test cases in suite`);
-      return response.data.data;
-    }
-    
-    return [];
-  } catch (error) {
-    console.error('❌ Failed to fetch test suite members:', error);
-    throw error;
-  }
-}
-
-/**
- * Create a new test suite
- * @param {Object} suiteData - Test suite data
- * @param {string} suiteData.name - Suite name (required)
- * @param {string} suiteData.description - Suite description
- * @param {string} suiteData.version - Suite version
- * @param {string} suiteData.suite_type - Type: 'smoke', 'regression', 'sanity', 'integration', 'custom'
- * @param {number} suiteData.estimated_duration - Estimated duration in minutes
- * @param {string} suiteData.recommended_environment - Recommended environment
- * @param {string[]} suiteData.test_case_ids - Optional array of test case IDs to add initially
- * @returns {Promise<Object>} Created test suite object
- */
-async createTestSuite(suiteData) {
-  const workspaceId = this.getCurrentWorkspaceId();
-
-  // Validate required fields
-  if (!suiteData.name) {
-    throw new Error('Suite name is required');
-  }
-
-  try {
-    console.log(`📤 Creating test suite: ${suiteData.name}`);
-    
-    const response = await apiClient.post('/api/test-suites', {
-      ...suiteData,
-      workspace_id: workspaceId
-    });
-
-    if (response.data.success) {
-      console.log(`✅ Created test suite: ${response.data.data.name} (${response.data.data.id})`);
-      this._notifyListeners(); // Notify UI to refresh
-      return response.data.data;
-    }
-  } catch (error) {
-    console.error('❌ Error creating test suite:', error);
-    throw error;
-  }
-}
-
-/**
- * Update an existing test suite
- * @param {string} suiteId - Test suite ID (UUID)
- * @param {Object} updates - Fields to update
- * @returns {Promise<Object>} Updated test suite object
- */
-async updateTestSuite(suiteId, updates) {
-  const workspaceId = this.getCurrentWorkspaceId();
-
-  try {
-    console.log(`📤 Updating test suite: ${suiteId}`);
-    
-    const response = await apiClient.put(`/api/test-suites/${suiteId}`, {
-      ...updates,
-      workspace_id: workspaceId
-    });
-
-    if (response.data.success) {
-      console.log(`✅ Updated test suite: ${response.data.data.name}`);
-      this._notifyListeners(); // Notify UI to refresh
-      return response.data.data;
-    }
-  } catch (error) {
-    console.error('❌ Error updating test suite:', error);
-    throw error;
-  }
-}
-
-/**
- * Add test cases to a suite
- * @param {string} suiteId - Test suite ID (UUID)
- * @param {string[]} testCaseIds - Array of test case IDs to add
- * @returns {Promise<Object>} Result with added/skipped counts
- */
-async addTestCasesToSuite(suiteId, testCaseIds) {
-  const workspaceId = this.getCurrentWorkspaceId();
-
-  if (!Array.isArray(testCaseIds) || testCaseIds.length === 0) {
-    throw new Error('test_case_ids must be a non-empty array');
-  }
-
-  try {
-    console.log(`📤 Adding ${testCaseIds.length} test cases to suite: ${suiteId}`);
-    
-    const response = await apiClient.post(`/api/test-suites/${suiteId}/members`, {
-      test_case_ids: testCaseIds,
-      workspace_id: workspaceId
-    });
-
-    if (response.data.success) {
-      console.log(`✅ Added ${response.data.added} test cases to suite (${response.data.skipped} skipped)`);
-      this._notifyListeners(); // Notify UI to refresh
-      return response.data;
-    }
-  } catch (error) {
-    console.error('❌ Error adding test cases to suite:', error);
-    throw error;
-  }
-}
-
-/**
- * Remove a test case from a suite
- * @param {string} suiteId - Test suite ID (UUID)
- * @param {string} testCaseId - Test case ID to remove
- * @returns {Promise<boolean>} True if successful
- */
-async removeTestCaseFromSuite(suiteId, testCaseId) {
-  const workspaceId = this.getCurrentWorkspaceId();
-
-  try {
-    console.log(`📤 Removing test case ${testCaseId} from suite: ${suiteId}`);
-    
-    const response = await apiClient.delete(
-      `/api/test-suites/${suiteId}/members/${testCaseId}?workspace_id=${workspaceId}`
-    );
-
-    if (response.data.success) {
-      console.log(`✅ Removed test case from suite`);
-      this._notifyListeners(); // Notify UI to refresh
-      return true;
-    }
-    
-    return false;
-  } catch (error) {
-    console.error('❌ Error removing test case from suite:', error);
-    throw error;
-  }
-}
-
-/**
- * Delete a test suite
- * @param {string} suiteId - Test suite ID (UUID)
- * @returns {Promise<boolean>} True if successful
- */
-async deleteTestSuite(suiteId) {
-  const workspaceId = this.getCurrentWorkspaceId();
-
-  try {
-    console.log(`🗑️ Deleting test suite: ${suiteId}`);
-    
-    const response = await apiClient.delete(
-      `/api/test-suites/${suiteId}?workspace_id=${workspaceId}`
-    );
-
-    if (response.data.success) {
-      console.log(`✅ Deleted test suite`);
-      this._notifyListeners(); // Notify UI to refresh
-      return true;
-    }
-    
-    return false;
-  } catch (error) {
-    console.error('❌ Error deleting test suite:', error);
-    throw error;
-  }
-}
-
-// ========================================================================
-// HELPER METHODS (Optional but useful)
-// ========================================================================
-
-/**
- * Check if a test case is in a suite
- * @param {string} suiteId - Test suite ID (UUID)
- * @param {string} testCaseId - Test case ID
- * @returns {Promise<boolean>} True if test case is in suite
- */
-async isTestCaseInSuite(suiteId, testCaseId) {
-  try {
-    const members = await this.getTestSuiteMembers(suiteId);
-    return members.some(tc => tc.id === testCaseId);
-  } catch (error) {
-    console.error('Error checking suite membership:', error);
-    return false;
-  }
-}
-
-/**
- * Get all suites that contain a specific test case
- * @param {string} testCaseId - Test case ID
- * @returns {Promise<Array>} Array of test suites containing this test case
- */
-async getSuitesContainingTestCase(testCaseId) {
-  try {
-    const allSuites = await this.getTestSuites();
-    const suitesWithTestCase = [];
-
-    // Check each suite to see if it contains the test case
-    for (const suite of allSuites) {
-      const members = await this.getTestSuiteMembers(suite.id);
-      if (members.some(tc => tc.id === testCaseId)) {
-        suitesWithTestCase.push(suite);
+      if (response.data.success) {
+        console.log(`✅ Loaded ${response.data.count} test suites`);
+        return response.data.data;
       }
+
+      return [];
+    } catch (error) {
+      console.error('❌ Failed to fetch test suites:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get a single test suite by ID
+   * @param {string} suiteId - Test suite ID (UUID)
+   * @returns {Promise<Object>} Test suite object
+   */
+  async getTestSuite(suiteId) {
+    const workspaceId = this.getCurrentWorkspaceId();
+
+    try {
+      console.log(`📦 Fetching test suite: ${suiteId}`);
+
+      const response = await apiClient.get(
+        `/api/test-suites/${suiteId}?workspace_id=${workspaceId}`
+      );
+
+      if (response.data.success) {
+        console.log(`✅ Loaded test suite: ${response.data.data.name}`);
+        return response.data.data;
+      }
+
+      return null;
+    } catch (error) {
+      console.error('❌ Failed to fetch test suite:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get test cases in a suite (suite members)
+   * @param {string} suiteId - Test suite ID (UUID)
+   * @returns {Promise<Array>} Array of test case objects with membership data
+   */
+  async getTestSuiteMembers(suiteId) {
+    const workspaceId = this.getCurrentWorkspaceId();
+
+    try {
+      console.log(`📦 Fetching members for suite: ${suiteId}`);
+
+      const response = await apiClient.get(
+        `/api/test-suites/${suiteId}/members?workspace_id=${workspaceId}`
+      );
+
+      if (response.data.success) {
+        console.log(`✅ Loaded ${response.data.count} test cases in suite`);
+        return response.data.data;
+      }
+
+      return [];
+    } catch (error) {
+      console.error('❌ Failed to fetch test suite members:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Create a new test suite
+   * @param {Object} suiteData - Test suite data
+   * @param {string} suiteData.name - Suite name (required)
+   * @param {string} suiteData.description - Suite description
+   * @param {string} suiteData.version - Suite version
+   * @param {string} suiteData.suite_type - Type: 'smoke', 'regression', 'sanity', 'integration', 'custom'
+   * @param {number} suiteData.estimated_duration - Estimated duration in minutes
+   * @param {string} suiteData.recommended_environment - Recommended environment
+   * @param {string[]} suiteData.test_case_ids - Optional array of test case IDs to add initially
+   * @returns {Promise<Object>} Created test suite object
+   */
+  async createTestSuite(suiteData) {
+    const workspaceId = this.getCurrentWorkspaceId();
+
+    // Validate required fields
+    if (!suiteData.name) {
+      throw new Error('Suite name is required');
     }
 
-    return suitesWithTestCase;
-  } catch (error) {
-    console.error('Error getting suites for test case:', error);
-    return [];
-  }
-}
+    try {
+      console.log(`📤 Creating test suite: ${suiteData.name}`);
 
-/**
- * Get suite statistics
- * @param {string} suiteId - Test suite ID (UUID)
- * @returns {Promise<Object>} Suite statistics
- */
-async getTestSuiteStats(suiteId) {
-  try {
-    const suite = await this.getTestSuite(suiteId);
-    const members = await this.getTestSuiteMembers(suiteId);
+      const response = await apiClient.post('/api/test-suites', {
+        ...suiteData,
+        workspace_id: workspaceId
+      });
 
-    return {
-      id: suite.id,
-      name: suite.name,
-      totalTests: members.length,
-      automatedTests: members.filter(tc => tc.automation_status === 'Automated').length,
-      manualTests: members.filter(tc => tc.automation_status === 'Manual').length,
-      passedTests: members.filter(tc => tc.status === 'Passed').length,
-      failedTests: members.filter(tc => tc.status === 'Failed').length,
-      notRunTests: members.filter(tc => tc.status === 'Not Run').length,
-      estimatedDuration: suite.estimated_duration,
-      suiteType: suite.suite_type,
-      version: suite.version
-    };
-  } catch (error) {
-    console.error('Error getting suite stats:', error);
-    return null;
+      if (response.data.success) {
+        console.log(`✅ Created test suite: ${response.data.data.name} (${response.data.data.id})`);
+        this._notifyListeners(); // Notify UI to refresh
+        return response.data.data;
+      }
+    } catch (error) {
+      console.error('❌ Error creating test suite:', error);
+      throw error;
+    }
   }
-}
+
+  /**
+   * Update an existing test suite
+   * @param {string} suiteId - Test suite ID (UUID)
+   * @param {Object} updates - Fields to update
+   * @returns {Promise<Object>} Updated test suite object
+   */
+  async updateTestSuite(suiteId, updates) {
+    const workspaceId = this.getCurrentWorkspaceId();
+
+    try {
+      console.log(`📤 Updating test suite: ${suiteId}`);
+
+      const response = await apiClient.put(`/api/test-suites/${suiteId}`, {
+        ...updates,
+        workspace_id: workspaceId
+      });
+
+      if (response.data.success) {
+        console.log(`✅ Updated test suite: ${response.data.data.name}`);
+        this._notifyListeners(); // Notify UI to refresh
+        return response.data.data;
+      }
+    } catch (error) {
+      console.error('❌ Error updating test suite:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Add test cases to a suite
+   * @param {string} suiteId - Test suite ID (UUID)
+   * @param {string[]} testCaseIds - Array of test case IDs to add
+   * @returns {Promise<Object>} Result with added/skipped counts
+   */
+  async addTestCasesToSuite(suiteId, testCaseIds) {
+    const workspaceId = this.getCurrentWorkspaceId();
+
+    if (!Array.isArray(testCaseIds) || testCaseIds.length === 0) {
+      throw new Error('test_case_ids must be a non-empty array');
+    }
+
+    try {
+      console.log(`📤 Adding ${testCaseIds.length} test cases to suite: ${suiteId}`);
+
+      const response = await apiClient.post(`/api/test-suites/${suiteId}/members`, {
+        test_case_ids: testCaseIds,
+        workspace_id: workspaceId
+      });
+
+      if (response.data.success) {
+        console.log(`✅ Added ${response.data.added} test cases to suite (${response.data.skipped} skipped)`);
+        this._notifyListeners(); // Notify UI to refresh
+        return response.data;
+      }
+    } catch (error) {
+      console.error('❌ Error adding test cases to suite:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Remove a test case from a suite
+   * @param {string} suiteId - Test suite ID (UUID)
+   * @param {string} testCaseId - Test case ID to remove
+   * @returns {Promise<boolean>} True if successful
+   */
+  async removeTestCaseFromSuite(suiteId, testCaseId) {
+    const workspaceId = this.getCurrentWorkspaceId();
+
+    try {
+      console.log(`📤 Removing test case ${testCaseId} from suite: ${suiteId}`);
+
+      const response = await apiClient.delete(
+        `/api/test-suites/${suiteId}/members/${testCaseId}?workspace_id=${workspaceId}`
+      );
+
+      if (response.data.success) {
+        console.log(`✅ Removed test case from suite`);
+        this._notifyListeners(); // Notify UI to refresh
+        return true;
+      }
+
+      return false;
+    } catch (error) {
+      console.error('❌ Error removing test case from suite:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Delete a test suite
+   * @param {string} suiteId - Test suite ID (UUID)
+   * @returns {Promise<boolean>} True if successful
+   */
+  async deleteTestSuite(suiteId) {
+    const workspaceId = this.getCurrentWorkspaceId();
+
+    try {
+      console.log(`🗑️ Deleting test suite: ${suiteId}`);
+
+      const response = await apiClient.delete(
+        `/api/test-suites/${suiteId}?workspace_id=${workspaceId}`
+      );
+
+      if (response.data.success) {
+        console.log(`✅ Deleted test suite`);
+        this._notifyListeners(); // Notify UI to refresh
+        return true;
+      }
+
+      return false;
+    } catch (error) {
+      console.error('❌ Error deleting test suite:', error);
+      throw error;
+    }
+  }
+
+  // ========================================================================
+  // HELPER METHODS (Optional but useful)
+  // ========================================================================
+
+  /**
+   * Check if a test case is in a suite
+   * @param {string} suiteId - Test suite ID (UUID)
+   * @param {string} testCaseId - Test case ID
+   * @returns {Promise<boolean>} True if test case is in suite
+   */
+  async isTestCaseInSuite(suiteId, testCaseId) {
+    try {
+      const members = await this.getTestSuiteMembers(suiteId);
+      return members.some(tc => tc.id === testCaseId);
+    } catch (error) {
+      console.error('Error checking suite membership:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Get all suites that contain a specific test case
+   * @param {string} testCaseId - Test case ID
+   * @returns {Promise<Array>} Array of test suites containing this test case
+   */
+  async getSuitesContainingTestCase(testCaseId) {
+    try {
+      const allSuites = await this.getTestSuites();
+      const suitesWithTestCase = [];
+
+      // Check each suite to see if it contains the test case
+      for (const suite of allSuites) {
+        const members = await this.getTestSuiteMembers(suite.id);
+        if (members.some(tc => tc.id === testCaseId)) {
+          suitesWithTestCase.push(suite);
+        }
+      }
+
+      return suitesWithTestCase;
+    } catch (error) {
+      console.error('Error getting suites for test case:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Get suite statistics
+   * @param {string} suiteId - Test suite ID (UUID)
+   * @returns {Promise<Object>} Suite statistics
+   */
+  async getTestSuiteStats(suiteId) {
+    try {
+      const suite = await this.getTestSuite(suiteId);
+      const members = await this.getTestSuiteMembers(suiteId);
+
+      return {
+        id: suite.id,
+        name: suite.name,
+        totalTests: members.length,
+        automatedTests: members.filter(tc => tc.automation_status === 'Automated').length,
+        manualTests: members.filter(tc => tc.automation_status === 'Manual').length,
+        passedTests: members.filter(tc => tc.status === 'Passed').length,
+        failedTests: members.filter(tc => tc.status === 'Failed').length,
+        notRunTests: members.filter(tc => tc.status === 'Not Run').length,
+        estimatedDuration: suite.estimated_duration,
+        suiteType: suite.suite_type,
+        version: suite.version
+      };
+    } catch (error) {
+      console.error('Error getting suite stats:', error);
+      return null;
+    }
+  }
 
   /**
  * Centralized validation for version-requirement compatibility
