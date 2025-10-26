@@ -1,12 +1,30 @@
-// src/pages/TestCases.jsx - Simplified Version
+// src/pages/TestCases.jsx - Simplified Version with Right Sidebar
 import React, { useState, useEffect, useMemo } from 'react';
 import {
   Plus,
   Search,
   X,
+  FileText,
+  Tag,
+  BarChart3,
+  Edit,
+  Trash2,
+  Link,
+  User,
+  Calendar,
+  CheckCircle,
+  AlertCircle,
+  Zap
 } from 'lucide-react';
 import MainLayout from '../components/Layout/MainLayout';
 import EmptyState from '../components/Common/EmptyState';
+import BulkActionsPanel from '../components/Common/BulkActionsPanel';
+import RightSidebarPanel, {
+  SidebarSection,
+  SidebarField,
+  SidebarActionButton,
+  SidebarBadge
+} from '../components/Common/RightSidebarPanel';
 import { useVersionContext } from '../context/VersionContext';
 import dataStore from '../services/DataStore';
 
@@ -18,18 +36,31 @@ const getLinkedRequirements = (testCaseId, mapping, requirements) => {
   return requirements.filter(req => linkedReqIds.includes(req.id));
 };
 
-// Simplified TestCaseRow Component - No actions, split ID/Name
+// Simplified TestCaseRow Component - No actions, split ID/Name, clickable for details
 const TestCaseRow = ({
   testCase,
   onSelect,
+  onRowClick,
   isSelected,
+  isHighlighted,
   mapping,
   requirements
 }) => {
   const linkedReqs = getLinkedRequirements(testCase.id, mapping, requirements);
 
   return (
-    <tr className={`hover:bg-gray-50 ${isSelected ? 'bg-blue-50' : ''}`}>
+    <tr 
+      className={`hover:bg-gray-50 cursor-pointer ${
+        isHighlighted ? 'bg-blue-100 border-l-4 border-blue-500' : 
+        isSelected ? 'bg-blue-50' : ''
+      }`}
+      onClick={(e) => {
+        // Don't trigger row click if clicking checkbox
+        if (e.target.type !== 'checkbox') {
+          onRowClick(testCase);
+        }
+      }}
+    >
       {/* Checkbox */}
       <td className="px-6 py-4 whitespace-nowrap w-12">
         <input
@@ -134,6 +165,7 @@ const TestCases = () => {
   // UI State
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTestCases, setSelectedTestCases] = useState(new Set());
+  const [selectedTestCase, setSelectedTestCase] = useState(null); // Single test case for details view
 
   // Load data from DataStore
   useEffect(() => {
@@ -231,6 +263,294 @@ const TestCases = () => {
     window.location.href = '/import#testcases-tab';
   };
 
+  // Handle row click to show details
+  const handleRowClick = (testCase) => {
+    // Clear multi-selection when clicking a single row
+    setSelectedTestCases(new Set());
+    setSelectedTestCase(testCase);
+  };
+
+  // Get linked requirements for selected test case
+  const linkedRequirements = useMemo(() => {
+    if (!selectedTestCase) return [];
+    return getLinkedRequirements(selectedTestCase.id, mapping, requirements);
+  }, [selectedTestCase, mapping, requirements]);
+
+  // Get all available tags from test cases
+  const allTags = useMemo(() => {
+    const tags = new Set();
+    testCases.forEach(tc => {
+      if (tc.tags && Array.isArray(tc.tags)) {
+        tc.tags.forEach(tag => tags.add(tag));
+      }
+    });
+    return Array.from(tags).sort();
+  }, [testCases]);
+
+  // Available versions for bulk assignment
+  const availableVersions = useMemo(() => {
+    return versions.map(v => ({
+      id: v.id,
+      name: v.name
+    }));
+  }, [versions]);
+
+  // Create right sidebar content based on selection state
+  const rightSidebarContent = useMemo(() => {
+    // Case 1: Multiple test cases selected -> Show Bulk Actions
+    if (selectedTestCases.size > 1) {
+      return (
+        <BulkActionsPanel
+          selectedCount={selectedTestCases.size}
+          selectedItems={testCases.filter(tc => selectedTestCases.has(tc.id))}
+          itemType="test case"
+          availableVersions={availableVersions}
+          availableTags={allTags}
+          onVersionAssign={(versionId, action) => {
+            console.log('Bulk version assign:', versionId, action);
+            // TODO: Implement bulk version assignment
+          }}
+          onTagsUpdate={(tags, action) => {
+            console.log('Bulk tags update:', tags, action);
+            // TODO: Implement bulk tags update
+          }}
+          onBulkDelete={() => {
+            if (confirm(`Delete ${selectedTestCases.size} test cases?`)) {
+              console.log('Bulk delete:', selectedTestCases);
+              // TODO: Implement bulk delete
+              setSelectedTestCases(new Set());
+            }
+          }}
+          onClearSelection={() => setSelectedTestCases(new Set())}
+          showExecuteButton={false}
+          showExportButton={false}
+        />
+      );
+    }
+
+    // Case 2: Single test case selected -> Show Details
+    if (selectedTestCase) {
+      return (
+        <RightSidebarPanel
+          title="Test Case Details"
+          onClose={() => setSelectedTestCase(null)}
+        >
+          {/* Quick Actions */}
+          <div className="p-4 space-y-2 border-b border-gray-200">
+            <SidebarActionButton
+              icon={<Edit size={16} />}
+              label="Edit Test Case"
+              onClick={() => {
+                console.log('Edit test case:', selectedTestCase.id);
+                // TODO: Implement edit
+              }}
+              variant="primary"
+            />
+            <SidebarActionButton
+              icon={<Link size={16} />}
+              label="Link Requirements"
+              onClick={() => {
+                console.log('Link requirements:', selectedTestCase.id);
+                // TODO: Implement linking
+              }}
+              variant="secondary"
+            />
+            <SidebarActionButton
+              icon={<Trash2 size={16} />}
+              label="Delete Test Case"
+              onClick={() => {
+                if (confirm(`Delete test case ${selectedTestCase.id}?`)) {
+                  console.log('Delete test case:', selectedTestCase.id);
+                  // TODO: Implement delete
+                  setSelectedTestCase(null);
+                }
+              }}
+              variant="danger"
+            />
+          </div>
+
+          {/* Basic Information */}
+          <SidebarSection
+            title="Basic Information"
+            icon={<FileText size={16} />}
+            defaultOpen={true}
+          >
+            <SidebarField
+              label="Test Case ID"
+              value={<span className="font-mono font-semibold">{selectedTestCase.id}</span>}
+            />
+            <SidebarField
+              label="Name"
+              value={selectedTestCase.name}
+            />
+            {selectedTestCase.description && (
+              <SidebarField
+                label="Description"
+                value={<p className="text-sm leading-relaxed">{selectedTestCase.description}</p>}
+              />
+            )}
+            {selectedTestCase.category && (
+              <SidebarField
+                label="Category"
+                value={selectedTestCase.category}
+              />
+            )}
+          </SidebarSection>
+
+          {/* Classification */}
+          <SidebarSection
+            title="Classification"
+            icon={<Tag size={16} />}
+            defaultOpen={true}
+          >
+            <SidebarField
+              label="Priority"
+              value={
+                <SidebarBadge
+                  label={selectedTestCase.priority || 'Medium'}
+                  color={
+                    selectedTestCase.priority === 'High' || selectedTestCase.priority === 'Critical'
+                      ? 'red'
+                      : selectedTestCase.priority === 'Medium'
+                      ? 'yellow'
+                      : 'blue'
+                  }
+                />
+              }
+            />
+            <SidebarField
+              label="Automation Status"
+              value={
+                <SidebarBadge
+                  label={selectedTestCase.automationStatus || 'Manual'}
+                  color={
+                    selectedTestCase.automationStatus === 'Automated'
+                      ? 'green'
+                      : selectedTestCase.automationStatus === 'Semi-Automated'
+                      ? 'blue'
+                      : selectedTestCase.automationStatus === 'Planned'
+                      ? 'purple'
+                      : 'gray'
+                  }
+                />
+              }
+            />
+            <SidebarField
+              label="Status"
+              value={
+                <SidebarBadge
+                  label={selectedTestCase.status || 'Not Run'}
+                  color={
+                    selectedTestCase.status === 'Passed'
+                      ? 'green'
+                      : selectedTestCase.status === 'Failed'
+                      ? 'red'
+                      : selectedTestCase.status === 'Blocked'
+                      ? 'yellow'
+                      : 'gray'
+                  }
+                />
+              }
+            />
+          </SidebarSection>
+
+          {/* Linked Requirements */}
+          {linkedRequirements.length > 0 && (
+            <SidebarSection
+              title="Linked Requirements"
+              icon={<Link size={16} />}
+              defaultOpen={true}
+            >
+              <div className="space-y-2">
+                {linkedRequirements.map(req => (
+                  <div
+                    key={req.id}
+                    className="p-2 bg-white border border-gray-200 rounded hover:border-blue-300 transition-colors"
+                  >
+                    <div className="font-mono text-sm font-semibold text-gray-900">
+                      {req.id}
+                    </div>
+                    <div className="text-xs text-gray-600 mt-1">
+                      {req.name}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </SidebarSection>
+          )}
+
+          {/* Tags */}
+          {selectedTestCase.tags && selectedTestCase.tags.length > 0 && (
+            <SidebarSection
+              title="Tags"
+              icon={<Tag size={16} />}
+              defaultOpen={false}
+            >
+              <div className="flex flex-wrap gap-2">
+                {selectedTestCase.tags.map(tag => (
+                  <SidebarBadge key={tag} label={tag} color="blue" />
+                ))}
+              </div>
+            </SidebarSection>
+          )}
+
+          {/* Execution History */}
+          {(selectedTestCase.lastExecuted || selectedTestCase.executionCount) && (
+            <SidebarSection
+              title="Execution History"
+              icon={<BarChart3 size={16} />}
+              defaultOpen={false}
+            >
+              {selectedTestCase.lastExecuted && (
+                <SidebarField
+                  label="Last Executed"
+                  value={new Date(selectedTestCase.lastExecuted).toLocaleDateString()}
+                />
+              )}
+              {selectedTestCase.executionCount && (
+                <SidebarField
+                  label="Total Executions"
+                  value={selectedTestCase.executionCount}
+                />
+              )}
+              {selectedTestCase.duration && (
+                <SidebarField
+                  label="Last Duration"
+                  value={`${selectedTestCase.duration}ms`}
+                />
+              )}
+            </SidebarSection>
+          )}
+
+          {/* Additional Details */}
+          {(selectedTestCase.assignee || selectedTestCase.estimatedDuration) && (
+            <SidebarSection
+              title="Additional Details"
+              icon={<User size={16} />}
+              defaultOpen={false}
+            >
+              {selectedTestCase.assignee && (
+                <SidebarField
+                  label="Assignee"
+                  value={selectedTestCase.assignee}
+                />
+              )}
+              {selectedTestCase.estimatedDuration && (
+                <SidebarField
+                  label="Estimated Duration"
+                  value={`${selectedTestCase.estimatedDuration} minutes`}
+                />
+              )}
+            </SidebarSection>
+          )}
+        </RightSidebarPanel>
+      );
+    }
+
+    // Case 3: No selection -> Show nothing (or could show filters/stats)
+    return null;
+  }, [selectedTestCases, selectedTestCase, testCases, linkedRequirements, availableVersions, allTags]);
+
   // Check if no test cases exist
   if (!hasTestCases) {
     return (
@@ -248,7 +568,12 @@ const TestCases = () => {
   }
 
   return (
-    <MainLayout title="Test Cases" hasData={hasTestCases}>
+    <MainLayout 
+      title="Test Cases" 
+      hasData={hasTestCases}
+      showRightSidebar={!!rightSidebarContent}
+      rightSidebar={rightSidebarContent}
+    >
       <div className="space-y-6">
         {/* Version indicator for unassigned view */}
         {selectedVersion === 'unassigned' && (
@@ -421,7 +746,9 @@ const TestCases = () => {
                       key={testCase.id}
                       testCase={testCase}
                       onSelect={handleTestCaseSelection}
+                      onRowClick={handleRowClick}
                       isSelected={selectedTestCases.has(testCase.id)}
+                      isHighlighted={selectedTestCase?.id === testCase.id}
                       mapping={mapping}
                       requirements={requirements}
                     />
