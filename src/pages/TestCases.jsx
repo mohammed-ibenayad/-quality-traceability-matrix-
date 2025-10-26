@@ -19,6 +19,7 @@ import {
 import MainLayout from '../components/Layout/MainLayout';
 import EmptyState from '../components/Common/EmptyState';
 import BulkActionsPanel from '../components/Common/BulkActionsPanel';
+import EditTestCasePanel from '../components/TestCases/EditTestCasePanel';
 import RightSidebarPanel, {
   SidebarSection,
   SidebarField,
@@ -166,6 +167,8 @@ const TestCases = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTestCases, setSelectedTestCases] = useState(new Set());
   const [selectedTestCase, setSelectedTestCase] = useState(null); // Single test case for details view
+  const [editPanelOpen, setEditPanelOpen] = useState(false);
+  const [testCaseToEdit, setTestCaseToEdit] = useState(null);
 
   // Load data from DataStore
   useEffect(() => {
@@ -263,6 +266,34 @@ const TestCases = () => {
     window.location.href = '/import#testcases-tab';
   };
 
+  // Handle save test case from edit panel
+  const handleSaveTestCase = async (updatedTestCase) => {
+    try {
+      if (testCases.find(tc => tc.id === updatedTestCase.id)) {
+        // Update existing test case
+        await dataStore.updateTestCase(updatedTestCase.id, updatedTestCase);
+      } else {
+        // Create new test case
+        await dataStore.addTestCase(updatedTestCase);
+      }
+      
+      // Refresh data
+      setTestCases(dataStore.getTestCases());
+      
+      // Close panels
+      setEditPanelOpen(false);
+      setTestCaseToEdit(null);
+      
+      // If we were viewing details of this test case, update it
+      if (selectedTestCase?.id === updatedTestCase.id) {
+        setSelectedTestCase(updatedTestCase);
+      }
+    } catch (error) {
+      console.error('Failed to save test case:', error);
+      throw error;
+    }
+  };
+
   // Handle row click to show details
   const handleRowClick = (testCase) => {
     // Clear multi-selection when clicking a single row
@@ -341,19 +372,27 @@ const TestCases = () => {
               icon={<Edit size={16} />}
               label="Edit Test Case"
               onClick={() => {
-                console.log('Edit test case:', selectedTestCase.id);
-                // TODO: Implement edit
+                setTestCaseToEdit({
+                  id: selectedTestCase.id || '',
+                  name: selectedTestCase.name || '',
+                  description: selectedTestCase.description || '',
+                  category: selectedTestCase.category || '',
+                  priority: selectedTestCase.priority || 'Medium',
+                  automationStatus: selectedTestCase.automationStatus || 'Manual',
+                  status: selectedTestCase.status || 'Not Run',
+                  steps: selectedTestCase.steps || [],
+                  expectedResult: selectedTestCase.expectedResult || '',
+                  preconditions: selectedTestCase.preconditions || '',
+                  testData: selectedTestCase.testData || '',
+                  tags: selectedTestCase.tags || [],
+                  requirementIds: selectedTestCase.requirementIds || [],
+                  applicableVersions: selectedTestCase.applicableVersions || [],
+                  assignee: selectedTestCase.assignee || '',
+                  estimatedDuration: selectedTestCase.estimatedDuration || null
+                });
+                setEditPanelOpen(true);
               }}
               variant="primary"
-            />
-            <SidebarActionButton
-              icon={<Link size={16} />}
-              label="Link Requirements"
-              onClick={() => {
-                console.log('Link requirements:', selectedTestCase.id);
-                // TODO: Implement linking
-              }}
-              variant="secondary"
             />
             <SidebarActionButton
               icon={<Trash2 size={16} />}
@@ -759,6 +798,19 @@ const TestCases = () => {
           )}
         </div>
       </div>
+
+      {/* Edit Test Case Panel */}
+      <EditTestCasePanel
+        isOpen={editPanelOpen}
+        onClose={() => {
+          setEditPanelOpen(false);
+          setTestCaseToEdit(null);
+        }}
+        testCase={testCaseToEdit}
+        onSave={handleSaveTestCase}
+        versions={versions}
+        requirements={requirements}
+      />
     </MainLayout>
   );
 };
