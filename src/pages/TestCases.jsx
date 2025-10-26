@@ -1,4 +1,3 @@
-// src/pages/TestCases.jsx - Simplified Version with Right Sidebar
 import React, { useState, useEffect, useMemo } from 'react';
 import {
   Plus,
@@ -28,6 +27,7 @@ import RightSidebarPanel, {
 } from '../components/Common/RightSidebarPanel';
 import { useVersionContext } from '../context/VersionContext';
 import dataStore from '../services/DataStore';
+import TestCasesBrowseSidebar from '../components/TestCases/TestCasesBrowseSidebar';
 
 // Helper to get linked requirements for a test case
 const getLinkedRequirements = (testCaseId, mapping, requirements) => {
@@ -170,6 +170,13 @@ const TestCases = () => {
   const [editPanelOpen, setEditPanelOpen] = useState(false);
   const [testCaseToEdit, setTestCaseToEdit] = useState(null);
 
+  // === FILTER STATE (Step 3.1) ===
+  const [categoryFilter, setCategoryFilter] = useState('All');
+  const [statusFilter, setStatusFilter] = useState('All');
+  const [priorityFilter, setPriorityFilter] = useState('All');
+  const [automationFilter, setAutomationFilter] = useState('All');
+  const [selectedTagsFilter, setSelectedTagsFilter] = useState([]);
+
   // Load data from DataStore
   useEffect(() => {
     const updateData = () => {
@@ -200,23 +207,80 @@ const TestCases = () => {
     });
   }, [testCases, selectedVersion]);
 
-  // Filter test cases by search
+  // === HELPER FUNCTIONS (Step 3.2) ===
+  const getAllCategories = (testCases) => {
+    const categories = new Set();
+    testCases.forEach(tc => {
+      if (tc.category) categories.add(tc.category);
+    });
+    return Array.from(categories).sort();
+  };
+
+  const getAllTags = (testCases) => {
+    const tags = new Set();
+    testCases.forEach(tc => {
+      if (tc.tags && Array.isArray(tc.tags)) {
+        tc.tags.forEach(tag => tags.add(tag));
+      }
+    });
+    return Array.from(tags).sort();
+  };
+
+  // === COMPREHENSIVE FILTERING LOGIC (Step 3.3) ===
   const filteredTestCases = useMemo(() => {
-    let filtered = versionFilteredTestCases;
+    return versionFilteredTestCases.filter(tc => {
+      // Search filter
+      const matchesSearch = !searchQuery || (() => {
+        const searchTerms = searchQuery.toLowerCase().trim().split(/\s+/);
+        return searchTerms.some(term =>
+          tc.name?.toLowerCase().includes(term) ||
+          tc.id?.toLowerCase().includes(term) ||
+          (tc.description && tc.description.toLowerCase().includes(term))
+        );
+      })();
 
-    // Search filter
-    if (searchQuery) {
-      filtered = filtered.filter(testCase =>
-        testCase.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        testCase.id?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        testCase.category?.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-    }
+      // Category filter
+      const matchesCategory = categoryFilter === 'All' || tc.category === categoryFilter;
 
-    return filtered;
-  }, [versionFilteredTestCases, searchQuery]);
+      // Status filter
+      const matchesStatus = statusFilter === 'All' || tc.status === statusFilter;
 
-  // Calculate summary statistics
+      // Priority filter
+      const matchesPriority = priorityFilter === 'All' || tc.priority === priorityFilter;
+
+      // Automation filter
+      const matchesAutomation = automationFilter === 'All' || tc.automationStatus === automationFilter;
+
+      // Tags filter
+      const matchesTags = selectedTagsFilter.length === 0 ||
+        (tc.tags && tc.tags.some(tag => selectedTagsFilter.includes(tag)));
+
+      return matchesSearch && matchesCategory && matchesStatus &&
+             matchesPriority && matchesAutomation && matchesTags;
+    });
+  }, [
+    versionFilteredTestCases,
+    searchQuery,
+    categoryFilter,
+    statusFilter,
+    priorityFilter,
+    automationFilter,
+    selectedTagsFilter
+  ]);
+
+  // === FILTER STATISTICS (Step 3.4) ===
+  const filterStats = useMemo(() => {
+    return {
+      total: versionFilteredTestCases.length,
+      filtered: filteredTestCases.length,
+      automated: filteredTestCases.filter(tc => tc.automationStatus === 'Automated').length,
+      manual: filteredTestCases.filter(tc => tc.automationStatus === 'Manual').length,
+      passed: filteredTestCases.filter(tc => tc.status === 'Passed').length,
+      failed: filteredTestCases.filter(tc => tc.status === 'Failed').length
+    };
+  }, [versionFilteredTestCases, filteredTestCases]);
+
+  // Calculate summary statistics (kept for header metrics)
   const summaryStats = useMemo(() => {
     const total = filteredTestCases.length;
     const automated = filteredTestCases.filter(tc => tc.automationStatus === 'Automated').length;
@@ -326,40 +390,9 @@ const TestCases = () => {
     }));
   }, [versions]);
 
-  // Create right sidebar content based on selection state
+  // === RIGHT SIDEBAR CONTENT (Step 3.5) ===
   const rightSidebarContent = useMemo(() => {
-    // Case 1: Multiple test cases selected -> Show Bulk Actions
-    if (selectedTestCases.size > 1) {
-      return (
-        <BulkActionsPanel
-          selectedCount={selectedTestCases.size}
-          selectedItems={testCases.filter(tc => selectedTestCases.has(tc.id))}
-          itemType="test case"
-          availableVersions={availableVersions}
-          availableTags={allTags}
-          onVersionAssign={(versionId, action) => {
-            console.log('Bulk version assign:', versionId, action);
-            // TODO: Implement bulk version assignment
-          }}
-          onTagsUpdate={(tags, action) => {
-            console.log('Bulk tags update:', tags, action);
-            // TODO: Implement bulk tags update
-          }}
-          onBulkDelete={() => {
-            if (confirm(`Delete ${selectedTestCases.size} test cases?`)) {
-              console.log('Bulk delete:', selectedTestCases);
-              // TODO: Implement bulk delete
-              setSelectedTestCases(new Set());
-            }
-          }}
-          onClearSelection={() => setSelectedTestCases(new Set())}
-          showExecuteButton={false}
-          showExportButton={false}
-        />
-      );
-    }
-
-    // Case 2: Single test case selected -> Show Details
+    // Case 1: Single test case selected -> Show details
     if (selectedTestCase) {
       return (
         <RightSidebarPanel
@@ -586,9 +619,81 @@ const TestCases = () => {
       );
     }
 
-    // Case 3: No selection -> Show nothing (or could show filters/stats)
-    return null;
-  }, [selectedTestCases, selectedTestCase, testCases, linkedRequirements, availableVersions, allTags]);
+    // Case 2: Multiple test cases selected -> Show bulk actions
+    if (selectedTestCases.size > 0) {
+      return (
+        <BulkActionsPanel
+          selectedCount={selectedTestCases.size}
+          selectedItems={testCases.filter(tc => selectedTestCases.has(tc.id))}
+          itemType="test case"
+          availableVersions={availableVersions}
+          availableTags={allTags}
+          onVersionAssign={(versionId, action) => {
+            console.log('Bulk version assign:', versionId, action);
+            // TODO: Implement bulk version assignment
+          }}
+          onTagsUpdate={(tags, action) => {
+            console.log('Bulk tags update:', tags, action);
+            // TODO: Implement bulk tags update
+          }}
+          onBulkDelete={() => {
+            if (confirm(`Delete ${selectedTestCases.size} test cases?`)) {
+              console.log('Bulk delete:', selectedTestCases);
+              // TODO: Implement bulk delete
+              setSelectedTestCases(new Set());
+            }
+          }}
+          onClearSelection={() => setSelectedTestCases(new Set())}
+          showExecuteButton={false}
+          showExportButton={false}
+        />
+      );
+    }
+
+    // Case 3: Nothing selected -> Show Filters
+    return (
+      <TestCasesBrowseSidebar
+        // Filter values
+        categoryFilter={categoryFilter}
+        statusFilter={statusFilter}
+        priorityFilter={priorityFilter}
+        automationFilter={automationFilter}
+        selectedTagsFilter={selectedTagsFilter}
+        // Available options
+        allCategories={getAllCategories(versionFilteredTestCases)}
+        allTags={getAllTags(versionFilteredTestCases)}
+        // Callbacks
+        onCategoryChange={setCategoryFilter}
+        onStatusChange={setStatusFilter}
+        onPriorityChange={setPriorityFilter}
+        onAutomationChange={setAutomationFilter}
+        onTagsChange={setSelectedTagsFilter}
+        onClearAllFilters={() => {
+          setCategoryFilter('All');
+          setStatusFilter('All');
+          setPriorityFilter('All');
+          setAutomationFilter('All');
+          setSelectedTagsFilter([]);
+        }}
+        // Statistics
+        stats={filterStats}
+      />
+    );
+  }, [
+    selectedTestCase,
+    selectedTestCases,
+    testCases,
+    linkedRequirements,
+    availableVersions,
+    allTags,
+    versionFilteredTestCases,
+    categoryFilter,
+    statusFilter,
+    priorityFilter,
+    automationFilter,
+    selectedTagsFilter,
+    filterStats
+  ]);
 
   // Check if no test cases exist
   if (!hasTestCases) {
@@ -610,7 +715,7 @@ const TestCases = () => {
     <MainLayout 
       title="Test Cases" 
       hasData={hasTestCases}
-      showRightSidebar={!!rightSidebarContent}
+      showRightSidebar={true} // Always show sidebar (Step 3.6)
       rightSidebar={rightSidebarContent}
     >
       <div className="space-y-6">
@@ -718,18 +823,31 @@ const TestCases = () => {
             </div>
           </div>
 
-          {/* Results count */}
-          <div className="px-6 py-2 text-sm text-gray-600 bg-gray-50">
-            Showing {filteredTestCases.length} of {versionFilteredTestCases.length} test cases
-            {selectedTestCases.size > 0 && (
-              <span className="ml-2">
-                · {selectedTestCases.size} selected
-                <button
-                  onClick={handleClearSelection}
-                  className="ml-2 text-blue-600 hover:text-blue-700 font-medium"
-                >
-                  Clear selection
-                </button>
+          {/* Results count + Active Filter Indicator (Step 3.7) */}
+          <div className="px-6 py-2 text-sm text-gray-600 bg-gray-50 flex justify-between items-center">
+            <span>
+              Showing {filteredTestCases.length} of {versionFilteredTestCases.length} test cases
+              {selectedTestCases.size > 0 && (
+                <span className="ml-2">
+                  · {selectedTestCases.size} selected
+                  <button
+                    onClick={handleClearSelection}
+                    className="ml-2 text-blue-600 hover:text-blue-700 font-medium"
+                  >
+                    Clear selection
+                  </button>
+                </span>
+              )}
+            </span>
+            {/* Active Filter Indicator */}
+            {(searchQuery || 
+              categoryFilter !== 'All' || 
+              statusFilter !== 'All' || 
+              priorityFilter !== 'All' || 
+              automationFilter !== 'All' || 
+              selectedTagsFilter.length > 0) && (
+              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                Filters active
               </span>
             )}
           </div>
