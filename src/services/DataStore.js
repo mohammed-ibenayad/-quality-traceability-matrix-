@@ -1412,10 +1412,19 @@ class DataStoreService {
         if (getResponse.data.success) {
           const index = this._testCases.findIndex(tc => tc.id === id);
           if (index !== -1) {
-            // ✅ Store the API response (already in snake_case from DB)
-            this._testCases[index] = getResponse.data.data;
+            // ✅ FIX: Convert snake_case from API to camelCase before storing
+            const freshData = getResponse.data.data;
+            const camelCaseData = this._toCamelCase(freshData);
+
+            this._testCases[index] = camelCaseData;
+
+            // ✅ FIX: Update mappings from test case requirements
+            this._updateMappingsFromTestCases();
+
+            // ✅ Notify listeners AFTER mappings are updated
             this._notifyListeners();
-            console.log('✅ Test case updated and refreshed from API:', id);
+
+            console.log('✅ Test case updated, mappings refreshed, listeners notified:', id);
           }
         }
       }

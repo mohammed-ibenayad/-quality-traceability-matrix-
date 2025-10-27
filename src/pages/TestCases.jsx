@@ -378,7 +378,7 @@ const TestCases = () => {
   // Handle save test case from edit panel
   const handleSaveTestCase = async (updatedTestCase) => {
     try {
-      if (testCases.find(tc => tc.id === updatedTestCase.id)) {
+      if (testCaseToEdit) {
         // Update existing test case
         await dataStore.updateTestCase(updatedTestCase.id, updatedTestCase);
       } else {
@@ -386,16 +386,19 @@ const TestCases = () => {
         await dataStore.addTestCase(updatedTestCase);
       }
 
-      // Refresh data
+      // ✅ FIX: Refresh ALL data - test cases, requirements, AND mapping
       setTestCases(dataStore.getTestCases());
+      setMapping(dataStore.getMapping());
+      setRequirements(dataStore.getRequirements());
 
       // Close panels
       setEditPanelOpen(false);
       setTestCaseToEdit(null);
 
-      // If we were viewing details of this test case, update it
+      // ✅ FIX: Refresh the selected test case with fresh data from store
       if (selectedTestCase?.id === updatedTestCase.id) {
-        setSelectedTestCase(updatedTestCase);
+        const refreshedTestCase = dataStore.getTestCase(updatedTestCase.id);
+        setSelectedTestCase(refreshedTestCase);
       }
     } catch (error) {
       console.error('Failed to save test case:', error);
