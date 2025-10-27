@@ -14,12 +14,15 @@ import {
   CheckCircle,
   AlertCircle,
   Zap,
-  Layers // <-- Added for Create Suite button icon
+  Layers,
+  FolderOpen,
 } from 'lucide-react';
 import MainLayout from '../components/Layout/MainLayout';
 import EmptyState from '../components/Common/EmptyState';
 import BulkActionsPanel from '../components/Common/BulkActionsPanel';
 import EditTestCasePanel from '../components/TestCases/EditTestCasePanel';
+import TestCasesSuiteSidebar from '../components/TestCases/TestCasesSuiteSidebar';
+
 import RightSidebarPanel, {
   SidebarSection,
   SidebarField,
@@ -55,11 +58,10 @@ const TestCaseRow = ({
   const linkedReqs = getLinkedRequirements(testCase.id, mapping, requirements);
 
   return (
-    <tr 
-      className={`hover:bg-gray-50 cursor-pointer ${
-        isHighlighted ? 'bg-blue-100 border-l-4 border-blue-500' : 
+    <tr
+      className={`hover:bg-gray-50 cursor-pointer ${isHighlighted ? 'bg-blue-100 border-l-4 border-blue-500' :
         isSelected ? 'bg-blue-50' : ''
-      }`}
+        }`}
       onClick={(e) => {
         // Don't trigger row click if clicking checkbox
         if (e.target.type !== 'checkbox') {
@@ -76,7 +78,7 @@ const TestCaseRow = ({
           className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
         />
       </td>
-      
+
       {/* ID Column */}
       <td className="px-6 py-4 whitespace-nowrap">
         <div className="text-sm font-medium text-gray-900">
@@ -103,28 +105,26 @@ const TestCaseRow = ({
 
       {/* Priority Column */}
       <td className="px-6 py-4 whitespace-nowrap text-center">
-        <span className={`inline-flex px-3 py-1 text-xs font-medium rounded-full border ${
-          testCase.priority === 'Critical' || testCase.priority === 'High'
-            ? 'bg-red-100 text-red-800 border-red-200'
-            : testCase.priority === 'Medium'
+        <span className={`inline-flex px-3 py-1 text-xs font-medium rounded-full border ${testCase.priority === 'Critical' || testCase.priority === 'High'
+          ? 'bg-red-100 text-red-800 border-red-200'
+          : testCase.priority === 'Medium'
             ? 'bg-yellow-100 text-yellow-800 border-yellow-200'
             : 'bg-blue-100 text-blue-800 border-blue-200'
-        }`}>
+          }`}>
           {testCase.priority || 'Medium'}
         </span>
       </td>
 
       {/* Automation Column */}
       <td className="px-6 py-4 whitespace-nowrap text-center">
-        <span className={`inline-flex px-3 py-1 text-xs font-medium rounded-full border ${
-          testCase.automationStatus === 'Automated'
-            ? 'bg-green-100 text-green-800 border-green-200'
-            : testCase.automationStatus === 'Semi-Automated'
+        <span className={`inline-flex px-3 py-1 text-xs font-medium rounded-full border ${testCase.automationStatus === 'Automated'
+          ? 'bg-green-100 text-green-800 border-green-200'
+          : testCase.automationStatus === 'Semi-Automated'
             ? 'bg-blue-100 text-blue-800 border-blue-200'
             : testCase.automationStatus === 'Planned'
-            ? 'bg-purple-100 text-purple-800 border-purple-200'
-            : 'bg-gray-100 text-gray-800 border-gray-200'
-        }`}>
+              ? 'bg-purple-100 text-purple-800 border-purple-200'
+              : 'bg-gray-100 text-gray-800 border-gray-200'
+          }`}>
           {testCase.automationStatus || 'Manual'}
         </span>
       </td>
@@ -161,19 +161,24 @@ const TestCaseRow = ({
 const TestCases = () => {
   // Get version context
   const { selectedVersion, versions } = useVersionContext();
-  
+
   // State for data from DataStore
   const [testCases, setTestCases] = useState([]);
   const [requirements, setRequirements] = useState([]);
   const [mapping, setMapping] = useState({});
   const [hasTestCases, setHasTestCases] = useState(false);
-  
+
   // UI State
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTestCases, setSelectedTestCases] = useState(new Set());
   const [selectedTestCase, setSelectedTestCase] = useState(null);
   const [editPanelOpen, setEditPanelOpen] = useState(false);
   const [testCaseToEdit, setTestCaseToEdit] = useState(null);
+  const [selectedSuite, setSelectedSuite] = useState(null);
+  const [activeSuiteFilter, setActiveSuiteFilter] = useState(null);
+  const [showEditSuiteModal, setShowEditSuiteModal] = useState(false);
+  const [suiteToEdit, setSuiteToEdit] = useState(null);
+
 
   // === FILTER STATE ===
   const [categoryFilter, setCategoryFilter] = useState('All');
@@ -200,7 +205,7 @@ const TestCases = () => {
       setHasTestCases(dataStore.getTestCases().length > 0);
     };
     updateData();
-    
+
     // Subscribe to DataStore changes
     const unsubscribe = dataStore.subscribe(updateData);
     return () => unsubscribe();
@@ -229,7 +234,7 @@ const TestCases = () => {
     if (selectedVersion === 'unassigned') {
       return testCases;
     }
-    
+
     return testCases.filter(tc => {
       if (tc.applicableVersions) {
         if (tc.applicableVersions.length === 0) return true;
@@ -260,44 +265,51 @@ const TestCases = () => {
 
   // === COMPREHENSIVE FILTERING LOGIC ===
   const filteredTestCases = useMemo(() => {
-    return versionFilteredTestCases.filter(tc => {
-      // Search filter
-      const matchesSearch = !searchQuery || (() => {
-        const searchTerms = searchQuery.toLowerCase().trim().split(/\s+/);
-        return searchTerms.some(term =>
-          tc.name?.toLowerCase().includes(term) ||
-          tc.id?.toLowerCase().includes(term) ||
-          (tc.description && tc.description.toLowerCase().includes(term))
-        );
-      })();
+    let filtered = versionFilteredTestCases;
 
-      // Category filter
-      const matchesCategory = categoryFilter === 'All' || tc.category === categoryFilter;
+    // Apply category filter
+    if (categoryFilter !== 'All') {
+      filtered = filtered.filter(tc => tc.category === categoryFilter);
+    }
 
-      // Status filter
-      const matchesStatus = statusFilter === 'All' || tc.status === statusFilter;
+    // Apply status filter
+    if (statusFilter !== 'All') {
+      filtered = filtered.filter(tc => tc.status === statusFilter);
+    }
 
-      // Priority filter
-      const matchesPriority = priorityFilter === 'All' || tc.priority === priorityFilter;
+    // Apply priority filter
+    if (priorityFilter !== 'All') {
+      filtered = filtered.filter(tc => tc.priority === priorityFilter);
+    }
 
-      // Automation filter
-      const matchesAutomation = automationFilter === 'All' || tc.automationStatus === automationFilter;
+    // Apply automation filter
+    if (automationFilter !== 'All') {
+      filtered = filtered.filter(tc => tc.automationStatus === automationFilter);
+    }
 
-      // Tags filter
-      const matchesTags = selectedTagsFilter.length === 0 ||
-        (tc.tags && tc.tags.some(tag => selectedTagsFilter.includes(tag)));
+    // Apply tags filter
+    if (selectedTagsFilter.length > 0) {
+      filtered = filtered.filter(tc =>
+        selectedTagsFilter.every(tag => tc.tags?.includes(tag))
+      );
+    }
 
-      return matchesSearch && matchesCategory && matchesStatus &&
-             matchesPriority && matchesAutomation && matchesTags;
-    });
+    // 🔥 NEW: Apply suite filter (when a suite is active)
+    if (activeSuiteFilter && suiteMembers.length > 0) {
+      const suiteMemberIds = suiteMembers.map(m => m.id);
+      filtered = filtered.filter(tc => suiteMemberIds.includes(tc.id));
+    }
+
+    return filtered;
   }, [
     versionFilteredTestCases,
-    searchQuery,
     categoryFilter,
     statusFilter,
     priorityFilter,
     automationFilter,
-    selectedTagsFilter
+    selectedTagsFilter,
+    activeSuiteFilter,    // NEW dependency
+    suiteMembers          // NEW dependency
   ]);
 
   // === FILTER STATISTICS ===
@@ -359,7 +371,8 @@ const TestCases = () => {
 
   // Handle new test case
   const handleNewTestCase = () => {
-    window.location.href = '/import#testcases-tab';
+    setTestCaseToEdit(null);  // null = create mode
+    setEditPanelOpen(true);
   };
 
   // Handle save test case from edit panel
@@ -372,14 +385,14 @@ const TestCases = () => {
         // Create new test case
         await dataStore.addTestCase(updatedTestCase);
       }
-      
+
       // Refresh data
       setTestCases(dataStore.getTestCases());
-      
+
       // Close panels
       setEditPanelOpen(false);
       setTestCaseToEdit(null);
-      
+
       // If we were viewing details of this test case, update it
       if (selectedTestCase?.id === updatedTestCase.id) {
         setSelectedTestCase(updatedTestCase);
@@ -447,36 +460,219 @@ const TestCases = () => {
     }
   };
 
-  // Handler: Open the "Add to Suite" modal
-  const handleOpenAddToSuite = async (suite) => {
+
+
+  /**
+ * Handler: When user clicks on a test suite
+ * - Loads suite details and members
+ * - Sets active filter to show only suite members in main table
+ * - Opens suite details in sidebar
+ */
+  const handleSuiteClick = async (suite) => {
     try {
       setIsLoadingSuiteOperation(true);
-      setSelectedSuiteForAdding(suite);
+
+      // Set as currently selected suite (for sidebar)
+      setSelectedSuite(suite);
+
+      // Set as active filter (filters main table)
+      setActiveSuiteFilter(suite.id);
+
+      // Load suite members
       const members = await dataStore.getTestSuiteMembers(suite.id);
       setSuiteMembers(members);
-      setShowAddToSuiteModal(true);
+
+      // Clear any test case selections (optional but recommended)
+      setSelectedTestCases(new Set());
+      setSelectedTestCase(null);
+
     } catch (error) {
-      console.error('Error loading suite members:', error);
-      alert('Failed to load suite members');
+      console.error('Error loading suite:', error);
+      alert('Failed to load suite details');
     } finally {
       setIsLoadingSuiteOperation(false);
     }
   };
 
-  // Handler: Add test cases to a suite
+
+
+  /**
+   * Handler: Exit suite view mode
+   * - Clears suite filter
+   * - Returns to browse all test cases mode
+   */
+  const handleClearSuiteFilter = () => {
+    setSelectedSuite(null);
+    setActiveSuiteFilter(null);
+    setSuiteMembers([]);
+  };
+
+
+
+
+  /**
+   * Handler: Open modal to add test cases to suite
+   * Note: This is now called FROM the sidebar, not on suite click
+   */
+  const handleOpenAddToSuite = (suite) => {
+    // Suite members are already loaded when suite was clicked
+    setSelectedSuiteForAdding(suite || selectedSuite);
+    setShowAddToSuiteModal(true);
+  };
+  /**
+   * Handler: Open edit modal for suite
+   */
+  const handleEditSuite = (suite) => {
+    setSuiteToEdit(suite || selectedSuite);
+    setShowEditSuiteModal(true);
+  };
+
+  /**
+   * Handler: Save edited suite
+   */
+  const handleUpdateSuite = async (suiteData) => {
+    try {
+      setIsLoadingSuiteOperation(true);
+
+      // Call API to update suite
+      await dataStore.updateTestSuite(suiteToEdit.id, suiteData);
+
+      // Reload suites
+      const updatedSuites = await dataStore.getTestSuites();
+      setTestSuites(updatedSuites);
+
+      // Update selected suite if it's the one being edited
+      if (selectedSuite?.id === suiteId) {
+        const updatedSuite = updatedSuites.find(s => s.id === suiteId);
+        if (updatedSuite) {
+          setSelectedSuite(updatedSuite);
+        }
+      }
+
+      // Close modal
+      setShowEditSuiteModal(false);
+      setSuiteToEdit(null);
+
+      alert('Suite updated successfully!');
+
+    } catch (error) {
+      console.error('Error updating suite:', error);
+      alert(`Failed to update suite: ${error.message}`);
+    } finally {
+      setIsLoadingSuiteOperation(false);
+    }
+  };
+
+  /**
+   * Handler: Delete a test suite
+   */
+  const handleDeleteSuite = async (suite) => {
+    const suiteToDelete = suite || selectedSuite;
+
+    if (!window.confirm(`Are you sure you want to delete "${suiteToDelete.name}"?\n\nThis action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      setIsLoadingSuiteOperation(true);
+
+      // Call API to delete suite
+      await dataStore.deleteTestSuite(suiteToDelete.id);
+
+      // Reload suites
+      const updatedSuites = await dataStore.getTestSuites();
+      setTestSuites(updatedSuites);
+
+      // Clear suite filter if we deleted the active suite
+      if (selectedSuite?.id === suiteToDelete.id) {
+        handleClearSuiteFilter();
+      }
+
+      alert('Suite deleted successfully!');
+
+    } catch (error) {
+      console.error('Error deleting suite:', error);
+      alert(`Failed to delete suite: ${error.message}`);
+    } finally {
+      setIsLoadingSuiteOperation(false);
+    }
+  };
+
+  /**
+   * Handler: Remove a single test case from suite
+   */
+  const handleRemoveTestFromSuite = async (testCaseId) => {
+    if (!selectedSuite) return;
+
+    if (!window.confirm('Remove this test case from the suite?')) {
+      return;
+    }
+
+    try {
+      setIsLoadingSuiteOperation(true);
+
+      // Call API to remove test case
+      await dataStore.removeTestCaseFromSuite(selectedSuite.id, testCaseId);
+
+      // Reload suite members
+      const updatedMembers = await dataStore.getTestSuiteMembers(selectedSuite.id);
+      setSuiteMembers(updatedMembers);
+
+      // Reload suites to update counts
+      const updatedSuites = await dataStore.getTestSuites();
+      setTestSuites(updatedSuites);
+
+      // Update selected suite with new member count
+      const updatedSuite = updatedSuites.find(s => s.id === selectedSuite.id);
+      if (updatedSuite) {
+        setSelectedSuite(updatedSuite);
+      }
+
+    } catch (error) {
+      console.error('Error removing test case:', error);
+      alert('Failed to remove test case from suite');
+    } finally {
+      setIsLoadingSuiteOperation(false);
+    }
+  };
+
+
+  /**
+ * Handler: Add test cases to suite
+ * Updated to refresh suite members after adding
+ */
   const handleAddTestCasesToSuite = async (suiteId, testCaseIds) => {
     try {
       setIsLoadingSuiteOperation(true);
+
       const result = await dataStore.addTestCasesToSuite(suiteId, testCaseIds);
+
       if (result.added > 0) {
         alert(`Successfully added ${result.added} test case(s) to the suite.${result.skipped > 0 ? ` (${result.skipped} already in suite)` : ''}`);
       } else {
         alert('No new test cases were added. They may already be in the suite.');
       }
+
+      // Reload suites
       const updatedSuites = await dataStore.getTestSuites();
       setTestSuites(updatedSuites);
+
+      // Reload suite members if we're viewing this suite
+      if (selectedSuite?.id === suiteId) {
+        const updatedMembers = await dataStore.getTestSuiteMembers(suiteId);
+        setSuiteMembers(updatedMembers);
+
+        // Update selected suite
+        const updatedSuite = updatedSuites.find(s => s.id === suiteId);
+        if (updatedSuite) {
+          setSelectedSuite(updatedSuite);
+        }
+      }
+
+      // Close modal
       setShowAddToSuiteModal(false);
       setSelectedSuiteForAdding(null);
+
     } catch (error) {
       console.error('Error adding test cases to suite:', error);
       alert(`Failed to add test cases: ${error.message}`);
@@ -486,9 +682,108 @@ const TestCases = () => {
     }
   };
 
-  // === RIGHT SIDEBAR CONTENT ===
+  // ============================================
+  // BULK ACTION HANDLERS
+  // ============================================
+
+  const handleBulkVersionAssignment = async (versionIds) => {
+    if (selectedTestCases.size === 0) return;
+    try {
+      const testCaseIds = Array.from(selectedTestCases);
+      for (const tcId of testCaseIds) {
+        const testCase = testCases.find(tc => tc.id === tcId);
+        if (testCase) {
+          await dataStore.updateTestCase(tcId, {
+            ...testCase,
+            applicableVersions: versionIds
+          });
+        }
+      }
+      setTestCases(dataStore.getTestCases());
+      alert(`Updated ${testCaseIds.length} test case(s) with new versions`);
+    } catch (error) {
+      console.error('Error updating versions:', error);
+      alert('Failed to update versions');
+    }
+  };
+
+  const handleBulkTagsUpdate = async (tags) => {
+    if (selectedTestCases.size === 0) return;
+    try {
+      const testCaseIds = Array.from(selectedTestCases);
+      for (const tcId of testCaseIds) {
+        const testCase = testCases.find(tc => tc.id === tcId);
+        if (testCase) {
+          await dataStore.updateTestCase(tcId, {
+            ...testCase,
+            tags: tags
+          });
+        }
+      }
+      setTestCases(dataStore.getTestCases());
+      alert(`Updated ${testCaseIds.length} test case(s) with new tags`);
+    } catch (error) {
+      console.error('Error updating tags:', error);
+      alert('Failed to update tags');
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedTestCases.size === 0) return;
+    const count = selectedTestCases.size;
+    if (!window.confirm(`Delete ${count} test case(s)? This cannot be undone.`)) return;
+    try {
+      const testCaseIds = Array.from(selectedTestCases);
+      for (const tcId of testCaseIds) {
+        await dataStore.deleteTestCase(tcId);
+      }
+      setTestCases(dataStore.getTestCases());
+      setSelectedTestCases(new Set());
+      alert(`Successfully deleted ${count} test case(s)`);
+    } catch (error) {
+      console.error('Error deleting test cases:', error);
+      alert('Failed to delete test cases');
+    }
+  };
+
   const rightSidebarContent = useMemo(() => {
-    // Case 1: Single test case selected -> Show details
+    // 🔥 PRIORITY 1: Suite is selected → Show suite details
+    if (selectedSuite) {
+      return (
+        <TestCasesSuiteSidebar
+          suite={{ ...selectedSuite, members: suiteMembers }}
+          onEditSuite={() => handleEditSuite(selectedSuite)}
+          onDeleteSuite={() => handleDeleteSuite(selectedSuite)}
+          onClose={handleClearSuiteFilter}  // X button clears filter
+          onAddTests={() => handleOpenAddToSuite(selectedSuite)}
+          onRemoveTest={handleRemoveTestFromSuite}  // NEW: Remove test from suite
+          isFiltering={activeSuiteFilter !== null}  // Show filter indicator
+        />
+      );
+    }
+
+    // PRIORITY 2: Multiple test cases selected → Bulk actions
+    if (selectedTestCases.size > 1) {
+      return (
+        <BulkActionsPanel
+          selectedCount={selectedTestCases.size}
+          selectedItems={Array.from(selectedTestCases).map(id =>
+            testCases.find(tc => tc.id === id)
+          ).filter(Boolean)}
+          itemType="testcase"
+          availableVersions={versions}
+          availableTags={getAllTags(testCases)}
+          onVersionAssign={handleBulkVersionAssignment}
+          onTagsUpdate={handleBulkTagsUpdate}
+          onBulkDelete={handleBulkDelete}
+          onClearSelection={() => setSelectedTestCases(new Set())}
+          showExecuteButton={true}
+          onExecute={() => console.log('Execute selected tests')}
+        />
+      );
+    }
+
+    // PRIORITY 3: Single test case selected → Test case details
     if (selectedTestCase) {
       return (
         <RightSidebarPanel
@@ -522,6 +817,7 @@ const TestCases = () => {
                 setEditPanelOpen(true);
               }}
               variant="primary"
+              fullWidth
             />
             <SidebarActionButton
               icon={<Trash2 size={16} />}
@@ -534,6 +830,7 @@ const TestCases = () => {
                 }
               }}
               variant="danger"
+              fullWidth
             />
           </div>
 
@@ -580,25 +877,8 @@ const TestCases = () => {
                     selectedTestCase.priority === 'High' || selectedTestCase.priority === 'Critical'
                       ? 'red'
                       : selectedTestCase.priority === 'Medium'
-                      ? 'yellow'
-                      : 'blue'
-                  }
-                />
-              }
-            />
-            <SidebarField
-              label="Automation Status"
-              value={
-                <SidebarBadge
-                  label={selectedTestCase.automationStatus || 'Manual'}
-                  color={
-                    selectedTestCase.automationStatus === 'Automated'
-                      ? 'green'
-                      : selectedTestCase.automationStatus === 'Semi-Automated'
-                      ? 'blue'
-                      : selectedTestCase.automationStatus === 'Planned'
-                      ? 'purple'
-                      : 'gray'
+                        ? 'yellow'
+                        : 'blue'
                   }
                 />
               }
@@ -612,38 +892,87 @@ const TestCases = () => {
                     selectedTestCase.status === 'Passed'
                       ? 'green'
                       : selectedTestCase.status === 'Failed'
-                      ? 'red'
-                      : selectedTestCase.status === 'Blocked'
-                      ? 'yellow'
-                      : 'gray'
+                        ? 'red'
+                        : selectedTestCase.status === 'Blocked'
+                          ? 'orange'
+                          : 'gray'
+                  }
+                />
+              }
+            />
+            <SidebarField
+              label="Automation"
+              value={
+                <SidebarBadge
+                  label={selectedTestCase.automationStatus || 'Manual'}
+                  color={
+                    selectedTestCase.automationStatus === 'Automated'
+                      ? 'green'
+                      : selectedTestCase.automationStatus === 'Semi-Automated'
+                        ? 'blue'
+                        : selectedTestCase.automationStatus === 'Planned'
+                          ? 'purple'
+                          : 'gray'
                   }
                 />
               }
             />
           </SidebarSection>
 
-          {/* Linked Requirements */}
-          {linkedRequirements.length > 0 && (
+          {/* Test Steps */}
+          {selectedTestCase.steps && selectedTestCase.steps.length > 0 && (
             <SidebarSection
-              title="Linked Requirements"
-              icon={<Link size={16} />}
-              defaultOpen={true}
+              title="Test Steps"
+              icon={<CheckCircle size={16} />}
+              defaultOpen={false}
             >
-              <div className="space-y-2">
-                {linkedRequirements.map(req => (
-                  <div
-                    key={req.id}
-                    className="p-2 bg-white border border-gray-200 rounded hover:border-blue-300 transition-colors"
-                  >
-                    <div className="font-mono text-sm font-semibold text-gray-900">
-                      {req.id}
-                    </div>
-                    <div className="text-xs text-gray-600 mt-1">
-                      {req.name}
-                    </div>
-                  </div>
+              <ol className="space-y-2 text-sm">
+                {selectedTestCase.steps.map((step, index) => (
+                  <li key={index} className="flex">
+                    <span className="font-semibold text-gray-700 mr-2">{index + 1}.</span>
+                    <span className="text-gray-600">{step}</span>
+                  </li>
                 ))}
-              </div>
+              </ol>
+            </SidebarSection>
+          )}
+
+          {/* Expected Result */}
+          {selectedTestCase.expectedResult && (
+            <SidebarSection
+              title="Expected Result"
+              icon={<CheckCircle size={16} />}
+              defaultOpen={false}
+            >
+              <p className="text-sm text-gray-600 leading-relaxed">
+                {selectedTestCase.expectedResult}
+              </p>
+            </SidebarSection>
+          )}
+
+          {/* Preconditions */}
+          {selectedTestCase.preconditions && (
+            <SidebarSection
+              title="Preconditions"
+              icon={<AlertCircle size={16} />}
+              defaultOpen={false}
+            >
+              <p className="text-sm text-gray-600 leading-relaxed">
+                {selectedTestCase.preconditions}
+              </p>
+            </SidebarSection>
+          )}
+
+          {/* Test Data */}
+          {selectedTestCase.testData && (
+            <SidebarSection
+              title="Test Data"
+              icon={<FileText size={16} />}
+              defaultOpen={false}
+            >
+              <p className="text-sm text-gray-600 leading-relaxed">
+                {selectedTestCase.testData}
+              </p>
             </SidebarSection>
           )}
 
@@ -655,110 +984,132 @@ const TestCases = () => {
               defaultOpen={false}
             >
               <div className="flex flex-wrap gap-2">
-                {selectedTestCase.tags.map(tag => (
-                  <SidebarBadge key={tag} label={tag} color="blue" />
+                {selectedTestCase.tags.map((tag, index) => (
+                  <span
+                    key={index}
+                    className="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded"
+                  >
+                    {tag}
+                  </span>
                 ))}
               </div>
             </SidebarSection>
           )}
 
-          {/* Execution History */}
-          {(selectedTestCase.lastExecuted || selectedTestCase.executionCount) && (
+          {/* Linked Requirements */}
+          {linkedRequirements.length > 0 && (
             <SidebarSection
-              title="Execution History"
-              icon={<BarChart3 size={16} />}
+              title="Linked Requirements"
+              icon={<Link size={16} />}
               defaultOpen={false}
+              badge={linkedRequirements.length}
             >
-              {selectedTestCase.lastExecuted && (
-                <SidebarField
-                  label="Last Executed"
-                  value={new Date(selectedTestCase.lastExecuted).toLocaleDateString()}
-                />
-              )}
-              {selectedTestCase.executionCount && (
-                <SidebarField
-                  label="Total Executions"
-                  value={selectedTestCase.executionCount}
-                />
-              )}
-              {selectedTestCase.duration && (
-                <SidebarField
-                  label="Last Duration"
-                  value={`${selectedTestCase.duration}ms`}
-                />
-              )}
+              <div className="space-y-2">
+                {linkedRequirements.map((req) => (
+                  <div
+                    key={req.id}
+                    className="p-2 bg-purple-50 border border-purple-200 rounded text-sm"
+                  >
+                    <div className="font-medium text-purple-900">{req.id}</div>
+                    <div className="text-xs text-purple-700 mt-1">{req.name}</div>
+                  </div>
+                ))}
+              </div>
             </SidebarSection>
           )}
 
-          {/* Additional Details */}
-          {(selectedTestCase.assignee || selectedTestCase.estimatedDuration) && (
-            <SidebarSection
-              title="Additional Details"
-              icon={<User size={16} />}
-              defaultOpen={false}
-            >
-              {selectedTestCase.assignee && (
-                <SidebarField
-                  label="Assignee"
-                  value={selectedTestCase.assignee}
-                />
-              )}
-              {selectedTestCase.estimatedDuration && (
-                <SidebarField
-                  label="Estimated Duration"
-                  value={`${selectedTestCase.estimatedDuration} minutes`}
-                />
-              )}
-            </SidebarSection>
-          )}
+          {/* Metadata */}
+          <SidebarSection
+            title="Metadata"
+            icon={<BarChart3 size={16} />}
+            defaultOpen={false}
+          >
+            {selectedTestCase.assignee && (
+              <SidebarField
+                label="Assignee"
+                value={
+                  <div className="flex items-center">
+                    <User size={14} className="mr-1 text-gray-500" />
+                    <span className="text-sm">{selectedTestCase.assignee}</span>
+                  </div>
+                }
+              />
+            )}
+            {selectedTestCase.estimatedDuration && (
+              <SidebarField
+                label="Estimated Duration"
+                value={
+                  <div className="flex items-center">
+                    <Calendar size={14} className="mr-1 text-gray-500" />
+                    <span className="text-sm">{selectedTestCase.estimatedDuration} min</span>
+                  </div>
+                }
+              />
+            )}
+            {selectedTestCase.applicableVersions && selectedTestCase.applicableVersions.length > 0 && (
+              <SidebarField
+                label="Versions"
+                value={
+                  <div className="flex flex-wrap gap-1">
+                    {selectedTestCase.applicableVersions.map((version, index) => (
+                      <span
+                        key={index}
+                        className="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-700 rounded"
+                      >
+                        {version}
+                      </span>
+                    ))}
+                  </div>
+                }
+              />
+            )}
+            {selectedTestCase.automationPath && (
+              <SidebarField
+                label="Automation Path"
+                value={
+                  <span className="text-xs font-mono bg-gray-100 px-2 py-1 rounded">
+                    {selectedTestCase.automationPath}
+                  </span>
+                }
+              />
+            )}
+            {selectedTestCase.lastExecuted && (
+              <SidebarField
+                label="Last Executed"
+                value={new Date(selectedTestCase.lastExecuted).toLocaleDateString()}
+              />
+            )}
+            {selectedTestCase.executedBy && (
+              <SidebarField
+                label="Executed By"
+                value={selectedTestCase.executedBy}
+              />
+            )}
+          </SidebarSection>
         </RightSidebarPanel>
       );
     }
 
-    // Case 2: Multiple test cases selected -> Show bulk actions
-    if (selectedTestCases.size > 0) {
-      return (
-        <BulkActionsPanel
-          selectedCount={selectedTestCases.size}
-          selectedItems={testCases.filter(tc => selectedTestCases.has(tc.id))}
-          itemType="test case"
-          availableVersions={availableVersions}
-          availableTags={allTags}
-          onVersionAssign={(versionId, action) => {
-            console.log('Bulk version assign:', versionId, action);
-            // TODO: Implement bulk version assignment
-          }}
-          onTagsUpdate={(tags, action) => {
-            console.log('Bulk tags update:', tags, action);
-            // TODO: Implement bulk tags update
-          }}
-          onBulkDelete={() => {
-            if (confirm(`Delete ${selectedTestCases.size} test cases?`)) {
-              console.log('Bulk delete:', selectedTestCases);
-              // TODO: Implement bulk delete
-              setSelectedTestCases(new Set());
-            }
-          }}
-          onClearSelection={() => setSelectedTestCases(new Set())}
-          showExecuteButton={false}
-          showExportButton={false}
-        />
-      );
-    }
-
-    // Case 3: Nothing selected -> Show Filters
+    // DEFAULT: Browse mode → Show browse sidebar
     return (
       <TestCasesBrowseSidebar
-        // Filter values
+        testSuites={testSuites}
+        onCreateSuite={() => setShowCreateSuiteModal(true)}
+        onSuiteClick={handleSuiteClick}  // 🔥 Changed from handleOpenAddToSuite
+        onAddTestCase={handleNewTestCase}
+
+        // Filters
         categoryFilter={categoryFilter}
         statusFilter={statusFilter}
         priorityFilter={priorityFilter}
         automationFilter={automationFilter}
         selectedTagsFilter={selectedTagsFilter}
+
         // Available options
         allCategories={getAllCategories(versionFilteredTestCases)}
         allTags={getAllTags(versionFilteredTestCases)}
-        // Callbacks
+
+        // Filter callbacks
         onCategoryChange={setCategoryFilter}
         onStatusChange={setStatusFilter}
         onPriorityChange={setPriorityFilter}
@@ -771,30 +1122,26 @@ const TestCases = () => {
           setAutomationFilter('All');
           setSelectedTagsFilter([]);
         }}
+
         // Statistics
         stats={filterStats}
-        // === SECTION 7: PASS TEST SUITES AND CALLBACKS TO SIDEBAR ===
-        testSuites={testSuites}
-        onCreateSuite={() => setShowCreateSuiteModal(true)}
-        onSuiteClick={handleOpenAddToSuite}
       />
     );
   }, [
+    selectedSuite,
     selectedTestCase,
     selectedTestCases,
     testCases,
-    linkedRequirements,
-    availableVersions,
-    allTags,
+    testSuites,
+    suiteMembers,
+    activeSuiteFilter,  // NEW
     versionFilteredTestCases,
     categoryFilter,
     statusFilter,
     priorityFilter,
     automationFilter,
     selectedTagsFilter,
-    filterStats,
-    // === ADDED DEPENDENCIES FOR SIDEBAR ===
-    testSuites
+    filterStats
   ]);
 
   // Check if no test cases exist
@@ -814,13 +1161,38 @@ const TestCases = () => {
   }
 
   return (
-    <MainLayout 
-      title="Test Cases" 
+    <MainLayout
+      title="Test Cases"
       hasData={hasTestCases}
       showRightSidebar={true}
       rightSidebar={rightSidebarContent}
     >
-      <div className="space-y-6">       
+      <div className="space-y-6">
+
+        {activeSuiteFilter && selectedSuite && (
+          <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <FolderOpen size={20} className="text-blue-600" />
+                <div>
+                  <p className="text-sm font-medium text-blue-900">
+                    Viewing: {selectedSuite.name}
+                  </p>
+                  <p className="text-xs text-blue-700">
+                    Showing {filteredTestCases.length} test case{filteredTestCases.length !== 1 ? 's' : ''} from this suite
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={handleClearSuiteFilter}
+                className="px-3 py-1.5 text-sm text-blue-700 hover:text-blue-900 hover:bg-blue-100 rounded transition-colors flex items-center gap-1"
+              >
+                <X size={14} />
+                Clear Filter
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Test Cases Table - No grouping, no filters, no actions */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
@@ -902,9 +1274,14 @@ const TestCases = () => {
       {/* === SECTION 5: MODALS === */}
       {/* Create Suite Modal */}
       <CreateSuiteModal
-        isOpen={showCreateSuiteModal}
-        onClose={() => setShowCreateSuiteModal(false)}
-        onCreate={handleCreateSuite}
+        isOpen={showEditSuiteModal}
+        onClose={() => {
+          setShowEditSuiteModal(false);
+          setSuiteToEdit(null);
+        }}
+        onCreate={handleUpdateSuite}
+        initialData={suiteToEdit}
+        isEditMode={true}
       />
       {/* Add to Suite Modal */}
       <AddToSuiteModal
