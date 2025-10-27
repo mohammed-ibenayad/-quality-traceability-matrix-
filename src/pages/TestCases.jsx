@@ -371,7 +371,8 @@ const TestCases = () => {
 
   // Handle new test case
   const handleNewTestCase = () => {
-    window.location.href = '/import#testcases-tab';
+    setTestCaseToEdit(null);  // null = create mode
+    setEditPanelOpen(true);
   };
 
   // Handle save test case from edit panel
