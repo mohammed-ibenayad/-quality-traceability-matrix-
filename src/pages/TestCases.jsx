@@ -14,12 +14,15 @@ import {
   CheckCircle,
   AlertCircle,
   Zap,
-  Layers // <-- Added for Create Suite button icon
+  Layers,
+  FolderOpen,
 } from 'lucide-react';
 import MainLayout from '../components/Layout/MainLayout';
 import EmptyState from '../components/Common/EmptyState';
 import BulkActionsPanel from '../components/Common/BulkActionsPanel';
 import EditTestCasePanel from '../components/TestCases/EditTestCasePanel';
+import TestCasesSuiteSidebar from '../components/TestCases/TestCasesSuiteSidebar';
+
 import RightSidebarPanel, {
   SidebarSection,
   SidebarField,
@@ -526,12 +529,12 @@ const TestCases = () => {
   /**
    * Handler: Save edited suite
    */
-  const handleUpdateSuite = async (suiteId, updatedData) => {
+  const handleUpdateSuite = async (suiteData) => {
     try {
       setIsLoadingSuiteOperation(true);
 
       // Call API to update suite
-      await dataStore.updateTestSuite(suiteId, updatedData);
+      await dataStore.updateTestSuite(suiteToEdit.id, suiteData);
 
       // Reload suites
       const updatedSuites = await dataStore.getTestSuites();
@@ -733,7 +736,7 @@ const TestCases = () => {
         testSuites={testSuites}
         onCreateSuite={() => setShowCreateSuiteModal(true)}
         onSuiteClick={handleSuiteClick}  // 🔥 Changed from handleOpenAddToSuite
-        onAddTestCase={() => navigate('/import#testcases-tab')}
+        onAddTestCase={handleNewTestCase}
 
         // Filters
         categoryFilter={categoryFilter}
@@ -805,6 +808,31 @@ const TestCases = () => {
       rightSidebar={rightSidebarContent}
     >
       <div className="space-y-6">
+
+        {activeSuiteFilter && selectedSuite && (
+          <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <FolderOpen size={20} className="text-blue-600" />
+                <div>
+                  <p className="text-sm font-medium text-blue-900">
+                    Viewing: {selectedSuite.name}
+                  </p>
+                  <p className="text-xs text-blue-700">
+                    Showing {filteredTestCases.length} test case{filteredTestCases.length !== 1 ? 's' : ''} from this suite
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={handleClearSuiteFilter}
+                className="px-3 py-1.5 text-sm text-blue-700 hover:text-blue-900 hover:bg-blue-100 rounded transition-colors flex items-center gap-1"
+              >
+                <X size={14} />
+                Clear Filter
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Test Cases Table - No grouping, no filters, no actions */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
@@ -886,9 +914,14 @@ const TestCases = () => {
       {/* === SECTION 5: MODALS === */}
       {/* Create Suite Modal */}
       <CreateSuiteModal
-        isOpen={showCreateSuiteModal}
-        onClose={() => setShowCreateSuiteModal(false)}
-        onCreate={handleCreateSuite}
+        isOpen={showEditSuiteModal}
+        onClose={() => {
+          setShowEditSuiteModal(false);
+          setSuiteToEdit(null);
+        }}
+        onCreate={handleUpdateSuite}
+        initialData={suiteToEdit}
+        isEditMode={true}
       />
       {/* Add to Suite Modal */}
       <AddToSuiteModal
