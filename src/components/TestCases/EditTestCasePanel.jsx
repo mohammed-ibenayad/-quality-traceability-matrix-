@@ -241,9 +241,8 @@ const EditTestCasePanel = ({
               type="text"
               value={formData.id}
               onChange={(e) => handleInputChange('id', e.target.value)}
-              className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                errors.id ? 'border-red-300' : 'border-gray-300'
-              }`}
+              className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.id ? 'border-red-300' : 'border-gray-300'
+                }`}
               placeholder="e.g., TC-001"
               disabled={!!testCase} // Can't change ID when editing
             />
@@ -260,9 +259,8 @@ const EditTestCasePanel = ({
               type="text"
               value={formData.name}
               onChange={(e) => handleInputChange('name', e.target.value)}
-              className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                errors.name ? 'border-red-300' : 'border-gray-300'
-              }`}
+              className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.name ? 'border-red-300' : 'border-gray-300'
+                }`}
               placeholder="Enter test case name"
             />
             {errors.name && <p className="mt-1 text-sm text-red-600">{errors.name}</p>}
@@ -515,10 +513,22 @@ const EditTestCasePanel = ({
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Tags</h3>
           <input
             type="text"
-            value={formData.tags.join(', ')}
-            onChange={(e) => handleInputChange('tags', e.target.value.split(',').map(t => t.trim()).filter(t => t))}
+            value={Array.isArray(formData.tags) ? formData.tags.join(', ') : ''}
+            onChange={(e) => {
+              // Let user type freely - don't process yet
+              e.target.dataset.rawValue = e.target.value;
+            }}
+            onBlur={(e) => {
+              // Process tags when user finishes typing
+              const tagsArray = (e.target.dataset.rawValue || e.target.value)
+                .split(',')
+                .map(t => t.trim())
+                .filter(t => t);
+              handleInputChange('tags', tagsArray);
+              delete e.target.dataset.rawValue;
+            }}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            placeholder="Enter tags separated by commas"
+            placeholder="Enter tags separated by commas (e.g., UI, Authentication, Security)"
           />
           <p className="mt-1 text-xs text-gray-500">Separate tags with commas</p>
         </div>
