@@ -45,7 +45,8 @@ const FilterPanel = ({
     priority: true,
     status: true,
     coverage: false,
-    tags: false
+    tags: false,
+    stats: true  // Statistics section expanded by default
   });
 
   // Count active filters
@@ -64,6 +65,13 @@ const FilterPanel = ({
     } else {
       onTagsChange([...selectedTags, tag]);
     }
+  };
+
+  const toggleSection = (section) => {
+    setExpandedSections(prev => ({
+      ...prev,
+      [section]: !prev[section]
+    }));
   };
 
   return (
@@ -95,7 +103,8 @@ const FilterPanel = ({
       <SidebarSection
         title="Search"
         icon={<Search size={16} />}
-        defaultOpen={true}
+        defaultOpen={expandedSections.search}
+        onToggle={() => toggleSection('search')}
       >
         <div className="relative">
           <input
@@ -119,7 +128,8 @@ const FilterPanel = ({
       {/* Priority Filter */}
       <SidebarSection
         title="Priority"
-        defaultOpen={true}
+        defaultOpen={expandedSections.priority}
+        onToggle={() => toggleSection('priority')}
       >
         <div className="space-y-2">
           {['All', 'High', 'Medium', 'Low'].map((priority) => (
@@ -151,7 +161,8 @@ const FilterPanel = ({
       {/* Status Filter */}
       <SidebarSection
         title="Status"
-        defaultOpen={true}
+        defaultOpen={expandedSections.status}
+        onToggle={() => toggleSection('status')}
       >
         <div className="space-y-2">
           {['All', 'Active', 'Draft', 'Deprecated'].map((status) => (
@@ -176,7 +187,8 @@ const FilterPanel = ({
       {/* Type Filter */}
       <SidebarSection
         title="Type"
-        defaultOpen={true}
+        defaultOpen={expandedSections.type}
+        onToggle={() => toggleSection('type')}
       >
         <select
           value={typeFilter}
@@ -196,7 +208,8 @@ const FilterPanel = ({
       {/* Coverage Filter */}
       <SidebarSection
         title="Test Coverage"
-        defaultOpen={false}
+        defaultOpen={expandedSections.coverage}
+        onToggle={() => toggleSection('coverage')}
       >
         <div className="space-y-2">
           {['All', 'With Tests', 'No Coverage'].map((coverage) => (
@@ -234,7 +247,8 @@ const FilterPanel = ({
       {allTags.length > 0 && (
         <SidebarSection
           title="Tags"
-          defaultOpen={false}
+          defaultOpen={expandedSections.tags}
+          onToggle={() => toggleSection('tags')}
         >
           <div className="space-y-2 max-h-48 overflow-y-auto">
             {allTags.map((tag) => (
@@ -263,12 +277,13 @@ const FilterPanel = ({
         </SidebarSection>
       )}
 
-      {/* Statistics */}
-      <div className="p-4 bg-gradient-to-br from-blue-50 to-indigo-50 border-t border-gray-200 mt-4">
-        <div className="flex items-center mb-3">
-          <TrendingUp size={16} className="text-blue-600 mr-2" />
-          <h4 className="font-semibold text-gray-900">Statistics</h4>
-        </div>
+      {/* Statistics Section */}
+      <SidebarSection
+        title="Statistics"
+        icon={<TrendingUp size={16} />}
+        defaultOpen={expandedSections.stats}
+        onToggle={() => toggleSection('stats')}
+      >
         <div className="space-y-2 text-sm">
           <div className="flex justify-between">
             <span className="text-gray-600">Total Requirements:</span>
@@ -279,13 +294,14 @@ const FilterPanel = ({
             <span className="font-semibold text-blue-600">{stats.filtered}</span>
           </div>
           {stats.filtered !== stats.total && (
-            <div className="pt-2 border-t border-blue-200">
+            <div className="pt-2 border-t border-gray-200">
               <div className="text-xs text-gray-500">
                 {stats.total - stats.filtered} hidden by filters
               </div>
             </div>
           )}
-          <div className="pt-2 border-t border-blue-200 space-y-1">
+          
+          <div className="pt-2 border-t border-gray-200 space-y-1.5">
             <div className="flex justify-between text-xs">
               <span className="text-gray-600">High Priority:</span>
               <span className="font-medium text-red-600">{stats.highPriority}</span>
@@ -300,7 +316,7 @@ const FilterPanel = ({
             </div>
           </div>
         </div>
-      </div>
+      </SidebarSection>
 
       {/* Quick Tips */}
       <div className="p-4 bg-gray-50 border-t border-gray-200">
