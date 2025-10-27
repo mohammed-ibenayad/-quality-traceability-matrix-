@@ -1,35 +1,89 @@
-// Location: src/components/TestCases/TestCasesSuiteSidebar.jsx
-import React from 'react';
+import React, { useState } from 'react';
 import RightSidebarPanel, {
   SidebarSection,
-  SidebarActionButton,
   SidebarField,
+  SidebarActionButton,
   SidebarBadge
 } from '../Common/RightSidebarPanel';
-import { 
-  Edit, 
-  Trash2, 
-  Plus, 
-  X, 
-  FolderOpen, 
+import {
+  Plus,
+  FolderOpen,
   Filter,
-  AlertCircle
+  Tag,
+  X
 } from 'lucide-react';
 
 /**
- * Enhanced TestCasesSuiteSidebar - For Option B Design
- * Shows suite details and filters main table to suite members
+ * TestCasesBrowseSidebar - Browse Mode Sidebar
+ * Shows filters, test suites, and statistics
  */
-const TestCasesSuiteSidebar = ({
-  suite,
-  onEditSuite,
-  onDeleteSuite,
-  onClose, // This now means "exit suite mode" / "clear filter"
-  onAddTests,
-  onRemoveTest, // NEW: Remove individual test from suite
-  isFiltering = true // NEW: Indicates if table is filtered
-}) => {
+const TestCasesBrowseSidebar = ({
+  // Test Suites data
+  testSuites = [],
+  onSuiteClick,
+  onCreateSuite,
+  onAddTestCase,
   
+  // Filter values
+  categoryFilter = 'All',
+  statusFilter = 'All',
+  priorityFilter = 'All',
+  automationFilter = 'All',
+  selectedTagsFilter = [],
+  
+  // Available options
+  allCategories = [],
+  allTags = [],
+  
+  // Callbacks
+  onCategoryChange,
+  onStatusChange,
+  onPriorityChange,
+  onAutomationChange,
+  onTagsChange,
+  onClearAllFilters,
+  
+  // Statistics
+  stats = {
+    total: 0,
+    filtered: 0,
+    automated: 0,
+    manual: 0,
+    passed: 0,
+    failed: 0
+  }
+}) => {
+  const [expandedSections, setExpandedSections] = useState({
+    suites: true,
+    filters: true,
+    stats: false
+  });
+
+  const toggleSection = (section) => {
+    setExpandedSections(prev => ({
+      ...prev,
+      [section]: !prev[section]
+    }));
+  };
+
+  // Count active filters
+  const activeFiltersCount = [
+    categoryFilter !== 'All',
+    statusFilter !== 'All',
+    priorityFilter !== 'All',
+    automationFilter !== 'All',
+    selectedTagsFilter.length > 0
+  ].filter(Boolean).length;
+
+  const handleToggleTag = (tag) => {
+    if (selectedTagsFilter.includes(tag)) {
+      onTagsChange(selectedTagsFilter.filter(t => t !== tag));
+    } else {
+      onTagsChange([...selectedTagsFilter, tag]);
+    }
+  };
+
+  // Get suite type badge color
   const getSuiteTypeBadge = (suiteType) => {
     const colors = {
       smoke: 'bg-orange-100 text-orange-800',
@@ -43,230 +97,313 @@ const TestCasesSuiteSidebar = ({
 
   return (
     <RightSidebarPanel
-      title="Suite View"
-      subtitle={suite.name}
-      onClose={onClose}
+      title="Browse & Filter"
+      subtitle="Organize and filter test cases"
+      badge={activeFiltersCount > 0 ? `${activeFiltersCount}` : null}
     >
-      {/* 🔥 ACTIVE FILTER INDICATOR */}
-      {isFiltering && (
-        <div className="mx-4 mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-          <div className="flex items-start gap-2">
-            <Filter size={16} className="text-blue-600 mt-0.5 flex-shrink-0" />
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-blue-900">
-                Table filtered to suite
-              </p>
-              <p className="text-xs text-blue-700 mt-0.5">
-                Showing {suite.members?.length || 0} test case{suite.members?.length !== 1 ? 's' : ''} from this suite
-              </p>
-            </div>
-            <button
-              onClick={onClose}
-              className="text-blue-600 hover:text-blue-800 p-1 hover:bg-blue-100 rounded"
-              title="Clear filter"
-            >
-              <X size={14} />
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Quick Actions */}
-      <div className="p-4 space-y-2 border-b border-gray-200 bg-gray-50">
-        <SidebarActionButton
-          icon={<Plus size={16} />}
-          label="Add Tests to Suite"
-          onClick={onAddTests}
-          variant="primary"
-          fullWidth
-        />
-        <div className="grid grid-cols-2 gap-2">
+      {/* ========================================
+          TEST SUITES SECTION
+      ======================================== */}
+      <SidebarSection
+        title="Test Suites"
+        icon={FolderOpen}
+        defaultOpen={expandedSections.suites}
+        onToggle={() => toggleSection('suites')}
+        action={
           <SidebarActionButton
-            icon={<Edit size={16} />}
-            label="Edit"
-            onClick={onEditSuite}
-            variant="secondary"
+            onClick={onCreateSuite}
+            icon={Plus}
+            label="New Suite"
           />
-          <SidebarActionButton
-            icon={<Trash2 size={16} />}
-            label="Delete"
-            onClick={onDeleteSuite}
-            variant="danger"
-          />
-        </div>
-      </div>
-
-      {/* Suite Information */}
-      <SidebarSection title="Information" icon={<FolderOpen size={16} />} defaultOpen={true}>
-        <SidebarField 
-          label="Name" 
-          value={suite.name} 
-        />
-        
-        <SidebarField 
-          label="Type" 
-          value={
-            <span className={`px-2 py-1 rounded text-xs font-medium ${getSuiteTypeBadge(suite.suite_type)}`}>
-              {suite.suite_type || 'Custom'}
-            </span>
-          } 
-        />
-        
-        {suite.version && (
-          <SidebarField 
-            label="Version" 
-            value={
-              <span className="text-sm font-mono bg-gray-100 px-2 py-1 rounded">
-                {suite.version}
-              </span>
-            } 
-          />
-        )}
-        
-        {suite.description && (
-          <SidebarField 
-            label="Description" 
-            value={<p className="text-sm text-gray-600 leading-relaxed">{suite.description}</p>} 
-          />
-        )}
-        
-        {suite.estimated_duration && (
-          <SidebarField 
-            label="Estimated Duration" 
-            value={`${suite.estimated_duration} minutes`} 
-          />
-        )}
-        
-        {suite.recommended_environment && (
-          <SidebarField 
-            label="Environment" 
-            value={suite.recommended_environment} 
-          />
-        )}
-      </SidebarSection>
-
-      {/* Test Cases in Suite */}
-      <SidebarSection 
-        title="Test Cases" 
-        defaultOpen={true} 
-        badge={suite.members?.length || 0}
+        }
       >
-        {!suite.members || suite.members.length === 0 ? (
-          <div className="text-center py-6">
-            <AlertCircle size={32} className="mx-auto text-gray-400 mb-2" />
-            <p className="text-sm text-gray-500 mb-3">
-              No test cases in this suite yet
-            </p>
-            <button
-              onClick={onAddTests}
-              className="text-sm text-blue-600 hover:text-blue-700 font-medium"
-            >
-              Add your first test case →
-            </button>
-          </div>
-        ) : (
-          <div className="space-y-1.5 max-h-96 overflow-y-auto">
-            {suite.members.map((member, index) => (
-              <div
-                key={member.id}
-                className="group p-2.5 bg-gray-50 hover:bg-gray-100 rounded border border-gray-200 hover:border-gray-300 transition-colors"
+        <div className="space-y-2">
+          {testSuites.length === 0 ? (
+            <div className="py-6 text-center">
+              <FolderOpen size={32} className="mx-auto text-gray-300 mb-2" />
+              <p className="text-sm text-gray-500">No test suites yet</p>
+              <button
+                onClick={onCreateSuite}
+                className="mt-2 text-xs text-blue-600 hover:text-blue-700 font-medium"
               >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex-1 min-w-0">
-                    {/* Test Case ID */}
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-xs font-mono font-semibold text-gray-700">
-                        {member.id}
-                      </span>
-                      {member.execution_order !== undefined && (
-                        <span className="text-xs text-gray-400">
-                          #{member.execution_order + 1}
-                        </span>
-                      )}
-                    </div>
-                    
-                    {/* Test Case Name */}
-                    {member.name && (
-                      <p className="text-xs text-gray-600 line-clamp-2 leading-relaxed">
-                        {member.name}
-                      </p>
-                    )}
-                    
-                    {/* Optional: Test Case Status/Priority */}
-                    <div className="flex items-center gap-2 mt-1.5">
-                      {member.priority && (
-                        <span className={`text-xs px-1.5 py-0.5 rounded ${
-                          member.priority === 'High' || member.priority === 'Critical'
-                            ? 'bg-red-100 text-red-700'
-                            : member.priority === 'Medium'
-                            ? 'bg-yellow-100 text-yellow-700'
-                            : 'bg-gray-100 text-gray-600'
-                        }`}>
-                          {member.priority}
-                        </span>
-                      )}
-                      {member.automationStatus === 'Automated' && (
-                        <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded">
-                          Auto
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  
-                  {/* Remove Button */}
-                  {onRemoveTest && (
-                    <button
-                      onClick={() => onRemoveTest(member.id)}
-                      className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-red-50 rounded text-red-600 hover:text-red-700 transition-all"
-                      title="Remove from suite"
-                    >
-                      <X size={14} />
-                    </button>
+                Create your first suite
+              </button>
+            </div>
+          ) : (
+            testSuites.map((suite) => (
+              <div
+                key={suite.id}
+                onClick={() => onSuiteClick(suite)}
+                className="p-3 border border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 cursor-pointer transition-all group"
+              >
+                <div className="flex items-start justify-between mb-1">
+                  <h4 className="text-sm font-medium text-gray-900 group-hover:text-blue-900">
+                    {suite.name}
+                  </h4>
+                  {suite.suite_type && (
+                    <SidebarBadge
+                      text={suite.suite_type}
+                      className={getSuiteTypeBadge(suite.suite_type)}
+                    />
+                  )}
+                </div>
+                {suite.description && (
+                  <p className="text-xs text-gray-500 mb-2 line-clamp-2">
+                    {suite.description}
+                  </p>
+                )}
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-gray-500">
+                    {suite.test_case_count || 0} test{suite.test_case_count !== 1 ? 's' : ''}
+                  </span>
+                  {suite.estimated_duration && (
+                    <span className="text-gray-500">
+                      ~{suite.estimated_duration}m
+                    </span>
                   )}
                 </div>
               </div>
-            ))}
-          </div>
-        )}
-      </SidebarSection>
-
-      {/* Suite Statistics */}
-      <SidebarSection title="Statistics" defaultOpen={false}>
-        <div className="space-y-2 text-sm">
-          <div className="flex justify-between">
-            <span className="text-gray-600">Total Tests:</span>
-            <span className="font-semibold text-gray-900">{suite.members?.length || 0}</span>
-          </div>
-          
-          {suite.automated_count !== undefined && (
-            <div className="flex justify-between">
-              <span className="text-gray-600">Automated:</span>
-              <span className="font-semibold text-green-600">{suite.automated_count}</span>
-            </div>
-          )}
-          
-          {suite.manual_count !== undefined && (
-            <div className="flex justify-between">
-              <span className="text-gray-600">Manual:</span>
-              <span className="font-semibold text-orange-600">{suite.manual_count}</span>
-            </div>
+            ))
           )}
         </div>
       </SidebarSection>
 
-      {/* Tips */}
-      <div className="p-4 bg-gray-50 border-t border-gray-200">
-        <h4 className="text-xs font-semibold text-gray-700 uppercase mb-2">
-          💡 Tips
-        </h4>
-        <ul className="text-xs text-gray-600 space-y-1">
-          <li>• Main table shows only tests in this suite</li>
-          <li>• Click X above to view all test cases</li>
-          <li>• Drag tests in the list to reorder (future)</li>
-        </ul>
+      {/* ========================================
+          FILTERS SECTION
+      ======================================== */}
+      <SidebarSection
+        title="Filters"
+        icon={Filter}
+        defaultOpen={expandedSections.filters}
+        onToggle={() => toggleSection('filters')}
+        badge={activeFiltersCount > 0 ? `${activeFiltersCount}` : null}
+      >
+        {/* Active Filters Badge */}
+        {activeFiltersCount > 0 && (
+          <div className="mb-3 p-2 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium text-blue-900">
+                {activeFiltersCount} filter{activeFiltersCount !== 1 ? 's' : ''} active
+              </span>
+              <button
+                onClick={onClearAllFilters}
+                className="text-xs text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1"
+              >
+                <X size={12} />
+                Clear all
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Category Filter */}
+        {allCategories.length > 0 && (
+          <SidebarField label="Category">
+            <select
+              value={categoryFilter}
+              onChange={(e) => onCategoryChange(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+            >
+              <option value="All">All Categories</option>
+              {allCategories.map((cat) => (
+                <option key={cat} value={cat}>
+                  {cat}
+                </option>
+              ))}
+            </select>
+          </SidebarField>
+        )}
+
+        {/* If no categories exist, show empty state */}
+        {allCategories.length === 0 && (
+          <SidebarField label="Category">
+            <select
+              disabled
+              className="w-full px-3 py-2 border border-gray-200 rounded-md text-sm bg-gray-50 text-gray-400"
+            >
+              <option>No categories available</option>
+            </select>
+          </SidebarField>
+        )}
+
+        {/* Status Filter - CORRECTED VALUES */}
+        <SidebarField label="Status">
+          <select
+            value={statusFilter}
+            onChange={(e) => onStatusChange(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+          >
+            <option value="All">All Statuses</option>
+            <option value="Not Run">Not Run</option>
+            <option value="Passed">Passed</option>
+            <option value="Failed">Failed</option>
+            <option value="Blocked">Blocked</option>
+            <option value="Skipped">Skipped</option>
+          </select>
+        </SidebarField>
+
+        {/* Priority Filter */}
+        <SidebarField label="Priority">
+          <select
+            value={priorityFilter}
+            onChange={(e) => onPriorityChange(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+          >
+            <option value="All">All Priorities</option>
+            <option value="Critical">Critical</option>
+            <option value="High">High</option>
+            <option value="Medium">Medium</option>
+            <option value="Low">Low</option>
+          </select>
+        </SidebarField>
+
+        {/* Automation Status Filter */}
+        <SidebarField label="Automation">
+          <select
+            value={automationFilter}
+            onChange={(e) => onAutomationChange(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+          >
+            <option value="All">All Types</option>
+            <option value="Automated">Automated</option>
+            <option value="Manual">Manual</option>
+            <option value="Semi-Automated">Semi-Automated</option>
+            <option value="Planned">Planned</option>
+          </select>
+        </SidebarField>
+
+        {/* Tags Filter */}
+        {allTags.length > 0 && (
+          <SidebarField label="Tags">
+            <div className="space-y-2">
+              {/* Selected tags */}
+              {selectedTagsFilter.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 p-2 bg-gray-50 rounded-md">
+                  {selectedTagsFilter.map((tag) => (
+                    <span
+                      key={tag}
+                      className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-md"
+                    >
+                      {tag}
+                      <button
+                        onClick={() => handleToggleTag(tag)}
+                        className="hover:bg-blue-200 rounded-full p-0.5"
+                      >
+                        <X size={10} />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+              
+              {/* Available tags */}
+              <div className="flex flex-wrap gap-1.5">
+                {allTags
+                  .filter(tag => !selectedTagsFilter.includes(tag))
+                  .map((tag) => (
+                    <button
+                      key={tag}
+                      onClick={() => handleToggleTag(tag)}
+                      className="px-2 py-1 rounded text-xs font-medium transition-colors bg-gray-100 text-gray-700 hover:bg-gray-200"
+                    >
+                      {tag}
+                    </button>
+                  ))}
+              </div>
+            </div>
+          </SidebarField>
+        )}
+
+        {/* If no tags exist, show empty state */}
+        {allTags.length === 0 && (
+          <SidebarField label="Tags">
+            <div className="p-3 bg-gray-50 rounded-md text-center">
+              <Tag size={20} className="mx-auto text-gray-300 mb-1" />
+              <p className="text-xs text-gray-500">No tags available</p>
+            </div>
+          </SidebarField>
+        )}
+      </SidebarSection>
+
+      {/* ========================================
+          STATISTICS SECTION
+      ======================================== */}
+      <SidebarSection
+        title="Statistics"
+        defaultOpen={expandedSections.stats}
+        onToggle={() => toggleSection('stats')}
+      >
+        <div className="space-y-3">
+          {/* Test Count */}
+          <div className="flex justify-between items-center py-2 border-b border-gray-100">
+            <span className="text-sm text-gray-600">Total Tests</span>
+            <span className="text-sm font-semibold text-gray-900">
+              {stats.total}
+            </span>
+          </div>
+
+          {/* Filtered Count */}
+          {stats.filtered !== stats.total && (
+            <div className="flex justify-between items-center py-2 border-b border-gray-100">
+              <span className="text-sm text-gray-600">Filtered</span>
+              <span className="text-sm font-semibold text-blue-600">
+                {stats.filtered}
+              </span>
+            </div>
+          )}
+
+          {/* Automation Breakdown */}
+          <div className="py-2 border-b border-gray-100">
+            <div className="flex justify-between items-center mb-1">
+              <span className="text-sm text-gray-600">Automation</span>
+              <span className="text-sm font-semibold text-gray-900">
+                {stats.automated + stats.manual > 0
+                  ? Math.round((stats.automated / (stats.automated + stats.manual)) * 100)
+                  : 0}%
+              </span>
+            </div>
+            <div className="flex gap-2 text-xs">
+              <span className="text-gray-500">
+                Automated: {stats.automated}
+              </span>
+              <span className="text-gray-500">
+                Manual: {stats.manual}
+              </span>
+            </div>
+          </div>
+
+          {/* Status Breakdown */}
+          <div className="py-2">
+            <div className="flex justify-between items-center mb-1">
+              <span className="text-sm text-gray-600">Status</span>
+            </div>
+            <div className="space-y-1 text-xs">
+              <div className="flex justify-between">
+                <span className="text-green-600">Passed</span>
+                <span className="font-medium text-green-600">{stats.passed}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-red-600">Failed</span>
+                <span className="font-medium text-red-600">{stats.failed}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </SidebarSection>
+
+      {/* ========================================
+          QUICK ACTIONS
+      ======================================== */}
+      <div className="pt-4 border-t border-gray-200">
+        <SidebarActionButton
+          onClick={onAddTestCase}
+          icon={Plus}
+          label="Create Test Case"
+          className="w-full justify-center bg-blue-600 text-white hover:bg-blue-700"
+        />
       </div>
     </RightSidebarPanel>
   );
 };
 
-export default TestCasesSuiteSidebar;
+export default TestCasesBrowseSidebar;
