@@ -1,192 +1,227 @@
-import React, { useState, useEffect } from 'react';
+// Location: src/components/TestCases/TestCasesSuiteSidebar.jsx
+import React from 'react';
 import RightSidebarPanel, {
   SidebarSection,
-  SidebarField,
   SidebarActionButton,
+  SidebarField,
   SidebarBadge
 } from '../Common/RightSidebarPanel';
-import {
-  Plus,
-  FolderOpen,
+import { 
+  Edit, 
+  Trash2, 
+  Plus, 
+  X, 
+  FolderOpen, 
   Filter,
-  Tag,
-  Search,
-  PlayCircle,
-  FileCheck,
-  Layers,
-  TrendingUp
+  AlertCircle
 } from 'lucide-react';
 
 /**
- * TestCasesBrowseSidebar - State 1 Sidebar
- * Shows when no test cases are selected and no suite is active
- * Purpose: Browse and organize test cases into suites, apply filters
+ * Enhanced TestCasesSuiteSidebar - For Option B Design
+ * Shows suite details and filters main table to suite members
  */
-const TestCasesBrowseSidebar = ({
-  // Test Suites data
-  testSuites = [],
-  onSuiteClick,
-  onCreateSuite,
-  onAddTestCase,
-  
-  // Filter values
-  categoryFilter = 'All',
-  statusFilter = 'All',
-  priorityFilter = 'All',
-  automationFilter = 'All',
-  selectedTagsFilter = [],
-  
-  // Available options
-  allCategories = [],
-  allTags = [],
-  
-  // Callbacks
-  onCategoryChange,
-  onStatusChange,
-  onPriorityChange,
-  onAutomationChange,
-  onTagsChange,
-  onClearAllFilters,
-  
-  // Statistics
-  stats = {
-    total: 0,
-    filtered: 0,
-    automated: 0,
-    manual: 0,
-    passed: 0,
-    failed: 0,
-    highPriority: 0,
-    notRun: 0
-  }
+const TestCasesSuiteSidebar = ({
+  suite,
+  onEditSuite,
+  onDeleteSuite,
+  onClose, // This now means "exit suite mode" / "clear filter"
+  onAddTests,
+  onRemoveTest, // NEW: Remove individual test from suite
+  isFiltering = true // NEW: Indicates if table is filtered
 }) => {
-  const [expandedSections, setExpandedSections] = useState({
-    suites: true,
-    filters: true,
-    stats: true
-  });
-
-  const toggleSection = (section) => {
-    setExpandedSections(prev => ({
-      ...prev,
-      [section]: !prev[section]
-    }));
-  };
-
-  // Count active filters
-  const activeFiltersCount = [
-    categoryFilter !== 'All',
-    statusFilter !== 'All',
-    priorityFilter !== 'All',
-    automationFilter !== 'All',
-    selectedTagsFilter.length > 0
-  ].filter(Boolean).length;
-
-  const handleToggleTag = (tag) => {
-    if (selectedTagsFilter.includes(tag)) {
-      onTagsChange(selectedTagsFilter.filter(t => t !== tag));
-    } else {
-      onTagsChange([...selectedTagsFilter, tag]);
-    }
-  };
-
-  // Get suite type badge color
+  
   const getSuiteTypeBadge = (suiteType) => {
     const colors = {
       smoke: 'bg-orange-100 text-orange-800',
       regression: 'bg-blue-100 text-blue-800',
       sanity: 'bg-green-100 text-green-800',
       integration: 'bg-purple-100 text-purple-800',
-      e2e: 'bg-indigo-100 text-indigo-800',
-      performance: 'bg-pink-100 text-pink-800'
+      custom: 'bg-gray-100 text-gray-800'
     };
-    return colors[suiteType] || 'bg-gray-100 text-gray-800';
+    return colors[suiteType?.toLowerCase()] || colors.custom;
   };
 
   return (
-    <RightSidebarPanel title="Browse Test Cases">
-      
-      {/* Test Suites Section */}
-      <SidebarSection
-        title="Test Suites"
-        icon={<Layers size={16} />}
-        defaultOpen={expandedSections.suites}
-        onToggle={() => toggleSection('suites')}
-        action={
-          <SidebarActionButton
-            icon={<Plus size={14} />}
-            label="New Suite"
-            onClick={onCreateSuite}
-          />
-        }
-      >
-        {testSuites.length === 0 ? (
-          <div className="text-center py-4">
-            <FolderOpen className="mx-auto text-gray-400 mb-2" size={24} />
-            <p className="text-sm text-gray-500 mb-2">No test suites yet</p>
+    <RightSidebarPanel
+      title="Suite View"
+      subtitle={suite.name}
+      onClose={onClose}
+    >
+      {/* 🔥 ACTIVE FILTER INDICATOR */}
+      {isFiltering && (
+        <div className="mx-4 mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="flex items-start gap-2">
+            <Filter size={16} className="text-blue-600 mt-0.5 flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-blue-900">
+                Table filtered to suite
+              </p>
+              <p className="text-xs text-blue-700 mt-0.5">
+                Showing {suite.members?.length || 0} test case{suite.members?.length !== 1 ? 's' : ''} from this suite
+              </p>
+            </div>
             <button
-              onClick={onCreateSuite}
-              className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+              onClick={onClose}
+              className="text-blue-600 hover:text-blue-800 p-1 hover:bg-blue-100 rounded"
+              title="Clear filter"
             >
-              Create your first suite
+              <X size={14} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Quick Actions */}
+      <div className="p-4 space-y-2 border-b border-gray-200 bg-gray-50">
+        <SidebarActionButton
+          icon={<Plus size={16} />}
+          label="Add Tests to Suite"
+          onClick={onAddTests}
+          variant="primary"
+          fullWidth
+        />
+        <div className="grid grid-cols-2 gap-2">
+          <SidebarActionButton
+            icon={<Edit size={16} />}
+            label="Edit"
+            onClick={onEditSuite}
+            variant="secondary"
+          />
+          <SidebarActionButton
+            icon={<Trash2 size={16} />}
+            label="Delete"
+            onClick={onDeleteSuite}
+            variant="danger"
+          />
+        </div>
+      </div>
+
+      {/* Suite Information */}
+      <SidebarSection title="Information" icon={<FolderOpen size={16} />} defaultOpen={true}>
+        <SidebarField 
+          label="Name" 
+          value={suite.name} 
+        />
+        
+        <SidebarField 
+          label="Type" 
+          value={
+            <span className={`px-2 py-1 rounded text-xs font-medium ${getSuiteTypeBadge(suite.suite_type)}`}>
+              {suite.suite_type || 'Custom'}
+            </span>
+          } 
+        />
+        
+        {suite.version && (
+          <SidebarField 
+            label="Version" 
+            value={
+              <span className="text-sm font-mono bg-gray-100 px-2 py-1 rounded">
+                {suite.version}
+              </span>
+            } 
+          />
+        )}
+        
+        {suite.description && (
+          <SidebarField 
+            label="Description" 
+            value={<p className="text-sm text-gray-600 leading-relaxed">{suite.description}</p>} 
+          />
+        )}
+        
+        {suite.estimated_duration && (
+          <SidebarField 
+            label="Estimated Duration" 
+            value={`${suite.estimated_duration} minutes`} 
+          />
+        )}
+        
+        {suite.recommended_environment && (
+          <SidebarField 
+            label="Environment" 
+            value={suite.recommended_environment} 
+          />
+        )}
+      </SidebarSection>
+
+      {/* Test Cases in Suite */}
+      <SidebarSection 
+        title="Test Cases" 
+        defaultOpen={true} 
+        badge={suite.members?.length || 0}
+      >
+        {!suite.members || suite.members.length === 0 ? (
+          <div className="text-center py-6">
+            <AlertCircle size={32} className="mx-auto text-gray-400 mb-2" />
+            <p className="text-sm text-gray-500 mb-3">
+              No test cases in this suite yet
+            </p>
+            <button
+              onClick={onAddTests}
+              className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+            >
+              Add your first test case →
             </button>
           </div>
         ) : (
-          <div className="space-y-2">
-            {testSuites.map((suite) => (
+          <div className="space-y-1.5 max-h-96 overflow-y-auto">
+            {suite.members.map((member, index) => (
               <div
-                key={suite.id}
-                onClick={() => onSuiteClick(suite)}
-                className="p-3 border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-blue-300 cursor-pointer transition-colors"
+                key={member.id}
+                className="group p-2.5 bg-gray-50 hover:bg-gray-100 rounded border border-gray-200 hover:border-gray-300 transition-colors"
               >
-                {/* Suite Name and Type */}
-                <div className="flex items-start justify-between mb-1">
+                <div className="flex items-start justify-between gap-2">
                   <div className="flex-1 min-w-0">
-                    <h4 className="text-sm font-medium text-gray-900 truncate">
-                      {suite.name}
-                    </h4>
-                    {suite.version && (
-                      <p className="text-xs text-gray-500 mt-0.5">
-                        v{suite.version}
+                    {/* Test Case ID */}
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-xs font-mono font-semibold text-gray-700">
+                        {member.id}
+                      </span>
+                      {member.execution_order !== undefined && (
+                        <span className="text-xs text-gray-400">
+                          #{member.execution_order + 1}
+                        </span>
+                      )}
+                    </div>
+                    
+                    {/* Test Case Name */}
+                    {member.name && (
+                      <p className="text-xs text-gray-600 line-clamp-2 leading-relaxed">
+                        {member.name}
                       </p>
                     )}
+                    
+                    {/* Optional: Test Case Status/Priority */}
+                    <div className="flex items-center gap-2 mt-1.5">
+                      {member.priority && (
+                        <span className={`text-xs px-1.5 py-0.5 rounded ${
+                          member.priority === 'High' || member.priority === 'Critical'
+                            ? 'bg-red-100 text-red-700'
+                            : member.priority === 'Medium'
+                            ? 'bg-yellow-100 text-yellow-700'
+                            : 'bg-gray-100 text-gray-600'
+                        }`}>
+                          {member.priority}
+                        </span>
+                      )}
+                      {member.automationStatus === 'Automated' && (
+                        <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded">
+                          Auto
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  {suite.suite_type && (
-                    <span
-                      className={`ml-2 px-2 py-0.5 rounded text-xs font-medium flex-shrink-0 ${getSuiteTypeBadge(
-                        suite.suite_type
-                      )}`}
+                  
+                  {/* Remove Button */}
+                  {onRemoveTest && (
+                    <button
+                      onClick={() => onRemoveTest(member.id)}
+                      className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-red-50 rounded text-red-600 hover:text-red-700 transition-all"
+                      title="Remove from suite"
                     >
-                      {suite.suite_type}
-                    </span>
-                  )}
-                </div>
-
-                {/* Suite Description */}
-                {suite.description && (
-                  <p className="text-xs text-gray-600 mb-2 line-clamp-2">
-                    {suite.description}
-                  </p>
-                )}
-
-                {/* Suite Stats */}
-                <div className="flex items-center justify-between text-xs text-gray-500">
-                  <div className="flex items-center space-x-3">
-                    <span className="flex items-center">
-                      <FileCheck size={12} className="mr-1" />
-                      {suite.test_count || 0} tests
-                    </span>
-                    {suite.automated_count > 0 && (
-                      <span className="flex items-center text-green-600">
-                        <PlayCircle size={12} className="mr-1" />
-                        {suite.automated_count} auto
-                      </span>
-                    )}
-                  </div>
-                  {suite.estimated_duration && (
-                    <span className="text-gray-400">
-                      ~{suite.estimated_duration}m
-                    </span>
+                      <X size={14} />
+                    </button>
                   )}
                 </div>
               </div>
@@ -195,193 +230,43 @@ const TestCasesBrowseSidebar = ({
         )}
       </SidebarSection>
 
-      {/* Filters Section */}
-      <SidebarSection
-        title="Filters"
-        icon={<Filter size={16} />}
-        defaultOpen={expandedSections.filters}
-        onToggle={() => toggleSection('filters')}
-        badge={activeFiltersCount > 0 ? `${activeFiltersCount}` : null}
-      >
-        {/* Active Filters Badge */}
-        {activeFiltersCount > 0 && (
-          <div className="mb-3 p-2 bg-blue-50 border border-blue-200 rounded-lg">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-blue-900">
-                {activeFiltersCount} filter{activeFiltersCount !== 1 ? 's' : ''} active
-              </span>
-              <button
-                onClick={onClearAllFilters}
-                className="text-xs text-blue-600 hover:text-blue-700 font-medium"
-              >
-                Clear all
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Category Filter */}
-        {allCategories.length > 0 && (
-          <SidebarField label="Category">
-            <select
-              value={categoryFilter}
-              onChange={(e) => onCategoryChange(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            >
-              <option value="All">All Categories</option>
-              {allCategories.map((cat) => (
-                <option key={cat} value={cat}>
-                  {cat}
-                </option>
-              ))}
-            </select>
-          </SidebarField>
-        )}
-
-        {/* Status Filter */}
-        <SidebarField label="Status">
-          <select
-            value={statusFilter}
-            onChange={(e) => onStatusChange(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-          >
-            <option value="All">All Statuses</option>
-            <option value="Draft">Draft</option>
-            <option value="Active">Active</option>
-            <option value="Deprecated">Deprecated</option>
-          </select>
-        </SidebarField>
-
-        {/* Priority Filter */}
-        <SidebarField label="Priority">
-          <select
-            value={priorityFilter}
-            onChange={(e) => onPriorityChange(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-          >
-            <option value="All">All Priorities</option>
-            <option value="Critical">Critical</option>
-            <option value="High">High</option>
-            <option value="Medium">Medium</option>
-            <option value="Low">Low</option>
-          </select>
-        </SidebarField>
-
-        {/* Automation Status Filter */}
-        <SidebarField label="Automation">
-          <select
-            value={automationFilter}
-            onChange={(e) => onAutomationChange(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-          >
-            <option value="All">All Types</option>
-            <option value="Automated">Automated</option>
-            <option value="Manual">Manual</option>
-          </select>
-        </SidebarField>
-
-        {/* Tags Filter */}
-        {allTags.length > 0 && (
-          <SidebarField label="Tags">
-            <div className="flex flex-wrap gap-1">
-              {allTags.slice(0, 10).map((tag) => {
-                const isSelected = selectedTagsFilter.includes(tag);
-                return (
-                  <button
-                    key={tag}
-                    onClick={() => handleToggleTag(tag)}
-                    className={`px-2 py-1 text-xs rounded-full transition-colors ${
-                      isSelected
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
-                  >
-                    {tag}
-                  </button>
-                );
-              })}
-            </div>
-          </SidebarField>
-        )}
-      </SidebarSection>
-
-      {/* Statistics Section - Enhanced to match Requirements page */}
-      <SidebarSection
-        title="Statistics"
-        icon={<TrendingUp size={16} />}
-        defaultOpen={expandedSections.stats}
-        onToggle={() => toggleSection('stats')}
-      >
+      {/* Suite Statistics */}
+      <SidebarSection title="Statistics" defaultOpen={false}>
         <div className="space-y-2 text-sm">
-          {/* Total and Showing counts */}
           <div className="flex justify-between">
-            <span className="text-gray-600">Total Test Cases:</span>
-            <span className="font-semibold text-gray-900">{stats.total}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-gray-600">Showing:</span>
-            <span className="font-semibold text-blue-600">{stats.filtered}</span>
+            <span className="text-gray-600">Total Tests:</span>
+            <span className="font-semibold text-gray-900">{suite.members?.length || 0}</span>
           </div>
           
-          {/* Hidden by filters indicator */}
-          {stats.filtered !== stats.total && (
-            <div className="pt-2 border-t border-gray-200">
-              <div className="text-xs text-gray-500">
-                {stats.total - stats.filtered} hidden by filters
-              </div>
+          {suite.automated_count !== undefined && (
+            <div className="flex justify-between">
+              <span className="text-gray-600">Automated:</span>
+              <span className="font-semibold text-green-600">{suite.automated_count}</span>
             </div>
           )}
           
-          {/* Priority breakdown */}
-          <div className="pt-2 border-t border-gray-200 space-y-1.5">
-            <div className="flex justify-between text-xs">
-              <span className="text-gray-600">High Priority:</span>
-              <span className="font-medium text-red-600">{stats.highPriority || 0}</span>
-            </div>
-            <div className="flex justify-between text-xs">
-              <span className="text-gray-600">Automated:</span>
-              <span className="font-medium text-green-600">{stats.automated}</span>
-            </div>
-            <div className="flex justify-between text-xs">
+          {suite.manual_count !== undefined && (
+            <div className="flex justify-between">
               <span className="text-gray-600">Manual:</span>
-              <span className="font-medium text-orange-600">{stats.manual}</span>
+              <span className="font-semibold text-orange-600">{suite.manual_count}</span>
             </div>
-          </div>
-          
-          {/* Execution status breakdown */}
-          <div className="pt-2 border-t border-gray-200 space-y-1.5">
-            <div className="flex justify-between text-xs">
-              <span className="text-gray-600">Passed:</span>
-              <span className="font-medium text-green-600">{stats.passed}</span>
-            </div>
-            <div className="flex justify-between text-xs">
-              <span className="text-gray-600">Failed:</span>
-              <span className="font-medium text-red-600">{stats.failed}</span>
-            </div>
-            <div className="flex justify-between text-xs">
-              <span className="text-gray-600">Not Run:</span>
-              <span className="font-medium text-gray-600">
-                {stats.notRun || (stats.total - stats.passed - stats.failed)}
-              </span>
-            </div>
-          </div>
+          )}
         </div>
       </SidebarSection>
 
-      {/* Quick Tips */}
+      {/* Tips */}
       <div className="p-4 bg-gray-50 border-t border-gray-200">
         <h4 className="text-xs font-semibold text-gray-700 uppercase mb-2">
-          💡 Quick Tips
+          💡 Tips
         </h4>
         <ul className="text-xs text-gray-600 space-y-1">
-          <li>• Click a suite to view its tests</li>
-          <li>• Use filters to narrow results</li>
-          <li>• Select tests for bulk actions</li>
-          <li>• Create suites to organize tests</li>
+          <li>• Main table shows only tests in this suite</li>
+          <li>• Click X above to view all test cases</li>
+          <li>• Drag tests in the list to reorder (future)</li>
         </ul>
       </div>
     </RightSidebarPanel>
   );
 };
 
-export default TestCasesBrowseSidebar;
+export default TestCasesSuiteSidebar;
