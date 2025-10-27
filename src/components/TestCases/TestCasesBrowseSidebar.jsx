@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import RightSidebarPanel, {
   SidebarSection,
   SidebarField,
@@ -10,17 +10,12 @@ import {
   FolderOpen,
   Filter,
   Tag,
-  Search,
-  PlayCircle,
-  FileCheck,
-  Layers,
-  TrendingUp
+  X
 } from 'lucide-react';
 
 /**
- * TestCasesBrowseSidebar - State 1 Sidebar
- * Shows when no test cases are selected and no suite is active
- * Purpose: Browse and organize test cases into suites, apply filters
+ * TestCasesBrowseSidebar - Browse Mode Sidebar
+ * Shows filters, test suites, and statistics
  */
 const TestCasesBrowseSidebar = ({
   // Test Suites data
@@ -97,120 +92,88 @@ const TestCasesBrowseSidebar = ({
       integration: 'bg-purple-100 text-purple-800',
       custom: 'bg-gray-100 text-gray-800'
     };
-    return colors[suiteType] || colors.custom;
+    return colors[suiteType?.toLowerCase()] || colors.custom;
   };
 
   return (
     <RightSidebarPanel
-      title="Browse & Organize"
-      subtitle="Test Cases"
-      onClose={null} // Can't close browse mode
+      title="Browse & Filter"
+      subtitle="Organize and filter test cases"
+      badge={activeFiltersCount > 0 ? `${activeFiltersCount}` : null}
     >
-      {/* Quick Actions */}
-      <div className="p-4 space-y-2 border-b border-gray-200 bg-gray-50">
-        <SidebarActionButton
-          icon={<Plus size={16} />}
-          label="Add Test Case"
-          onClick={onAddTestCase}
-          variant="primary"
-          fullWidth
-        />
-        <SidebarActionButton
-          icon={<Layers size={16} />}
-          label="Create Suite"
-          onClick={onCreateSuite}
-          variant="secondary"
-          fullWidth
-        />
-      </div>
-
-      {/* Test Suites Section */}
+      {/* ========================================
+          TEST SUITES SECTION
+      ======================================== */}
       <SidebarSection
         title="Test Suites"
-        icon={<FolderOpen size={16} />}
+        icon={FolderOpen}
         defaultOpen={expandedSections.suites}
         onToggle={() => toggleSection('suites')}
-        badge={testSuites.length > 0 ? `${testSuites.length}` : null}
+        action={
+          <SidebarActionButton
+            onClick={onCreateSuite}
+            icon={Plus}
+            label="New Suite"
+          />
+        }
       >
-        {testSuites.length === 0 ? (
-          <div className="text-sm text-gray-500 italic text-center py-4">
-            No test suites yet.
-            <br />
-            <button
-              onClick={onCreateSuite}
-              className="text-blue-600 hover:text-blue-700 font-medium mt-2 inline-block"
-            >
-              Create your first suite
-            </button>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {testSuites.map((suite) => (
+        <div className="space-y-2">
+          {testSuites.length === 0 ? (
+            <div className="py-6 text-center">
+              <FolderOpen size={32} className="mx-auto text-gray-300 mb-2" />
+              <p className="text-sm text-gray-500">No test suites yet</p>
+              <button
+                onClick={onCreateSuite}
+                className="mt-2 text-xs text-blue-600 hover:text-blue-700 font-medium"
+              >
+                Create your first suite
+              </button>
+            </div>
+          ) : (
+            testSuites.map((suite) => (
               <div
                 key={suite.id}
                 onClick={() => onSuiteClick(suite)}
-                className="p-3 bg-white border border-gray-200 rounded-lg hover:border-blue-300 hover:shadow-sm cursor-pointer transition-all group"
+                className="p-3 border border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 cursor-pointer transition-all group"
               >
-                {/* Suite Header */}
-                <div className="flex items-start justify-between mb-2">
-                  <div className="flex-1 min-w-0">
-                    <h4 className="text-sm font-semibold text-gray-900 truncate group-hover:text-blue-600">
-                      {suite.name}
-                    </h4>
-                    {suite.version && (
-                      <p className="text-xs text-gray-500 mt-0.5">
-                        v{suite.version}
-                      </p>
-                    )}
-                  </div>
+                <div className="flex items-start justify-between mb-1">
+                  <h4 className="text-sm font-medium text-gray-900 group-hover:text-blue-900">
+                    {suite.name}
+                  </h4>
                   {suite.suite_type && (
-                    <span
-                      className={`ml-2 px-2 py-0.5 rounded text-xs font-medium flex-shrink-0 ${getSuiteTypeBadge(
-                        suite.suite_type
-                      )}`}
-                    >
-                      {suite.suite_type}
-                    </span>
+                    <SidebarBadge
+                      text={suite.suite_type}
+                      className={getSuiteTypeBadge(suite.suite_type)}
+                    />
                   )}
                 </div>
-
-                {/* Suite Description */}
                 {suite.description && (
-                  <p className="text-xs text-gray-600 mb-2 line-clamp-2">
+                  <p className="text-xs text-gray-500 mb-2 line-clamp-2">
                     {suite.description}
                   </p>
                 )}
-
-                {/* Suite Stats */}
-                <div className="flex items-center justify-between text-xs text-gray-500">
-                  <div className="flex items-center space-x-3">
-                    <span className="flex items-center">
-                      <FileCheck size={12} className="mr-1" />
-                      {suite.test_count || 0} tests
-                    </span>
-                    {suite.automated_count > 0 && (
-                      <span className="flex items-center text-green-600">
-                        <PlayCircle size={12} className="mr-1" />
-                        {suite.automated_count} auto
-                      </span>
-                    )}
-                  </div>
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-gray-500">
+                    {suite.test_case_count || 0} test{suite.test_case_count !== 1 ? 's' : ''}
+                  </span>
                   {suite.estimated_duration && (
-                    <span className="text-gray-400">
+                    <span className="text-gray-500">
                       ~{suite.estimated_duration}m
                     </span>
                   )}
                 </div>
               </div>
-            ))}
-          </div>
-        )}
+            ))
+          )}
+        </div>
       </SidebarSection>
 
-      {/* Filters Section */}
+      {/* ========================================
+          FILTERS SECTION
+      ======================================== */}
       <SidebarSection
         title="Filters"
-        icon={<Filter size={16} />}
+        icon={Filter}
         defaultOpen={expandedSections.filters}
         onToggle={() => toggleSection('filters')}
         badge={activeFiltersCount > 0 ? `${activeFiltersCount}` : null}
@@ -224,8 +187,9 @@ const TestCasesBrowseSidebar = ({
               </span>
               <button
                 onClick={onClearAllFilters}
-                className="text-xs text-blue-600 hover:text-blue-700 font-medium"
+                className="text-xs text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1"
               >
+                <X size={12} />
                 Clear all
               </button>
             </div>
@@ -238,7 +202,7 @@ const TestCasesBrowseSidebar = ({
             <select
               value={categoryFilter}
               onChange={(e) => onCategoryChange(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
             >
               <option value="All">All Categories</option>
               {allCategories.map((cat) => (
@@ -250,17 +214,31 @@ const TestCasesBrowseSidebar = ({
           </SidebarField>
         )}
 
-        {/* Status Filter */}
+        {/* If no categories exist, show empty state */}
+        {allCategories.length === 0 && (
+          <SidebarField label="Category">
+            <select
+              disabled
+              className="w-full px-3 py-2 border border-gray-200 rounded-md text-sm bg-gray-50 text-gray-400"
+            >
+              <option>No categories available</option>
+            </select>
+          </SidebarField>
+        )}
+
+        {/* Status Filter - CORRECTED VALUES */}
         <SidebarField label="Status">
           <select
             value={statusFilter}
             onChange={(e) => onStatusChange(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
           >
             <option value="All">All Statuses</option>
-            <option value="Draft">Draft</option>
-            <option value="Active">Active</option>
-            <option value="Deprecated">Deprecated</option>
+            <option value="Not Run">Not Run</option>
+            <option value="Passed">Passed</option>
+            <option value="Failed">Failed</option>
+            <option value="Blocked">Blocked</option>
+            <option value="Skipped">Skipped</option>
           </select>
         </SidebarField>
 
@@ -269,7 +247,7 @@ const TestCasesBrowseSidebar = ({
           <select
             value={priorityFilter}
             onChange={(e) => onPriorityChange(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
           >
             <option value="All">All Priorities</option>
             <option value="Critical">Critical</option>
@@ -284,96 +262,145 @@ const TestCasesBrowseSidebar = ({
           <select
             value={automationFilter}
             onChange={(e) => onAutomationChange(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
           >
             <option value="All">All Types</option>
             <option value="Automated">Automated</option>
             <option value="Manual">Manual</option>
-            <option value="Hybrid">Hybrid</option>
+            <option value="Semi-Automated">Semi-Automated</option>
+            <option value="Planned">Planned</option>
           </select>
         </SidebarField>
 
         {/* Tags Filter */}
         {allTags.length > 0 && (
           <SidebarField label="Tags">
-            <div className="flex flex-wrap gap-1.5">
-              {allTags.map((tag) => {
-                const isSelected = selectedTagsFilter.includes(tag);
-                return (
-                  <button
-                    key={tag}
-                    onClick={() => handleToggleTag(tag)}
-                    className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
-                      isSelected
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
-                  >
-                    {tag}
-                  </button>
-                );
-              })}
+            <div className="space-y-2">
+              {/* Selected tags */}
+              {selectedTagsFilter.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 p-2 bg-gray-50 rounded-md">
+                  {selectedTagsFilter.map((tag) => (
+                    <span
+                      key={tag}
+                      className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-md"
+                    >
+                      {tag}
+                      <button
+                        onClick={() => handleToggleTag(tag)}
+                        className="hover:bg-blue-200 rounded-full p-0.5"
+                      >
+                        <X size={10} />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+              
+              {/* Available tags */}
+              <div className="flex flex-wrap gap-1.5">
+                {allTags
+                  .filter(tag => !selectedTagsFilter.includes(tag))
+                  .map((tag) => (
+                    <button
+                      key={tag}
+                      onClick={() => handleToggleTag(tag)}
+                      className="px-2 py-1 rounded text-xs font-medium transition-colors bg-gray-100 text-gray-700 hover:bg-gray-200"
+                    >
+                      {tag}
+                    </button>
+                  ))}
+              </div>
+            </div>
+          </SidebarField>
+        )}
+
+        {/* If no tags exist, show empty state */}
+        {allTags.length === 0 && (
+          <SidebarField label="Tags">
+            <div className="p-3 bg-gray-50 rounded-md text-center">
+              <Tag size={20} className="mx-auto text-gray-300 mb-1" />
+              <p className="text-xs text-gray-500">No tags available</p>
             </div>
           </SidebarField>
         )}
       </SidebarSection>
 
-      {/* Statistics Section */}
+      {/* ========================================
+          STATISTICS SECTION
+      ======================================== */}
       <SidebarSection
         title="Statistics"
-        icon={<TrendingUp size={16} />}
         defaultOpen={expandedSections.stats}
         onToggle={() => toggleSection('stats')}
       >
-        <div className="space-y-2 text-sm">
-          <div className="flex justify-between">
-            <span className="text-gray-600">Total Test Cases:</span>
-            <span className="font-semibold text-gray-900">{stats.total}</span>
+        <div className="space-y-3">
+          {/* Test Count */}
+          <div className="flex justify-between items-center py-2 border-b border-gray-100">
+            <span className="text-sm text-gray-600">Total Tests</span>
+            <span className="text-sm font-semibold text-gray-900">
+              {stats.total}
+            </span>
           </div>
-          <div className="flex justify-between">
-            <span className="text-gray-600">Showing:</span>
-            <span className="font-semibold text-blue-600">{stats.filtered}</span>
-          </div>
+
+          {/* Filtered Count */}
           {stats.filtered !== stats.total && (
-            <div className="pt-2 border-t border-gray-200">
-              <div className="text-xs text-gray-500">
-                {stats.total - stats.filtered} hidden by filters
-              </div>
+            <div className="flex justify-between items-center py-2 border-b border-gray-100">
+              <span className="text-sm text-gray-600">Filtered</span>
+              <span className="text-sm font-semibold text-blue-600">
+                {stats.filtered}
+              </span>
             </div>
           )}
-          
-          <div className="pt-2 border-t border-gray-200 space-y-1.5">
-            <div className="flex justify-between text-xs">
-              <span className="text-gray-600">Automated:</span>
-              <span className="font-medium text-green-600">{stats.automated}</span>
+
+          {/* Automation Breakdown */}
+          <div className="py-2 border-b border-gray-100">
+            <div className="flex justify-between items-center mb-1">
+              <span className="text-sm text-gray-600">Automation</span>
+              <span className="text-sm font-semibold text-gray-900">
+                {stats.automated + stats.manual > 0
+                  ? Math.round((stats.automated / (stats.automated + stats.manual)) * 100)
+                  : 0}%
+              </span>
             </div>
-            <div className="flex justify-between text-xs">
-              <span className="text-gray-600">Manual:</span>
-              <span className="font-medium text-orange-600">{stats.manual}</span>
+            <div className="flex gap-2 text-xs">
+              <span className="text-gray-500">
+                Automated: {stats.automated}
+              </span>
+              <span className="text-gray-500">
+                Manual: {stats.manual}
+              </span>
             </div>
-            <div className="flex justify-between text-xs">
-              <span className="text-gray-600">Passed:</span>
-              <span className="font-medium text-green-600">{stats.passed}</span>
+          </div>
+
+          {/* Status Breakdown */}
+          <div className="py-2">
+            <div className="flex justify-between items-center mb-1">
+              <span className="text-sm text-gray-600">Status</span>
             </div>
-            <div className="flex justify-between text-xs">
-              <span className="text-gray-600">Failed:</span>
-              <span className="font-medium text-red-600">{stats.failed}</span>
+            <div className="space-y-1 text-xs">
+              <div className="flex justify-between">
+                <span className="text-green-600">Passed</span>
+                <span className="font-medium text-green-600">{stats.passed}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-red-600">Failed</span>
+                <span className="font-medium text-red-600">{stats.failed}</span>
+              </div>
             </div>
           </div>
         </div>
       </SidebarSection>
 
-      {/* Quick Tips */}
-      <div className="p-4 bg-gray-50 border-t border-gray-200">
-        <h4 className="text-xs font-semibold text-gray-700 uppercase mb-2">
-          💡 Quick Tips
-        </h4>
-        <ul className="text-xs text-gray-600 space-y-1">
-          <li>• Click a suite to view its tests</li>
-          <li>• Use filters to narrow results</li>
-          <li>• Select tests for bulk actions</li>
-          <li>• Create suites to organize tests</li>
-        </ul>
+      {/* ========================================
+          QUICK ACTIONS
+      ======================================== */}
+      <div className="pt-4 border-t border-gray-200">
+        <SidebarActionButton
+          onClick={onAddTestCase}
+          icon={Plus}
+          label="Create Test Case"
+          className="w-full justify-center bg-blue-600 text-white hover:bg-blue-700"
+        />
       </div>
     </RightSidebarPanel>
   );
