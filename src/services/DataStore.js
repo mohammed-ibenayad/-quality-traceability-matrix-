@@ -297,11 +297,13 @@ class DataStoreService {
       }
 
       // Fetch test cases with workspace_id
+      // Fetch test cases with workspace_id
       try {
         const tcResponse = await apiClient.get(`/api/test-cases${workspaceParam}`);
         if (tcResponse.data.success && Array.isArray(tcResponse.data.data)) {
-          this._testCases = tcResponse.data.data;
-          console.log(`✅ Loaded ${this._testCases.length} test cases`);
+          // ✅ FIX: Convert ALL test cases from snake_case to camelCase
+          this._testCases = tcResponse.data.data.map(tc => this._toCamelCase(tc));
+          console.log(`✅ Loaded and converted ${this._testCases.length} test cases`);
         }
       } catch (error) {
         console.error('❌ Failed to fetch test cases:', error.message);
@@ -309,7 +311,6 @@ class DataStoreService {
           throw new Error('workspace_id is required. Please select a workspace.');
         }
       }
-
       // Fetch versions with workspace_id
       try {
         const versionResponse = await apiClient.get(`/api/versions${workspaceParam}`);
@@ -1393,7 +1394,6 @@ class DataStoreService {
     const workspaceId = this.getCurrentWorkspaceId();
 
     try {
-      // ✅ Convert camelCase to snake_case before sending to API
       const apiPayload = {
         ...this._toSnakeCase(updates),
         workspace_id: workspaceId
@@ -1404,7 +1404,6 @@ class DataStoreService {
       const response = await apiClient.put(`/api/test-cases/${id}`, apiPayload);
 
       if (response.data.success) {
-        // ✅ Fetch fresh data from API to ensure we have all fields
         const getResponse = await apiClient.get(
           `/api/test-cases/${id}?workspace_id=${workspaceId}`
         );
@@ -1412,10 +1411,19 @@ class DataStoreService {
         if (getResponse.data.success) {
           const index = this._testCases.findIndex(tc => tc.id === id);
           if (index !== -1) {
-            // ✅ Store the API response (already in snake_case from DB)
-            this._testCases[index] = getResponse.data.data;
+            // ✅ FIX: Convert snake_case from API to camelCase
+            const freshData = getResponse.data.data;
+            const camelCaseData = this._toCamelCase(freshData);
+
+            this._testCases[index] = camelCaseData;
+
+            // ✅ FIX: Update mappings from test case requirements
+            this._updateMappingsFromTestCases();
+
+            // ✅ Notify listeners AFTER mappings are updated
             this._notifyListeners();
-            console.log('✅ Test case updated and refreshed from API:', id);
+
+            console.log('✅ Test case updated, converted, mappings refreshed:', id);
           }
         }
       }

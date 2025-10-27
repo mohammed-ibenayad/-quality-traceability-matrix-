@@ -294,10 +294,13 @@ const TestCases = () => {
       );
     }
 
-    // 🔥 NEW: Apply suite filter (when a suite is active)
-    if (activeSuiteFilter && suiteMembers.length > 0) {
-      const suiteMemberIds = suiteMembers.map(m => m.id);
-      filtered = filtered.filter(tc => suiteMemberIds.includes(tc.id));
+    if (activeSuiteFilter) {
+      if (suiteMembers.length === 0) {
+        filtered = []; // Empty suite = show zero test cases
+      } else {
+        const suiteMemberIds = suiteMembers.map(m => m.id);
+        filtered = filtered.filter(tc => suiteMemberIds.includes(tc.id));
+      }
     }
 
     return filtered;
@@ -378,24 +381,25 @@ const TestCases = () => {
   // Handle save test case from edit panel
   const handleSaveTestCase = async (updatedTestCase) => {
     try {
-      if (testCases.find(tc => tc.id === updatedTestCase.id)) {
-        // Update existing test case
+      if (testCaseToEdit) {
         await dataStore.updateTestCase(updatedTestCase.id, updatedTestCase);
       } else {
-        // Create new test case
         await dataStore.addTestCase(updatedTestCase);
       }
 
-      // Refresh data
+      // ✅ FIX: Refresh ALL data including mapping
       setTestCases(dataStore.getTestCases());
+      setMapping(dataStore.getMapping());
+      setRequirements(dataStore.getRequirements());
 
       // Close panels
       setEditPanelOpen(false);
       setTestCaseToEdit(null);
 
-      // If we were viewing details of this test case, update it
+      // ✅ FIX: Refresh selected test case from store
       if (selectedTestCase?.id === updatedTestCase.id) {
-        setSelectedTestCase(updatedTestCase);
+        const refreshedTestCase = dataStore.getTestCase(updatedTestCase.id);
+        setSelectedTestCase(refreshedTestCase);
       }
     } catch (error) {
       console.error('Failed to save test case:', error);
@@ -445,13 +449,26 @@ const TestCases = () => {
         description: suiteData.description || '',
         version: suiteData.version || '',
         suite_type: suiteData.suite_type || 'custom',
-        estimated_duration: suiteData.estimated_duration ? parseInt(suiteData.estimated_duration) : null,
+        estimated_duration: suiteData.estimated_duration ?
+          parseInt(suiteData.estimated_duration) : null,
         recommended_environment: suiteData.recommended_environment || ''
       });
+
       setShowCreateSuiteModal(false);
       alert(`Test suite "${newSuite.name}" created successfully!`);
+
+      // Reload suites list
       const updatedSuites = await dataStore.getTestSuites();
       setTestSuites(updatedSuites);
+
+      // ✅ FIX: Automatically open the newly created suite
+      // This will show 0 test cases (empty suite) instead of all test cases
+      setSelectedSuite(newSuite);
+      setActiveSuiteFilter(newSuite.id);
+      setSuiteMembers([]); // New suite has no members yet
+      setSelectedTestCases(new Set()); // Clear any selections
+      setSelectedTestCase(null); // Clear detail view
+
     } catch (error) {
       console.error('Error creating test suite:', error);
       alert(`Failed to create test suite: ${error.message}`);
@@ -1272,7 +1289,16 @@ const TestCases = () => {
       />
 
       {/* === SECTION 5: MODALS === */}
-      {/* Create Suite Modal */}
+
+      {/* Create Suite Modal (NEW SUITE) */}
+      <CreateSuiteModal
+        isOpen={showCreateSuiteModal}
+        onClose={() => setShowCreateSuiteModal(false)}
+        onCreate={handleCreateSuite}
+        isEditMode={false}
+      />
+
+      {/* Edit Suite Modal (EXISTING SUITE) */}
       <CreateSuiteModal
         isOpen={showEditSuiteModal}
         onClose={() => {
@@ -1283,6 +1309,7 @@ const TestCases = () => {
         initialData={suiteToEdit}
         isEditMode={true}
       />
+
       {/* Add to Suite Modal */}
       <AddToSuiteModal
         isOpen={showAddToSuiteModal}
