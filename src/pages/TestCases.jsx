@@ -379,14 +379,12 @@ const TestCases = () => {
   const handleSaveTestCase = async (updatedTestCase) => {
     try {
       if (testCaseToEdit) {
-        // Update existing test case
         await dataStore.updateTestCase(updatedTestCase.id, updatedTestCase);
       } else {
-        // Create new test case
         await dataStore.addTestCase(updatedTestCase);
       }
 
-      // ✅ FIX: Refresh ALL data - test cases, requirements, AND mapping
+      // ✅ FIX: Refresh ALL data including mapping
       setTestCases(dataStore.getTestCases());
       setMapping(dataStore.getMapping());
       setRequirements(dataStore.getRequirements());
@@ -395,7 +393,7 @@ const TestCases = () => {
       setEditPanelOpen(false);
       setTestCaseToEdit(null);
 
-      // ✅ FIX: Refresh the selected test case with fresh data from store
+      // ✅ FIX: Refresh selected test case from store
       if (selectedTestCase?.id === updatedTestCase.id) {
         const refreshedTestCase = dataStore.getTestCase(updatedTestCase.id);
         setSelectedTestCase(refreshedTestCase);
@@ -448,13 +446,26 @@ const TestCases = () => {
         description: suiteData.description || '',
         version: suiteData.version || '',
         suite_type: suiteData.suite_type || 'custom',
-        estimated_duration: suiteData.estimated_duration ? parseInt(suiteData.estimated_duration) : null,
+        estimated_duration: suiteData.estimated_duration ?
+          parseInt(suiteData.estimated_duration) : null,
         recommended_environment: suiteData.recommended_environment || ''
       });
+
       setShowCreateSuiteModal(false);
       alert(`Test suite "${newSuite.name}" created successfully!`);
+
+      // Reload suites list
       const updatedSuites = await dataStore.getTestSuites();
       setTestSuites(updatedSuites);
+
+      // ✅ FIX: Automatically open the newly created suite
+      // This will show 0 test cases (empty suite) instead of all test cases
+      setSelectedSuite(newSuite);
+      setActiveSuiteFilter(newSuite.id);
+      setSuiteMembers([]); // New suite has no members yet
+      setSelectedTestCases(new Set()); // Clear any selections
+      setSelectedTestCase(null); // Clear detail view
+
     } catch (error) {
       console.error('Error creating test suite:', error);
       alert(`Failed to create test suite: ${error.message}`);
