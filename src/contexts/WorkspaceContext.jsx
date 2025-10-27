@@ -35,6 +35,21 @@ export const WorkspaceProvider = ({ children }) => {
       setIsLoading(true);
       console.log('🔄 Initializing workspace context...');
 
+      // ✅ CHECK: Don't fetch if not authenticated
+      const token = localStorage.getItem('auth_token');
+      if (!token) {
+        console.log('⏭️ No auth token found, skipping workspace fetch');
+        console.log('💡 Workspace will be fetched after login');
+        setIsLoading(false);
+        return;
+      }
+
+      // ✅ ENSURE: Token is in axios headers (important for first load)
+      if (!apiClient.defaults.headers.common['Authorization']) {
+        apiClient.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+        console.log('🔑 Set auth token in axios headers');
+      }
+
       // Fetch all available workspaces
       const response = await apiClient.get('/api/workspaces');
 
@@ -87,6 +102,13 @@ export const WorkspaceProvider = ({ children }) => {
 
     } catch (error) {
       console.error('❌ Error initializing workspace context:', error);
+      
+      // If it's a 401, the token is invalid - clear it
+      if (error.response?.status === 401) {
+        console.log('🔒 Token invalid or expired, clearing auth data');
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('auth_user');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -96,6 +118,19 @@ export const WorkspaceProvider = ({ children }) => {
     try {
       setIsLoading(true);
       console.log('🔄 Fetching workspaces...');
+
+      // ✅ CHECK: Ensure we have auth token
+      const token = localStorage.getItem('auth_token');
+      if (!token) {
+        console.log('⏭️ No auth token, cannot fetch workspaces');
+        return [];
+      }
+
+      // ✅ ENSURE: Token is in axios headers
+      if (!apiClient.defaults.headers.common['Authorization']) {
+        apiClient.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+        console.log('🔑 Set auth token in axios headers');
+      }
 
       const response = await apiClient.get('/api/workspaces');
 
@@ -128,6 +163,14 @@ export const WorkspaceProvider = ({ children }) => {
       return [];
     } catch (error) {
       console.error('❌ Error fetching workspaces:', error);
+      
+      // If it's a 401, the token is invalid
+      if (error.response?.status === 401) {
+        console.log('🔒 Token invalid or expired');
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('auth_user');
+      }
+      
       return [];
     } finally {
       setIsLoading(false);
