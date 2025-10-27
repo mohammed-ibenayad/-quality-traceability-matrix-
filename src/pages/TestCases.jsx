@@ -1272,7 +1272,16 @@ const TestCases = () => {
       />
 
       {/* === SECTION 5: MODALS === */}
-      {/* Create Suite Modal */}
+
+      {/* Create Suite Modal (NEW SUITE) */}
+      <CreateSuiteModal
+        isOpen={showCreateSuiteModal}
+        onClose={() => setShowCreateSuiteModal(false)}
+        onCreate={handleCreateSuite}
+        isEditMode={false}
+      />
+
+      {/* Edit Suite Modal (EXISTING SUITE) */}
       <CreateSuiteModal
         isOpen={showEditSuiteModal}
         onClose={() => {
@@ -1283,6 +1292,7 @@ const TestCases = () => {
         initialData={suiteToEdit}
         isEditMode={true}
       />
+
       {/* Add to Suite Modal */}
       <AddToSuiteModal
         isOpen={showAddToSuiteModal}
