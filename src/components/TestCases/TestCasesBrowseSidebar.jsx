@@ -11,12 +11,13 @@ import {
   Filter,
   Tag,
   TrendingUp,
-  Layers
+  Layers,
+  X
 } from 'lucide-react';
 
 /**
  * TestCasesBrowseSidebar - Browse Mode Sidebar
- * Fixed version with correct status values matching database schema
+ * FINAL FIXED VERSION - Dropdowns render correctly
  */
 const TestCasesBrowseSidebar = ({
   // Test Suites data
@@ -201,16 +202,20 @@ const TestCasesBrowseSidebar = ({
               </span>
               <button
                 onClick={onClearAllFilters}
-                className="text-xs text-blue-600 hover:text-blue-700 font-medium"
+                className="text-xs text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1"
               >
+                <X size={12} />
                 Clear all
               </button>
             </div>
           </div>
         )}
 
-        {/* Category Filter */}
-        <SidebarField label="Category">
+        {/* Category Filter - NOT wrapped in SidebarField */}
+        <div className="mb-4">
+          <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">
+            Category
+          </label>
           {allCategories.length > 0 ? (
             <select
               value={categoryFilter}
@@ -229,10 +234,13 @@ const TestCasesBrowseSidebar = ({
               <option>No categories available</option>
             </select>
           )}
-        </SidebarField>
+        </div>
 
-        {/* Status Filter - FIXED VALUES */}
-        <SidebarField label="Status">
+        {/* Status Filter - NOT wrapped in SidebarField */}
+        <div className="mb-4">
+          <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">
+            Status
+          </label>
           <select
             value={statusFilter}
             onChange={(e) => onStatusChange(e.target.value)}
@@ -245,10 +253,13 @@ const TestCasesBrowseSidebar = ({
             <option value="Blocked">Blocked</option>
             <option value="Skipped">Skipped</option>
           </select>
-        </SidebarField>
+        </div>
 
-        {/* Priority Filter */}
-        <SidebarField label="Priority">
+        {/* Priority Filter - NOT wrapped in SidebarField */}
+        <div className="mb-4">
+          <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">
+            Priority
+          </label>
           <select
             value={priorityFilter}
             onChange={(e) => onPriorityChange(e.target.value)}
@@ -260,10 +271,13 @@ const TestCasesBrowseSidebar = ({
             <option value="Medium">Medium</option>
             <option value="Low">Low</option>
           </select>
-        </SidebarField>
+        </div>
 
-        {/* Automation Status Filter - FIXED VALUES */}
-        <SidebarField label="Automation">
+        {/* Automation Filter - NOT wrapped in SidebarField */}
+        <div className="mb-4">
+          <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">
+            Automation
+          </label>
           <select
             value={automationFilter}
             onChange={(e) => onAutomationChange(e.target.value)}
@@ -275,10 +289,13 @@ const TestCasesBrowseSidebar = ({
             <option value="Semi-Automated">Semi-Automated</option>
             <option value="Planned">Planned</option>
           </select>
-        </SidebarField>
+        </div>
 
-        {/* Tags Filter */}
-        <SidebarField label="Tags">
+        {/* Tags Filter - NOT wrapped in SidebarField */}
+        <div className="mb-4">
+          <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">
+            Tags
+          </label>
           {allTags.length > 0 ? (
             <div className="space-y-2">
               {selectedTagsFilter.length > 0 && (
@@ -296,7 +313,7 @@ const TestCasesBrowseSidebar = ({
                         }}
                         className="hover:bg-blue-200 rounded-full p-0.5"
                       >
-                        ×
+                        <X size={10} />
                       </button>
                     </span>
                   ))}
@@ -322,7 +339,7 @@ const TestCasesBrowseSidebar = ({
               <p className="text-xs text-gray-500">No tags available</p>
             </div>
           )}
-        </SidebarField>
+        </div>
       </SidebarSection>
 
       {/* Statistics Section */}
