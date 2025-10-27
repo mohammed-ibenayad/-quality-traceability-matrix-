@@ -439,40 +439,40 @@ const TestCases = () => {
   // === NEW HANDLER FUNCTIONS FROM SECTION 4 ===
   // Handler: Create a new test suite
   const handleCreateSuite = async (suiteData) => {
-    try {
-      setIsLoadingSuiteOperation(true);
-      const newSuite = await dataStore.createTestSuite({
-        name: suiteData.name,
-        description: suiteData.description || '',
-        version: suiteData.version || '',
-        suite_type: suiteData.suite_type || 'custom',
-        estimated_duration: suiteData.estimated_duration ?
-          parseInt(suiteData.estimated_duration) : null,
-        recommended_environment: suiteData.recommended_environment || ''
-      });
-
-      setShowCreateSuiteModal(false);
-      alert(`Test suite "${newSuite.name}" created successfully!`);
-
-      // Reload suites list
-      const updatedSuites = await dataStore.getTestSuites();
-      setTestSuites(updatedSuites);
-
-      // ✅ FIX: Automatically open the newly created suite
-      // This will show 0 test cases (empty suite) instead of all test cases
-      setSelectedSuite(newSuite);
-      setActiveSuiteFilter(newSuite.id);
-      setSuiteMembers([]); // New suite has no members yet
-      setSelectedTestCases(new Set()); // Clear any selections
-      setSelectedTestCase(null); // Clear detail view
-
-    } catch (error) {
-      console.error('Error creating test suite:', error);
-      alert(`Failed to create test suite: ${error.message}`);
-    } finally {
-      setIsLoadingSuiteOperation(false);
-    }
-  };
+  try {
+    setIsLoadingSuiteOperation(true);
+    const newSuite = await dataStore.createTestSuite({
+      name: suiteData.name,
+      description: suiteData.description || '',
+      version: suiteData.version || '',
+      suite_type: suiteData.suite_type || 'custom',
+      estimated_duration: suiteData.estimated_duration ?
+        parseInt(suiteData.estimated_duration) : null,
+      recommended_environment: suiteData.recommended_environment || ''
+    });
+    
+    setShowCreateSuiteModal(false);
+    alert(`Test suite "${newSuite.name}" created successfully!`);
+    
+    // Reload suites list
+    const updatedSuites = await dataStore.getTestSuites();
+    setTestSuites(updatedSuites);
+    
+    // ✅ FIX: Automatically open the newly created suite
+    // This will show 0 test cases (empty suite) instead of all test cases
+    setSelectedSuite(newSuite);
+    setActiveSuiteFilter(newSuite.id);
+    setSuiteMembers([]); // New suite has no members yet
+    setSelectedTestCases(new Set()); // Clear any selections
+    setSelectedTestCase(null); // Clear detail view
+    
+  } catch (error) {
+    console.error('Error creating test suite:', error);
+    alert(`Failed to create test suite: ${error.message}`);
+  } finally {
+    setIsLoadingSuiteOperation(false);
+  }
+};
 
 
 
