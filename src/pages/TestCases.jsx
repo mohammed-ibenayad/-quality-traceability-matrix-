@@ -682,6 +682,70 @@ const TestCases = () => {
     }
   };
 
+  // ============================================
+  // BULK ACTION HANDLERS
+  // ============================================
+
+  const handleBulkVersionAssignment = async (versionIds) => {
+    if (selectedTestCases.size === 0) return;
+    try {
+      const testCaseIds = Array.from(selectedTestCases);
+      for (const tcId of testCaseIds) {
+        const testCase = testCases.find(tc => tc.id === tcId);
+        if (testCase) {
+          await dataStore.updateTestCase(tcId, {
+            ...testCase,
+            applicableVersions: versionIds
+          });
+        }
+      }
+      setTestCases(dataStore.getTestCases());
+      alert(`Updated ${testCaseIds.length} test case(s) with new versions`);
+    } catch (error) {
+      console.error('Error updating versions:', error);
+      alert('Failed to update versions');
+    }
+  };
+
+  const handleBulkTagsUpdate = async (tags) => {
+    if (selectedTestCases.size === 0) return;
+    try {
+      const testCaseIds = Array.from(selectedTestCases);
+      for (const tcId of testCaseIds) {
+        const testCase = testCases.find(tc => tc.id === tcId);
+        if (testCase) {
+          await dataStore.updateTestCase(tcId, {
+            ...testCase,
+            tags: tags
+          });
+        }
+      }
+      setTestCases(dataStore.getTestCases());
+      alert(`Updated ${testCaseIds.length} test case(s) with new tags`);
+    } catch (error) {
+      console.error('Error updating tags:', error);
+      alert('Failed to update tags');
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedTestCases.size === 0) return;
+    const count = selectedTestCases.size;
+    if (!window.confirm(`Delete ${count} test case(s)? This cannot be undone.`)) return;
+    try {
+      const testCaseIds = Array.from(selectedTestCases);
+      for (const tcId of testCaseIds) {
+        await dataStore.deleteTestCase(tcId);
+      }
+      setTestCases(dataStore.getTestCases());
+      setSelectedTestCases(new Set());
+      alert(`Successfully deleted ${count} test case(s)`);
+    } catch (error) {
+      console.error('Error deleting test cases:', error);
+      alert('Failed to delete test cases');
+    }
+  };
+
   const rightSidebarContent = useMemo(() => {
     // 🔥 PRIORITY 1: Suite is selected → Show suite details
     if (selectedSuite) {
