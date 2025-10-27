@@ -725,7 +725,302 @@ const TestCases = () => {
           title="Test Case Details"
           onClose={() => setSelectedTestCase(null)}
         >
-          {/* Your existing test case details panel content */}
+          {/* Quick Actions */}
+          <div className="p-4 space-y-2 border-b border-gray-200">
+            <SidebarActionButton
+              icon={<Edit size={16} />}
+              label="Edit Test Case"
+              onClick={() => {
+                setTestCaseToEdit({
+                  id: selectedTestCase.id || '',
+                  name: selectedTestCase.name || '',
+                  description: selectedTestCase.description || '',
+                  category: selectedTestCase.category || '',
+                  priority: selectedTestCase.priority || 'Medium',
+                  automationStatus: selectedTestCase.automationStatus || 'Manual',
+                  status: selectedTestCase.status || 'Not Run',
+                  steps: selectedTestCase.steps || [],
+                  expectedResult: selectedTestCase.expectedResult || '',
+                  preconditions: selectedTestCase.preconditions || '',
+                  testData: selectedTestCase.testData || '',
+                  tags: selectedTestCase.tags || [],
+                  requirementIds: selectedTestCase.requirementIds || [],
+                  applicableVersions: selectedTestCase.applicableVersions || [],
+                  assignee: selectedTestCase.assignee || '',
+                  estimatedDuration: selectedTestCase.estimatedDuration || null
+                });
+                setEditPanelOpen(true);
+              }}
+              variant="primary"
+              fullWidth
+            />
+            <SidebarActionButton
+              icon={<Trash2 size={16} />}
+              label="Delete Test Case"
+              onClick={() => {
+                if (confirm(`Delete test case ${selectedTestCase.id}?`)) {
+                  console.log('Delete test case:', selectedTestCase.id);
+                  // TODO: Implement delete
+                  setSelectedTestCase(null);
+                }
+              }}
+              variant="danger"
+              fullWidth
+            />
+          </div>
+
+          {/* Basic Information */}
+          <SidebarSection
+            title="Basic Information"
+            icon={<FileText size={16} />}
+            defaultOpen={true}
+          >
+            <SidebarField
+              label="Test Case ID"
+              value={<span className="font-mono font-semibold">{selectedTestCase.id}</span>}
+            />
+            <SidebarField
+              label="Name"
+              value={selectedTestCase.name}
+            />
+            {selectedTestCase.description && (
+              <SidebarField
+                label="Description"
+                value={<p className="text-sm leading-relaxed">{selectedTestCase.description}</p>}
+              />
+            )}
+            {selectedTestCase.category && (
+              <SidebarField
+                label="Category"
+                value={selectedTestCase.category}
+              />
+            )}
+          </SidebarSection>
+
+          {/* Classification */}
+          <SidebarSection
+            title="Classification"
+            icon={<Tag size={16} />}
+            defaultOpen={true}
+          >
+            <SidebarField
+              label="Priority"
+              value={
+                <SidebarBadge
+                  label={selectedTestCase.priority || 'Medium'}
+                  color={
+                    selectedTestCase.priority === 'High' || selectedTestCase.priority === 'Critical'
+                      ? 'red'
+                      : selectedTestCase.priority === 'Medium'
+                        ? 'yellow'
+                        : 'blue'
+                  }
+                />
+              }
+            />
+            <SidebarField
+              label="Status"
+              value={
+                <SidebarBadge
+                  label={selectedTestCase.status || 'Not Run'}
+                  color={
+                    selectedTestCase.status === 'Passed'
+                      ? 'green'
+                      : selectedTestCase.status === 'Failed'
+                        ? 'red'
+                        : selectedTestCase.status === 'Blocked'
+                          ? 'orange'
+                          : 'gray'
+                  }
+                />
+              }
+            />
+            <SidebarField
+              label="Automation"
+              value={
+                <SidebarBadge
+                  label={selectedTestCase.automationStatus || 'Manual'}
+                  color={
+                    selectedTestCase.automationStatus === 'Automated'
+                      ? 'green'
+                      : selectedTestCase.automationStatus === 'Semi-Automated'
+                        ? 'blue'
+                        : selectedTestCase.automationStatus === 'Planned'
+                          ? 'purple'
+                          : 'gray'
+                  }
+                />
+              }
+            />
+          </SidebarSection>
+
+          {/* Test Steps */}
+          {selectedTestCase.steps && selectedTestCase.steps.length > 0 && (
+            <SidebarSection
+              title="Test Steps"
+              icon={<CheckCircle size={16} />}
+              defaultOpen={false}
+            >
+              <ol className="space-y-2 text-sm">
+                {selectedTestCase.steps.map((step, index) => (
+                  <li key={index} className="flex">
+                    <span className="font-semibold text-gray-700 mr-2">{index + 1}.</span>
+                    <span className="text-gray-600">{step}</span>
+                  </li>
+                ))}
+              </ol>
+            </SidebarSection>
+          )}
+
+          {/* Expected Result */}
+          {selectedTestCase.expectedResult && (
+            <SidebarSection
+              title="Expected Result"
+              icon={<CheckCircle size={16} />}
+              defaultOpen={false}
+            >
+              <p className="text-sm text-gray-600 leading-relaxed">
+                {selectedTestCase.expectedResult}
+              </p>
+            </SidebarSection>
+          )}
+
+          {/* Preconditions */}
+          {selectedTestCase.preconditions && (
+            <SidebarSection
+              title="Preconditions"
+              icon={<AlertCircle size={16} />}
+              defaultOpen={false}
+            >
+              <p className="text-sm text-gray-600 leading-relaxed">
+                {selectedTestCase.preconditions}
+              </p>
+            </SidebarSection>
+          )}
+
+          {/* Test Data */}
+          {selectedTestCase.testData && (
+            <SidebarSection
+              title="Test Data"
+              icon={<FileText size={16} />}
+              defaultOpen={false}
+            >
+              <p className="text-sm text-gray-600 leading-relaxed">
+                {selectedTestCase.testData}
+              </p>
+            </SidebarSection>
+          )}
+
+          {/* Tags */}
+          {selectedTestCase.tags && selectedTestCase.tags.length > 0 && (
+            <SidebarSection
+              title="Tags"
+              icon={<Tag size={16} />}
+              defaultOpen={false}
+            >
+              <div className="flex flex-wrap gap-2">
+                {selectedTestCase.tags.map((tag, index) => (
+                  <span
+                    key={index}
+                    className="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded"
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            </SidebarSection>
+          )}
+
+          {/* Linked Requirements */}
+          {linkedRequirements.length > 0 && (
+            <SidebarSection
+              title="Linked Requirements"
+              icon={<Link size={16} />}
+              defaultOpen={false}
+              badge={linkedRequirements.length}
+            >
+              <div className="space-y-2">
+                {linkedRequirements.map((req) => (
+                  <div
+                    key={req.id}
+                    className="p-2 bg-purple-50 border border-purple-200 rounded text-sm"
+                  >
+                    <div className="font-medium text-purple-900">{req.id}</div>
+                    <div className="text-xs text-purple-700 mt-1">{req.name}</div>
+                  </div>
+                ))}
+              </div>
+            </SidebarSection>
+          )}
+
+          {/* Metadata */}
+          <SidebarSection
+            title="Metadata"
+            icon={<BarChart3 size={16} />}
+            defaultOpen={false}
+          >
+            {selectedTestCase.assignee && (
+              <SidebarField
+                label="Assignee"
+                value={
+                  <div className="flex items-center">
+                    <User size={14} className="mr-1 text-gray-500" />
+                    <span className="text-sm">{selectedTestCase.assignee}</span>
+                  </div>
+                }
+              />
+            )}
+            {selectedTestCase.estimatedDuration && (
+              <SidebarField
+                label="Estimated Duration"
+                value={
+                  <div className="flex items-center">
+                    <Calendar size={14} className="mr-1 text-gray-500" />
+                    <span className="text-sm">{selectedTestCase.estimatedDuration} min</span>
+                  </div>
+                }
+              />
+            )}
+            {selectedTestCase.applicableVersions && selectedTestCase.applicableVersions.length > 0 && (
+              <SidebarField
+                label="Versions"
+                value={
+                  <div className="flex flex-wrap gap-1">
+                    {selectedTestCase.applicableVersions.map((version, index) => (
+                      <span
+                        key={index}
+                        className="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-700 rounded"
+                      >
+                        {version}
+                      </span>
+                    ))}
+                  </div>
+                }
+              />
+            )}
+            {selectedTestCase.automationPath && (
+              <SidebarField
+                label="Automation Path"
+                value={
+                  <span className="text-xs font-mono bg-gray-100 px-2 py-1 rounded">
+                    {selectedTestCase.automationPath}
+                  </span>
+                }
+              />
+            )}
+            {selectedTestCase.lastExecuted && (
+              <SidebarField
+                label="Last Executed"
+                value={new Date(selectedTestCase.lastExecuted).toLocaleDateString()}
+              />
+            )}
+            {selectedTestCase.executedBy && (
+              <SidebarField
+                label="Executed By"
+                value={selectedTestCase.executedBy}
+              />
+            )}
+          </SidebarSection>
         </RightSidebarPanel>
       );
     }
