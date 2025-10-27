@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import RightSidebarPanel, {
   SidebarSection,
   SidebarField,
@@ -10,17 +10,14 @@ import {
   FolderOpen,
   Filter,
   Tag,
-  Search,
-  PlayCircle,
-  FileCheck,
+  TrendingUp,
   Layers,
-  TrendingUp
+  X
 } from 'lucide-react';
 
 /**
- * TestCasesBrowseSidebar - State 1 Sidebar
- * Shows when no test cases are selected and no suite is active
- * Purpose: Browse and organize test cases into suites, apply filters
+ * TestCasesBrowseSidebar - Browse Mode Sidebar
+ * FINAL FIXED VERSION - Dropdowns render correctly
  */
 const TestCasesBrowseSidebar = ({
   // Test Suites data
@@ -97,14 +94,14 @@ const TestCasesBrowseSidebar = ({
       integration: 'bg-purple-100 text-purple-800',
       custom: 'bg-gray-100 text-gray-800'
     };
-    return colors[suiteType] || colors.custom;
+    return colors[suiteType?.toLowerCase()] || colors.custom;
   };
 
   return (
     <RightSidebarPanel
       title="Browse & Organize"
       subtitle="Test Cases"
-      onClose={null} // Can't close browse mode
+      onClose={null}
     >
       {/* Quick Actions */}
       <div className="p-4 space-y-2 border-b border-gray-200 bg-gray-50">
@@ -130,7 +127,7 @@ const TestCasesBrowseSidebar = ({
         icon={<FolderOpen size={16} />}
         defaultOpen={expandedSections.suites}
         onToggle={() => toggleSection('suites')}
-        badge={testSuites.length > 0 ? `${testSuites.length}` : null}
+        badge={testSuites.length > 0 ? String(testSuites.length) : null}
       >
         {testSuites.length === 0 ? (
           <div className="text-sm text-gray-500 italic text-center py-4">
@@ -151,52 +148,33 @@ const TestCasesBrowseSidebar = ({
                 onClick={() => onSuiteClick(suite)}
                 className="p-3 bg-white border border-gray-200 rounded-lg hover:border-blue-300 hover:shadow-sm cursor-pointer transition-all group"
               >
-                {/* Suite Header */}
                 <div className="flex items-start justify-between mb-2">
                   <div className="flex-1 min-w-0">
                     <h4 className="text-sm font-semibold text-gray-900 truncate group-hover:text-blue-600">
                       {suite.name}
                     </h4>
                     {suite.version && (
-                      <p className="text-xs text-gray-500 mt-0.5">
-                        v{suite.version}
-                      </p>
+                      <p className="text-xs text-gray-500 mt-0.5">{suite.version}</p>
                     )}
                   </div>
                   {suite.suite_type && (
-                    <span
-                      className={`ml-2 px-2 py-0.5 rounded text-xs font-medium flex-shrink-0 ${getSuiteTypeBadge(
-                        suite.suite_type
-                      )}`}
-                    >
-                      {suite.suite_type}
-                    </span>
+                    <SidebarBadge
+                      label={suite.suite_type}
+                      className={getSuiteTypeBadge(suite.suite_type)}
+                    />
                   )}
                 </div>
-
-                {/* Suite Description */}
                 {suite.description && (
                   <p className="text-xs text-gray-600 mb-2 line-clamp-2">
                     {suite.description}
                   </p>
                 )}
-
-                {/* Suite Stats */}
-                <div className="flex items-center justify-between text-xs text-gray-500">
-                  <div className="flex items-center space-x-3">
-                    <span className="flex items-center">
-                      <FileCheck size={12} className="mr-1" />
-                      {suite.test_count || 0} tests
-                    </span>
-                    {suite.automated_count > 0 && (
-                      <span className="flex items-center text-green-600">
-                        <PlayCircle size={12} className="mr-1" />
-                        {suite.automated_count} auto
-                      </span>
-                    )}
-                  </div>
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-gray-500">
+                    {suite.test_case_count || 0} test{suite.test_case_count !== 1 ? 's' : ''}
+                  </span>
                   {suite.estimated_duration && (
-                    <span className="text-gray-400">
+                    <span className="text-gray-500">
                       ~{suite.estimated_duration}m
                     </span>
                   )}
@@ -213,7 +191,7 @@ const TestCasesBrowseSidebar = ({
         icon={<Filter size={16} />}
         defaultOpen={expandedSections.filters}
         onToggle={() => toggleSection('filters')}
-        badge={activeFiltersCount > 0 ? `${activeFiltersCount}` : null}
+        badge={activeFiltersCount > 0 ? String(activeFiltersCount) : null}
       >
         {/* Active Filters Badge */}
         {activeFiltersCount > 0 && (
@@ -224,17 +202,21 @@ const TestCasesBrowseSidebar = ({
               </span>
               <button
                 onClick={onClearAllFilters}
-                className="text-xs text-blue-600 hover:text-blue-700 font-medium"
+                className="text-xs text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1"
               >
+                <X size={12} />
                 Clear all
               </button>
             </div>
           </div>
         )}
 
-        {/* Category Filter */}
-        {allCategories.length > 0 && (
-          <SidebarField label="Category">
+        {/* Category Filter - NOT wrapped in SidebarField */}
+        <div className="mb-4">
+          <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">
+            Category
+          </label>
+          {allCategories.length > 0 ? (
             <select
               value={categoryFilter}
               onChange={(e) => onCategoryChange(e.target.value)}
@@ -247,25 +229,37 @@ const TestCasesBrowseSidebar = ({
                 </option>
               ))}
             </select>
-          </SidebarField>
-        )}
+          ) : (
+            <select disabled className="w-full px-3 py-2 border border-gray-200 rounded-md text-sm bg-gray-50 text-gray-400">
+              <option>No categories available</option>
+            </select>
+          )}
+        </div>
 
-        {/* Status Filter */}
-        <SidebarField label="Status">
+        {/* Status Filter - NOT wrapped in SidebarField */}
+        <div className="mb-4">
+          <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">
+            Status
+          </label>
           <select
             value={statusFilter}
             onChange={(e) => onStatusChange(e.target.value)}
             className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           >
             <option value="All">All Statuses</option>
-            <option value="Draft">Draft</option>
-            <option value="Active">Active</option>
-            <option value="Deprecated">Deprecated</option>
+            <option value="Not Run">Not Run</option>
+            <option value="Passed">Passed</option>
+            <option value="Failed">Failed</option>
+            <option value="Blocked">Blocked</option>
+            <option value="Skipped">Skipped</option>
           </select>
-        </SidebarField>
+        </div>
 
-        {/* Priority Filter */}
-        <SidebarField label="Priority">
+        {/* Priority Filter - NOT wrapped in SidebarField */}
+        <div className="mb-4">
+          <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">
+            Priority
+          </label>
           <select
             value={priorityFilter}
             onChange={(e) => onPriorityChange(e.target.value)}
@@ -277,10 +271,13 @@ const TestCasesBrowseSidebar = ({
             <option value="Medium">Medium</option>
             <option value="Low">Low</option>
           </select>
-        </SidebarField>
+        </div>
 
-        {/* Automation Status Filter */}
-        <SidebarField label="Automation">
+        {/* Automation Filter - NOT wrapped in SidebarField */}
+        <div className="mb-4">
+          <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">
+            Automation
+          </label>
           <select
             value={automationFilter}
             onChange={(e) => onAutomationChange(e.target.value)}
@@ -289,33 +286,60 @@ const TestCasesBrowseSidebar = ({
             <option value="All">All Types</option>
             <option value="Automated">Automated</option>
             <option value="Manual">Manual</option>
-            <option value="Hybrid">Hybrid</option>
+            <option value="Semi-Automated">Semi-Automated</option>
+            <option value="Planned">Planned</option>
           </select>
-        </SidebarField>
+        </div>
 
-        {/* Tags Filter */}
-        {allTags.length > 0 && (
-          <SidebarField label="Tags">
-            <div className="flex flex-wrap gap-1.5">
-              {allTags.map((tag) => {
-                const isSelected = selectedTagsFilter.includes(tag);
-                return (
-                  <button
-                    key={tag}
-                    onClick={() => handleToggleTag(tag)}
-                    className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
-                      isSelected
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
-                  >
-                    {tag}
-                  </button>
-                );
-              })}
+        {/* Tags Filter - NOT wrapped in SidebarField */}
+        <div className="mb-4">
+          <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">
+            Tags
+          </label>
+          {allTags.length > 0 ? (
+            <div className="space-y-2">
+              {selectedTagsFilter.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 p-2 bg-gray-50 rounded-md">
+                  {selectedTagsFilter.map((tag) => (
+                    <span
+                      key={tag}
+                      className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-md"
+                    >
+                      {tag}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleToggleTag(tag);
+                        }}
+                        className="hover:bg-blue-200 rounded-full p-0.5"
+                      >
+                        <X size={10} />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+              <div className="flex flex-wrap gap-1.5">
+                {allTags
+                  .filter(tag => !selectedTagsFilter.includes(tag))
+                  .map((tag) => (
+                    <button
+                      key={tag}
+                      onClick={() => handleToggleTag(tag)}
+                      className="px-2 py-1 rounded text-xs font-medium transition-colors bg-gray-100 text-gray-700 hover:bg-gray-200"
+                    >
+                      {tag}
+                    </button>
+                  ))}
+              </div>
             </div>
-          </SidebarField>
-        )}
+          ) : (
+            <div className="p-3 bg-gray-50 rounded-md text-center">
+              <Tag size={20} className="mx-auto text-gray-300 mb-1" />
+              <p className="text-xs text-gray-500">No tags available</p>
+            </div>
+          )}
+        </div>
       </SidebarSection>
 
       {/* Statistics Section */}
