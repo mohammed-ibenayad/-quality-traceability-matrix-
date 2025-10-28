@@ -22,7 +22,7 @@ export const WorkspaceProvider = ({ children }) => {
     initializeWorkspace();
   }, []);
 
-  // ✅ ADD THIS: Notify DataStore when workspace changes
+  // Notify DataStore when workspace changes
   useEffect(() => {
     if (currentWorkspace) {
       console.log('🔄 WorkspaceContext: Setting workspace in DataStore:', currentWorkspace.id);
@@ -33,42 +33,82 @@ export const WorkspaceProvider = ({ children }) => {
   const initializeWorkspace = async () => {
     try {
       setIsLoading(true);
+      console.log('🔄 Initializing workspace context...');
 
-      // ✅ FIRST: Fetch fresh workspaces from API
-      const fetchedWorkspaces = await fetchWorkspaces();
+      // ✅ CHECK: Don't fetch if not authenticated
+      const token = localStorage.getItem('auth_token');
+      if (!token) {
+        console.log('⏭️ No auth token found, skipping workspace fetch');
+        console.log('💡 Workspace will be fetched after login');
+        setIsLoading(false);
+        return;
+      }
 
-      // ✅ THEN: Try to restore saved workspace (only if it still exists)
+      // ✅ ENSURE: Token is in axios headers (important for first load)
+      if (!apiClient.defaults.headers.common['Authorization']) {
+        apiClient.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+        console.log('🔑 Set auth token in axios headers');
+      }
+
+      // Fetch all available workspaces
+      const response = await apiClient.get('/api/workspaces');
+
+      if (!response.data.success) {
+        console.error('❌ Failed to fetch workspaces');
+        setIsLoading(false);
+        return;
+      }
+
+      const fetchedWorkspaces = response.data.data;
+      console.log(`✅ Fetched ${fetchedWorkspaces.length} workspace(s)`);
+      setWorkspaces(fetchedWorkspaces);
+
+      // If no workspaces exist, user needs to create one
+      if (fetchedWorkspaces.length === 0) {
+        console.log('⚠️ No workspaces available');
+        setIsLoading(false);
+        return;
+      }
+
+      // Try to restore workspace from localStorage
       const savedWorkspace = localStorage.getItem('currentWorkspace');
+      
       if (savedWorkspace) {
         try {
           const parsed = JSON.parse(savedWorkspace);
           const exists = fetchedWorkspaces.find(w => w.id === parsed.id);
+          
           if (exists) {
             console.log('✅ Restored workspace from localStorage:', exists.name);
             setCurrentWorkspace(exists);
+            setIsLoading(false);
+            return;
           } else {
-            // Saved workspace no longer accessible - clear it and select first available
-            console.log('⚠️ Saved workspace not found, selecting first available');
+            console.log('⚠️ Saved workspace no longer exists, clearing localStorage');
             localStorage.removeItem('currentWorkspace');
-            if (fetchedWorkspaces.length > 0) {
-              const defaultWorkspace = fetchedWorkspaces[0];
-              setCurrentWorkspace(defaultWorkspace);
-              localStorage.setItem('currentWorkspace', JSON.stringify(defaultWorkspace));
-            }
           }
         } catch (e) {
-          console.error('Error parsing saved workspace:', e);
+          console.error('❌ Error parsing saved workspace:', e);
           localStorage.removeItem('currentWorkspace');
         }
-      } else if (fetchedWorkspaces.length > 0) {
-        // No saved workspace - select first one
-        console.log('✅ No saved workspace, selecting first available');
-        const defaultWorkspace = fetchedWorkspaces[0];
-        setCurrentWorkspace(defaultWorkspace);
-        localStorage.setItem('currentWorkspace', JSON.stringify(defaultWorkspace));
       }
+
+      // No valid saved workspace - auto-select the first one
+      console.log('🎯 Auto-selecting first available workspace');
+      const defaultWorkspace = fetchedWorkspaces[0];
+      setCurrentWorkspace(defaultWorkspace);
+      localStorage.setItem('currentWorkspace', JSON.stringify(defaultWorkspace));
+      console.log(`✅ Auto-selected workspace: ${defaultWorkspace.name}`);
+
     } catch (error) {
-      console.error('Error initializing workspace context:', error);
+      console.error('❌ Error initializing workspace context:', error);
+      
+      // If it's a 401, the token is invalid - clear it
+      if (error.response?.status === 401) {
+        console.log('🔒 Token invalid or expired, clearing auth data');
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('auth_user');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -77,22 +117,44 @@ export const WorkspaceProvider = ({ children }) => {
   const fetchWorkspaces = async () => {
     try {
       setIsLoading(true);
+      console.log('🔄 Fetching workspaces...');
+
+      // ✅ CHECK: Ensure we have auth token
+      const token = localStorage.getItem('auth_token');
+      if (!token) {
+        console.log('⏭️ No auth token, cannot fetch workspaces');
+        return [];
+      }
+
+      // ✅ ENSURE: Token is in axios headers
+      if (!apiClient.defaults.headers.common['Authorization']) {
+        apiClient.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+        console.log('🔑 Set auth token in axios headers');
+      }
 
       const response = await apiClient.get('/api/workspaces');
 
       if (response.data.success) {
         const fetchedWorkspaces = response.data.data;
         setWorkspaces(fetchedWorkspaces);
+        console.log(`✅ Fetched ${fetchedWorkspaces.length} workspace(s)`);
 
-        // If no current workspace is selected or the current one doesn't exist anymore,
-        // select the first available one
-        if (
-          (!currentWorkspace && fetchedWorkspaces.length > 0) ||
-          (currentWorkspace && !fetchedWorkspaces.find(w => w.id === currentWorkspace.id))
-        ) {
-          const defaultWorkspace = fetchedWorkspaces[0];
-          setCurrentWorkspace(defaultWorkspace);
-          localStorage.setItem('currentWorkspace', JSON.stringify(defaultWorkspace));
+        // Auto-select logic when fetching workspaces manually
+        if (fetchedWorkspaces.length > 0) {
+          // If no current workspace, select first one
+          if (!currentWorkspace) {
+            const defaultWorkspace = fetchedWorkspaces[0];
+            setCurrentWorkspace(defaultWorkspace);
+            localStorage.setItem('currentWorkspace', JSON.stringify(defaultWorkspace));
+            console.log(`✅ Auto-selected workspace: ${defaultWorkspace.name}`);
+          } 
+          // If current workspace no longer exists, select first one
+          else if (!fetchedWorkspaces.find(w => w.id === currentWorkspace.id)) {
+            const defaultWorkspace = fetchedWorkspaces[0];
+            setCurrentWorkspace(defaultWorkspace);
+            localStorage.setItem('currentWorkspace', JSON.stringify(defaultWorkspace));
+            console.log(`✅ Current workspace gone, auto-selected: ${defaultWorkspace.name}`);
+          }
         }
 
         return fetchedWorkspaces;
@@ -100,7 +162,15 @@ export const WorkspaceProvider = ({ children }) => {
 
       return [];
     } catch (error) {
-      console.error('Error fetching workspaces:', error);
+      console.error('❌ Error fetching workspaces:', error);
+      
+      // If it's a 401, the token is invalid
+      if (error.response?.status === 401) {
+        console.log('🔒 Token invalid or expired');
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('auth_user');
+      }
+      
       return [];
     } finally {
       setIsLoading(false);

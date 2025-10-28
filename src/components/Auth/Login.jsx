@@ -2,11 +2,13 @@ import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '../UI/Common';
 import authService from '../../services/authService';
-import logoImage from '../../assets/logo.svg'; // Replace with your actual logo path
+import { useWorkspaceContext } from '../../contexts/WorkspaceContext';
+import logoImage from '../../assets/logo.svg';
 
 const Login = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { fetchWorkspaces } = useWorkspaceContext();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -27,13 +29,22 @@ const Login = () => {
       setIsLoading(true);
       setError('');
       
-      // In a real app, you would call your authentication API
+      // Step 1: Login and get token
+      console.log('🔐 Step 1: Logging in...');
       await authService.login(email, password);
       
-      // Redirect to the requested page or dashboard
+      // Step 2: Fetch workspaces AFTER token is set
+      // This is critical - the token needs to be in localStorage and axios headers
+      // before we can fetch workspaces
+      console.log('📁 Step 2: Fetching workspaces...');
+      await fetchWorkspaces();
+      
+      console.log('✅ Login flow complete, redirecting...');
+      
+      // Step 3: Redirect to the requested page or dashboard
       navigate(from, { replace: true });
     } catch (err) {
-      console.error('Login error:', err);
+      console.error('❌ Login error:', err);
       setError(err.message || 'Failed to login. Please check your credentials.');
     } finally {
       setIsLoading(false);
@@ -124,7 +135,7 @@ const Login = () => {
               loading={isLoading}
               className="w-full"
             >
-              Sign in
+              {isLoading ? 'Signing in...' : 'Sign in'}
             </Button>
           </div>
         </form>
