@@ -24,6 +24,8 @@ import MainLayout from '../components/Layout/MainLayout';
 import EmptyState from '../components/Common/EmptyState';
 import SlideOutPanel from '../components/Common/SlideOutPanel';
 import FilterPanel from '../components/Common/FilterPanel';
+import BulkUpdateModal from '../components/Common/BulkUpdateModal';
+
 
 import RightSidebarPanel, {
   SidebarSection,
@@ -115,6 +117,8 @@ const Requirements = () => {
   const [expandedRows, setExpandedRows] = useState(new Set());
   const [isProcessing, setIsProcessing] = useState(false);
   const [processProgress, setProcessProgress] = useState({ current: 0, total: 0 });
+
+
 
   // Add the modal state hooks here, before any conditional logic
   const [showVersionAssignmentModal, setShowVersionAssignmentModal] = useState(false);
@@ -806,7 +810,6 @@ const Requirements = () => {
         selectedCount: totalRequirements
       });
 
-      // Track success/failure
       const results = {
         successful: [],
         failed: []
@@ -814,7 +817,6 @@ const Requirements = () => {
 
       let currentIndex = 0;
 
-      // Update each selected requirement individually
       for (const reqId of selectedRequirements) {
         try {
           const requirement = requirements.find(r => r.id === reqId);
@@ -826,19 +828,15 @@ const Requirements = () => {
             continue;
           }
 
-          // Calculate new versions array
           const currentVersions = requirement.versions || [];
           let newVersions;
 
           if (versionAssignmentAction === 'add') {
-            // Add version and remove duplicates
             newVersions = [...new Set([...currentVersions, selectedVersionForAssignment])];
           } else {
-            // Remove version
             newVersions = currentVersions.filter(v => v !== selectedVersionForAssignment);
           }
 
-          // Only update if versions actually changed
           if (JSON.stringify(currentVersions.sort()) === JSON.stringify(newVersions.sort())) {
             console.log(`ℹ️ No version changes needed for ${reqId}`);
             results.successful.push(reqId);
@@ -847,40 +845,27 @@ const Requirements = () => {
             continue;
           }
 
-          console.log(`📝 Updating versions for ${reqId}:`, {
-            before: currentVersions,
-            after: newVersions
-          });
-
-          // Call the API to update the requirement
           await dataStore.updateRequirement(reqId, {
             versions: newVersions,
             updatedAt: new Date().toISOString()
           });
 
           results.successful.push(reqId);
-          console.log(`✅ Successfully updated versions for ${reqId}`);
-
         } catch (error) {
           console.error(`❌ Failed to update versions for ${reqId}:`, error);
           results.failed.push(reqId);
         }
 
-        // Update progress
         currentIndex++;
         setProcessProgress({ current: currentIndex, total: totalRequirements });
-
-        // Small delay to allow UI to update
         await new Promise(resolve => setTimeout(resolve, 50));
       }
 
-      // Clear selection and close modal
       setSelectedRequirements(new Set());
       setShowVersionAssignmentModal(false);
       setIsProcessing(false);
       setProcessProgress({ current: 0, total: 0 });
 
-      // Show success message with details
       const versionName = versions.find(v => v.id === selectedVersionForAssignment)?.name;
       const actionText = versionAssignmentAction === 'add' ? 'added to' : 'removed from';
 
@@ -893,7 +878,6 @@ const Requirements = () => {
           `❌ ${results.failed.length} failed`
         );
       }
-
     } catch (error) {
       console.error('❌ Error in bulk version assignment:', error);
       alert('Error updating requirements: ' + error.message);
@@ -901,76 +885,76 @@ const Requirements = () => {
       setProcessProgress({ current: 0, total: 0 });
     }
   };
+
   // Add confirmation handler for tag assignment
   const confirmTagAssignment = async () => {
     try {
+      setIsProcessing(true);
+      const totalRequirements = selectedRequirements.size;
+      setProcessProgress({ current: 0, total: totalRequirements });
+
       console.log('🏷️ Starting tag assignment...', {
         action: tagAssignmentAction,
         tags: selectedTagsForAssignment,
-        selectedCount: selectedRequirements.size
+        selectedCount: totalRequirements
       });
 
-      // Track success/failure
       const results = {
         successful: [],
         failed: []
       };
 
-      // Update each selected requirement individually to ensure database persistence
+      let currentIndex = 0;
+
       for (const reqId of selectedRequirements) {
         try {
           const requirement = requirements.find(r => r.id === reqId);
           if (!requirement) {
             console.warn(`⚠️ Requirement ${reqId} not found`);
             results.failed.push(reqId);
+            currentIndex++;
+            setProcessProgress({ current: currentIndex, total: totalRequirements });
             continue;
           }
 
-          // Calculate new tags array
           const currentTags = requirement.tags || [];
           let newTags;
 
           if (tagAssignmentAction === 'add') {
-            // Add tags and remove duplicates using Set
             newTags = [...new Set([...currentTags, ...selectedTagsForAssignment])];
           } else {
-            // Remove tags
             newTags = currentTags.filter(t => !selectedTagsForAssignment.includes(t));
           }
 
-          // Only update if tags actually changed
           if (JSON.stringify(currentTags.sort()) === JSON.stringify(newTags.sort())) {
             console.log(`ℹ️ No tag changes needed for ${reqId}`);
-            results.successful.push(reqId); // Still count as successful (no error)
+            results.successful.push(reqId);
+            currentIndex++;
+            setProcessProgress({ current: currentIndex, total: totalRequirements });
             continue;
           }
 
-          console.log(`📝 Updating tags for ${reqId}:`, {
-            before: currentTags,
-            after: newTags
-          });
-
-          // Call the API to update the requirement
-          // This will persist to the database
           await dataStore.updateRequirement(reqId, {
             tags: newTags,
             updatedAt: new Date().toISOString()
           });
 
           results.successful.push(reqId);
-          console.log(`✅ Successfully updated tags for ${reqId}`);
-
         } catch (error) {
           console.error(`❌ Failed to update tags for ${reqId}:`, error);
           results.failed.push(reqId);
         }
+
+        currentIndex++;
+        setProcessProgress({ current: currentIndex, total: totalRequirements });
+        await new Promise(resolve => setTimeout(resolve, 50));
       }
 
-      // Clear selection and close modal
       setSelectedRequirements(new Set());
       setShowTagAssignmentModal(false);
+      setIsProcessing(false);
+      setProcessProgress({ current: 0, total: 0 });
 
-      // Show success message with details
       const actionText = tagAssignmentAction === 'add' ? 'added to' : 'removed from';
       const tagText = selectedTagsForAssignment.length === 1
         ? `"${selectedTagsForAssignment[0]}"`
@@ -980,122 +964,15 @@ const Requirements = () => {
 
       if (results.failed.length > 0) {
         message += `\n⚠️ Failed to update ${results.failed.length} requirement(s)`;
-        console.error('Failed requirement IDs:', results.failed);
       }
 
       alert(message);
-
     } catch (error) {
       console.error('❌ Tag assignment failed:', error);
       alert('❌ Tag assignment failed: ' + error.message);
+      setIsProcessing(false);
+      setProcessProgress({ current: 0, total: 0 });
     }
-  };
-
-  // Define modal components outside the main component
-  const VersionAssignmentModal = ({
-    show,
-    onClose,
-    onConfirm,
-    action,
-    version,
-    selectedCount,
-    versions,
-    isProcessing = false,        // NEW: Add this prop
-    processProgress = { current: 0, total: 0 }  // NEW: Add this prop
-  }) => {
-    if (!show) return null;
-
-    return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
-          <h3 className="text-lg font-semibold mb-4">
-            Confirm Version {action === 'add' ? 'Addition' : 'Removal'}
-          </h3>
-
-          {isProcessing ? (
-            // NEW: Show progress during update
-            <div className="mb-4">
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-3">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm text-gray-700 font-medium">
-                    Processing requirements...
-                  </span>
-                  <span className="text-sm font-semibold text-blue-600">
-                    {processProgress.current} / {processProgress.total}
-                  </span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-2.5">
-                  <div
-                    className="bg-blue-600 h-2.5 rounded-full transition-all duration-300"
-                    style={{
-                      width: `${processProgress.total > 0 ? (processProgress.current / processProgress.total) * 100 : 0}%`
-                    }}
-                  />
-                </div>
-              </div>
-            </div>
-          ) : (
-            // Show normal content when not processing
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-              <p className="text-sm mb-2">
-                You are about to <strong>{action}</strong> {selectedCount} requirement(s) {action === 'add' ? 'to' : 'from'}:
-              </p>
-              <div className="font-medium text-blue-800">
-                {versions.find(v => v.id === version)?.name || version}
-              </div>
-            </div>
-          )}
-
-          <div className="flex space-x-3">
-            <button
-              onClick={onConfirm}
-              disabled={isProcessing}
-              className={`flex-1 py-2 px-4 rounded font-medium flex items-center justify-center gap-2 ${isProcessing
-                  ? 'bg-gray-400 cursor-not-allowed'
-                  : action === 'add'
-                    ? 'bg-blue-600 text-white hover:bg-blue-700'
-                    : 'bg-red-600 text-white hover:bg-red-700'
-                }`}
-            >
-              {isProcessing ? (
-                <>
-                  {/* Spinning loader icon */}
-                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                      fill="none"
-                    />
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                    />
-                  </svg>
-                  <span>Processing...</span>
-                </>
-              ) : (
-                `Confirm ${action === 'add' ? 'Addition' : 'Removal'}`
-              )}
-            </button>
-            <button
-              onClick={onClose}
-              disabled={isProcessing}
-              className={`flex-1 py-2 px-4 border border-gray-300 rounded font-medium text-gray-700 ${isProcessing
-                  ? 'bg-gray-100 cursor-not-allowed opacity-50'
-                  : 'hover:bg-gray-50'
-                }`}
-            >
-              {isProcessing ? 'Processing...' : 'Cancel'}
-            </button>
-          </div>
-        </div>
-      </div>
-    );
   };
 
   const TagAssignmentModal = ({
@@ -1808,25 +1685,42 @@ const Requirements = () => {
           </div>
         </SlideOutPanel>
 
-        {/* Version and Tag Assignment Modals */}
-        <VersionAssignmentModal
+        {/* Version Assignment Modal */}
+        <BulkUpdateModal
           show={showVersionAssignmentModal}
-          onClose={() => setShowVersionAssignmentModal(false)}
+          onClose={() => {
+            setShowVersionAssignmentModal(false);
+            setIsProcessing(false);
+            setProcessProgress({ current: 0, total: 0 });
+          }}
           onConfirm={confirmVersionAssignment}
+          type="version"
           action={versionAssignmentAction}
-          version={selectedVersionForAssignment}
+          itemType="requirement"
           selectedCount={selectedRequirements.size}
-          versions={versions}
-          isProcessing={isProcessing}              // ADD THIS
-          processProgress={processProgress}        // ADD THIS
+          items={selectedVersionForAssignment}
+          allItems={versions}
+          isProcessing={isProcessing}
+          processProgress={processProgress}
         />
-        <TagAssignmentModal
+
+        {/* Tag Assignment Modal */}
+        <BulkUpdateModal
           show={showTagAssignmentModal}
-          onClose={() => setShowTagAssignmentModal(false)}
+          onClose={() => {
+            setShowTagAssignmentModal(false);
+            setIsProcessing(false);
+            setProcessProgress({ current: 0, total: 0 });
+          }}
           onConfirm={confirmTagAssignment}
+          type="tag"
           action={tagAssignmentAction}
-          tags={selectedTagsForAssignment}
+          itemType="requirement"
           selectedCount={selectedRequirements.size}
+          items={selectedTagsForAssignment}
+          allItems={[]}  // Not needed for tags as we show the actual tag names
+          isProcessing={isProcessing}
+          processProgress={processProgress}
         />
       </div>
     </MainLayout>
