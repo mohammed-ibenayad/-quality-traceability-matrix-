@@ -61,8 +61,7 @@ const TestCaseRow = ({
 
   return (
     <tr
-      className={`hover:bg-gray-50 cursor-pointer ${isHighlighted ? 'bg-blue-100 border-l-4 border-blue-500' :
-        isSelected ? 'bg-blue-50' : ''
+      className={`hover:bg-gray-50 cursor-pointer ${isHighlighted ? 'bg-blue-100 border-l-4 border-blue-500' : ''
         }`}
       onClick={(e) => {
         // Don't trigger row click if clicking checkbox
@@ -94,15 +93,11 @@ const TestCaseRow = ({
       </td>
 
       {/* Name Column */}
+      {/* Name Column */}
       <td className="px-6 py-4">
         <div className="text-sm text-gray-900">
           {testCase.name}
         </div>
-        {testCase.description && (
-          <div className="text-xs text-gray-500 mt-1 line-clamp-2">
-            {testCase.description}
-          </div>
-        )}
       </td>
 
       {/* Priority Column */}
@@ -129,32 +124,6 @@ const TestCaseRow = ({
           }`}>
           {testCase.automationStatus || 'Manual'}
         </span>
-      </td>
-
-      {/* Requirements Column */}
-      <td className="px-6 py-4">
-        {linkedReqs.length > 0 ? (
-          <div className="flex flex-wrap gap-1">
-            {linkedReqs.slice(0, 3).map((req) => (
-              <span
-                key={req.id}
-                className="inline-flex px-2 py-1 text-xs font-medium bg-purple-100 text-purple-800 rounded border border-purple-200"
-                title={req.name}
-              >
-                {req.id}
-              </span>
-            ))}
-            {linkedReqs.length > 3 && (
-              <span className="inline-flex px-2 py-1 text-xs font-medium bg-gray-100 text-gray-600 rounded border border-gray-200">
-                +{linkedReqs.length - 3}
-              </span>
-            )}
-          </div>
-        ) : (
-          <span className="text-sm text-gray-400">
-            No requirements linked
-          </span>
-        )}
       </td>
     </tr>
   );
@@ -1350,8 +1319,34 @@ const TestCases = () => {
       showRightSidebar={true}
       rightSidebar={rightSidebarContent}
     >
+      {/* Top Bar with count and Add button */}
+      <div className="bg-white rounded-lg shadow mb-4 p-4">
+        <div className="flex items-center justify-between">
+          {/* Left: Results count */}
+          <div className="flex items-center space-x-4">
+            <div className="text-sm text-gray-600">
+              Showing <span className="font-semibold text-gray-900">
+                {filteredTestCases.length}
+              </span> of {testCases.length} test cases
+            </div>
+            {/* Show if filters active */}
+            {(categoryFilter !== 'All' || statusFilter !== 'All' || priorityFilter !== 'All' || automationFilter !== 'All' || selectedTagsFilter.length > 0) && (
+              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                Filters active
+              </span>
+            )}
+          </div>
+          {/* Right: Add Button */}
+          <button
+            onClick={handleNewTestCase}
+            className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          >
+            <Plus size={16} className="mr-2" />
+            Add Test Case
+          </button>
+        </div>
+      </div>
       <div className="space-y-6">
-
         {activeSuiteFilter && selectedSuite && (
           <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
             <div className="flex items-center justify-between">
@@ -1416,9 +1411,7 @@ const TestCases = () => {
                     <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Automation
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Requirements
-                    </th>
+
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
@@ -1429,7 +1422,7 @@ const TestCases = () => {
                       onSelect={handleTestCaseSelection}
                       onRowClick={handleRowClick}
                       isSelected={selectedTestCases.has(testCase.id)}
-                      isHighlighted={selectedTestCase?.id === testCase.id}
+                      isHighlighted={selectedTestCases.has(testCase.id) || selectedTestCase?.id === testCase.id}
                       mapping={mapping}
                       requirements={requirements}
                     />
