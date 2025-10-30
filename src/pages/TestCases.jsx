@@ -61,8 +61,7 @@ const TestCaseRow = ({
 
   return (
     <tr
-      className={`hover:bg-gray-50 cursor-pointer ${isHighlighted ? 'bg-blue-100 border-l-4 border-blue-500' :
-        isSelected ? 'bg-blue-50' : ''
+      className={`hover:bg-gray-50 cursor-pointer ${isHighlighted ? 'bg-blue-100 border-l-4 border-blue-500' : ''
         }`}
       onClick={(e) => {
         // Don't trigger row click if clicking checkbox
