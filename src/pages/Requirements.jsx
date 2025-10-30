@@ -113,6 +113,8 @@ const Requirements = () => {
   const [selectedTagsFilter, setSelectedTagsFilter] = useState([]); // NEW
   const [selectedRequirements, setSelectedRequirements] = useState(new Set());
   const [expandedRows, setExpandedRows] = useState(new Set());
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [processProgress, setProcessProgress] = useState({ current: 0, total: 0 });
 
   // Add the modal state hooks here, before any conditional logic
   const [showVersionAssignmentModal, setShowVersionAssignmentModal] = useState(false);
@@ -158,8 +160,8 @@ const Requirements = () => {
 
   // Filter requirements by selected version
   const versionFilteredRequirements = selectedVersion === 'unassigned'
-  ? requirements
-  : requirements.filter(req => {
+    ? requirements
+    : requirements.filter(req => {
       // If no versions assigned, show in all version views
       if (!req.versions || req.versions.length === 0) {
         return true;
@@ -791,13 +793,17 @@ const Requirements = () => {
     );
   }
 
-  // Add confirmation handler for version assignment
+
   const confirmVersionAssignment = async () => {
     try {
+      setIsProcessing(true);
+      const totalRequirements = selectedRequirements.size;
+      setProcessProgress({ current: 0, total: totalRequirements });
+
       console.log('🔧 Starting version assignment...', {
         action: versionAssignmentAction,
         version: selectedVersionForAssignment,
-        selectedCount: selectedRequirements.size
+        selectedCount: totalRequirements
       });
 
       // Track success/failure
@@ -806,13 +812,17 @@ const Requirements = () => {
         failed: []
       };
 
-      // Update each selected requirement individually to ensure database persistence
+      let currentIndex = 0;
+
+      // Update each selected requirement individually
       for (const reqId of selectedRequirements) {
         try {
           const requirement = requirements.find(r => r.id === reqId);
           if (!requirement) {
             console.warn(`⚠️ Requirement ${reqId} not found`);
             results.failed.push(reqId);
+            currentIndex++;
+            setProcessProgress({ current: currentIndex, total: totalRequirements });
             continue;
           }
 
@@ -832,6 +842,8 @@ const Requirements = () => {
           if (JSON.stringify(currentVersions.sort()) === JSON.stringify(newVersions.sort())) {
             console.log(`ℹ️ No version changes needed for ${reqId}`);
             results.successful.push(reqId);
+            currentIndex++;
+            setProcessProgress({ current: currentIndex, total: totalRequirements });
             continue;
           }
 
@@ -841,7 +853,6 @@ const Requirements = () => {
           });
 
           // Call the API to update the requirement
-          // This will persist to the database
           await dataStore.updateRequirement(reqId, {
             versions: newVersions,
             updatedAt: new Date().toISOString()
@@ -854,27 +865,40 @@ const Requirements = () => {
           console.error(`❌ Failed to update versions for ${reqId}:`, error);
           results.failed.push(reqId);
         }
+
+        // Update progress
+        currentIndex++;
+        setProcessProgress({ current: currentIndex, total: totalRequirements });
+
+        // Small delay to allow UI to update
+        await new Promise(resolve => setTimeout(resolve, 50));
       }
 
       // Clear selection and close modal
       setSelectedRequirements(new Set());
       setShowVersionAssignmentModal(false);
+      setIsProcessing(false);
+      setProcessProgress({ current: 0, total: 0 });
 
       // Show success message with details
       const versionName = versions.find(v => v.id === selectedVersionForAssignment)?.name;
       const actionText = versionAssignmentAction === 'add' ? 'added to' : 'removed from';
 
-      if (results.successful.length > 0) {
-        alert(`✅ ${results.successful.length} requirements ${actionText} ${versionName}`);
-      }
-
-      if (results.failed.length > 0) {
-        alert(`⚠️ ${results.failed.length} requirements failed to update`);
+      if (results.failed.length === 0) {
+        alert(`✅ Successfully ${actionText} "${versionName}" for ${results.successful.length} requirement(s)`);
+      } else {
+        alert(
+          `⚠️ Bulk update completed:\n` +
+          `✅ ${results.successful.length} successful\n` +
+          `❌ ${results.failed.length} failed`
+        );
       }
 
     } catch (error) {
-      console.error('Version assignment failed:', error);
-      alert('❌ Version assignment failed: ' + error.message);
+      console.error('❌ Error in bulk version assignment:', error);
+      alert('Error updating requirements: ' + error.message);
+      setIsProcessing(false);
+      setProcessProgress({ current: 0, total: 0 });
     }
   };
   // Add confirmation handler for tag assignment
