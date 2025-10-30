@@ -22,6 +22,8 @@ import EmptyState from '../components/Common/EmptyState';
 import BulkActionsPanel from '../components/Common/BulkActionsPanel';
 import EditTestCasePanel from '../components/TestCases/EditTestCasePanel';
 import TestCasesSuiteSidebar from '../components/TestCases/TestCasesSuiteSidebar';
+import BulkUpdateModal from '../components/Common/BulkUpdateModal';
+
 
 import RightSidebarPanel, {
   SidebarSection,
@@ -178,6 +180,19 @@ const TestCases = () => {
   const [activeSuiteFilter, setActiveSuiteFilter] = useState(null);
   const [showEditSuiteModal, setShowEditSuiteModal] = useState(false);
   const [suiteToEdit, setSuiteToEdit] = useState(null);
+
+  // Progress tracking state
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [processProgress, setProcessProgress] = useState({ current: 0, total: 0 });
+
+  // Modal state
+  const [showVersionAssignmentModal, setShowVersionAssignmentModal] = useState(false);
+  const [versionAssignmentAction, setVersionAssignmentAction] = useState('add');
+  const [selectedVersionForAssignment, setSelectedVersionForAssignment] = useState('');
+
+  const [showTagAssignmentModal, setShowTagAssignmentModal] = useState(false);
+  const [tagAssignmentAction, setTagAssignmentAction] = useState('add');
+  const [selectedTagsForAssignment, setSelectedTagsForAssignment] = useState([]);
 
 
   // === FILTER STATE ===
@@ -703,45 +718,196 @@ const TestCases = () => {
   // BULK ACTION HANDLERS
   // ============================================
 
-  const handleBulkVersionAssignment = async (versionIds) => {
+  /**
+   * Handler for bulk version assignment
+   */
+  const handleBulkVersionAssignment = (versionId, action) => {
     if (selectedTestCases.size === 0) return;
+    setSelectedVersionForAssignment(versionId);
+    setVersionAssignmentAction(action);
+    setShowVersionAssignmentModal(true);
+  };
+
+  /**
+   * Handler for bulk tag updates
+   */
+  const handleBulkTagsUpdate = (tags, action) => {
+    if (selectedTestCases.size === 0) return;
+    setSelectedTagsForAssignment(tags);
+    setTagAssignmentAction(action);
+    setShowTagAssignmentModal(true);
+  };
+  /**
+   * Confirm and execute version assignment for test cases
+   */
+  const confirmVersionAssignment = async () => {
     try {
-      const testCaseIds = Array.from(selectedTestCases);
-      for (const tcId of testCaseIds) {
-        const testCase = testCases.find(tc => tc.id === tcId);
-        if (testCase) {
+      setIsProcessing(true);
+      const totalTestCases = selectedTestCases.size;
+      setProcessProgress({ current: 0, total: totalTestCases });
+
+      console.log('🔧 Starting version assignment for test cases...', {
+        action: versionAssignmentAction,
+        version: selectedVersionForAssignment,
+        selectedCount: totalTestCases
+      });
+
+      const results = {
+        successful: [],
+        failed: []
+      };
+
+      let currentIndex = 0;
+
+      for (const tcId of selectedTestCases) {
+        try {
+          const testCase = testCases.find(tc => tc.id === tcId);
+          if (!testCase) {
+            results.failed.push(tcId);
+            currentIndex++;
+            setProcessProgress({ current: currentIndex, total: totalTestCases });
+            continue;
+          }
+
+          const currentVersions = testCase.applicableVersions || [];
+          let newVersions;
+
+          if (versionAssignmentAction === 'add') {
+            newVersions = [...new Set([...currentVersions, selectedVersionForAssignment])];
+          } else {
+            newVersions = currentVersions.filter(v => v !== selectedVersionForAssignment);
+          }
+
+          if (JSON.stringify(currentVersions.sort()) === JSON.stringify(newVersions.sort())) {
+            results.successful.push(tcId);
+            currentIndex++;
+            setProcessProgress({ current: currentIndex, total: totalTestCases });
+            continue;
+          }
+
           await dataStore.updateTestCase(tcId, {
-            ...testCase,
-            applicableVersions: versionIds
+            applicableVersions: newVersions,
+            updatedAt: new Date().toISOString()
           });
+
+          results.successful.push(tcId);
+        } catch (error) {
+          console.error(`❌ Failed to update versions for ${tcId}:`, error);
+          results.failed.push(tcId);
         }
+
+        currentIndex++;
+        setProcessProgress({ current: currentIndex, total: totalTestCases });
+        await new Promise(resolve => setTimeout(resolve, 50));
       }
-      setTestCases(dataStore.getTestCases());
-      alert(`Updated ${testCaseIds.length} test case(s) with new versions`);
+
+      setSelectedTestCases(new Set());
+      setShowVersionAssignmentModal(false);
+      setIsProcessing(false);
+      setProcessProgress({ current: 0, total: 0 });
+
+      const versionName = versions.find(v => v.id === selectedVersionForAssignment)?.name;
+      const actionText = versionAssignmentAction === 'add' ? 'added to' : 'removed from';
+
+      if (results.failed.length === 0) {
+        alert(`✅ Successfully ${actionText} "${versionName}" for ${results.successful.length} test case(s)`);
+      } else {
+        alert(
+          `⚠️ Bulk update completed:\n` +
+          `✅ ${results.successful.length} successful\n` +
+          `❌ ${results.failed.length} failed`
+        );
+      }
     } catch (error) {
-      console.error('Error updating versions:', error);
-      alert('Failed to update versions');
+      console.error('❌ Error in bulk version assignment:', error);
+      alert('Error updating test cases: ' + error.message);
+      setIsProcessing(false);
+      setProcessProgress({ current: 0, total: 0 });
     }
   };
 
-  const handleBulkTagsUpdate = async (tags) => {
-    if (selectedTestCases.size === 0) return;
+  /**
+   * Confirm and execute tag assignment for test cases
+   */
+  const confirmTagAssignment = async () => {
     try {
-      const testCaseIds = Array.from(selectedTestCases);
-      for (const tcId of testCaseIds) {
-        const testCase = testCases.find(tc => tc.id === tcId);
-        if (testCase) {
+      setIsProcessing(true);
+      const totalTestCases = selectedTestCases.size;
+      setProcessProgress({ current: 0, total: totalTestCases });
+
+      const results = {
+        successful: [],
+        failed: []
+      };
+
+      let currentIndex = 0;
+
+      for (const tcId of selectedTestCases) {
+        try {
+          const testCase = testCases.find(tc => tc.id === tcId);
+          if (!testCase) {
+            results.failed.push(tcId);
+            currentIndex++;
+            setProcessProgress({ current: currentIndex, total: totalTestCases });
+            continue;
+          }
+
+          const currentTags = testCase.tags || [];
+          let newTags;
+
+          if (tagAssignmentAction === 'add') {
+            newTags = [...new Set([...currentTags, ...selectedTagsForAssignment])];
+          } else {
+            newTags = currentTags.filter(t => !selectedTagsForAssignment.includes(t));
+          }
+
+          if (JSON.stringify(currentTags.sort()) === JSON.stringify(newTags.sort())) {
+            results.successful.push(tcId);
+            currentIndex++;
+            setProcessProgress({ current: currentIndex, total: totalTestCases });
+            continue;
+          }
+
           await dataStore.updateTestCase(tcId, {
-            ...testCase,
-            tags: tags
+            tags: newTags,
+            updatedAt: new Date().toISOString()
           });
+
+          results.successful.push(tcId);
+        } catch (error) {
+          console.error(`❌ Failed to update tags for ${tcId}:`, error);
+          results.failed.push(tcId);
         }
+
+        currentIndex++;
+        setProcessProgress({ current: currentIndex, total: totalTestCases });
+        await new Promise(resolve => setTimeout(resolve, 50));
       }
-      setTestCases(dataStore.getTestCases());
-      alert(`Updated ${testCaseIds.length} test case(s) with new tags`);
+
+      setSelectedTestCases(new Set());
+      setShowTagAssignmentModal(false);
+      setIsProcessing(false);
+      setProcessProgress({ current: 0, total: 0 });
+
+      const actionText = tagAssignmentAction === 'add' ? 'added to' : 'removed from';
+      const tagText = selectedTagsForAssignment.length === 1
+        ? `"${selectedTagsForAssignment[0]}"`
+        : `${selectedTagsForAssignment.length} tags`;
+
+      if (results.failed.length === 0) {
+        alert(`✅ ${tagText} ${actionText} ${results.successful.length} test case(s)`);
+      } else {
+        alert(
+          `⚠️ Bulk update completed:\n` +
+          `✅ ${results.successful.length} successful\n` +
+          `❌ ${results.failed.length} failed`
+        );
+      }
     } catch (error) {
-      console.error('Error updating tags:', error);
-      alert('Failed to update tags');
+      console.error('❌ Tag assignment failed:', error);
+      alert('❌ Tag assignment failed: ' + error.message);
+      setIsProcessing(false);
+      setProcessProgress({ current: 0, total: 0 });
     }
   };
 
@@ -1322,6 +1488,44 @@ const TestCases = () => {
         availableTestCases={testCases}
         existingMemberIds={suiteMembers.map(m => m.id)}
         isLoading={isLoadingSuiteOperation}
+      />
+
+      {/* Version Assignment Modal */}
+      <BulkUpdateModal
+        show={showVersionAssignmentModal}
+        onClose={() => {
+          setShowVersionAssignmentModal(false);
+          setIsProcessing(false);
+          setProcessProgress({ current: 0, total: 0 });
+        }}
+        onConfirm={confirmVersionAssignment}
+        type="version"
+        action={versionAssignmentAction}
+        itemType="test case"
+        selectedCount={selectedTestCases.size}
+        items={selectedVersionForAssignment}
+        allItems={versions}
+        isProcessing={isProcessing}
+        processProgress={processProgress}
+      />
+
+      {/* Tag Assignment Modal */}
+      <BulkUpdateModal
+        show={showTagAssignmentModal}
+        onClose={() => {
+          setShowTagAssignmentModal(false);
+          setIsProcessing(false);
+          setProcessProgress({ current: 0, total: 0 });
+        }}
+        onConfirm={confirmTagAssignment}
+        type="tag"
+        action={tagAssignmentAction}
+        itemType="test case"
+        selectedCount={selectedTestCases.size}
+        items={selectedTagsForAssignment}
+        allItems={[]}
+        isProcessing={isProcessing}
+        processProgress={processProgress}
       />
     </MainLayout>
   );
