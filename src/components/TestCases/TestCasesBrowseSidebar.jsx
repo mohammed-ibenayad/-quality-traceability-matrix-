@@ -25,18 +25,18 @@ const TestCasesBrowseSidebar = ({
   onSuiteClick,
   onCreateSuite,
   onAddTestCase,
-  
+
   // Filter values
   categoryFilter = 'All',
   statusFilter = 'All',
   priorityFilter = 'All',
   automationFilter = 'All',
   selectedTagsFilter = [],
-  
+
   // Available options
   allCategories = [],
   allTags = [],
-  
+
   // Callbacks
   onCategoryChange,
   onStatusChange,
@@ -44,7 +44,7 @@ const TestCasesBrowseSidebar = ({
   onAutomationChange,
   onTagsChange,
   onClearAllFilters,
-  
+
   // Statistics
   stats = {
     total: 0,
@@ -164,7 +164,7 @@ const TestCasesBrowseSidebar = ({
                 )}
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-gray-500">
-                    {suite.test_case_count || 0} test{suite.test_case_count !== 1 ? 's' : ''}
+                    {suite.test_count || 0} test{suite.test_count !== 1 ? 's' : ''}
                   </span>
                   {suite.estimated_duration && (
                     <span className="text-gray-500">
@@ -358,7 +358,7 @@ const TestCasesBrowseSidebar = ({
               </div>
             </div>
           )}
-          
+
           <div className="pt-2 border-t border-gray-200 space-y-1.5">
             <div className="flex justify-between text-xs">
               <span className="text-gray-600">Automated:</span>
