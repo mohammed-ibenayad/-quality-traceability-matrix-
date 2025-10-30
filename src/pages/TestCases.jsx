@@ -93,15 +93,11 @@ const TestCaseRow = ({
       </td>
 
       {/* Name Column */}
+      {/* Name Column */}
       <td className="px-6 py-4">
         <div className="text-sm text-gray-900">
           {testCase.name}
         </div>
-        {testCase.description && (
-          <div className="text-xs text-gray-500 mt-1 line-clamp-2">
-            {testCase.description}
-          </div>
-        )}
       </td>
 
       {/* Priority Column */}
@@ -128,32 +124,6 @@ const TestCaseRow = ({
           }`}>
           {testCase.automationStatus || 'Manual'}
         </span>
-      </td>
-
-      {/* Requirements Column */}
-      <td className="px-6 py-4">
-        {linkedReqs.length > 0 ? (
-          <div className="flex flex-wrap gap-1">
-            {linkedReqs.slice(0, 3).map((req) => (
-              <span
-                key={req.id}
-                className="inline-flex px-2 py-1 text-xs font-medium bg-purple-100 text-purple-800 rounded border border-purple-200"
-                title={req.name}
-              >
-                {req.id}
-              </span>
-            ))}
-            {linkedReqs.length > 3 && (
-              <span className="inline-flex px-2 py-1 text-xs font-medium bg-gray-100 text-gray-600 rounded border border-gray-200">
-                +{linkedReqs.length - 3}
-              </span>
-            )}
-          </div>
-        ) : (
-          <span className="text-sm text-gray-400">
-            No requirements linked
-          </span>
-        )}
       </td>
     </tr>
   );
@@ -1441,9 +1411,7 @@ const TestCases = () => {
                     <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Automation
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Requirements
-                    </th>
+
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
