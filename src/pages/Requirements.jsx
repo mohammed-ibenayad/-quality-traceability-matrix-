@@ -158,8 +158,15 @@ const Requirements = () => {
 
   // Filter requirements by selected version
   const versionFilteredRequirements = selectedVersion === 'unassigned'
-    ? requirements
-    : requirements.filter(req => req.versions && req.versions.includes(selectedVersion));
+  ? requirements
+  : requirements.filter(req => {
+      // If no versions assigned, show in all version views
+      if (!req.versions || req.versions.length === 0) {
+        return true;
+      }
+      // Otherwise check if this version is in the list
+      return req.versions.includes(selectedVersion);
+    });
 
 
 

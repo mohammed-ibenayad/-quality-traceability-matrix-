@@ -286,7 +286,7 @@ class DataStoreService {
       try {
         const reqResponse = await apiClient.get(`/api/requirements${workspaceParam}`);
         if (reqResponse.data.success && Array.isArray(reqResponse.data.data)) {
-          this._requirements = reqResponse.data.data;
+          this._requirements = reqResponse.data.data.map(req => this._toCamelCase(req));
           console.log(`✅ Loaded ${this._requirements.length} requirements`);
         }
       } catch (error) {
