@@ -1429,7 +1429,7 @@ const TestCases = () => {
                       onSelect={handleTestCaseSelection}
                       onRowClick={handleRowClick}
                       isSelected={selectedTestCases.has(testCase.id)}
-                      isHighlighted={selectedTestCase?.id === testCase.id}
+                      isHighlighted={selectedTestCases.has(testCase.id)}
                       mapping={mapping}
                       requirements={requirements}
                     />
