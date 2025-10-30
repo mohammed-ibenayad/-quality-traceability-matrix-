@@ -106,13 +106,6 @@ const TestCasesBrowseSidebar = ({
       {/* Quick Actions */}
       <div className="p-4 space-y-2 border-b border-gray-200 bg-gray-50">
         <SidebarActionButton
-          icon={<Plus size={16} />}
-          label="Add Test Case"
-          onClick={onAddTestCase}
-          variant="primary"
-          fullWidth
-        />
-        <SidebarActionButton
           icon={<Layers size={16} />}
           label="Create Suite"
           onClick={onCreateSuite}
